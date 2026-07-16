@@ -35,7 +35,7 @@ export const SLOT_DISPLAY: Record<AbilitySlot, SlotDisplay> = {
   GENERAL: { category: 'GENERAL' },
   ADVANCED: { category: 'ADVANCED' },
   TECHNOLOGY: { category: 'TECHNOLOGY' },
-  ACTION_CARD: { category: 'ACTION_CARD' },
+  ACTION_CARD: { category: 'ACTION CARD' },
   RELIC: { category: 'RELIC' },
   AGENDA: { category: 'AGENDA' },
   ENVIRONMENT: { category: 'ENVIRONMENT' },
@@ -54,8 +54,8 @@ export const SLOT_DISPLAY: Record<AbilitySlot, SlotDisplay> = {
   TF_ABILITY: { category: 'ABILITIES' },
   TF_GENOME: { category: 'GENOMES' },
   TF_PARADIGM: { category: 'PARADIGMS' },
-  TF_ACTION_CARD: { category: 'ACTION_CARD' },
-  TF_UNIT_UPGRADE: { category: 'UNIT_UPGRADES' },
+  TF_ACTION_CARD: { category: 'ACTION CARD' },
+  TF_UNIT_UPGRADE: { category: 'UNIT UPGRADES' },
   OTHER: { category: 'OTHER' },
 }
 
