@@ -1,3 +1,4 @@
+import radiantAurIcon from '@/assets/faction/radiant_aur.svg?raw'
 import { planetaryShield } from '@/data/abilities/general/planetary-shield'
 import { sustainDamage } from '@/data/abilities/general/sustain-damage'
 import type { Faction } from '@/types'
@@ -6,6 +7,7 @@ import { starlancerII } from './starlancer-ii'
 
 export const radiant_aur: Faction = {
   name: 'Radiant Aur',
+  icon: radiantAurIcon,
   system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {

@@ -1,3 +1,4 @@
+import saintOfSwordsIcon from '@/assets/faction/saint_of_swords.svg?raw'
 import { sustainDamage } from '@/data/abilities/general/sustain-damage'
 import type { Faction } from '@/types'
 
@@ -5,6 +6,7 @@ import { colada } from './colada'
 
 export const saint_of_swords: Faction = {
   name: 'The Saint of Swords',
+  icon: saintOfSwordsIcon,
   system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {

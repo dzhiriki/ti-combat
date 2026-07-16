@@ -1,3 +1,4 @@
+import elNenJanovetIcon from '@/assets/faction/el_nen_janovet.svg?raw'
 import { sustainDamage } from '@/data/abilities/general/sustain-damage'
 import type { Faction } from '@/types'
 
@@ -5,6 +6,7 @@ import { facesOfJanovet } from './faces-of-janovet'
 
 export const el_nen_janovet: Faction = {
   name: 'El Nen Janovet',
+  icon: elNenJanovetIcon,
   system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {

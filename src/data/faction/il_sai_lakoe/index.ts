@@ -1,8 +1,10 @@
+import ilSaiLakoeIcon from '@/assets/faction/il_sai_lakoe.svg?raw'
 import { sustainDamage } from '@/data/abilities/general/sustain-damage'
 import type { Faction } from '@/types'
 
 export const il_sai_lakoe: Faction = {
   name: 'Il Sai Lakoe, Herald of Thorns',
+  icon: ilSaiLakoeIcon,
   system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {
