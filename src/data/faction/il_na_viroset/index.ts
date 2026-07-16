@@ -1,6 +1,8 @@
 import { sustainDamage } from '@/data/abilities/general/sustain-damage'
 import type { Faction } from '@/types'
 
+import { starlancerXI } from './starlancer-xi'
+
 export const il_na_viroset: Faction = {
   name: 'Il Na Viroset',
   system: 'TWILIGHTS_FALL',
@@ -32,7 +34,7 @@ export const il_na_viroset: Faction = {
         UNIT_ABILITIES: {
           SUSTAIN_DAMAGE: true,
         },
-        ABILITIES: [sustainDamage],
+        ABILITIES: [sustainDamage, starlancerXI],
       },
     },
   },
