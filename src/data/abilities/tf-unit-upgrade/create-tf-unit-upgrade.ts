@@ -1,5 +1,4 @@
 import type { Ability, AbilityCallContext } from '@/combat'
-import { disablePlanetaryShield } from '@/data/abilities/general/disable-planetary-shield'
 import { planetaryShield } from '@/data/abilities/general/planetary-shield'
 import { sustainDamage } from '@/data/abilities/general/sustain-damage'
 import type { DiceGroup, UnitBaseType, UnitStats } from '@/types'
@@ -35,6 +34,10 @@ export interface TfUnitUpgradeConfig {
   spaceCannon?: DiceGroup
   planetaryShield?: boolean
   production?: number
+  // Strips the opponent's Planetary Shield in the card's own PREPARE (2RAM
+  // style). The shared DISABLE_PLANETARY_SHIELD ability can't be used here:
+  // it only fires when carried by a unit DEFINITION, and abilities attached
+  // to unit stats at PREPARE are too late for their own PREPARE invoke.
   disablePlanetaryShield?: boolean
   // Immune to "Spark" (Direct Hit) — e.g. the dreadnought upgrades.
   directHitImmune?: boolean
@@ -69,7 +72,6 @@ function buildStats(cfg: TfUnitUpgradeConfig): Partial<UnitStats> {
     unitAbilities.PLANETARY_SHIELD = true
     abilities.push(planetaryShield)
   }
-  if (cfg.disablePlanetaryShield) abilities.push(disablePlanetaryShield)
   if (cfg.bombardment) unitAbilities.BOMBARDMENT = cfg.bombardment
   if (cfg.afb) unitAbilities.AFB = cfg.afb
   if (cfg.spaceCannon) unitAbilities.SPACE_CANNON = cfg.spaceCannon
@@ -106,6 +108,9 @@ export function createTfUnitUpgrade(cfg: TfUnitUpgradeConfig): Ability {
         call: (ctx: AbilityCallContext) => {
           if (cfg.apply) cfg.apply(ctx)
           else if (stats) ctx.api.own.modifyUnitType(cfg.unitType, stats)
+          if (cfg.disablePlanetaryShield) {
+            ctx.api.opponent.setUnitAbilityLost('PLANETARY_SHIELD', cfg.key)
+          }
           cfg.onPrepare?.(ctx)
         },
       },
