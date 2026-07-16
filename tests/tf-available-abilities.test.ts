@@ -59,6 +59,19 @@ describe("Twilight's Fall unit-upgrade exclusivity", () => {
     expect(isEnabled('TF_UPGRADE_AHK_SYL_FIER')).toBe(true)
   })
 
+  it('carrier cards are mutually exclusive with each other', () => {
+    const { enable, isEnabled } = tfSetup()
+    enable('TF_UPGRADE_ADVANCED_CARRIER')
+    enable('TF_UPGRADE_AMBASSADOR')
+
+    expect(isEnabled('TF_UPGRADE_ADVANCED_CARRIER')).toBe(false)
+    expect(isEnabled('TF_UPGRADE_AMBASSADOR')).toBe(true)
+
+    enable('TF_UPGRADE_VORTEXER')
+    expect(isEnabled('TF_UPGRADE_AMBASSADOR')).toBe(false)
+    expect(isEnabled('TF_UPGRADE_VORTEXER')).toBe(true)
+  })
+
   it('mech upgrades stack with each other and with other types', () => {
     const { enable, isEnabled } = tfSetup()
     enable('TF_UPGRADE_EIDOLON_LANDWASTER')

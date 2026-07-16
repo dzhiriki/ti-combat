@@ -14,10 +14,10 @@ import { strikeWingAlphaAfbInvoke } from './strike-wing-alpha'
 //
 // `description` is set only when a card has a combat-affecting rule *beyond*
 // its stat/ability changes (e.g. Strike Wing Alpha's AFB bonus). Plain stat
-// upgrades carry no description so the UI shows nothing redundant. Cards whose
-// only differences are non-combat (extra movement / capacity / production /
-// cost) are omitted entirely: Ambassador & Vortexer (carriers), all space-dock
-// variants, and Valefar Prime (mech cost).
+// upgrades carry no description so the UI shows nothing redundant. Capacity
+// changes count (the capacity phase reads them), so every carrier card is
+// present; only cards whose sole differences are movement / production / cost
+// are omitted: all space-dock variants and Valefar Prime (mech cost).
 export const TF_UNIT_UPGRADES: readonly Ability[] = [
   // ── Carriers ─────────────────────────────────────────────────────────
   createTfUnitUpgrade({
@@ -29,6 +29,26 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     move: 2,
     capacity: 8,
     sustain: true,
+  }),
+  // Ambassador's coexistence clause and Vortexer's capture clause are
+  // out-of-combat effects — only their capacity bump matters here.
+  createTfUnitUpgrade({
+    key: 'TF_UPGRADE_AMBASSADOR',
+    name: 'Ambassador',
+    unitType: 'CARRIER',
+    cost: 3,
+    combat: [9, 1],
+    move: 2,
+    capacity: 6,
+  }),
+  createTfUnitUpgrade({
+    key: 'TF_UPGRADE_VORTEXER',
+    name: 'Vortexer',
+    unitType: 'CARRIER',
+    cost: 3,
+    combat: [9, 1],
+    move: 2,
+    capacity: 6,
   }),
 
   // ── Cruisers ─────────────────────────────────────────────────────────
