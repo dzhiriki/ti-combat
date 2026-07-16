@@ -1,6 +1,8 @@
 import { sustainDamage } from '@/data/abilities/general/sustain-damage'
 import type { Faction } from '@/types'
 
+import { facesOfJanovet } from './faces-of-janovet'
+
 export const el_nen_janovet: Faction = {
   name: 'El Nen Janovet',
   system: 'TWILIGHTS_FALL',
@@ -18,7 +20,7 @@ export const el_nen_janovet: Faction = {
         UNIT_ABILITIES: {
           SUSTAIN_DAMAGE: true,
         },
-        ABILITIES: [sustainDamage],
+        ABILITIES: [sustainDamage, facesOfJanovet],
       },
     },
     MECH: {

@@ -25,7 +25,10 @@ import yinBrotherhoodIcon from '@/assets/faction/yin_brotherhood.svg?raw'
 import yssarilTribesIcon from '@/assets/faction/yssaril_tribes.svg?raw'
 import type { Ability } from '@/combat'
 
-import { createTfUnitUpgrade } from './create-tf-unit-upgrade'
+import {
+  createTfUnitUpgrade,
+  type TfUnitUpgradeConfig,
+} from './create-tf-unit-upgrade'
 import { exotriremeSelfDestructInvoke } from './exotrireme'
 import { helTitanDeclareParamChange, helTitanOnPrepare } from './hel-titan'
 import { linkshipRetreatInvoke } from './linkship-retreat'
@@ -47,11 +50,11 @@ import { strikeWingAlphaAfbInvoke } from './strike-wing-alpha'
 // Array order IS display order: buckets follow the UI's unit ordering
 // (UNIT_TYPES — Flagship, War Sun, Dreadnought, Carrier, Cruiser, Destroyer,
 // Fighter, Mech, Infantry, PDS), and cards are alphabetical within a bucket.
-export const TF_UNIT_UPGRADES: readonly Ability[] = [
+export const TF_UNIT_UPGRADE_CONFIGS: readonly TfUnitUpgradeConfig[] = [
   // ── Flagship ─────────────────────────────────────────────────────────
   // Relative to each faction's own flagship, so applied as adjustments
   // rather than a stat block.
-  createTfUnitUpgrade({
+  {
     key: 'TF_UPGRADE_ECHO_OF_ASCENSION',
     icon: nomadIcon,
     name: 'Echo of Ascension',
@@ -67,10 +70,10 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
         CAPACITY: (stats.CAPACITY ?? 0) + 2,
       })
     },
-  }),
+  },
 
   // ── War Suns ─────────────────────────────────────────────────────────
-  createTfUnitUpgrade({
+  {
     key: 'TF_UPGRADE_PROTOTYPE_WAR_SUN',
     icon: embersOfMuaatIcon,
     name: 'Prototype War Sun',
@@ -83,8 +86,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     sustain: true,
     bombardment: [3, 3],
     disablePlanetaryShield: true,
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_THE_DRAGON_FREED',
     icon: obsidianIcon,
     name: 'The Dragon, Freed',
@@ -98,8 +101,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     sustain: true,
     bombardment: [3, 3],
     disablePlanetaryShield: true,
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_UNIVERSITY_WAR_SUN',
     icon: universitiesOfJolNarIcon,
     name: 'University War Sun',
@@ -112,10 +115,10 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     sustain: true,
     bombardment: [4, 3],
     disablePlanetaryShield: true,
-  }),
+  },
 
   // ── Dreadnoughts ─────────────────────────────────────────────────────
-  createTfUnitUpgrade({
+  {
     key: 'TF_UPGRADE_DAWNCRUSHER',
     icon: baronyOfLetnevIcon,
     name: 'Dawncrusher',
@@ -128,8 +131,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     sustain: true,
     bombardment: [4, 1],
     directHitImmune: true,
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_EXOTRIREME',
     icon: sardakkNorrIcon,
     name: 'Exotrireme',
@@ -152,8 +155,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
       },
     ],
     invokes: [exotriremeSelfDestructInvoke],
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_SUPER_DREADNOUGHT',
     icon: l1z1xMindnetIcon,
     name: 'Super-Dreadnought',
@@ -166,10 +169,10 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     sustain: true,
     bombardment: [4, 1],
     directHitImmune: true,
-  }),
+  },
 
   // ── Carriers ─────────────────────────────────────────────────────────
-  createTfUnitUpgrade({
+  {
     key: 'TF_UPGRADE_ADVANCED_CARRIER',
     icon: federationOfSolIcon,
     name: 'Advanced Carrier',
@@ -179,10 +182,10 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     move: 2,
     capacity: 8,
     sustain: true,
-  }),
+  },
   // Ambassador's coexistence clause and Vortexer's capture clause are
   // out-of-combat effects — only their capacity bump matters here.
-  createTfUnitUpgrade({
+  {
     key: 'TF_UPGRADE_AMBASSADOR',
     icon: deepwroughtScholarateIcon,
     name: 'Ambassador',
@@ -191,8 +194,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     combat: [9, 1],
     move: 2,
     capacity: 6,
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_VORTEXER',
     icon: vuilraithCabalIcon,
     name: 'Vortexer',
@@ -201,10 +204,10 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     combat: [9, 1],
     move: 2,
     capacity: 6,
-  }),
+  },
 
   // ── Cruisers ─────────────────────────────────────────────────────────
-  createTfUnitUpgrade({
+  {
     key: 'TF_UPGRADE_AHK_SYL_FIER',
     icon: ghostsOfCreussIcon,
     name: 'Ahk Syl Fier',
@@ -213,8 +216,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     combat: [6, 1],
     move: 3,
     capacity: 1,
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_CORSAIR',
     icon: mentakCoalitionIcon,
     name: 'Corsair',
@@ -223,8 +226,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     combat: [6, 1],
     move: 3,
     capacity: 2,
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_SAGGITARIA',
     icon: councilKeleresIcon,
     name: 'Saggitaria',
@@ -234,10 +237,10 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     move: 3,
     capacity: 1,
     sustain: true,
-  }),
+  },
 
   // ── Destroyers ───────────────────────────────────────────────────────
-  createTfUnitUpgrade({
+  {
     key: 'TF_UPGRADE_EXILE',
     icon: crimsonRebellionIcon,
     name: 'Exile',
@@ -246,8 +249,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     combat: [8, 1],
     move: 4,
     afb: [6, 3],
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_LINKSHIP',
     icon: ralNelIcon,
     name: 'Linkship',
@@ -259,8 +262,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     move: 2,
     afb: [6, 3],
     invokes: [linkshipRetreatInvoke],
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_STRIKE_WING_ALPHA',
     icon: argentFlightIcon,
     name: 'Strike Wing Alpha',
@@ -273,10 +276,10 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     capacity: 1,
     afb: [6, 3],
     invokes: [strikeWingAlphaAfbInvoke],
-  }),
+  },
 
   // ── Fighters ─────────────────────────────────────────────────────────
-  createTfUnitUpgrade({
+  {
     key: 'TF_UPGRADE_HYBRID_CRYSTAL_FIGHTER',
     icon: naaluCollectiveIcon,
     name: 'Hybrid Crystal Fighter',
@@ -284,8 +287,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     cost: 0.5,
     combat: [7, 1],
     move: 2,
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_MORPHWING',
     icon: naazRokhaAllianceIcon,
     name: 'Morphwing',
@@ -293,8 +296,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     cost: 0.5,
     combat: [7, 1],
     move: 2,
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_TRIUNE',
     icon: empyreanIcon,
     name: 'Triune',
@@ -302,10 +305,10 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     cost: 0.5,
     combat: [7, 1],
     move: 2,
-  }),
+  },
 
   // ── Mech upgrades (stack — a faction may apply all of them) ───────────
-  createTfUnitUpgrade({
+  {
     key: 'TF_UPGRADE_EIDOLON_LANDWASTER',
     icon: naazRokhaAllianceIcon,
     name: 'Eidolon Landwaster (Mech)',
@@ -319,8 +322,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
         COMBAT: [combat[0], (combat[1] ?? 1) + 1],
       })
     },
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_EIDOLON_TERMINUS',
     icon: vuilraithCabalIcon,
     name: 'Eidolon Terminus (Mech)',
@@ -335,18 +338,18 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
         COMBAT: [Math.max(1, combat[0] - 1), combat[1]],
       })
     },
-  }),
+  },
 
   // ── Infantry ─────────────────────────────────────────────────────────
-  createTfUnitUpgrade({
+  {
     key: 'TF_UPGRADE_GUILD_AGENTS',
     icon: yssarilTribesIcon,
     name: 'Guild Agents',
     unitType: 'INFANTRY',
     cost: 0.5,
     combat: [7, 1],
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_LETANI_WARRIOR',
     icon: arborecIcon,
     name: 'Letani Warrior',
@@ -354,18 +357,18 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     cost: 0.5,
     combat: [7, 1],
     production: 2,
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_YIN_CLONE',
     icon: yinBrotherhoodIcon,
     name: 'Yin Clone',
     unitType: 'INFANTRY',
     cost: 0.5,
     combat: [7, 1],
-  }),
+  },
 
   // ── PDS ──────────────────────────────────────────────────────────────
-  createTfUnitUpgrade({
+  {
     key: 'TF_UPGRADE_HEL_TITAN',
     icon: titansOfUlIcon,
     name: 'Hel-Titan',
@@ -379,8 +382,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     production: 1,
     declareParamChange: helTitanDeclareParamChange,
     onPrepare: helTitanOnPrepare,
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_JUSTICIAR_RAIL',
     icon: winnuIcon,
     name: 'Justiciar Rail',
@@ -389,8 +392,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     unitType: 'PDS',
     spaceCannon: [5, 1],
     planetaryShield: true,
-  }),
-  createTfUnitUpgrade({
+  },
+  {
     key: 'TF_UPGRADE_KEEPER_MATRIX',
     icon: xxchaKingdomIcon,
     name: 'Keeper Matrix',
@@ -399,5 +402,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     unitType: 'PDS',
     spaceCannon: [5, 2],
     planetaryShield: true,
-  }),
+  },
 ]
+
+export const TF_UNIT_UPGRADES: readonly Ability[] =
+  TF_UNIT_UPGRADE_CONFIGS.map(createTfUnitUpgrade)
