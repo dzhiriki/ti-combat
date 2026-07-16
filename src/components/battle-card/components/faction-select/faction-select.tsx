@@ -1,4 +1,5 @@
 import { clsx } from 'clsx'
+import { useId, useMemo } from 'react'
 
 import {
   Select,
@@ -10,6 +11,7 @@ import {
 import factions from '@/data/faction'
 import type { Faction, FactionKey, GameSystem } from '@/types'
 import { GAME_SYSTEMS, getFactionSystem } from '@/utils/get-faction-system'
+import { namespaceSvgIds } from '@/utils/namespace-svg-ids'
 
 import styles from './faction-select.module.css'
 
@@ -37,8 +39,12 @@ const FACTION_ENTRIES_BY_SYSTEM = ALL_FACTION_ENTRIES.reduce(
 )
 
 function FactionIcon({ icon }: { icon: string }) {
+  // Namespace internal SVG ids per instance — the faction SVGs all define
+  // clipPaths named `a`/`b`/..., and an open dropdown inlines many at once.
+  const id = useId()
+  const html = useMemo(() => namespaceSvgIds(icon, id), [icon, id])
   return (
-    <span className={styles.icon} dangerouslySetInnerHTML={{ __html: icon }} />
+    <span className={styles.icon} dangerouslySetInnerHTML={{ __html: html }} />
   )
 }
 

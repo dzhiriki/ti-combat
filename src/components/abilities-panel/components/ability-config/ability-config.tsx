@@ -16,6 +16,7 @@ import type { UIConfigItem } from '@/combat/abilities-engine/types'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Tooltip } from '@/components/ui/tooltip'
+import { namespaceSvgIds } from '@/utils/namespace-svg-ids'
 
 import {
   type CheckboxListValue,
@@ -45,6 +46,13 @@ export function AbilityConfig({
 }: AbilityConfigProps): React.ReactElement {
   const id = useId()
   const anchorName = `--a${id.replaceAll(':', '')}`
+  // Namespace the icon's internal SVG ids per instance — the faction SVGs all
+  // define clipPaths named `a`/`b`/..., and inlining many at once makes them
+  // resolve against each other's shapes.
+  const iconHtml = useMemo(
+    () => (ability.icon ? namespaceSvgIds(ability.icon, id) : undefined),
+    [ability.icon, id],
+  )
   const defaults = useMemo(() => extractDefaults(ability), [ability])
   const headerUiRef = useRef<HTMLInputElement>(null)
 
@@ -213,10 +221,10 @@ export function AbilityConfig({
       ) : (
         <span className={styles.collapseIndent} />
       )}
-      {ability.icon && !hideIcon && (
+      {iconHtml && !hideIcon && (
         <span
           className={styles.icon}
-          dangerouslySetInnerHTML={{ __html: ability.icon }}
+          dangerouslySetInnerHTML={{ __html: iconHtml }}
         />
       )}
       <span className={styles.title}>{ability.name}</span>
