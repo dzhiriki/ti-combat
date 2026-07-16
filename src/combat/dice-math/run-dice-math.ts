@@ -222,12 +222,14 @@ export function runDiceMath(input: DiceMathInput): DiceMathResult {
 function canRunFast(modifiers: Modifier[]): boolean {
   for (const m of modifiers) {
     if (m.type === 'REROLL') {
-      // Conditional rerolls (with `rerollIf`) need per-branch fire-tracking
-      // to bill `uses` only on actually-fired branches. That tracking only
-      // lives in per-unit-type mode (its `SideBranch` carries `usesDelta`);
-      // fast-mode's `PerSourceBranch` collapses outcomes by bucket totals
-      // and would lose the per-branch billing distinction.
+      // Conditional rerolls (with `rerollIf`) and unit-scoped rerolls (with
+      // `units`) need per-branch fire-tracking to bill `uses` only on
+      // actually-fired branches. That tracking only lives in per-unit-type
+      // mode (its `SideBranch` carries `usesDelta`); fast-mode's
+      // `PerSourceBranch` collapses outcomes by bucket totals and would lose
+      // the per-branch billing distinction.
       if (m.target[0]?.rerollIf || m.target[1]?.rerollIf) return false
+      if (m.target[0]?.units || m.target[1]?.units) return false
       continue
     }
     if (m.type !== 'ADDITIONAL_HIT_POOL') return false
@@ -294,11 +296,12 @@ function markOneShotUses(
         continue
       }
       // No `consumeUseIf` override: per-branch billing for conditional
-      // rerolls is handled inside `applyRerollSpecs` (the factory marks
-      // `usesDelta[spec.key]` on the rerolled output, leaving unfired
-      // branches' use intact). Unconditional rerolls in fast-mode lack
-      // that per-branch tracking, so bill them here.
-      if (d.rerollIf === undefined) {
+      // (`rerollIf`) and unit-scoped (`unitType`) rerolls is handled inside
+      // `applyRerollSpecs` (the factory marks `usesDelta[spec.key]` on the
+      // rerolled output, leaving unfired branches' use intact).
+      // Unconditional rerolls in fast-mode lack that per-branch tracking,
+      // so bill them here.
+      if (d.rerollIf === undefined && !d.unitType?.length) {
         branch.usesDelta.set(key, 1)
       }
     }

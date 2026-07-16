@@ -106,13 +106,13 @@ hit values.
 math-kernel `Modifier` union. Each modifier carries a sided target tuple
 `[OWN?, OPPONENT?]` indexed from the firing side's perspective.
 
-| Modifier               | Target spec                                                          |
-| ---------------------- | -------------------------------------------------------------------- |
-| `REROLL`               | `{ key, ownerSide, target: 'MISSES' \| 'HITS' \| 'ALL', rerollIf? }` |
-| `CONDITIONAL_MODIFIER` | `{ key, ownerSide, bonus, limit, source? }`                          |
-| `ADDITIONAL_HIT_POOL`  | `{ key, units: UnitType[], transform: (count) => HitPool }`          |
-| `ROLL_TRIGGER`         | `{ key, slotId, faces: number[], units?: UnitType[] }` (+ effect)    |
-| `CUSTOM_ROLL`          | `{ key, shouldTransform(hv, dpu), createGenerator(hv, dpu) }`        |
+| Modifier               | Target spec                                                                  |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| `REROLL`               | `{ key, ownerSide, target: 'MISSES' \| 'HITS' \| 'ALL', units?, rerollIf? }` |
+| `CONDITIONAL_MODIFIER` | `{ key, ownerSide, bonus, limit, source? }`                                  |
+| `ADDITIONAL_HIT_POOL`  | `{ key, units: UnitType[], transform: (count) => HitPool }`                  |
+| `ROLL_TRIGGER`         | `{ key, slotId, faces: number[], units?: UnitType[] }` (+ effect)            |
+| `CUSTOM_ROLL`          | `{ key, shouldTransform(hv, dpu), createGenerator(hv, dpu) }`                |
 
 Decls deduplicate to a single modifier, but the group key depends on the kind:
 
@@ -132,14 +132,26 @@ Decls deduplicate to a single modifier, but the group key depends on the kind:
 
 ```
 canRunFast = every modifier is ADDITIONAL_HIT_POOL
-             or an *unconditional* REROLL (no rerollIf)
+             or an *unconditional, unscoped* REROLL (no rerollIf, no units)
 ```
 
-A REROLL carrying a `rerollIf` predicate forces per-unit-type mode: conditional
-rerolls need per-branch fire-tracking to bill `uses` only on branches that
-actually rerolled, which only the per-unit-type `SideBranch` (with its
+A REROLL carrying a `rerollIf` predicate or a `units` source filter (a
+unit-scoped reroll — sources outside the filter pass through untouched, and a
+branch where the scoped sources have nothing to reroll is not fired and keeps
+its use) forces per-unit-type mode: both need per-branch fire-tracking to
+bill `uses` only on branches that actually rerolled, which only the
+per-unit-type `SideBranch` (with its
 `usesDelta`) supports. `CONDITIONAL_MODIFIER`, `ROLL_TRIGGER`, and
 `CUSTOM_ROLL` also disqualify fast mode.
+
+Scoped rerolls may additionally set `perUnit: { threshold }` for per-UNIT
+semantics (Bone Picked Clean: spend 1 captured infantry per mech to reroll
+that mech's dice). The pass expands the source's total hits into per-unit
+splits — dice are i.i.d., so conditioned on the total the split is
+multivariate hypergeometric (`Π C(d, hᵢ) / C(N·d, k)`) — then every unit
+whose reroll-eligible dice count is ≥ `threshold` spends 1 use to reroll its
+dice, most-eligible-first, capped by the spec's `limit` (the ability's `uses`
+snapshot). Billing is the actual number of units rerolled in each branch.
 
 When fast mode qualifies, the kernel skips per-source ROLL_TRIGGER /
 CONDITIONAL_MODIFIER enumeration. Without rerolls it emits a binomial

@@ -319,11 +319,11 @@ Stats (combat/AFB/Bombardment/Sustain) are wired for all 8 factions. Unique text
 - [x] Radiant Aur mech (Starlancer II) — repair your mechs at the start of a ground round; uses counter = strategy tokens to spend (1 per repair)
 - [x] Saint of Swords mech (Colada) — +1 die to a unit (approximate model)
 - [ ] Il Na Viroset mech — participate in space combat as a ship (deferred)
-- [ ] Sickening Lurch mech — reroll its own dice (deferred — needs unit-scoped reroll)
+- [x] Sickening Lurch mech (Bone Picked Clean) — uses counter = captured infantry available; each mech whose missed-dice count reaches the spend threshold (select: 1/2/3 misses) spends 1 infantry to reroll ITS missed dice, worst rolls first when infantry run short. Built on the kernel's per-unit scoped rerolls (`unitType` + `perUnit` on `declareReroll`)
 - [x] El Nen Janovet flagship (The Faces of Janovet) — gains the unit abilities and text abilities of the side's enabled **cruiser, destroyer, and dreadnought** unit-upgrade cards: AFB / Bombardment / Sustain Damage / Spark immunity merge onto the flagship at PREPARE, and the invoke-based texts extend to it (Strike Wing Alpha's 9/10-kills-infantry AFB trigger, Linkship's retreat destroy). Exotrireme's self-destruct stays dreadnought-only ("destroy this unit" sacrifices the dreadnought itself)
 
 ### Not yet implemented
 
 - [ ] Meld (dice-distribution transform)
-- [ ] Viroset mech space-participation, Lurch mech reroll (see above)
+- [ ] Viroset mech space-participation (see above)
 - [ ] Triune (skipped — the cancel interaction is expressible with existing controls)

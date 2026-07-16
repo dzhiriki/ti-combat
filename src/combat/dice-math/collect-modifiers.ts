@@ -44,10 +44,18 @@ export function collectModifiers(input: CollectModifiersInput): Modifier[] {
   const rerollByKey = new Map<string, SidedTarget<RerollTargetSpec>>()
   for (const d of input.modifiers) {
     if (d.type !== 'REROLL') continue
+    const usesKey = `${d.ownerSide}|${d.abilityKey}`
+    const declaredUses = input.abilityUses?.get(usesKey)
     const slot: RerollTargetSpec = {
       key: d.abilityKey,
       ownerSide: d.ownerSide,
       target: d.target ?? 'ALL',
+      units: d.unitType && d.unitType.length > 0 ? [...d.unitType] : undefined,
+      perUnit: d.perUnit,
+      // Budget for per-unit rerolls (1 use per rerolled unit).
+      limit: Number.isFinite(declaredUses)
+        ? (declaredUses as number)
+        : Infinity,
       rerollIf: d.rerollIf,
     }
     const idx: 0 | 1 = d.side === firing ? 0 : 1
