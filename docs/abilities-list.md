@@ -320,10 +320,10 @@ Stats (combat/AFB/Bombardment/Sustain) are wired for all 8 factions. Unique text
 - [x] Saint of Swords mech (Colada) — +1 die to a unit (approximate model)
 - [ ] Il Na Viroset mech — participate in space combat as a ship (deferred)
 - [ ] Sickening Lurch mech — reroll its own dice (deferred — needs unit-scoped reroll)
-- [ ] El Nen Janovet flagship — gain your unit-upgrade abilities (deferred — complex)
+- [x] El Nen Janovet flagship (The Faces of Janovet) — gains the unit abilities and text abilities of the side's enabled **cruiser, destroyer, and dreadnought** unit-upgrade cards: AFB / Bombardment / Sustain Damage / Spark immunity merge onto the flagship at PREPARE, and the invoke-based texts extend to it (Strike Wing Alpha's 9/10-kills-infantry AFB trigger, Linkship's retreat destroy). Exotrireme's self-destruct stays dreadnought-only ("destroy this unit" sacrifices the dreadnought itself)
 
 ### Not yet implemented
 
 - [ ] Meld (dice-distribution transform)
-- [ ] Hel-Titan ground-force participation, Viroset/Janovet/Lurch faction abilities (see above)
+- [ ] Viroset mech space-participation, Lurch mech reroll (see above)
 - [ ] Triune (skipped — the cancel interaction is expressible with existing controls)
