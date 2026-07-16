@@ -313,7 +313,7 @@ Available to TF factions (the RELIC slot is shown): Crown of Thalnos, Lightrail 
 
 Stats (combat/AFB/Bombardment/Sustain) are wired for all 8 factions. Unique text abilities:
 
-- [x] Radiant Aur mech (Starlancer II) — repair your mechs at the start of a ground round
+- [x] Radiant Aur mech (Starlancer II) — repair your mechs at the start of a ground round; uses counter = strategy tokens to spend (1 per repair)
 - [x] Saint of Swords mech (Colada) — +1 die to a unit (approximate model)
 - [ ] Il Na Viroset mech — participate in space combat as a ship (deferred)
 - [ ] Sickening Lurch mech — reroll its own dice (deferred — needs unit-scoped reroll)

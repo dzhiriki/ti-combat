@@ -1,8 +1,9 @@
 import type { Ability } from '@/combat'
 
 // Radiant Aur mech. At the start of each round of ground combat you may spend a
-// strategy token to repair all of your mechs. Modeled as an opt-in toggle that
-// un-damages every own mech at the start of each ground-combat round.
+// strategy token to repair all of your mechs. Each repair costs 1 token, so the
+// header is a uses counter — set it to the number of tokens you're willing to
+// spend; one is consumed per round in which a repair actually happens.
 export const starlancerII: Ability = {
   key: 'TF_STARLANCER_II',
   name: 'Starlancer II',
@@ -10,10 +11,10 @@ export const starlancerII: Ability = {
     'At the start of each round of ground combat, you may spend 1 token from your strategy pool to repair all of your mechs.',
   context: 'GROUND',
   params: {
-    isEnabled: false,
-    uses: Infinity,
+    isEnabled: true,
+    uses: 0,
   },
-  headerUI: 'isEnabled',
+  headerUI: 'uses',
   invoke: [
     {
       timing: 'START_OF_COMBAT_ROUND',

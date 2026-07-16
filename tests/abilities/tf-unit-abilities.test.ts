@@ -47,7 +47,7 @@ describe('TF unit abilities', () => {
       attacker: {
         faction: 'RADIANT_AUR',
         units: { MECH: 1 },
-        abilities: { TF_STARLANCER_II: true },
+        abilities: { TF_STARLANCER_II: { isEnabled: true, uses: 1 } },
       },
       defender: { faction: 'AVARICE_REX', units: { INFANTRY: 2 } },
     })
@@ -60,5 +60,29 @@ describe('TF unit abilities', () => {
     expect(t.attacker.units.MECH).toHaveLength(1)
     // Repaired at the start of round 2 → no longer damaged
     expect(t.attacker.units.MECH?.[0].isDamaged).toBeFalsy()
+  })
+
+  it('Radiant Aur mech repair is limited by its uses (1 token = 1 repair)', () => {
+    const t = combatTest({
+      mode: 'GROUND',
+      attacker: {
+        faction: 'RADIANT_AUR',
+        units: { MECH: 1 },
+        abilities: { TF_STARLANCER_II: { isEnabled: true, uses: 1 } },
+      },
+      defender: { faction: 'AVARICE_REX', units: { INFANTRY: 3 } },
+    })
+
+    t.advanceTo('GROUND_COMBAT')
+    t.advanceRound({ attacker: 1, defender: 0 })
+    expect(t.attacker.units.MECH?.[0].isDamaged).toBe(true)
+
+    // Round 2: the single use repairs the mech, then it takes a hit again.
+    t.advanceRound({ attacker: 1, defender: 0 })
+    expect(t.attacker.units.MECH?.[0].isDamaged).toBe(true)
+
+    // Round 3: no uses left — the mech stays damaged.
+    t.advanceRound({ attacker: 0, defender: 0 })
+    expect(t.attacker.units.MECH?.[0].isDamaged).toBe(true)
   })
 })
