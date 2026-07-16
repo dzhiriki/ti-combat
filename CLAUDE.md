@@ -101,6 +101,10 @@ For abilities info — read `docs/abilities-list.md`.
 When implementing a new ability, read `docs/abilities.md` first — it contains the full development guide with API reference, patterns, and code examples.
 After implementation mark ability as done in `docs/abilities-list.md`.
 
+## Engine Gotchas
+
+Before implementing or debugging anything that touches the abilities engine, reconcile pipeline, dice-math kernel, or test harness, read `docs/engine-gotchas.md` — it lists non-obvious invariants (invoke dedup rules, participation vs ships, hit-received test conventions, etc.) that are expensive to rediscover. When you uncover a new invariant of this kind, add it there.
+
 ## Ability Testing
 
 When writing or modifying ability tests, read `docs/testing.md` first — it contains the full testing guide with API reference, test patterns, and code examples.
