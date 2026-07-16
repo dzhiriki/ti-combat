@@ -60,9 +60,14 @@ describe("Twilight's Fall available abilities", () => {
     }
   })
 
-  it('every TF ability, genome, and unit upgrade carries its faction logo', () => {
+  it('every TF ability, genome, paradigm, and unit upgrade carries its faction logo', () => {
     const regs = getAvailableAbilities('attacker', 'AVARICE_REX')
-    for (const slot of ['TF_ABILITY', 'TF_GENOME', 'TF_UNIT_UPGRADE']) {
+    for (const slot of [
+      'TF_ABILITY',
+      'TF_GENOME',
+      'TF_PARADIGM',
+      'TF_UNIT_UPGRADE',
+    ]) {
       const entries = regs.filter(r => r.slot === slot)
       expect(entries.length).toBeGreaterThan(0)
       for (const r of entries) {
