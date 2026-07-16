@@ -16,6 +16,8 @@ export const tfUnitUpgradeGroup = (unitType: UnitBaseType): string =>
 export interface TfUnitUpgradeConfig {
   key: string
   name: string
+  // Originating TI4/TE faction's logo (raw SVG) — shows card provenance.
+  icon?: string
   // Only set when the card has a combat-affecting rule *beyond* its stat/ability
   // changes (e.g. Strike Wing Alpha's AFB bonus). Plain stat upgrades leave it
   // undefined so the UI shows no redundant text.
@@ -90,6 +92,7 @@ export function createTfUnitUpgrade(cfg: TfUnitUpgradeConfig): Ability {
     key: cfg.key,
     name: cfg.name,
     description: cfg.description,
+    ...(cfg.icon && { icon: cfg.icon }),
     ...(cfg.stack ? {} : { exclusiveGroup: tfUnitUpgradeGroup(cfg.unitType) }),
     params: { isEnabled: false, uses: Infinity, ...cfg.extraParams },
     headerUI: 'isEnabled',

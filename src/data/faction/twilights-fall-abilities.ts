@@ -1,3 +1,16 @@
+import argentFlightIcon from '@/assets/faction/argent_flight.svg?raw'
+import baronyOfLetnevIcon from '@/assets/faction/barony_of_letnev.svg?raw'
+import federationOfSolIcon from '@/assets/faction/federation_of_sol.svg?raw'
+import ghostsOfCreussIcon from '@/assets/faction/ghosts_of_creuss.svg?raw'
+import l1z1xMindnetIcon from '@/assets/faction/l1z1x_mindnet.svg?raw'
+import lastBastionIcon from '@/assets/faction/last_bastion.svg?raw'
+import mentakCoalitionIcon from '@/assets/faction/mentak_coalition.svg?raw'
+import nekroVirusIcon from '@/assets/faction/nekro_virus.svg?raw'
+import obsidianIcon from '@/assets/faction/obsidian.svg?raw'
+import sardakkNorrIcon from '@/assets/faction/sardakk_norr.svg?raw'
+import titansOfUlIcon from '@/assets/faction/titans_of_ul.svg?raw'
+import universitiesOfJolNarIcon from '@/assets/faction/universities_of_jol_nar.svg?raw'
+import yinBrotherhoodIcon from '@/assets/faction/yin_brotherhood.svg?raw'
 import type { Ability, RegisteredAbility } from '@/combat'
 import { solarFlare } from '@/data/abilities/action-card/solar-flare'
 import { heartOfIxth } from '@/data/abilities/relic/heart-of-ixth'
@@ -40,8 +53,16 @@ import { devotion } from './yin_brotherhood/devotion'
 // that implementation under the TF name. Only reuse when the timing window
 // also matches; TF cards whose window differs (e.g. Hardlight vs Shields
 // Holding) need their own implementation and are intentionally not here yet.
-function brand(ability: Ability, name: string, description: string): Ability {
-  const branded: Ability = { ...ability, name, description }
+// `icon` is the ORIGINATING TI4/TE faction's logo (per the ti4lookup CSVs'
+// faction id column) — TF's shared decks are drawn from those factions' kits,
+// and the logo shows a card's provenance at a glance.
+function brand(
+  ability: Ability,
+  name: string,
+  description: string,
+  icon?: string,
+): Ability {
+  const branded: Ability = { ...ability, name, description, icon }
   // TF abilities are optional draws from a shared deck — unlike their TI4
   // counterparts, none are always-on. Strip read-only locks and, unless the
   // card is a uses-counter (0 = unused), give it a simple on/off toggle that
@@ -58,70 +79,15 @@ function brand(ability: Ability, name: string, description: string): Ability {
   return branded
 }
 
-// The Abilities deck (what Singularity may copy from).
+// The Abilities deck (what Singularity may copy from), alphabetized.
 const tfAbilities: RegisteredAbility[] = [
-  {
-    slot: 'TF_ABILITY',
-    ability: brand(
-      unrelenting,
-      'Unrelenting',
-      "Apply +1 to the result of each of your unit's combat rolls.",
-    ),
-  },
   {
     slot: 'TF_ABILITY',
     ability: brand(
       ambush,
       'Ambush',
       'At the start of a space combat: You may roll 1 die for each of up to 2 of your cruisers or destroyers in the system. For each result equal to or greater than that ship’s combat value, produce 1 hit; your opponent must assign it to 1 of their ships.',
-    ),
-  },
-  {
-    slot: 'TF_ABILITY',
-    ability: brand(
-      harrow,
-      'Harrow',
-      'At the end of each round of ground combat: Your ships in the active system may use their Bombardment abilities against your opponent’s ground forces.',
-    ),
-  },
-  {
-    slot: 'TF_ABILITY',
-    ability: brand(
-      munitionsReserves,
-      'Munitions Reserves',
-      'At the start of each round of space combat: You may spend 2 trade goods; you may reroll any number of your dice during that combat round.',
-    ),
-  },
-  {
-    slot: 'TF_ABILITY',
-    ability: brand(
-      nonEuclideanShielding,
-      'Non-Euclidean Shielding',
-      'When 1 of your units uses Sustain Damage: Cancel 2 hits instead of 1.',
-    ),
-  },
-  {
-    slot: 'TF_ABILITY',
-    ability: brand(
-      dimensionalSplicer,
-      'Dimensional Splicer',
-      'At the start of a space combat in a system that contains a wormhole and 1 or more of your ships: You may produce 1 hit and assign it to 1 of your opponent’s ships.',
-    ),
-  },
-  {
-    slot: 'TF_ABILITY',
-    ability: brand(
-      raidFormation,
-      'Raid Formation',
-      'When 1 or more of your units use Anti-Fighter Barrage: For each hit produced in excess of your opponent’s fighters, choose 1 of your opponent’s ships that has Sustain Damage to become damaged.',
-    ),
-  },
-  {
-    slot: 'TF_ABILITY',
-    ability: brand(
-      valkyrieParticleWeave,
-      'Valkyrie Particle Weave',
-      'After making combat rolls during a round of ground combat: If your opponent produced 1 or more hits, you produce 1 additional hit.',
+      mentakCoalitionIcon,
     ),
   },
   {
@@ -130,14 +96,52 @@ const tfAbilities: RegisteredAbility[] = [
       devotion,
       'Devotion',
       'After each space combat round: You may destroy 1 of your cruisers or destroyers in the active system to produce 1 hit and assign it to 1 of your opponent’s ships.',
+      yinBrotherhoodIcon,
     ),
   },
   {
     slot: 'TF_ABILITY',
     ability: brand(
-      trrakanAunZulok,
-      'Zealous',
-      'When 1 or more of your units roll dice for a unit ability: You may choose 1 of those units to roll 1 additional die.',
+      dimensionalSplicer,
+      'Dimensional Splicer',
+      'At the start of a space combat in a system that contains a wormhole and 1 or more of your ships: You may produce 1 hit and assign it to 1 of your opponent’s ships.',
+      ghostsOfCreussIcon,
+    ),
+  },
+  {
+    slot: 'TF_ABILITY',
+    ability: brand(
+      harrow,
+      'Harrow',
+      'At the end of each round of ground combat: Your ships in the active system may use their Bombardment abilities against your opponent’s ground forces.',
+      l1z1xMindnetIcon,
+    ),
+  },
+  {
+    slot: 'TF_ABILITY',
+    ability: brand(
+      munitionsReserves,
+      'Munitions Reserves',
+      'At the start of each round of space combat: You may spend 2 trade goods; you may reroll any number of your dice during that combat round.',
+      baronyOfLetnevIcon,
+    ),
+  },
+  {
+    slot: 'TF_ABILITY',
+    ability: brand(
+      nonEuclideanShielding,
+      'Non-Euclidean Shielding',
+      'When 1 of your units uses Sustain Damage: Cancel 2 hits instead of 1.',
+      baronyOfLetnevIcon,
+    ),
+  },
+  {
+    slot: 'TF_ABILITY',
+    ability: brand(
+      raidFormation,
+      'Raid Formation',
+      'When 1 or more of your units use Anti-Fighter Barrage: For each hit produced in excess of your opponent’s fighters, choose 1 of your opponent’s ships that has Sustain Damage to become damaged.',
+      argentFlightIcon,
     ),
   },
   {
@@ -146,6 +150,34 @@ const tfAbilities: RegisteredAbility[] = [
       agnlanOln,
       'Tactical Brilliance',
       'After you roll dice for a unit ability: You may reroll any of those dice.',
+      universitiesOfJolNarIcon,
+    ),
+  },
+  {
+    slot: 'TF_ABILITY',
+    ability: brand(
+      unrelenting,
+      'Unrelenting',
+      "Apply +1 to the result of each of your unit's combat rolls.",
+      sardakkNorrIcon,
+    ),
+  },
+  {
+    slot: 'TF_ABILITY',
+    ability: brand(
+      valkyrieParticleWeave,
+      'Valkyrie Particle Weave',
+      'After making combat rolls during a round of ground combat: If your opponent produced 1 or more hits, you produce 1 additional hit.',
+      sardakkNorrIcon,
+    ),
+  },
+  {
+    slot: 'TF_ABILITY',
+    ability: brand(
+      trrakanAunZulok,
+      'Zealous',
+      'When 1 or more of your units roll dice for a unit ability: You may choose 1 of those units to roll 1 additional die.',
+      argentFlightIcon,
     ),
   },
 ]
@@ -155,24 +187,28 @@ const tfAbilities: RegisteredAbility[] = [
 const tfSingularities: RegisteredAbility[] = (['X', 'Y', 'Z'] as const).map(
   letter => ({
     slot: 'TF_ABILITY' as const,
-    ability: createTfSingularity(
-      letter,
-      tfAbilities.map(r => collectCopyable(r.ability)),
-    ),
+    ability: {
+      ...createTfSingularity(
+        letter,
+        tfAbilities.map(r => collectCopyable(r.ability)),
+      ),
+      icon: nekroVirusIcon,
+    },
   }),
 )
 
-export const TF_SHARED_REGISTERED: readonly RegisteredAbility[] = [
-  ...tfAbilities,
-  ...tfSingularities,
+const byName = (a: RegisteredAbility, b: RegisteredAbility) =>
+  a.ability.name.localeCompare(b.ability.name)
 
-  // ── Genomes (agent-style exhaust effects) ────────────────────────────
+// ── Genomes (agent-style exhaust effects), alphabetized ────────────────
+const tfGenomesUnsorted: RegisteredAbility[] = [
   {
     slot: 'TF_GENOME',
     ability: brand(
       tellurian,
       'Altruistic Genome',
       'When a hit is produced against a unit: You may exhaust this card to cancel that hit.',
+      titansOfUlIcon,
     ),
   },
   {
@@ -181,6 +217,7 @@ export const TF_SHARED_REGISTERED: readonly RegisteredAbility[] = [
       viscountUnlenn,
       'Aristocratic Genome',
       'At the start of a space combat round: You may exhaust this card to choose 1 ship in the active system; that ship rolls 1 additional die during this combat round.',
+      baronyOfLetnevIcon,
     ),
   },
   {
@@ -189,11 +226,21 @@ export const TF_SHARED_REGISTERED: readonly RegisteredAbility[] = [
       evelynDelouis,
       'Human Genome',
       'At the start of a round of ground combat: You may exhaust this card to choose 1 ground force in the active system; that ground force rolls 1 additional die during this combat round.',
+      federationOfSolIcon,
     ),
   },
-  { slot: 'TF_GENOME', ability: mirrorGenome },
-  { slot: 'TF_GENOME', ability: splittingGenome },
-  { slot: 'TF_GENOME', ability: valiantGenome },
+  { slot: 'TF_GENOME', ability: { ...mirrorGenome, icon: obsidianIcon } },
+  {
+    slot: 'TF_GENOME',
+    ability: { ...splittingGenome, icon: yinBrotherhoodIcon },
+  },
+  { slot: 'TF_GENOME', ability: { ...valiantGenome, icon: lastBastionIcon } },
+]
+const tfGenomes = tfGenomesUnsorted.sort(byName)
+
+export const TF_SHARED_REGISTERED: readonly RegisteredAbility[] = [
+  ...[...tfAbilities, ...tfSingularities].sort(byName),
+  ...tfGenomes,
 
   // ── Paradigms (hero-style, once per combat) ──────────────────────────
   // Ship-placement paradigms (Artemiris Ascendant, Dimensional Reflection) are
@@ -211,12 +258,7 @@ export const TF_SHARED_REGISTERED: readonly RegisteredAbility[] = [
   // ── Action Cards ─────────────────────────────────────────────────────
   // Bespoke TF implementations (timing windows / combat modes differ from any
   // TI4 card).
-  { slot: 'TF_ACTION_CARD', ability: hardlight },
-  { slot: 'TF_ACTION_CARD', ability: divinity },
-  { slot: 'TF_ACTION_CARD', ability: lash },
-  { slot: 'TF_ACTION_CARD', ability: spark },
   { slot: 'TF_ACTION_CARD', ability: atomize },
-  { slot: 'TF_ACTION_CARD', ability: converge },
   // Reused where the TI4 analog matches mechanic AND timing exactly.
   {
     slot: 'TF_ACTION_CARD',
@@ -226,6 +268,10 @@ export const TF_SHARED_REGISTERED: readonly RegisteredAbility[] = [
       'After you activate a system: Space Cannon cannot be used against your ships during this movement.',
     ),
   },
+  { slot: 'TF_ACTION_CARD', ability: converge },
+  { slot: 'TF_ACTION_CARD', ability: divinity },
+  { slot: 'TF_ACTION_CARD', ability: hardlight },
+  { slot: 'TF_ACTION_CARD', ability: lash },
   {
     slot: 'TF_ACTION_CARD',
     // Same effect as the Heart of Ixth relic, but a distinct key so a faction
@@ -241,6 +287,7 @@ export const TF_SHARED_REGISTERED: readonly RegisteredAbility[] = [
       invoke: heartOfIxth.invoke.map(inv => ({ ...inv })),
     },
   },
+  { slot: 'TF_ACTION_CARD', ability: spark },
 
   // ── Unit Upgrades ────────────────────────────────────────────────────
   ...TF_UNIT_UPGRADES.map(
