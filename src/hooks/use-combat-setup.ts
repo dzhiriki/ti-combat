@@ -4,11 +4,19 @@ import type { CombatMode } from '@/combat'
 import { CombatSetup } from '@/hooks/combat-setup'
 import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
-import type { CombatSide, FactionKey, UnitBaseType } from '@/types'
+import type { CombatSide, FactionKey, GameSystem, UnitBaseType } from '@/types'
 
 export function useCombatSetup() {
   const [setup] = useState(() => new CombatSetup())
   const [, forceRender] = useReducer((x: number) => x + 1, 0)
+
+  const setSystem = useCallback(
+    (system: GameSystem) => {
+      setup.setSystem(system)
+      forceRender()
+    },
+    [setup],
+  )
 
   const setFaction = useCallback(
     (side: CombatSide, faction: FactionKey) => {
@@ -98,6 +106,7 @@ export function useCombatSetup() {
   const allAbilities = useMemo(() => getAllAbilities(), [])
 
   return {
+    system: setup.system,
     attackerFaction: setup.attackerFaction,
     defenderFaction: setup.defenderFaction,
     attackerSelections: setup.attackerSelections,
@@ -111,6 +120,7 @@ export function useCombatSetup() {
     simulationInput,
     serializedConfig,
     allAbilities,
+    setSystem,
     setFaction,
     setUnitCount,
     setUpgraded,

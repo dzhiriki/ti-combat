@@ -17,9 +17,11 @@ import {
 import type {
   CombatSide,
   FactionKey,
+  GameSystem,
   UnitBaseType,
   UnitSelection,
 } from '@/types'
+import { GAME_SYSTEM_LABELS, GAME_SYSTEMS } from '@/utils/get-faction-system'
 import type { UnitConfig } from '@/utils/get-unit-config'
 
 import { Divider } from '../ui/divider'
@@ -51,7 +53,14 @@ const COMBAT_MODE_OPTIONS = [
   { value: 'GROUND' as const, label: 'Ground Combat' },
 ]
 
+const SYSTEM_OPTIONS = GAME_SYSTEMS.map(system => ({
+  value: system,
+  label: GAME_SYSTEM_LABELS[system],
+}))
+
 interface BattleCardProps {
+  system: GameSystem
+  onSystemChange: (system: GameSystem) => void
   attackerFaction: FactionKey
   defenderFaction: FactionKey
   attackerSelections: Record<UnitBaseType, UnitSelection>
@@ -91,6 +100,8 @@ function getTotalAmount(selections: Record<UnitBaseType, UnitSelection>) {
 }
 
 export function BattleCard({
+  system,
+  onSystemChange,
   attackerFaction,
   defenderFaction,
   attackerSelections,
@@ -115,6 +126,14 @@ export function BattleCard({
 }: BattleCardProps) {
   return (
     <GlassCard as="section" className={clsx(styles.battleCard, className)}>
+      <div className={styles.systemToggle}>
+        <ToggleGroup<GameSystem>
+          options={SYSTEM_OPTIONS}
+          value={system}
+          onChange={onSystemChange}
+        />
+      </div>
+
       <header className={styles.header}>
         {attackerActions && (
           <div className={styles.factionAction}>{attackerActions}</div>
@@ -122,6 +141,7 @@ export function BattleCard({
         <div className={clsx(styles.factionSelector)}>
           <FactionSelect
             value={attackerFaction}
+            system={system}
             onValueChange={faction => onFactionChange('attacker', faction)}
             className="theme-attacker"
           />
@@ -132,6 +152,7 @@ export function BattleCard({
         <div className={clsx(styles.factionSelector)}>
           <FactionSelect
             value={defenderFaction}
+            system={system}
             onValueChange={faction => onFactionChange('defender', faction)}
             className="theme-defender"
             align="end"

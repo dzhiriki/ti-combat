@@ -1,6 +1,8 @@
 import { SHARED_UNIT_ABILITY_KEYS } from '@/data/abilities/general'
 import factions from '@/data/faction'
+import { TF_SHARED_REGISTERED } from '@/data/faction/twilights-fall-abilities'
 import type { CombatSide, Faction, FactionKey, UnitBaseType } from '@/types'
+import { getFactionSystem } from '@/utils/get-faction-system'
 import { getFactionUnitConfig } from '@/utils/get-faction-unit-config'
 import { getEffectiveStats } from '@/utils/get-simulation-units'
 
@@ -178,6 +180,24 @@ const NEUTRAL_HIDDEN_SLOTS: ReadonlySet<AbilitySlot> = new Set<AbilitySlot>([
   'PROMISSORY',
 ])
 
+// Twilight's Fall has none of TI4's shared decks — no agendas, promissory
+// notes, TI4 technologies, action cards, relics, agents, or commanders. Only
+// general/advanced combat mechanics and terrain effects carry over; TF's own
+// shared ability pool is layered in separately.
+//
+// NOTE: 'ADVANCED' must NOT be hidden — those are the phase drivers (AFB,
+// Space Cannon, Bombardment, Retreat, Fleet Pool, Capacity, Ability Order),
+// which are universal combat mechanics the engine needs to run every phase.
+const TF_HIDDEN_SLOTS: ReadonlySet<AbilitySlot> = new Set<AbilitySlot>([
+  'AGENDA',
+  'TECHNOLOGY',
+  'ACTION_CARD',
+  'COMMANDER',
+  'AGENT',
+  'PROMISSORY',
+  'OTHER',
+])
+
 function collectUnitAbilities(
   faction: Faction,
   side: CombatSide,
@@ -282,6 +302,7 @@ export function getAvailableAbilities(
   upgradedTypes?: ReadonlySet<UnitBaseType>,
 ): RegisteredAbility[] {
   const isNeutral = factionKey === 'NEUTRAL'
+  const isTwilightsFall = getFactionSystem(factionKey) === 'TWILIGHTS_FALL'
 
   const faction = factions[factionKey]
   const ownedKeys = getFactionOwnedAbilityKeys(factionKey)
@@ -289,6 +310,9 @@ export function getAvailableAbilities(
   const base: RegisteredAbility[] = baseRegistered.filter(reg => {
     const a = reg.ability
     if (a.side && a.side !== side) return false
+    if (isTwilightsFall) {
+      return !TF_HIDDEN_SLOTS.has(reg.slot)
+    }
     if (isNeutral) {
       if (NEUTRAL_HIDDEN_SLOTS.has(reg.slot)) return false
       if (a.key === 'FLEET_POOL') return false
@@ -327,5 +351,12 @@ export function getAvailableAbilities(
     ? collectUnitAbilities(faction, side, upgradedTypes)
     : []
 
-  return [...base, ...factionAbilities, ...unitAbilities]
+  // Twilight's Fall factions all draw from the same shared ability pool.
+  const tfShared: RegisteredAbility[] = isTwilightsFall
+    ? TF_SHARED_REGISTERED.filter(
+        reg => !reg.ability.side || reg.ability.side === side,
+      )
+    : []
+
+  return [...base, ...factionAbilities, ...tfShared, ...unitAbilities]
 }
