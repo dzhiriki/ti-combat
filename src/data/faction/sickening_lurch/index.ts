@@ -1,3 +1,4 @@
+import sickeningLurchIcon from '@/assets/faction/sickening_lurch.svg?raw'
 import { sustainDamage } from '@/data/abilities/general/sustain-damage'
 import type { Faction } from '@/types'
 
@@ -5,6 +6,7 @@ import { bonePickedClean } from './bone-picked-clean'
 
 export const sickening_lurch: Faction = {
   name: 'A Sickening Lurch',
+  icon: sickeningLurchIcon,
   system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {

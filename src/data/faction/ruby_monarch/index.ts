@@ -1,8 +1,10 @@
+import rubyMonarchIcon from '@/assets/faction/ruby_monarch.svg?raw'
 import { sustainDamage } from '@/data/abilities/general/sustain-damage'
 import type { Faction } from '@/types'
 
 export const ruby_monarch: Faction = {
   name: 'The Ruby Monarch',
+  icon: rubyMonarchIcon,
   system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {

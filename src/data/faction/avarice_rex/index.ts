@@ -1,8 +1,10 @@
+import avariceRexIcon from '@/assets/faction/avarice_rex.svg?raw'
 import { sustainDamage } from '@/data/abilities/general/sustain-damage'
 import type { Faction } from '@/types'
 
 export const avarice_rex: Faction = {
   name: 'Avarice Rex',
+  icon: avariceRexIcon,
   system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {

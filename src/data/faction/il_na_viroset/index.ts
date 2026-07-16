@@ -1,3 +1,4 @@
+import ilNaVirosetIcon from '@/assets/faction/il_na_viroset.svg?raw'
 import { sustainDamage } from '@/data/abilities/general/sustain-damage'
 import type { Faction } from '@/types'
 
@@ -5,6 +6,7 @@ import { starlancerXI } from './starlancer-xi'
 
 export const il_na_viroset: Faction = {
   name: 'Il Na Viroset',
+  icon: ilNaVirosetIcon,
   system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {
