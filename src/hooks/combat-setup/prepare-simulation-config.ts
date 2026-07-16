@@ -1,4 +1,5 @@
-import type { CombatSide, FactionKey } from '@/types'
+import type { CombatSide, FactionKey, GameSystem } from '@/types'
+import { getFactionSystem } from '@/utils/get-faction-system'
 
 import type {
   Ability,
@@ -52,13 +53,21 @@ export function prepareSimulationConfig(
     ability,
     slot: 'OTHER',
   }))
+  // Both sides always share a game system. Neutral exists in every system,
+  // so derive it from whichever side is non-neutral (mirrors the shared-link
+  // restore logic in combat-setup.ts); all-neutral defaults to TI4.
+  const system: GameSystem =
+    getFactionSystem(attackerFaction) === 'TWILIGHTS_FALL' ||
+    getFactionSystem(defenderFaction) === 'TWILIGHTS_FALL'
+      ? 'TWILIGHTS_FALL'
+      : 'TI4'
   const registered: Record<CombatSide, RegisteredAbility[]> = {
     attacker: [
-      ...getAvailableAbilities('attacker', attackerFaction),
+      ...getAvailableAbilities('attacker', attackerFaction, undefined, system),
       ...customRegistered,
     ],
     defender: [
-      ...getAvailableAbilities('defender', defenderFaction),
+      ...getAvailableAbilities('defender', defenderFaction, undefined, system),
       ...customRegistered,
     ],
   }
