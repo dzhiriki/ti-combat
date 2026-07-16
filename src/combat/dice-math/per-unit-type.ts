@@ -125,13 +125,6 @@ export function runPerUnitTypeMode(input: PerUnitTypeInput): DiceMathBranch[] {
       branches = applyRollTrigger(branches, sourceMap, spec, side)
       branches = collapseSideBranches(branches)
     }
-    const sideConditionals = pickConditionals(
-      input.modifiers,
-      side,
-      input.selfTarget,
-    )
-    branches = applyConditionalSpecs(branches, sourceMap, sideConditionals)
-    branches = collapseSideBranches(branches)
     if (input.collapseThreshold !== undefined) {
       branches = collapseSideOutcomes(
         branches,
@@ -146,15 +139,16 @@ export function runPerUnitTypeMode(input: PerUnitTypeInput): DiceMathBranch[] {
     return { side, branches }
   })
 
-  // Two-sided shared-budget conditionals (both tuple slots filled, e.g. Heart
-  // of Ixth "Any") are excluded from the per-side passes above and applied here
-  // — once the cross-product exposes both sides' per-source hits — so a single
-  // `uses` budget caps the total flips across both sides.
-  const twoSided = input.modifiers.filter(
-    (m): m is ConditionalModifier =>
-      m.type === 'CONDITIONAL_MODIFIER' &&
-      m.target[0] !== undefined &&
-      m.target[1] !== undefined,
+  // ALL conditional ±1 flips — one-sided (`own` / `opponent`) and two-sided
+  // shared-budget "Any" cards (Heart of Ixth, Meddle) alike — resolve in ONE
+  // joint pass here, once the cross-product exposes both sides' per-source
+  // hits. A single pass is what keeps the math exact: same-sign cards stack on
+  // a die (Heart + Meddle reach a deficit-2 miss) and opposite-sign cards act
+  // on disjoint natural face pools (misses vs hits), while applying cards in
+  // separate passes would blindly re-enumerate faces an earlier pass already
+  // resolved (a boosted natural 5 is not a cancellable natural 6).
+  const conditionals = input.modifiers.filter(
+    (m): m is ConditionalModifier => m.type === 'CONDITIONAL_MODIFIER',
   )
   const selfTarget = input.selfTarget ?? false
 
@@ -171,10 +165,17 @@ export function runPerUnitTypeMode(input: PerUnitTypeInput): DiceMathBranch[] {
           probability: 1,
         },
       ]
-      for (const mod of twoSided) {
+      if (conditionals.length > 0) {
         const next: JointConditionalOutcome[] = []
         for (const j of joints) {
-          next.push(...applyTwoSidedConditional(j, mod, sourceMaps, selfTarget))
+          next.push(
+            ...applyConditionalModifiers(
+              j,
+              conditionals,
+              sourceMaps,
+              selfTarget,
+            ),
+          )
         }
         joints = next
       }
@@ -337,32 +338,6 @@ function pickRerolls(
   return out
 }
 
-function pickConditionals(
-  modifiers: Modifier[],
-  side: CombatSide,
-  selfTarget = false,
-): ConditionalModifierTargetSpec[] {
-  // On a self-targeting roll (Proxima self-bomb) the firer shoots itself, so
-  // attacker/defender are swapped — mirroring the post-roll `_swapHitPools`.
-  // A conditional declared against the firer's opponent (Heart `target:
-  // 'opponent'` -1, or the opponent's Heart `target:'own'` +1) then lands on
-  // the firer's self-routed dice, while a conditional declared against the
-  // firer itself routes to the (empty) opposite side and drops out.
-  const base: 0 | 1 = side === 'attacker' ? 0 : 1
-  const idx: 0 | 1 = selfTarget ? ((base ^ 1) as 0 | 1) : base
-  const out: ConditionalModifierTargetSpec[] = []
-  for (const m of modifiers) {
-    if (m.type !== 'CONDITIONAL_MODIFIER') continue
-    const { target } = m as ConditionalModifier
-    // Two-sided shared-budget conditionals are handled jointly after the
-    // cross-product (see `applyTwoSidedConditional`), not per side.
-    if (target[0] !== undefined && target[1] !== undefined) continue
-    const spec = target[idx]
-    if (spec) out.push(spec)
-  }
-  return out
-}
-
 interface JointConditionalOutcome {
   attackerHits: Record<Source, number>
   defenderHits: Record<Source, number>
@@ -370,120 +345,289 @@ interface JointConditionalOutcome {
   probability: number
 }
 
-/** Apply one two-sided shared-budget conditional (Heart "Any") to a joint
- *  cross-product branch. Both tuple slots are filled; on a self-targeting roll
- *  the slot→side mapping swaps, matching `pickConditionals`. The two slots
- *  share one `limit` (= owner's `uses`): flips are enumerated on each side,
- *  then allocated preferred-slot-first up to the shared budget, so the total
- *  number of ±1 flips never exceeds the budget. The use is billed on the owner
- *  once per flip. */
-function applyTwoSidedConditional(
+interface CondSlot {
+  sign: 1 | -1
+  magnitude: number
+  preferred: boolean
+}
+
+/** One conditional card, normalized: `limit` (= the owner's `uses`) is shared
+ *  across however many slots the card declared — one for `own`/`opponent`
+ *  targets, two for "Any". */
+interface CondCard {
+  key: string
+  ownerSide: CombatSide
+  limit: number
+  slots: Record<CombatSide, CondSlot | undefined>
+}
+
+/** Apply ALL conditional modifiers — one-sided and two-sided "Any" cards
+ *  alike — to a joint cross-product branch in one exact pass. On a
+ *  self-targeting roll (Proxima self-bomb) the firer shoots itself, so the
+ *  tuple-slot→side mapping swaps, mirroring the post-roll `_swapHitPools`:
+ *  a conditional declared against the firer's opponent lands on the firer's
+ *  self-routed dice, while one declared against the firer routes to the
+ *  (empty) opposite side and drops out.
+ *
+ *  Per side there are two flip pools: positive tiers live inside the natural
+ *  misses and negative tiers inside the natural hits — disjoint face sets, so
+ *  one two-sign enumeration per side is exact, a die flipped by one card is
+ *  never re-targeted by an opposing one (the 5c convention), and same-sign
+ *  cards stack (tier-T dice flip by combining T distinct cards, so Heart of
+ *  Ixth + Meddle rescue a deficit-2 miss).
+ *
+ *  Allocation is greedy: pools that some card marks preferred go first (an
+ *  "Any" card prefers its own-boost pool by default), then the rest in a
+ *  fixed order; within a pool, cheapest tier first (a tier-T flip costs T
+ *  uses), capped by the pool's contributing cards' remaining budgets, which
+ *  are fungible (a 2-use card may spend both uses on one die). Consumed uses
+ *  debit contributing cards in sorted-key order up to each one's remaining
+ *  budget — deterministic regardless of PREPARE shuffle order, mirroring the
+ *  historical batch pass. */
+function applyConditionalModifiers(
   branch: JointConditionalOutcome,
-  modifier: ConditionalModifier,
+  modifiers: ConditionalModifier[],
   sourceMaps: Record<CombatSide, Record<Source, FlatSource>>,
   selfTarget: boolean,
 ): JointConditionalOutcome[] {
-  const attackerSpec = (selfTarget ? modifier.target[1] : modifier.target[0])!
-  const defenderSpec = (selfTarget ? modifier.target[0] : modifier.target[1])!
-  const limit = attackerSpec.limit
-  if (limit <= 0) return [branch]
+  const cards: CondCard[] = []
+  let sourceFilter: ConditionalModifierTargetSpec['source']
+  for (const m of modifiers) {
+    const attackerSpec = selfTarget ? m.target[1] : m.target[0]
+    const defenderSpec = selfTarget ? m.target[0] : m.target[1]
+    const ref = (attackerSpec ?? defenderSpec)!
+    if (ref.limit <= 0) continue
+    // Same source filter assumed across the batch — pick from first.
+    sourceFilter ??= attackerSpec?.source ?? defenderSpec?.source
+    const toSlot = (
+      spec: ConditionalModifierTargetSpec | undefined,
+    ): CondSlot | undefined =>
+      spec && {
+        sign: spec.bonus > 0 ? 1 : -1,
+        magnitude: Math.abs(spec.bonus),
+        preferred: spec.preferred === true,
+      }
+    cards.push({
+      key: ref.key,
+      ownerSide: ref.ownerSide,
+      limit: ref.limit,
+      slots: { attacker: toSlot(attackerSpec), defender: toSlot(defenderSpec) },
+    })
+  }
+  if (cards.length === 0) return [branch]
+  cards.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
 
-  const attackerFlips = enumerateFlippable(
+  // Per-side tier depth for each sign — the max combined shift one die can
+  // receive from the cards feeding that pool.
+  const depth = (side: CombatSide, sign: 1 | -1): number =>
+    cards.reduce((s, c) => {
+      const slot = c.slots[side]
+      return slot && slot.sign === sign ? s + slot.magnitude : s
+    }, 0)
+  const dPosA = depth('attacker', 1)
+  const dNegA = depth('attacker', -1)
+  const dPosD = depth('defender', 1)
+  const dNegD = depth('defender', -1)
+
+  const attackerFlips = enumerateFlippableTiersTwoSign(
     branch.attackerHits,
     sourceMaps.attacker,
-    attackerSpec,
+    sourceFilter,
+    dPosA,
+    dNegA,
   )
-  const defenderFlips = enumerateFlippable(
+  const defenderFlips = enumerateFlippableTiersTwoSign(
     branch.defenderHits,
     sourceMaps.defender,
-    defenderSpec,
+    sourceFilter,
+    dPosD,
+    dNegD,
   )
-  const attackerPreferred = attackerSpec.preferred === true
-  const signA = attackerSpec.bonus > 0 ? 1 : -1
-  const signD = defenderSpec.bonus > 0 ? 1 : -1
-  const usesKey = `${attackerSpec.ownerSide}|${attackerSpec.key}`
 
   const out: JointConditionalOutcome[] = []
   for (const af of attackerFlips) {
     for (const df of defenderFlips) {
       const probability = branch.probability * af.probability * df.probability
       if (probability === 0) continue
-      let flipsA: number
-      let flipsD: number
-      if (attackerPreferred) {
-        flipsA = Math.min(af.total, limit)
-        flipsD = Math.min(df.total, limit - flipsA)
-      } else {
-        flipsD = Math.min(df.total, limit)
-        flipsA = Math.min(af.total, limit - flipsD)
+
+      const pools = [
+        {
+          side: 'attacker' as const,
+          sign: 1 as const,
+          tiers: af.posTierTotals,
+          flips: new Array<number>(dPosA + 1).fill(0),
+        },
+        {
+          side: 'defender' as const,
+          sign: 1 as const,
+          tiers: df.posTierTotals,
+          flips: new Array<number>(dPosD + 1).fill(0),
+        },
+        {
+          side: 'attacker' as const,
+          sign: -1 as const,
+          tiers: af.negTierTotals,
+          flips: new Array<number>(dNegA + 1).fill(0),
+        },
+        {
+          side: 'defender' as const,
+          sign: -1 as const,
+          tiers: df.negTierTotals,
+          flips: new Array<number>(dNegD + 1).fill(0),
+        },
+      ]
+      const isPreferred = (p: (typeof pools)[number]) =>
+        cards.some(c => {
+          const slot = c.slots[p.side]
+          return slot !== undefined && slot.sign === p.sign && slot.preferred
+        })
+      const ordered = [
+        ...pools.filter(p => isPreferred(p)),
+        ...pools.filter(p => !isPreferred(p)),
+      ]
+
+      // Greedy: preferred pools first, cheapest tier first, capped by the
+      // pool's fungible budget; debits hit contributors in sorted-key order.
+      const budgets = cards.map(c => c.limit)
+      const spent = new Array<number>(cards.length).fill(0)
+      for (const pool of ordered) {
+        const contributors: number[] = []
+        for (let i = 0; i < cards.length; i++) {
+          const slot = cards[i].slots[pool.side]
+          if (slot && slot.sign === pool.sign) contributors.push(i)
+        }
+        if (contributors.length === 0) continue
+        let budget = contributors.reduce((s, i) => s + budgets[i], 0)
+        let consumed = 0
+        for (let T = 1; T < pool.tiers.length; T++) {
+          if (budget < T) break
+          const canFlip = Math.min(pool.tiers[T], Math.floor(budget / T))
+          pool.flips[T] = canFlip
+          budget -= T * canFlip
+          consumed += T * canFlip
+        }
+        let remaining = consumed
+        for (const i of contributors) {
+          if (remaining <= 0) break
+          const take = Math.min(budgets[i], remaining)
+          if (take === 0) continue
+          budgets[i] -= take
+          spent[i] += take
+          remaining -= take
+        }
       }
-      const consumed = flipsA + flipsD
+
       let usesDelta = branch.usesDelta
-      if (consumed > 0) {
+      if (spent.some(s => s > 0)) {
         usesDelta = new Map(branch.usesDelta)
-        usesDelta.set(usesKey, (usesDelta.get(usesKey) ?? 0) + consumed)
+        for (let i = 0; i < cards.length; i++) {
+          if (spent[i] === 0) continue
+          const usesKey = `${cards[i].ownerSide}|${cards[i].key}`
+          usesDelta.set(usesKey, (usesDelta.get(usesKey) ?? 0) + spent[i])
+        }
       }
-      out.push({
-        attackerHits: distributeFlips(
-          branch.attackerHits,
-          af.perSource,
-          flipsA,
-          signA,
-        ),
-        defenderHits: distributeFlips(
-          branch.defenderHits,
-          df.perSource,
-          flipsD,
-          signD,
-        ),
-        usesDelta,
-        probability,
-      })
+
+      let attackerHits = branch.attackerHits
+      attackerHits = distributeTierFlips(
+        attackerHits,
+        af.perSource.map(ps => ({ source: ps.source, counts: ps.pos })),
+        pools[0].flips,
+        1,
+      )
+      attackerHits = distributeTierFlips(
+        attackerHits,
+        af.perSource.map(ps => ({ source: ps.source, counts: ps.neg })),
+        pools[2].flips,
+        -1,
+      )
+      let defenderHits = branch.defenderHits
+      defenderHits = distributeTierFlips(
+        defenderHits,
+        df.perSource.map(ps => ({ source: ps.source, counts: ps.pos })),
+        pools[1].flips,
+        1,
+      )
+      defenderHits = distributeTierFlips(
+        defenderHits,
+        df.perSource.map(ps => ({ source: ps.source, counts: ps.neg })),
+        pools[3].flips,
+        -1,
+      )
+
+      out.push({ attackerHits, defenderHits, usesDelta, probability })
     }
   }
   return out
 }
 
-interface FlippableOutcome {
-  perSource: { source: Source; count: number }[]
-  total: number
+interface TwoSignFlippableOutcome {
+  /** Per matched source, dice sitting on each flippable tier for each sign
+   *  (`pos[T]` = misses exactly T below the hit value, `neg[T]` = hits
+   *  exactly T-1 above-or-at it; index 0 unused). */
+  perSource: { source: Source; pos: number[]; neg: number[] }[]
+  /** Tier totals across all matched sources (index 0 unused). */
+  posTierTotals: number[]
+  negTierTotals: number[]
   probability: number
 }
 
-/** Enumerate, per source on a side, how many dice sit on the single flippable
- *  face for a ±1 conditional (a `+1` flips the face one below the hit value;
- *  a `-1` flips the face exactly at the hit value), returning the joint
- *  distribution of flippable counts across that side's matched sources. */
-function enumerateFlippable(
+/** Enumerate, per source on a side, the joint distribution of dice sitting on
+ *  each flippable tier for BOTH signs at once: positive tiers live inside the
+ *  source's misses and negative tiers inside its hits, so the two multinomials
+ *  are independent given the branch's hit count and one pass is exact. */
+function enumerateFlippableTiersTwoSign(
   hits: Record<Source, number>,
   sourceMap: Record<Source, FlatSource>,
-  spec: ConditionalModifierTargetSpec,
-): FlippableOutcome[] {
-  const sign = spec.bonus > 0 ? 1 : -1
-  const matched = matchedSources(hits, sourceMap, spec.source)
-  let outcomes: FlippableOutcome[] = [
-    { perSource: [], total: 0, probability: 1 },
+  sourceFilter: ConditionalModifierTargetSpec['source'],
+  dPos: number,
+  dNeg: number,
+): TwoSignFlippableOutcome[] {
+  let outcomes: TwoSignFlippableOutcome[] = [
+    {
+      perSource: [],
+      posTierTotals: new Array<number>(dPos + 1).fill(0),
+      negTierTotals: new Array<number>(dNeg + 1).fill(0),
+      probability: 1,
+    },
   ]
+  if (dPos <= 0 && dNeg <= 0) return outcomes
+  const matched = matchedSources(hits, sourceMap, sourceFilter)
   for (const source of matched) {
     const info = sourceMap[source]
     if (!info) continue
     const k = hits[source] ?? 0
     const totalDice = info.unitCount * info.dicePerUnit
-    const available = sign > 0 ? totalDice - k : k
-    const tierFaces = sign > 0 ? info.hitValue - 1 : 11 - info.hitValue
-    // D=1: tier-1 count is the flippable count (one specific face).
-    const dist = enumerateTierMultinomial(available, 1, tierFaces).map(e => ({
-      count: e.counts[0],
-      probability: e.probability,
-    }))
-    const next: FlippableOutcome[] = []
+    const missFaces = info.hitValue - 1
+    const hitFaces = 11 - info.hitValue
+    // Tiers past the face range don't exist (e.g. hit-on-2 has one miss
+    // face); enumerate only the reachable ones and leave the rest at zero.
+    const effPos = Math.min(dPos, missFaces)
+    const effNeg = Math.min(dNeg, hitFaces)
+    const posDist = enumerateTierMultinomial(totalDice - k, effPos, missFaces)
+    const negDist = enumerateTierMultinomial(k, effNeg, hitFaces)
+    const next: TwoSignFlippableOutcome[] = []
     for (const o of outcomes) {
-      for (const d of dist) {
-        next.push({
-          perSource: [...o.perSource, { source, count: d.count }],
-          total: o.total + d.count,
-          probability: o.probability * d.probability,
-        })
+      for (const p of posDist) {
+        for (const n of negDist) {
+          const pos = new Array<number>(dPos + 1).fill(0)
+          const neg = new Array<number>(dNeg + 1).fill(0)
+          const posTierTotals = o.posTierTotals.slice()
+          const negTierTotals = o.negTierTotals.slice()
+          for (let t = 0; t < effPos; t++) {
+            pos[t + 1] = p.counts[t]
+            posTierTotals[t + 1] += p.counts[t]
+          }
+          for (let t = 0; t < effNeg; t++) {
+            neg[t + 1] = n.counts[t]
+            negTierTotals[t + 1] += n.counts[t]
+          }
+          next.push({
+            perSource: [...o.perSource, { source, pos, neg }],
+            posTierTotals,
+            negTierTotals,
+            probability: o.probability * p.probability * n.probability,
+          })
+        }
       }
     }
     outcomes = next
@@ -491,180 +635,32 @@ function enumerateFlippable(
   return outcomes
 }
 
-/** Apply `flips` ±1 modifications across a side's flippable sources, in source
- *  order (each source capped by its flippable count). */
-function distributeFlips(
+/** Apply the allocated tier flips across a side's sources in declaration
+ *  order (each source capped by its per-tier flippable count). A flipped die
+ *  changes the hit count by ±1 regardless of tier; tier only affects cost. */
+function distributeTierFlips(
   hits: Record<Source, number>,
-  perSource: { source: Source; count: number }[],
-  flips: number,
+  perSource: { source: Source; counts: number[] }[],
+  flipsByTier: number[],
   sign: 1 | -1,
 ): Record<Source, number> {
-  if (flips <= 0) return hits
+  let total = 0
+  for (let T = 1; T < flipsByTier.length; T++) total += flipsByTier[T]
+  if (total <= 0) return hits
   const out = { ...hits }
-  let remaining = flips
+  const remaining = flipsByTier.slice()
   for (const ps of perSource) {
-    if (remaining <= 0) break
-    const take = Math.min(ps.count, remaining)
-    if (take > 0) {
-      out[ps.source] = (out[ps.source] ?? 0) + sign * take
-      remaining -= take
+    let sourceFlips = 0
+    for (let T = 1; T < remaining.length; T++) {
+      const take = Math.min(ps.counts[T], remaining[T])
+      sourceFlips += take
+      remaining[T] -= take
+    }
+    if (sourceFlips > 0) {
+      out[ps.source] = (out[ps.source] ?? 0) + sign * sourceFlips
     }
   }
   return out
-}
-
-/**
- * CONDITIONAL_MODIFIER (dice-math spec §4). Same-sign specs stack: each
- * modifier contributes one application per die, so two `+1` modifiers
- * can combine to `+2` on a single die. A die converted by one modifier
- * is never re-targeted by another (positive flips happen on natural
- * misses, negative flips happen on natural hits — disjoint pools by
- * construction).
- *
- * For each branch and same-sign spec batch:
- *   1. Per matched source, enumerate the multinomial distribution of
- *      misses (positive batch) or hits (negative batch) over deficit
- *      tiers 1..D plus the "high" bucket (deficit > D non-flippable).
- *      Here D = sum of `|bonus|` across the batch — the max combined
- *      shift a single die can receive.
- *   2. Cross-product the per-source enumerations.
- *   3. Greedy global allocation: flip tier-1 dice first (1 use each),
- *      then tier-2 (2 uses each), etc., capped at total budget
- *      (= sum of `limit` across the batch).
- *   4. Distribute consumed uses across specs in declaration order,
- *      respecting per-spec limits.
- */
-function applyConditionalSpecs(
-  branches: SideBranch[],
-  sourceMap: Record<Source, FlatSource>,
-  specs: ConditionalModifierTargetSpec[],
-): SideBranch[] {
-  if (specs.length === 0) return branches
-  const positives = specs.filter(s => s.bonus > 0)
-  const negatives = specs.filter(s => s.bonus < 0)
-  let result = branches
-  if (positives.length > 0)
-    result = applyConditionalBatch(result, sourceMap, positives)
-  if (negatives.length > 0)
-    result = applyConditionalBatch(result, sourceMap, negatives)
-  return result
-}
-
-function applyConditionalBatch(
-  branches: SideBranch[],
-  sourceMap: Record<Source, FlatSource>,
-  rawSpecs: ConditionalModifierTargetSpec[],
-): SideBranch[] {
-  // Sort by ability key so use attribution is deterministic regardless of
-  // PREPARE shuffle order: alphabetically-first key consumes its share of
-  // the budget before later keys.
-  const specs = [...rawSpecs].sort((a, b) =>
-    a.key < b.key ? -1 : a.key > b.key ? 1 : 0,
-  )
-  const sign: 1 | -1 = specs[0].bonus > 0 ? 1 : -1
-  const D = specs.reduce((s, sp) => s + Math.abs(sp.bonus), 0)
-  const totalBudget = specs.reduce((s, sp) => s + sp.limit, 0)
-  if (D <= 0 || totalBudget <= 0) return branches
-
-  const next: SideBranch[] = []
-  for (const branch of branches) {
-    // Same source filter assumed across the batch — pick from first.
-    const matched = matchedSources(branch.hits, sourceMap, specs[0].source)
-    if (matched.length === 0) {
-      next.push(branch)
-      continue
-    }
-
-    // Per-source tier enumerations.
-    const perSource = matched.map(source => {
-      const info = sourceMap[source]
-      const k = branch.hits[source] ?? 0
-      const totalDice = info.unitCount * info.dicePerUnit
-      const available = sign > 0 ? totalDice - k : k
-      const tierFaces = sign > 0 ? info.hitValue - 1 : 11 - info.hitValue
-      return enumerateTierMultinomial(available, D, tierFaces)
-    })
-
-    // Cross-product.
-    let outcomes: { probability: number; perSourceCounts: number[][] }[] = [
-      { probability: 1, perSourceCounts: [] },
-    ]
-    for (const list of perSource) {
-      const nextOutcomes: typeof outcomes = []
-      for (const o of outcomes) {
-        for (const item of list) {
-          nextOutcomes.push({
-            probability: o.probability * item.probability,
-            perSourceCounts: [...o.perSourceCounts, item.counts],
-          })
-        }
-      }
-      outcomes = nextOutcomes
-    }
-
-    for (const outcome of outcomes) {
-      // Aggregate tier-T counts across sources (T=1..D; high bucket ignored).
-      const tierTotals = new Array<number>(D + 1).fill(0)
-      for (const counts of outcome.perSourceCounts) {
-        for (let t = 0; t < D; t++) tierTotals[t + 1] += counts[t]
-      }
-
-      // Greedy: flip tier-1 first, then tier-2, ..., constrained by budget.
-      let budget = totalBudget
-      const flipsByTier = new Array<number>(D + 1).fill(0)
-      for (let T = 1; T <= D; T++) {
-        if (budget < T) break
-        const canFlip = Math.min(tierTotals[T], Math.floor(budget / T))
-        flipsByTier[T] = canFlip
-        budget -= T * canFlip
-      }
-
-      // Per-source flips, distributed in declaration order within each tier.
-      const newHits = { ...branch.hits }
-      const remainingPerTier = flipsByTier.slice()
-      for (let s = 0; s < matched.length; s++) {
-        const source = matched[s]
-        const counts = outcome.perSourceCounts[s]
-        let sourceFlips = 0
-        for (let T = 1; T <= D; T++) {
-          const take = Math.min(counts[T - 1], remainingPerTier[T])
-          sourceFlips += take
-          remainingPerTier[T] -= take
-        }
-        if (sourceFlips > 0) {
-          newHits[source] = (newHits[source] ?? 0) + sign * sourceFlips
-        }
-      }
-
-      // Consumed uses = sum of T * flips_T. Distribute to specs in order,
-      // respecting per-spec limits.
-      let totalConsumed = 0
-      for (let T = 1; T <= D; T++) totalConsumed += T * flipsByTier[T]
-      let newUsesDelta = branch.usesDelta
-      if (totalConsumed > 0) {
-        newUsesDelta = new Map(branch.usesDelta)
-        let remaining = totalConsumed
-        for (const spec of specs) {
-          if (remaining <= 0) break
-          const take = Math.min(spec.limit, remaining)
-          if (take === 0) continue
-          // Key by `(ownerSide, abilityKey)` to match the abilityOwnerByKey
-          // bookkeeping in combat-state — the use is billed on the owner.
-          const usesKey = `${spec.ownerSide}|${spec.key}`
-          newUsesDelta.set(usesKey, (newUsesDelta.get(usesKey) ?? 0) + take)
-          remaining -= take
-        }
-      }
-
-      next.push({
-        probability: branch.probability * outcome.probability,
-        hits: newHits,
-        usesDelta: newUsesDelta,
-        pendingEffects: branch.pendingEffects,
-      })
-    }
-  }
-  return next
 }
 
 /** Enumerate the multinomial joint (m_1, m_2, ..., m_D, m_high) with

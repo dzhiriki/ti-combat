@@ -5,10 +5,13 @@ import { sustainDamage } from '@/data/abilities/general/sustain-damage'
 import type { DiceGroup, UnitBaseType, UnitStats } from '@/types'
 
 // Twilight's Fall unit upgrades come from a shared deck rather than a fixed
-// per-unit toggle. Only ONE non-mech upgrade may be applied at a time, so every
-// non-mech upgrade shares this exclusive group; mech upgrades omit it and
-// therefore stack (a faction may apply all of them).
-export const TF_NON_MECH_UPGRADE_GROUP = 'TF_NON_MECH_UNIT_UPGRADE'
+// per-unit toggle. Up to ONE upgrade may be applied per unit type (one cruiser
+// card AND one carrier card is fine; two cruiser cards is not), so non-mech
+// upgrades share a per-unit-type exclusive group. Mech upgrades omit the group
+// and therefore stack (a faction may apply all of them). The prefix keeps the
+// groups clear of Nekro's raw-unit-type exclusive groups.
+export const tfUnitUpgradeGroup = (unitType: UnitBaseType): string =>
+  `TF_UNIT_UPGRADE_${unitType}`
 
 export interface TfUnitUpgradeConfig {
   key: string
@@ -48,7 +51,7 @@ export interface TfUnitUpgradeConfig {
   extraParams?: Record<string, unknown>
   uiConfig?: Ability['uiConfig']
   declareParamChange?: Ability['declareParamChange']
-  // Mech upgrades stack; non-mech are mutually exclusive.
+  // Mech upgrades stack; non-mech are mutually exclusive per unit type.
   stack?: boolean
 }
 
@@ -87,7 +90,7 @@ export function createTfUnitUpgrade(cfg: TfUnitUpgradeConfig): Ability {
     key: cfg.key,
     name: cfg.name,
     description: cfg.description,
-    ...(cfg.stack ? {} : { exclusiveGroup: TF_NON_MECH_UPGRADE_GROUP }),
+    ...(cfg.stack ? {} : { exclusiveGroup: tfUnitUpgradeGroup(cfg.unitType) }),
     params: { isEnabled: false, uses: Infinity, ...cfg.extraParams },
     headerUI: 'isEnabled',
     ...(cfg.uiConfig && { uiConfig: cfg.uiConfig }),

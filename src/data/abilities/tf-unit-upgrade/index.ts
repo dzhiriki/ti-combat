@@ -7,9 +7,10 @@ import { linkshipRetreatInvoke } from './linkship-retreat'
 import { strikeWingAlphaAfbInvoke } from './strike-wing-alpha'
 
 // The Twilight's Fall unit-upgrade deck. Each card overrides the stats of one
-// generic unit type. Non-mech upgrades are mutually exclusive (only one may be
-// applied at a time — enforced via a shared exclusiveGroup); mech upgrades
-// stack. Stats sourced from the ti4lookup CSVs (twilights fall unit variants).
+// generic unit type. Non-mech upgrades are mutually exclusive per unit type
+// (up to one cruiser card, one carrier card, etc. — enforced via a per-type
+// exclusiveGroup); mech upgrades stack. Stats sourced from the ti4lookup CSVs
+// (twilights fall unit variants).
 //
 // `description` is set only when a card has a combat-affecting rule *beyond*
 // its stat/ability changes (e.g. Strike Wing Alpha's AFB bonus). Plain stat
