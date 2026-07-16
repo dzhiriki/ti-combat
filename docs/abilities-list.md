@@ -326,4 +326,6 @@ Stats (combat/AFB/Bombardment/Sustain) are wired for all 8 factions. Unique text
 
 - [ ] Meld (dice-distribution transform)
 - [ ] Viroset mech space-participation (see above)
+- [ ] Clever Genome (Yssaril — the TF Ssruu): copies another genome, the way Ssruu copies another faction's agent
+- [ ] Crown of Thalnos "dangerous" reroll — currently only the safe path is modeled (`safeReroll` param, no UI toggle; `false` is a no-op). Design when picked up: a **per-unit opt-in** (choose which units reroll all misses at +1 and risk destruction on a hitless reroll), needing per-unit outcome tracking through the dice kernel — adjacent to the Bone Picked Clean per-unit split machinery
 - [ ] Triune (skipped — the cancel interaction is expressible with existing controls)
