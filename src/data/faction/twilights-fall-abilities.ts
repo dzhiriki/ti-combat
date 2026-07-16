@@ -251,9 +251,13 @@ export const TF_SHARED_REGISTERED: readonly RegisteredAbility[] = [
       sleeperCell,
       'Insurrection',
       "At the start of a space combat you are participating in: For each other player's ship destroyed during this combat, place 1 ship of that type from your reinforcements in the active system.",
+      mentakCoalitionIcon,
     ),
   },
-  { slot: 'TF_PARADIGM', ability: intelligenceUnshackled },
+  {
+    slot: 'TF_PARADIGM',
+    ability: { ...intelligenceUnshackled, icon: lastBastionIcon },
+  },
 
   // ── Action Cards ─────────────────────────────────────────────────────
   // Bespoke TF implementations (timing windows / combat modes differ from any
