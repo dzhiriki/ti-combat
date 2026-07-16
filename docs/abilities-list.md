@@ -259,12 +259,12 @@ TF factions have only a unique flagship + mech; everything else comes from the s
 
 - [x] **Hardlight** — Before hits are assigned to your units: Cancel up to 2 hits. (Broader window than Shields Holding — applies in space combat, ground combat, and against unit-ability hits.)
 - [x] **Lash** — When one of your units is destroyed: Destroy 1 of your opponent's units in its system that has an equal or lower cost.
-- [x] **Divinity** — When 1 of your units would be destroyed: It is not destroyed instead (one-shot). Models destruction from hits; does not counter direct-destroy effects like Spark.
+- [x] **Divinity** — When 1 of your units would be destroyed: It is not destroyed instead (one-shot). Covers destruction from hits (cancels one incoming hit) AND opponent-inflicted direct-destroy effects (Spark, Lash, roll triggers, …) via the engine's `preventDestroy` hook; both paths share the single use. Self-inflicted destroys (costs like Devotion, Exotrireme's self-destruct) are not prevented.
 - [x] **Spark** — After another player's unit uses Sustain Damage to cancel a hit produced by your units/abilities: Destroy that unit. Like Direct Hit but usable in **ground combat** too (destroys sustaining mechs); respects Spark-immunity (dreadnought upgrades).
 - [x] **Atomize** — When your flagship is destroyed: destroy all other ships in the system (both sides). Modeled on Van Hauge.
 - [x] **Cloak** — After you activate a system: Space Cannon cannot be used against your ships (reuses Solar Flare).
 - [x] **Converge** — Space Cannon Offense hits must be assigned to non-fighter ships if able (reuses the Graviton Laser System phase hook). Defense→mechs clause not yet modeled.
-- [ ] **Meld** — When a die is rolled by any player: Roll two dice instead and add them together (max 10).
+- [x] **Meld** — When a die is rolled by any player: Roll two dice instead and add them together (max 10). Modeled as a distribution transform on every die of BOTH sides while enabled (combat + unit-ability rolls) via the kernel's CUSTOM_ROLL declaration. Post-roll face-level effects (±1 flips, rerolls) still assume uniform d10 faces, so stacking them on melded dice is approximate.
 - [ ] **Trine** — Off-board Space Cannon (not modeled — single-system calculator).
 
 ### Shared pool — reused TI4 implementations (mechanic + timing identical)
@@ -278,6 +278,7 @@ TF factions have only a unique flagship + mech; everything else comes from the s
 - [x] **Mirror Genome** — When you move ships: Space Cannon cannot be used against them (same effect as Cloak, distinct key).
 - [x] **Splitting Genome** — After your destroyer or cruiser is destroyed: place up to 2 fighters in its system.
 - [x] **Valiant Genome** — After one of your units is destroyed: roll 1 die; if ≥ that unit's combat value, your opponent must destroy 1 of their units (Courageous with a single die, both combat modes).
+- [x] **Clever Genome** — Has the text ability of 1 other genome (the TF Ssruu, from Yssaril). Modeled like Ssruu: a dropdown picks the copied genome from the deck; every genome's invokes are wrapped with a guard on the selected key and marked external.
 
 ### Unit Upgrades
 
@@ -324,7 +325,5 @@ Stats (combat/AFB/Bombardment/Sustain) are wired for all 8 factions. Unique text
 
 ### Not yet implemented
 
-- [ ] Meld (dice-distribution transform)
-- [ ] Clever Genome (Yssaril — the TF Ssruu): copies another genome, the way Ssruu copies another faction's agent
 - [ ] Crown of Thalnos "dangerous" reroll — currently only the safe path is modeled (`safeReroll` param, no UI toggle; `false` is a no-op). Design when picked up: a **per-unit opt-in** (choose which units reroll all misses at +1 and risk destruction on a hitless reroll), needing per-unit outcome tracking through the dice kernel — adjacent to the Bone Picked Clean per-unit split machinery
 - [ ] Triune (skipped — the cancel interaction is expressible with existing controls)
