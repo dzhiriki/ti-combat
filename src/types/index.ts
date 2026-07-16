@@ -6,7 +6,7 @@ export interface UnitSelection {
 export type CombatSide = 'attacker' | 'defender'
 
 export type { DiceGroup } from './die'
-export type { Faction, FactionKey } from './faction'
+export type { Faction, FactionKey, GameSystem } from './faction'
 export {
   UnitListBooleanSchema,
   UnitListNumberSchema,

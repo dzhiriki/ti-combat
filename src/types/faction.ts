@@ -3,6 +3,11 @@ import factions from '@/data/faction'
 
 import type { UnitBaseType, UnitDefinition } from './unit'
 
+// Game systems the calculator supports. TI4 is the base + expansions
+// (Prophecy of Kings, Codices, Thunder's Edge). Twilight's Fall is a
+// separate ruleset with its own faction roster and unit set.
+export type GameSystem = 'TI4' | 'TWILIGHTS_FALL'
+
 interface FactionAbilities {
   faction?: readonly Ability[]
   technology?: readonly Ability[]
@@ -18,6 +23,9 @@ interface FactionAbilities {
 export interface Faction {
   name: string
   icon?: string
+  // The game system this faction belongs to. Defaults to 'TI4' when omitted,
+  // so existing factions don't need to declare it.
+  system?: GameSystem
   units: Partial<Record<UnitBaseType, UnitDefinition>>
   abilities?: FactionAbilities
 }

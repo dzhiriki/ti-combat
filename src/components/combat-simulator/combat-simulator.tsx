@@ -66,6 +66,7 @@ export function CombatSimulator({
   precision,
 }: CombatSimulatorProps) {
   const {
+    system,
     attackerFaction,
     defenderFaction,
     attackerSelections,
@@ -80,6 +81,7 @@ export function CombatSimulator({
     serializedConfig,
     loadConfig,
     allAbilities,
+    setSystem,
     setFaction,
     setUnitCount,
     setUpgraded,
@@ -336,6 +338,8 @@ export function CombatSimulator({
       {/* Center column: Battle card */}
       <div className={styles.centerColumn}>
         <BattleCard
+          system={system}
+          onSystemChange={setSystem}
           attackerFaction={attackerFaction}
           defenderFaction={defenderFaction}
           attackerSelections={attackerSelections}

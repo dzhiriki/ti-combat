@@ -62,9 +62,16 @@ export const spaceCannonOffense: Ability<Params> = {
         // fighters sort last (hits hit non-fighter ships if able).
         const opp = ctx.api.opponent
         const sc = opp.getAbilityConfig('SPACE_CANNON_OFFENSE')
+        // Graviton Laser System, Twilight's Fall's "Converge" action card, and
+        // the Justiciar Rail PDS upgrade all force Space Cannon hits onto
+        // non-fighter ships if able.
+        const own = ctx.api.own
         const glsEnabled =
-          ctx.api.own.getAbilityConfig('GRAVITON_LASER_SYSTEM')?.isEnabled ===
-          true
+          own.getAbilityConfig('GRAVITON_LASER_SYSTEM')?.isEnabled === true ||
+          own.getAbilityConfig('TF_CONVERGE')?.isEnabled === true ||
+          own.getAbilityConfig(
+            'TF_UPGRADE_JUSTICIAR_RAIL' as keyof AbilityConfigMap,
+          )?.isEnabled === true
 
         let priority: UnitList | undefined = sc.customPriority
           ? sc.unitPriority

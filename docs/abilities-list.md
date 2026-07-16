@@ -248,3 +248,79 @@
 
 - [x] **Nebula** — If a space combat occurs in a nebula, the defender applies +1 to each combat roll of their ships during that combat.
 - [x] **Entropic Scar** — All unit abilities cannot be used by or against units inside of an entropic scar.
+
+---
+
+## Twilight's Fall
+
+TF factions have only a unique flagship + mech; everything else comes from the shared TF unit roster and shared draw decks (Abilities, Genomes, Paradigms, Action Cards, Unit Upgrades). Combat-relevant cards that mirror a TI4 ability exactly (mechanic **and** timing window) reuse that implementation under the TF name; cards whose timing differs get bespoke implementations.
+
+### Action Cards (bespoke)
+
+- [x] **Hardlight** — Before hits are assigned to your units: Cancel up to 2 hits. (Broader window than Shields Holding — applies in space combat, ground combat, and against unit-ability hits.)
+- [x] **Lash** — When one of your units is destroyed: Destroy 1 of your opponent's units in its system that has an equal or lower cost.
+- [x] **Divinity** — When 1 of your units would be destroyed: It is not destroyed instead (one-shot). Models destruction from hits; does not counter direct-destroy effects like Spark.
+- [x] **Spark** — After another player's unit uses Sustain Damage to cancel a hit produced by your units/abilities: Destroy that unit. Like Direct Hit but usable in **ground combat** too (destroys sustaining mechs); respects Spark-immunity (dreadnought upgrades).
+- [x] **Atomize** — When your flagship is destroyed: destroy all other ships in the system (both sides). Modeled on Van Hauge.
+- [x] **Cloak** — After you activate a system: Space Cannon cannot be used against your ships (reuses Solar Flare).
+- [x] **Converge** — Space Cannon Offense hits must be assigned to non-fighter ships if able (reuses the Graviton Laser System phase hook). Defense→mechs clause not yet modeled.
+- [ ] **Meld** — When a die is rolled by any player: Roll two dice instead and add them together (max 10).
+- [ ] **Trine** — Off-board Space Cannon (not modeled — single-system calculator).
+
+### Shared pool — reused TI4 implementations (mechanic + timing identical)
+
+- [x] Abilities: Unrelenting, Ambush, Harrow, Munitions Reserves, Non-Euclidean Shielding, Dimensional Splicer, Raid Formation, Valkyrie Particle Weave, Devotion, Zealous, Tactical Brilliance
+- [x] Genomes (reused): Altruistic Genome, Aristocratic Genome, Human Genome
+- [x] Action Cards (reused): Meddle (= Heart of Ixth)
+
+### Genomes (bespoke)
+
+- [x] **Mirror Genome** — When you move ships: Space Cannon cannot be used against them (same effect as Cloak, distinct key).
+- [x] **Splitting Genome** — After your destroyer or cruiser is destroyed: place up to 2 fighters in its system.
+- [x] **Valiant Genome** — After one of your units is destroyed: roll 1 die; if ≥ that unit's combat value, your opponent must destroy 1 of their units (Courageous with a single die, both combat modes).
+
+### Unit Upgrades
+
+Full shared deck of unit-upgrade cards, each overriding a generic unit's stats. Only **one non-mech** upgrade may be applied at a time (enforced via a shared `exclusiveGroup`); **mech** upgrades stack. 24 cards total (22 non-mech + 2 mech):
+
+- [x] Carrier: Advanced Carrier
+- [x] Cruiser: Ahk Syl Fier, Corsair, Saggitaria
+- [x] Destroyer: Exile, Linkship (destroys an eligible enemy ship on retreat), Strike Wing Alpha (AFB 9/10 also destroys enemy infantry in the space area)
+- [x] Dreadnought: Dawncrusher, Exotrireme (Spark-immune + opt-in self-destruct to kill up to 2 ships), Super-Dreadnought
+- [x] Fighter: Hybrid Crystal Fighter, Morphwing, Triune
+- [x] Infantry: Guild Agents, Letani Warrior, Yin Clone
+- [x] PDS: Hel-Titan (stats only — ground-force participation not yet wired), Justiciar Rail (non-fighter SC targeting), Keeper Matrix
+- [x] War Sun: Prototype War Sun, The Dragon Freed, University War Sun
+- [x] Mech (stacking): Eidolon Landwaster (+1 die), Eidolon Terminus (−1 combat)
+- Omitted (no combat impact — movement/capacity/production/cost only): Ambassador & Vortexer (carriers), Floating Factories / Helios Entity / Production Biomes (space docks), Valefar Prime (mech cost)
+
+### Singularity
+
+- [x] **Singularity X / Y / Z** — Once per combat, after an opponent unit is destroyed, gain the text of one of your opponent's **Abilities** (chosen from a dropdown) for the rest of the combat. Copies from the Abilities deck only (never unit upgrades or other singularities); activates mid-combat (Nekro-style `AFTER_DESTROY`), so it differs from pre-enabling the ability.
+
+### Paradigms (hero-style)
+
+Only the combat-relevant paradigms are modeled. Ship-placement paradigms (Artemiris Ascendant, Dimensional Reflection) are expressed via the starting fleet, so they are omitted.
+
+- [x] **Insurrection** — At the start of a space combat: for each of your opponent's ships destroyed during the combat, place 1 ship of that type from your reinforcements (reuses Sleeper Cell).
+- [x] **Intelligence Unshackled** — When one of your units is destroyed: roll 1 die for each of your opponent's units in the system; for each result ≥ the catalyst's combat value, destroy that unit. (Apollo without the galvanize requirement.)
+
+### Relics / Artifacts
+
+Available to TF factions (the RELIC slot is shown): Crown of Thalnos, Lightrail Ordnance, Metali Void Armaments, Metali Void Shielding, and Heart of Ixth. Heart of Ixth (relic) and Meddle (action card) are the same ±1 effect but distinct cards, so both can be held at once.
+
+### Faction flagship/mech unique abilities
+
+Stats (combat/AFB/Bombardment/Sustain) are wired for all 8 factions. Unique text abilities:
+
+- [x] Radiant Aur mech (Starlancer II) — repair your mechs at the start of a ground round
+- [x] Saint of Swords mech (Colada) — +1 die to a unit (approximate model)
+- [ ] Il Na Viroset mech — participate in space combat as a ship (deferred)
+- [ ] Sickening Lurch mech — reroll its own dice (deferred — needs unit-scoped reroll)
+- [ ] El Nen Janovet flagship — gain your unit-upgrade abilities (deferred — complex)
+
+### Not yet implemented
+
+- [ ] Meld (dice-distribution transform)
+- [ ] Hel-Titan ground-force participation, Viroset/Janovet/Lurch faction abilities (see above)
+- [ ] Triune (skipped — the cancel interaction is expressible with existing controls)
