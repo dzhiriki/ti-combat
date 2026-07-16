@@ -360,11 +360,50 @@ export class SideApi {
     }
 
     if (destroyed.length === 0) return
+
+    // Direct destroys inflicted by the OTHER side may be countered by this
+    // side's destroy-prevention abilities (Ability.preventDestroy) before
+    // removal. Own-side destroys (self-sacrifice costs like Devotion or
+    // Exotrireme's self-destruct) are never prevented.
+    if (this._abilitiesParams && this._ctx.side !== this._side) {
+      this._applyDestroyPrevention(destroyed)
+      if (destroyed.length === 0) return
+    }
+
     CombatSideState.removeUnits(s, destroyed)
     this._abilitiesParams?.combatState.syncWinnerSide()
 
     if (this._abilitiesParams) {
       this._ctx.runDestroyAbilities(destroyed)
+    }
+  }
+
+  /** Consult this side's enabled `preventDestroy` abilities and drop spared
+   *  ids from `destroyed` (mutated in place). Each hook may spare up to its
+   *  ability's remaining `uses`; one use is consumed per spared unit. */
+  private _applyDestroyPrevention(destroyed: UnitId[]): void {
+    const abilities = this._abilitiesParams!.runtimeAbilityList(this._side).all
+    for (const ability of abilities) {
+      if (!ability.preventDestroy || destroyed.length === 0) continue
+      const params = CombatSideState.getLiveParams(this._sideData, ability.key)
+      if (params?.isEnabled !== true) continue
+      const uses = typeof params.uses === 'number' ? params.uses : 0
+      if (uses <= 0) continue
+      const spared = [
+        ...new Set(ability.preventDestroy(params, [...destroyed], this)),
+      ]
+        .filter(id => destroyed.includes(id))
+        .slice(0, uses)
+      if (spared.length === 0) continue
+      for (const id of spared) destroyed.splice(destroyed.indexOf(id), 1)
+      this.updateAbilityConfig(ability.key, {
+        uses: (current: unknown) =>
+          (typeof current === 'number' ? current : uses) - spared.length,
+      })
+      this._ctx.logger
+        ?.child(ability.key)
+        .forSide(this._side)
+        .log({ sparedUnits: spared.length })
     }
   }
 

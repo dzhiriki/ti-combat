@@ -568,6 +568,21 @@ export interface Ability<Params extends Record<string, unknown> = any> {
     ctx: AbilityReadContext,
     unitIds: UnitId[],
   ) => UnitId[]
+  /** Destroy-prevention hook. When an OPPOSING ability directly destroys
+   *  units on this ability's side via `destroyUnits` (Spark, Lash, roll
+   *  triggers, ...), enabled abilities carrying this hook are consulted
+   *  before the units are removed. Receives the ability's live params, the
+   *  about-to-be-destroyed UnitIds, and this side's SideApi; returns the ids
+   *  to spare. The engine caps the spared count at the ability's remaining
+   *  `uses` and consumes one use per spared unit. Not consulted for destroys
+   *  inflicted by the ability's own side (self-sacrifice costs like Devotion
+   *  or Exotrireme's self-destruct) nor for hit-pool destruction — model
+   *  hit-based saves with a BEFORE_ASSIGN_HITS invoke instead. */
+  preventDestroy?: (
+    params: AbilityBaseParams & Params,
+    ids: UnitId[],
+    api: SideApi,
+  ) => UnitId[]
   invoke: AbilityInvoke<AbilityBaseParams & Params>[]
 }
 
