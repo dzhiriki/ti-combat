@@ -283,16 +283,18 @@ TF factions have only a unique flagship + mech; everything else comes from the s
 
 Full shared deck of unit-upgrade cards, each overriding a generic unit's stats. Up to **one upgrade per unit type** may be applied at a time (one cruiser card AND one carrier card is fine; two cruiser cards is not — enforced via a per-unit-type `exclusiveGroup`); **mech** upgrades stack. 27 cards total (25 non-mech + 2 mech):
 
-- [x] Carrier: Advanced Carrier, Ambassador, Vortexer (capacity changes feed the capacity phase; their coexistence/capture clauses are out-of-combat)
+Listed in the UI's unit order (cards alphabetical within each unit type):
+
 - [x] Flagship: Echo of Ascension (relative: −1 combat value, +1 die, +1 move, +2 capacity on the faction's own flagship)
+- [x] War Sun: Prototype War Sun, The Dragon Freed, University War Sun
+- [x] Dreadnought: Dawncrusher, Exotrireme (Spark-immune + opt-in self-destruct to kill up to 2 ships), Super-Dreadnought
+- [x] Carrier: Advanced Carrier, Ambassador, Vortexer (capacity changes feed the capacity phase; their coexistence/capture clauses are out-of-combat)
 - [x] Cruiser: Ahk Syl Fier, Corsair, Saggitaria
 - [x] Destroyer: Exile, Linkship (destroys an eligible enemy ship on retreat), Strike Wing Alpha (AFB 9/10 also destroys enemy infantry in the space area)
-- [x] Dreadnought: Dawncrusher, Exotrireme (Spark-immune + opt-in self-destruct to kill up to 2 ships), Super-Dreadnought
 - [x] Fighter: Hybrid Crystal Fighter, Morphwing, Triune
+- [x] Mech (stacking): Eidolon Landwaster (+1 die), Eidolon Terminus (−1 combat)
 - [x] Infantry: Guild Agents, Letani Warrior, Yin Clone
 - [x] PDS: Hel-Titan (fights in ground combat as a ground force), Justiciar Rail (non-fighter SC targeting), Keeper Matrix
-- [x] War Sun: Prototype War Sun, The Dragon Freed, University War Sun
-- [x] Mech (stacking): Eidolon Landwaster (+1 die), Eidolon Terminus (−1 combat)
 - Omitted (no combat impact — movement/production/cost only): Floating Factories / Helios Entity / Production Biomes (space docks), Valefar Prime (mech cost)
 
 ### Singularity
