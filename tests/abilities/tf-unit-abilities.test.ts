@@ -3,6 +3,24 @@ import { describe, expect, it } from 'vitest'
 import { combatTest } from '../utils/combat-test'
 
 describe('TF unit abilities', () => {
+  it('Hel-Titan PDS participates in ground combat as a ground force', () => {
+    const t = combatTest({
+      mode: 'GROUND',
+      attacker: {
+        faction: 'AVARICE_REX',
+        units: { PDS: 1 },
+        abilities: { TF_UPGRADE_HEL_TITAN: true },
+      },
+      defender: { faction: 'AVARICE_REX', units: { INFANTRY: 1 } },
+    })
+
+    t.advanceTo('GROUND_COMBAT')
+    t.advanceRound()
+
+    // PDS fights as a ground force (combat 5) → rolls in the ground dice pool
+    expect(t.dicePool().attacker).toContainDice('PDS', [5, 1])
+  })
+
   it('Exotrireme self-destruct destroys up to 2 enemy ships', () => {
     const t = combatTest({
       mode: 'SPACE',

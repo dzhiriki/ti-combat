@@ -2,6 +2,7 @@ import type { Ability } from '@/combat'
 
 import { createTfUnitUpgrade } from './create-tf-unit-upgrade'
 import { exotriremeSelfDestructInvoke } from './exotrireme'
+import { helTitanDeclareParamChange, helTitanOnPrepare } from './hel-titan'
 import { linkshipRetreatInvoke } from './linkship-retreat'
 import { strikeWingAlphaAfbInvoke } from './strike-wing-alpha'
 
@@ -208,9 +209,8 @@ export const TF_UNIT_UPGRADES: readonly Ability[] = [
     spaceCannon: [5, 1],
     planetaryShield: true,
     production: 1,
-    // NOTE: the "treated as a ground force" participation is not yet wired —
-    // declareParamChange on a config upgrade ability isn't processed the way a
-    // unit ability's is, so the PDS does not yet fight in ground combat.
+    declareParamChange: helTitanDeclareParamChange,
+    onPrepare: helTitanOnPrepare,
   }),
   createTfUnitUpgrade({
     key: 'TF_UPGRADE_JUSTICIAR_RAIL',
