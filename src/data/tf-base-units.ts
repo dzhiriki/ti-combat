@@ -1,4 +1,3 @@
-import { disablePlanetaryShield } from '@/data/abilities/general/disable-planetary-shield'
 import { planetaryShield } from '@/data/abilities/general/planetary-shield'
 import { sustainDamage } from '@/data/abilities/general/sustain-damage'
 
@@ -21,7 +20,7 @@ const tfBaseUnits = {
         SUSTAIN_DAMAGE: true,
         BOMBARDMENT: [5, 3],
       },
-      ABILITIES: [disablePlanetaryShield, sustainDamage],
+      ABILITIES: [sustainDamage],
     },
     UPGRADED: null,
   },
