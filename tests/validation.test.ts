@@ -106,6 +106,42 @@ describe('validateSerializedConfig', () => {
     expect(result.config.aa['FAKE_ABILITY']).toBeUndefined()
   })
 
+  // Twilight's Fall shared-deck abilities live only in TF_SHARED_REGISTERED —
+  // if the lookup misses them, every saved TF card is stripped on page
+  // refresh ("Unknown ability skipped").
+  it("keeps Twilight's Fall shared-deck abilities across a save/load round-trip", () => {
+    const setup = new CombatSetup()
+    setup.setSystem('TWILIGHTS_FALL')
+    setup.setUnitCount('attacker', 'CRUISER', 1)
+    setup.setUnitCount('defender', 'CRUISER', 1)
+    setup.setAbilityParam('attacker', 'TF_HARDLIGHT', {
+      isEnabled: true,
+      uses: 2,
+    })
+    setup.setAbilityParam('attacker', 'TF_DIVINITY', {
+      isEnabled: true,
+      uses: 1,
+    })
+    setup.setAbilityParam('defender', 'TF_MEDDLE', {
+      isEnabled: true,
+      uses: 1,
+      target: 'anyPreferOwn',
+    })
+
+    const config = setup.toSerializedConfig()
+    const result = validateSerializedConfig(config, abilityLookup)
+    expect(result.warnings).toEqual([])
+    expect(result.config.aa['TF_HARDLIGHT']).toBeDefined()
+    expect(result.config.aa['TF_DIVINITY']).toBeDefined()
+    expect(result.config.da['TF_MEDDLE']).toBeDefined()
+
+    const restored = new CombatSetup()
+    restored.loadConfig(result.config)
+    expect(restored.abilities.attacker['TF_HARDLIGHT']?.uses).toBe(2)
+    expect(restored.abilities.attacker['TF_DIVINITY']?.isEnabled).toBe(true)
+    expect(restored.abilities.defender['TF_MEDDLE']?.isEnabled).toBe(true)
+  })
+
   it('warns when custom param shape fails schema validation', () => {
     const config = makeValidConfig()
     // PRE_GALVANIZED expects [string, number][] but a flat string array

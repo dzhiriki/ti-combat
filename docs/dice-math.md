@@ -30,8 +30,8 @@ Step 4  split sources by       → SideBuckets
     Step 5         initial per-source binomial
     Step 6a        REROLL pass
     Step 6b        ROLL_TRIGGER pass
-    Step 6c        CONDITIONAL_MODIFIER pass
     cross-product attacker × defender branches
+    Step 6c        CONDITIONAL_MODIFIER pass (joint, both sides at once)
 
 Step 7  emit hit pools per bucket → DiceMathBranch[]
 Step 8  use accounting           → markOneShotUses (one-shot REROLLs) +
@@ -224,39 +224,52 @@ bucket the uniform assumption breaks (the flipped die's natural face is
 6, not a uniform draw from {h..10}). The spec lists this as step 5 by
 convention; in code it runs first to preserve the invariant.
 
-### 5c — CONDITIONAL_MODIFIER
+### 5c — CONDITIONAL_MODIFIER (joint pass, after the cross-product)
 
-Same-sign specs stack — two `+1` modifiers can combine into `+2` on a
-single die, but a die converted by one modifier is never re-targeted by
-another (positive flips happen on natural misses, negative on natural
-hits — disjoint pools by construction).
+ALL conditional ±1 flips — one-sided (`own` / `opponent`) and two-sided
+"Any" cards (Heart of Ixth, Meddle) alike — resolve in ONE pass applied
+after the attacker × defender cross-product, where both sides'
+per-source hits are visible. A single pass is what keeps the math exact:
+separate passes would blindly re-enumerate faces an earlier pass already
+resolved (a natural 5 boosted to a hit is not a cancellable natural 6).
 
-For each branch and each same-sign batch:
+Same-sign cards stack — two `+1` cards can combine into `+2` on a single
+die — but a die converted by one card is never re-targeted by an
+opposing one: positive flips happen on natural misses, negative on
+natural hits, disjoint face pools by construction.
 
-```
-D            = Σ |bonus|         over batch              (max per-die shift)
-totalBudget  = Σ limit           over batch
-sign         = +1 (flip miss→hit) or -1 (flip hit→miss)
-tierFaces    = h - 1 (positive batch) or 11 - h (negative batch)
-```
-
-Per matched source:
-
-1. Enumerate the multinomial `(m₁, m₂, ..., m_D, m_high)` summing to
-   `N - k` (positive) or `k` (negative). Tier T is the face that needs
-   exactly +T (or −T) to flip; `m_high` collects faces too far away to
-   ever flip.
-2. Cross-product across sources to get joint per-source counts.
-3. Greedy budget allocation: flip tier-1 dice first (1 use each), then
-   tier-2 (2 uses each), capped at `totalBudget`.
-4. Distribute consumed uses across specs in alphabetical key order so
-   attribution is deterministic regardless of decl order:
+Per side there are two flip pools (positive and negative). For each
+side, one two-sign enumeration per matched source:
 
 ```
-remaining = totalConsumed
-for spec in sortedSpecs:
-  take = min(spec.limit, remaining)
-  usesDelta[spec.key] += take
+dPos      = Σ |bonus| over that side's +1 slots     (max per-die boost)
+dNeg      = Σ |bonus| over that side's -1 slots     (max per-die cut)
+posTierT  = miss face exactly T below the hit value  (faces h-1 … h-dPos)
+negTierT  = hit  face exactly T-1 above-or-at it     (faces h … h+dNeg-1)
+```
+
+Positive tiers are enumerated as a multinomial over the source's `N - k`
+misses, negative tiers over its `k` hits (`m_high` collects faces too
+far away to ever flip); the two are independent given `k`, and the joint
+distribution crosses per-source enumerations within each side.
+
+Allocation is greedy over the four pools (attacker/defender ×
+positive/negative): pools that some card marks `preferred` go first (an
+"Any" card prefers its own-boost pool by default), then the rest in a
+fixed order. Within a pool: cheapest tier first — a tier-T flip costs T
+uses — capped by the pool's contributing cards' remaining budgets, which
+are fungible (a 2-use card may spend both uses on one die). An "Any"
+card's single budget (= its owner's `uses`) is shared across its two
+slots, so spending on the preferred pool starves the other. Consumed
+uses debit contributing cards in alphabetical key order up to each one's
+remaining budget, so attribution is deterministic regardless of decl
+order:
+
+```
+remaining = poolConsumed
+for card in sortedContributors:
+  take = min(card.remainingBudget, remaining)
+  usesDelta[card.owner|card.key] += take
   remaining -= take
 ```
 

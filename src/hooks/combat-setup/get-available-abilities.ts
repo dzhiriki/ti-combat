@@ -165,6 +165,9 @@ const allAbilitiesForLookup: Ability[] = [
   ...baseRegistered.map(r => r.ability),
   ...allUnitAbilities,
   ...allFactionAbilities,
+  // The Twilight's Fall shared pool — bespoke keys (TF_*) live nowhere else,
+  // and without them URL/refresh validation drops any saved TF card config.
+  ...TF_SHARED_REGISTERED.map(r => r.ability),
 ]
 
 export function getAllAbilities(): Ability[] {
@@ -197,6 +200,10 @@ const TF_HIDDEN_SLOTS: ReadonlySet<AbilitySlot> = new Set<AbilitySlot>([
   'PROMISSORY',
   'OTHER',
 ])
+
+// Individual cards that survive the slot filter but reference mechanics
+// Twilight's Fall doesn't have (there is no Galvanize in TF).
+const TF_HIDDEN_KEYS: ReadonlySet<string> = new Set(['PRE_GALVANIZED'])
 
 function collectUnitAbilities(
   faction: Faction,
@@ -311,7 +318,7 @@ export function getAvailableAbilities(
     const a = reg.ability
     if (a.side && a.side !== side) return false
     if (isTwilightsFall) {
-      return !TF_HIDDEN_SLOTS.has(reg.slot)
+      return !TF_HIDDEN_SLOTS.has(reg.slot) && !TF_HIDDEN_KEYS.has(a.key)
     }
     if (isNeutral) {
       if (NEUTRAL_HIDDEN_SLOTS.has(reg.slot)) return false

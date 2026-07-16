@@ -281,7 +281,7 @@ TF factions have only a unique flagship + mech; everything else comes from the s
 
 ### Unit Upgrades
 
-Full shared deck of unit-upgrade cards, each overriding a generic unit's stats. Only **one non-mech** upgrade may be applied at a time (enforced via a shared `exclusiveGroup`); **mech** upgrades stack. 24 cards total (22 non-mech + 2 mech):
+Full shared deck of unit-upgrade cards, each overriding a generic unit's stats. Up to **one upgrade per unit type** may be applied at a time (one cruiser card AND one carrier card is fine; two cruiser cards is not — enforced via a per-unit-type `exclusiveGroup`); **mech** upgrades stack. 24 cards total (22 non-mech + 2 mech):
 
 - [x] Carrier: Advanced Carrier
 - [x] Cruiser: Ahk Syl Fier, Corsair, Saggitaria
@@ -307,7 +307,7 @@ Only the combat-relevant paradigms are modeled. Ship-placement paradigms (Artemi
 
 ### Relics / Artifacts
 
-Available to TF factions (the RELIC slot is shown): Crown of Thalnos, Lightrail Ordnance, Metali Void Armaments, Metali Void Shielding, and Heart of Ixth. Heart of Ixth (relic) and Meddle (action card) are the same ±1 effect but distinct cards, so both can be held at once.
+Available to TF factions (the RELIC slot is shown): Crown of Thalnos, Lightrail Ordnance, Metali Void Armaments, Metali Void Shielding, and Heart of Ixth. Heart of Ixth (relic) and Meddle (action card) are the same ±1 effect but distinct cards, so both can be held at once — and their flips stack, so together they lift a die sitting 2 below its hit value (a lone PDS at space cannon 6 hits 70% of the time with both cards).
 
 ### Faction flagship/mech unique abilities
 
