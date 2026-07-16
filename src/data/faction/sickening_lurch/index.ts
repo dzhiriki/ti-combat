@@ -1,6 +1,8 @@
 import { sustainDamage } from '@/data/abilities/general/sustain-damage'
 import type { Faction } from '@/types'
 
+import { bonePickedClean } from './bone-picked-clean'
+
 export const sickening_lurch: Faction = {
   name: 'A Sickening Lurch',
   system: 'TWILIGHTS_FALL',
@@ -33,7 +35,7 @@ export const sickening_lurch: Faction = {
         UNIT_ABILITIES: {
           SUSTAIN_DAMAGE: true,
         },
-        ABILITIES: [sustainDamage],
+        ABILITIES: [sustainDamage, bonePickedClean],
       },
     },
   },

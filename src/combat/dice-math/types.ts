@@ -132,6 +132,18 @@ export interface RerollDecl {
    *  intuitive opponent-facing intent ("reroll bad rolls") and the engine
    *  applies the same intent to the self-routed roll. */
   target?: 'MISSES' | 'HITS' | 'ALL'
+  /** Optional source filter (variant keys or base types, matched like
+   *  ROLL_TRIGGER units). Omitted = every source on the affected side.
+   *  Scoped rerolls bill per-branch: a branch where the scoped sources
+   *  have nothing to reroll passes through unfired and keeps its use. */
+  unitType?: UnitType[]
+  /** Per-UNIT reroll semantics (requires `unitType`): each unit of the
+   *  scoped sources whose reroll-eligible dice count is at least
+   *  `threshold` spends 1 use to reroll ITS dice, most-eligible-first,
+   *  capped by the ability's remaining `uses`. Bills the actual number of
+   *  units rerolled per branch (e.g. Bone Picked Clean spending 1 captured
+   *  infantry per mech). */
+  perUnit?: { threshold: number }
   rerollIf?: (side: RerollSide) => boolean
   consumeUseIf?: (side: RerollSide) => boolean
   wasDeclaration?: boolean
@@ -278,6 +290,14 @@ export interface RerollTargetSpec {
   /** Which dice to reroll. `'MISSES'` rerolls failures, `'HITS'` rerolls
    *  successes, `'ALL'` rerolls every die. */
   target: 'MISSES' | 'HITS' | 'ALL'
+  /** Optional source filter (variant keys or base types). Omitted = every
+   *  source on the affected side. See `RerollDecl.unitType`. */
+  units?: UnitType[]
+  /** Per-UNIT reroll semantics — see `RerollDecl.perUnit`. */
+  perUnit?: { threshold: number }
+  /** Budget for `perUnit` rerolls — the ability's `uses` snapshot at
+   *  collection time. Each rerolled unit spends 1. */
+  limit?: number
   /** Optional gate consulted with the side's pre-reroll aggregate. */
   rerollIf?: (side: RerollSide) => boolean
 }

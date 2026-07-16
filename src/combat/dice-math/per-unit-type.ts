@@ -92,14 +92,24 @@ export function runPerUnitTypeMode(input: PerUnitTypeInput): DiceMathBranch[] {
         branches,
         sourceMap,
         sideRerolls,
-        (base, hits, probability, spec) => {
-          // Bill the use on the rerolled output. Branches whose `rerollIf`
+        (base, hits, probability, spec, consumed) => {
+          // Bill the uses on the rerolled output. Branches whose `rerollIf`
           // didn't fire skip this factory entirely and keep their use.
           // Key by `(ownerSide, abilityKey)` so when both sides own the
           // same ability (e.g. attacker + defender both running
           // SCRAMBLE_FREQUENCY) each side's fire bills its own owner.
+          // `consumed` is 1 except for per-unit rerolls (units rerolled;
+          // 0 in outcomes where no unit qualified — nothing billed).
+          if (consumed === 0) {
+            return {
+              probability,
+              hits,
+              usesDelta: base.usesDelta,
+              pendingEffects: base.pendingEffects,
+            }
+          }
           const usesDelta = new Map(base.usesDelta)
-          usesDelta.set(`${spec.ownerSide}|${spec.key}`, 1)
+          usesDelta.set(`${spec.ownerSide}|${spec.key}`, consumed)
           return {
             probability,
             hits,
