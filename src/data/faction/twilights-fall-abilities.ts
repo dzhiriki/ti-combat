@@ -11,6 +11,7 @@ import sardakkNorrIcon from '@/assets/faction/sardakk_norr.svg?raw'
 import titansOfUlIcon from '@/assets/faction/titans_of_ul.svg?raw'
 import universitiesOfJolNarIcon from '@/assets/faction/universities_of_jol_nar.svg?raw'
 import yinBrotherhoodIcon from '@/assets/faction/yin_brotherhood.svg?raw'
+import yssarilTribesIcon from '@/assets/faction/yssaril_tribes.svg?raw'
 import type { Ability, RegisteredAbility } from '@/combat'
 import { solarFlare } from '@/data/abilities/action-card/solar-flare'
 import { heartOfIxth } from '@/data/abilities/relic/heart-of-ixth'
@@ -23,7 +24,9 @@ import { converge } from '@/data/abilities/tf-action-card/converge'
 import { divinity } from '@/data/abilities/tf-action-card/divinity'
 import { hardlight } from '@/data/abilities/tf-action-card/hardlight'
 import { lash } from '@/data/abilities/tf-action-card/lash'
+import { meld } from '@/data/abilities/tf-action-card/meld'
 import { spark } from '@/data/abilities/tf-action-card/spark'
+import { createCleverGenome } from '@/data/abilities/tf-genome/clever-genome'
 import { mirrorGenome } from '@/data/abilities/tf-genome/mirror-genome'
 import { splittingGenome } from '@/data/abilities/tf-genome/splitting-genome'
 import { valiantGenome } from '@/data/abilities/tf-genome/valiant-genome'
@@ -236,7 +239,19 @@ const tfGenomesUnsorted: RegisteredAbility[] = [
   },
   { slot: 'TF_GENOME', ability: { ...valiantGenome, icon: lastBastionIcon } },
 ]
-const tfGenomes = tfGenomesUnsorted.sort(byName)
+// Clever Genome (the TF Ssruu) copies the text of one other genome from the
+// deck above, so it is built from the final branded genome objects and joins
+// the deck alongside them.
+const tfGenomes = [
+  ...tfGenomesUnsorted,
+  {
+    slot: 'TF_GENOME' as const,
+    ability: {
+      ...createCleverGenome(tfGenomesUnsorted.map(r => r.ability)),
+      icon: yssarilTribesIcon,
+    },
+  },
+].sort(byName)
 
 export const TF_SHARED_REGISTERED: readonly RegisteredAbility[] = [
   ...[...tfAbilities, ...tfSingularities].sort(byName),
@@ -291,6 +306,7 @@ export const TF_SHARED_REGISTERED: readonly RegisteredAbility[] = [
       invoke: heartOfIxth.invoke.map(inv => ({ ...inv })),
     },
   },
+  { slot: 'TF_ACTION_CARD', ability: meld },
   { slot: 'TF_ACTION_CARD', ability: spark },
 
   // ── Unit Upgrades ────────────────────────────────────────────────────

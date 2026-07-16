@@ -39,6 +39,13 @@ gotcha, what to do instead, and a reference implementation.
   `isCallable: params => params.isEnabled && params.uses > 0` explicitly
   (see Bone Picked Clean, Munitions Reserves).
 
+- **One external invoke poisons the rest on non-owner sides.** An ability
+  with ANY `external: true` invoke dispatches ONLY its external invokes on a
+  side that doesn't own it (`passesCrossFactionFilter`). A wrapper ability
+  that aggregates invokes from mixed sources (some agent-derived/external,
+  some not) must mark ALL of them external, or the non-external ones
+  silently never fire (see `wrapInvoke` in `tf-genome/clever-genome.ts`).
+
 - **`getAvailableAbilities` feeds BOTH the panel and the engine.** Hiding a
   slot removes engine behavior, not just UI. The `ADVANCED` slot holds the
   phase drivers (AFB, Space Cannon, Bombardment, Retreat, Fleet Pool,

@@ -43,6 +43,7 @@ interface Ability<Params extends Record<string, unknown>> {
   declareParamChange?: (params, settings: SettingsParams) => ParamChange[]
   declareSubtype?: (params) => DeclaredSubtype[] // Declare variant subtypes (e.g. Cavalry)
   sort?: (params, ctx, unitIds) => UnitId[] // Pre-sort this ability's unit invokes
+  preventDestroy?: (params, ids, api) => UnitId[] // Spare units from opponent direct destroys
   invoke: AbilityInvoke<Params>[] // Array of timing handlers
 }
 ```
@@ -75,6 +76,8 @@ side: 'defender' // Only available to the defender
 **`sync: true`** — both sides share identical config. When the user changes params on one side, the other side is automatically updated to match. Useful for environment effects and other abilities where both players share the same setting.
 
 **`exclusiveGroup`** — abilities sharing the same group are mutually exclusive — enabling one disables others in the group.
+
+**`preventDestroy`** — destroy-prevention hook (e.g. Divinity). When an OPPOSING ability directly destroys units on this ability's side via `destroyUnits` (Spark, Lash, roll triggers, …), enabled abilities carrying this hook are consulted before removal. Receives the ability's live params, the about-to-be-destroyed `UnitId[]`, and this side's `SideApi`; returns the ids to spare. The engine caps the spared count at the ability's remaining `uses` and consumes one use per spared unit. NOT consulted for destroys inflicted by the ability's own side (self-sacrifice costs like Devotion or Exotrireme's self-destruct) nor for hit-pool destruction — model hit-based saves with a `BEFORE_ASSIGN_HITS` invoke instead.
 
 ## Parameters
 
