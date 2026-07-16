@@ -255,6 +255,8 @@
 
 TF factions have only a unique flagship + mech; everything else comes from the shared TF unit roster and shared draw decks (Abilities, Genomes, Paradigms, Action Cards, Unit Upgrades). Combat-relevant cards that mirror a TI4 ability exactly (mechanic **and** timing window) reuse that implementation under the TF name; cards whose timing differs get bespoke implementations.
 
+Each TF faction carries its own logo (traced to SVG from the bern/ti4lookup PNGs). The Neutral faction in a TF session matches the TF slot layout: no OTHER catch-all, no Galvanize, and the TI4 agent pool replaced by the TF genome deck (the active `system` is threaded into `getAvailableAbilities` since Neutral belongs to every system).
+
 ### Action Cards (bespoke)
 
 - [x] **Hardlight** — Before hits are assigned to your units: Cancel up to 2 hits. (Broader window than Shields Holding — applies in space combat, ground combat, and against unit-ability hits.)
@@ -263,7 +265,7 @@ TF factions have only a unique flagship + mech; everything else comes from the s
 - [x] **Spark** — After another player's unit uses Sustain Damage to cancel a hit produced by your units/abilities: Destroy that unit. Like Direct Hit but usable in **ground combat** too (destroys sustaining mechs); respects Spark-immunity (dreadnought upgrades).
 - [x] **Atomize** — When your flagship is destroyed: destroy all other ships in the system (both sides). Modeled on Van Hauge.
 - [x] **Cloak** — After you activate a system: Space Cannon cannot be used against your ships (reuses Solar Flare).
-- [x] **Converge** — Space Cannon Offense hits must be assigned to non-fighter ships if able (reuses the Graviton Laser System phase hook). Defense→mechs clause not yet modeled.
+- [x] **Converge** — Space Cannon Offense hits must be assigned to non-fighter ships if able (reuses the Graviton Laser System phase hook); Space Cannon Defense hits must be assigned to mechs if able (mirrored hook in the SCD phase driver, so the card also applies in ground combat).
 - [x] **Meld** — When a die is rolled by any player: Roll two dice instead and add them together (max 10). Modeled as a distribution transform on every die of BOTH sides while enabled (combat + unit-ability rolls) via the kernel's CUSTOM_ROLL declaration. Post-roll face-level effects (±1 flips, rerolls) still assume uniform d10 faces, so stacking them on melded dice is approximate.
 - [ ] **Trine** — Off-board Space Cannon (not modeled — single-system calculator).
 

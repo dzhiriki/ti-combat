@@ -107,11 +107,13 @@ export class CombatSetup {
       'attacker',
       defaultFaction,
       this.getUpgradedTypes('attacker'),
+      this._system,
     )
     const defenderRegistered = getAvailableAbilities(
       'defender',
       defaultFaction,
       this.getUpgradedTypes('defender'),
+      this._system,
     )
     this._sideRegistered = {
       attacker: attackerRegistered,
@@ -259,6 +261,7 @@ export class CombatSetup {
       side,
       faction,
       this.getUpgradedTypes(side),
+      this._system,
     )
     this._sideRegistered[side] = reg
     this._sideAbilities[side] = flattenUnique(reg)
@@ -372,6 +375,7 @@ export class CombatSetup {
       side,
       faction,
       this.getUpgradedTypes(side),
+      this._system,
     )
     this._sideRegistered[side] = regReset
     this._sideAbilities[side] = flattenUnique(regReset)
@@ -437,11 +441,13 @@ export class CombatSetup {
       'attacker',
       this._attackerFaction,
       this.getUpgradedTypes('attacker'),
+      this._system,
     )
     const defenderRegistered = getAvailableAbilities(
       'defender',
       this._defenderFaction,
       this.getUpgradedTypes('defender'),
+      this._system,
     )
     this._sideRegistered = {
       attacker: attackerRegistered,
@@ -565,11 +571,13 @@ export class CombatSetup {
       'attacker',
       af,
       this.getUpgradedTypes('attacker'),
+      this._system,
     )
     const defenderReg = getAvailableAbilities(
       'defender',
       df,
       this.getUpgradedTypes('defender'),
+      this._system,
     )
     this._sideRegistered = {
       attacker: attackerReg,
@@ -692,6 +700,7 @@ export class CombatSetup {
         side,
         faction,
         this.getUpgradedTypes(side),
+        this._system,
       )
       this._sideRegistered[side] = regUpd
       this._sideAbilities[side] = flattenUnique(regUpd)

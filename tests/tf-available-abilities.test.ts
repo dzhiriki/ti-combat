@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import { twilightsFallFactions } from '@/data/faction/twilights-fall'
 import { CombatSetup } from '@/hooks/combat-setup'
 import { getAvailableAbilities } from '@/hooks/combat-setup/get-available-abilities'
+
+import { combatTest } from './utils/combat-test'
 
 describe("Twilight's Fall available abilities", () => {
   it('hides Galvanized Units — there is no Galvanize mechanic in TF', () => {
@@ -57,6 +60,58 @@ describe("Twilight's Fall available abilities", () => {
         .filter(r => typeOf(r) === type)
         .map(r => r.ability.name)
       expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)))
+    }
+  })
+
+  it('neutral in a TF session matches the TF slot layout', () => {
+    const regs = getAvailableAbilities(
+      'attacker',
+      'NEUTRAL',
+      undefined,
+      'TWILIGHTS_FALL',
+    )
+    // No OTHER catch-all, no Galvanize, no TI4 agent pool.
+    expect(regs.some(r => r.slot === 'OTHER')).toBe(false)
+    expect(regs.some(r => r.ability.key === 'PRE_GALVANIZED')).toBe(false)
+    expect(regs.some(r => r.slot === 'AGENT')).toBe(false)
+    // Agents are replaced by the TF genome deck — and only the genome deck.
+    expect(regs.some(r => r.slot === 'TF_GENOME')).toBe(true)
+    expect(regs.some(r => r.slot === 'TF_ABILITY')).toBe(false)
+    expect(regs.some(r => r.slot === 'TF_UNIT_UPGRADE')).toBe(false)
+    // GENERAL and the ADVANCED phase drivers stay.
+    expect(regs.some(r => r.slot === 'GENERAL')).toBe(true)
+    expect(regs.some(r => r.slot === 'ADVANCED')).toBe(true)
+  })
+
+  it('neutral in a TI4 session keeps the agent pool, OTHER, and Galvanize', () => {
+    const regs = getAvailableAbilities('attacker', 'NEUTRAL', undefined, 'TI4')
+    expect(regs.some(r => r.slot === 'AGENT')).toBe(true)
+    expect(regs.some(r => r.slot === 'OTHER')).toBe(true)
+    expect(regs.some(r => r.ability.key === 'PRE_GALVANIZED')).toBe(true)
+    expect(regs.some(r => r.slot === 'TF_GENOME')).toBe(false)
+  })
+
+  it('neutral vs a TF faction can use a TF genome in combat', () => {
+    const t = combatTest({
+      mode: 'SPACE',
+      attacker: {
+        faction: 'NEUTRAL',
+        units: { CRUISER: 2 },
+        abilities: { TF_MIRROR_GENOME: true },
+      },
+      defender: { faction: 'AVARICE_REX', units: { PDS: 1, CRUISER: 1 } },
+    })
+
+    t.advanceTo('SPACE_COMBAT')
+    // Mirror Genome blocks the TF opponent's Space Cannon Offense.
+    expect(t.dicePool()?.defender?.PDS).toBeUndefined()
+  })
+
+  it('every TF faction carries its own logo', () => {
+    for (const [key, faction] of Object.entries(twilightsFallFactions)) {
+      expect(faction.icon, `${key} is missing an icon`).toEqual(
+        expect.stringContaining('<svg'),
+      )
     }
   })
 

@@ -1,7 +1,13 @@
 import { SHARED_UNIT_ABILITY_KEYS } from '@/data/abilities/general'
 import factions from '@/data/faction'
 import { TF_SHARED_REGISTERED } from '@/data/faction/twilights-fall-abilities'
-import type { CombatSide, Faction, FactionKey, UnitBaseType } from '@/types'
+import type {
+  CombatSide,
+  Faction,
+  FactionKey,
+  GameSystem,
+  UnitBaseType,
+} from '@/types'
 import { getFactionSystem } from '@/utils/get-faction-system'
 import { getFactionUnitConfig } from '@/utils/get-faction-unit-config'
 import { getEffectiveStats } from '@/utils/get-simulation-units'
@@ -307,9 +313,16 @@ export function getAvailableAbilities(
   side: CombatSide,
   factionKey: FactionKey,
   upgradedTypes?: ReadonlySet<UnitBaseType>,
+  system?: GameSystem,
 ): RegisteredAbility[] {
   const isNeutral = factionKey === 'NEUTRAL'
   const isTwilightsFall = getFactionSystem(factionKey) === 'TWILIGHTS_FALL'
+  // Neutral belongs to every system, so its own `system` field can't tell TF
+  // apart — callers pass the session's active system. In a TF session the
+  // neutral panel matches the TF layout: no OTHER catch-all, no Galvanize,
+  // and the TI4 agent pool is replaced by the TF genome deck (genomes are
+  // TF's agent-style exhaust effects).
+  const isTfNeutral = isNeutral && system === 'TWILIGHTS_FALL'
 
   const faction = factions[factionKey]
   const ownedKeys = getFactionOwnedAbilityKeys(factionKey)
@@ -322,6 +335,10 @@ export function getAvailableAbilities(
     }
     if (isNeutral) {
       if (NEUTRAL_HIDDEN_SLOTS.has(reg.slot)) return false
+      if (isTfNeutral) {
+        if (reg.slot === 'AGENT' || reg.slot === 'OTHER') return false
+        if (TF_HIDDEN_KEYS.has(a.key)) return false
+      }
       if (a.key === 'FLEET_POOL') return false
       return true
     }
@@ -359,11 +376,19 @@ export function getAvailableAbilities(
     : []
 
   // Twilight's Fall factions all draw from the same shared ability pool.
+  // Neutral in a TF session gets only the genome deck — the TF analog of the
+  // agent pool a TI4 neutral is offered.
   const tfShared: RegisteredAbility[] = isTwilightsFall
     ? TF_SHARED_REGISTERED.filter(
         reg => !reg.ability.side || reg.ability.side === side,
       )
-    : []
+    : isTfNeutral
+      ? TF_SHARED_REGISTERED.filter(
+          reg =>
+            reg.slot === 'TF_GENOME' &&
+            (!reg.ability.side || reg.ability.side === side),
+        )
+      : []
 
   return [...base, ...factionAbilities, ...tfShared, ...unitAbilities]
 }
