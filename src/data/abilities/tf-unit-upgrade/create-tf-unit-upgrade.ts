@@ -35,6 +35,11 @@ export interface TfUnitUpgradeConfig {
   directHitImmune?: boolean
   // Custom apply for relative changes (e.g. mech +1 die). Takes precedence.
   apply?: (ctx: AbilityCallContext) => void
+  // Extra work to run inside the same PREPARE invoke, after the stat
+  // application (e.g. Hel-Titan adding PDS to groundForces). Kept in the one
+  // PREPARE invoke because the engine runs a single invoke per (ability,
+  // timing).
+  onPrepare?: (ctx: AbilityCallContext) => void
   // Extra ability invokes beyond the PREPARE stat application (e.g. Linkship's
   // WHEN_RETREAT destroy). They fire only while the upgrade is enabled.
   invokes?: Ability['invoke']
@@ -95,6 +100,7 @@ export function createTfUnitUpgrade(cfg: TfUnitUpgradeConfig): Ability {
         call: (ctx: AbilityCallContext) => {
           if (cfg.apply) cfg.apply(ctx)
           else if (stats) ctx.api.own.modifyUnitType(cfg.unitType, stats)
+          cfg.onPrepare?.(ctx)
         },
       },
       ...(cfg.invokes ?? []),

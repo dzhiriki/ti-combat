@@ -289,7 +289,7 @@ Full shared deck of unit-upgrade cards, each overriding a generic unit's stats. 
 - [x] Dreadnought: Dawncrusher, Exotrireme (Spark-immune + opt-in self-destruct to kill up to 2 ships), Super-Dreadnought
 - [x] Fighter: Hybrid Crystal Fighter, Morphwing, Triune
 - [x] Infantry: Guild Agents, Letani Warrior, Yin Clone
-- [x] PDS: Hel-Titan (stats only — ground-force participation not yet wired), Justiciar Rail (non-fighter SC targeting), Keeper Matrix
+- [x] PDS: Hel-Titan (fights in ground combat as a ground force), Justiciar Rail (non-fighter SC targeting), Keeper Matrix
 - [x] War Sun: Prototype War Sun, The Dragon Freed, University War Sun
 - [x] Mech (stacking): Eidolon Landwaster (+1 die), Eidolon Terminus (−1 combat)
 - Omitted (no combat impact — movement/capacity/production/cost only): Ambassador & Vortexer (carriers), Floating Factories / Helios Entity / Production Biomes (space docks), Valefar Prime (mech cost)
