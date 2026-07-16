@@ -21,6 +21,24 @@ describe('TF unit upgrades', () => {
     expect(t.dicePool().attacker).toContainDice('FIGHTER', [7, 1])
   })
 
+  it('Echo of Ascension adjusts the flagship relative to its faction stats', () => {
+    const t = combatTest({
+      mode: 'SPACE',
+      attacker: {
+        faction: 'AVARICE_REX',
+        units: { FLAGSHIP: 1 },
+        abilities: { TF_UPGRADE_ECHO_OF_ASCENSION: true },
+      },
+      defender: { faction: 'AVARICE_REX', units: { CRUISER: 1 } },
+    })
+
+    t.advanceTo('SPACE_COMBAT')
+    t.advanceRound()
+
+    // Scintillia base [9,2] → combat value -1 and +1 die → [8,3]
+    expect(t.dicePool().attacker).toContainDice('FLAGSHIP', [8, 3])
+  })
+
   it('grants Sustain Damage via the Advanced Carrier upgrade', () => {
     const t = combatTest({
       mode: 'SPACE',

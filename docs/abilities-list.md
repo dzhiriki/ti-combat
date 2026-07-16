@@ -281,9 +281,10 @@ TF factions have only a unique flagship + mech; everything else comes from the s
 
 ### Unit Upgrades
 
-Full shared deck of unit-upgrade cards, each overriding a generic unit's stats. Up to **one upgrade per unit type** may be applied at a time (one cruiser card AND one carrier card is fine; two cruiser cards is not — enforced via a per-unit-type `exclusiveGroup`); **mech** upgrades stack. 24 cards total (22 non-mech + 2 mech):
+Full shared deck of unit-upgrade cards, each overriding a generic unit's stats. Up to **one upgrade per unit type** may be applied at a time (one cruiser card AND one carrier card is fine; two cruiser cards is not — enforced via a per-unit-type `exclusiveGroup`); **mech** upgrades stack. 25 cards total (23 non-mech + 2 mech):
 
 - [x] Carrier: Advanced Carrier
+- [x] Flagship: Echo of Ascension (relative: −1 combat value, +1 die, +1 move, +2 capacity on the faction's own flagship)
 - [x] Cruiser: Ahk Syl Fier, Corsair, Saggitaria
 - [x] Destroyer: Exile, Linkship (destroys an eligible enemy ship on retreat), Strike Wing Alpha (AFB 9/10 also destroys enemy infantry in the space area)
 - [x] Dreadnought: Dawncrusher, Exotrireme (Spark-immune + opt-in self-destruct to kill up to 2 ships), Super-Dreadnought
