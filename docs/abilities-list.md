@@ -318,14 +318,13 @@ Stats (combat/AFB/Bombardment/Sustain) are wired for all 8 factions. Unique text
 
 - [x] Radiant Aur mech (Starlancer II) — repair your mechs at the start of a ground round; uses counter = strategy tokens to spend (1 per repair)
 - [x] Saint of Swords mech (Colada) — +1 die to a unit (approximate model)
-- [ ] Il Na Viroset mech — participate in space combat as a ship (deferred)
+- [x] Il Na Viroset mech (Starlancer XI) — participates in space combat as if it were a ship (rolls, takes hits at the back of the assignment order, uses Sustain Damage). The mechs fight from the ground: with no ships fielded there is no space combat for them to join, and when the last own ship dies the combat ends with the surviving mechs on the ground. Anomaly bonus (+1 per anomaly in/adjacent) is a manual count input — adjacency isn't modeled
 - [x] Sickening Lurch mech (Bone Picked Clean) — uses counter = captured infantry available; each mech whose missed-dice count reaches the spend threshold (select: 1/2/3 misses) spends 1 infantry to reroll ITS missed dice, worst rolls first when infantry run short. Built on the kernel's per-unit scoped rerolls (`unitType` + `perUnit` on `declareReroll`)
 - [x] El Nen Janovet flagship (The Faces of Janovet) — gains the unit abilities and text abilities of the side's enabled **cruiser, destroyer, and dreadnought** unit-upgrade cards: AFB / Bombardment / Sustain Damage / Spark immunity merge onto the flagship at PREPARE, and the invoke-based texts extend to it (Strike Wing Alpha's 9/10-kills-infantry AFB trigger, Linkship's retreat destroy). Exotrireme's self-destruct stays dreadnought-only ("destroy this unit" sacrifices the dreadnought itself)
 
 ### Not yet implemented
 
 - [ ] Meld (dice-distribution transform)
-- [ ] Viroset mech space-participation (see above)
 - [ ] Clever Genome (Yssaril — the TF Ssruu): copies another genome, the way Ssruu copies another faction's agent
 - [ ] Crown of Thalnos "dangerous" reroll — currently only the safe path is modeled (`safeReroll` param, no UI toggle; `false` is a no-op). Design when picked up: a **per-unit opt-in** (choose which units reroll all misses at +1 and risk destruction on a hitless reroll), needing per-unit outcome tracking through the dice kernel — adjacent to the Bone Picked Clean per-unit split machinery
 - [ ] Triune (skipped — the cancel interaction is expressible with existing controls)
