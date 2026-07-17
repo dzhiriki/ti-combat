@@ -1,11 +1,14 @@
 import argentFlightIcon from '@/assets/faction/argent_flight.svg?raw'
 import baronyOfLetnevIcon from '@/assets/faction/barony_of_letnev.svg?raw'
+import crimsonRebellionIcon from '@/assets/faction/crimson_rebellion.svg?raw'
 import federationOfSolIcon from '@/assets/faction/federation_of_sol.svg?raw'
 import ghostsOfCreussIcon from '@/assets/faction/ghosts_of_creuss.svg?raw'
 import l1z1xMindnetIcon from '@/assets/faction/l1z1x_mindnet.svg?raw'
 import lastBastionIcon from '@/assets/faction/last_bastion.svg?raw'
 import mentakCoalitionIcon from '@/assets/faction/mentak_coalition.svg?raw'
+import naazRokhaAllianceIcon from '@/assets/faction/naaz_rokha_alliance.svg?raw'
 import nekroVirusIcon from '@/assets/faction/nekro_virus.svg?raw'
+import nomadIcon from '@/assets/faction/nomad.svg?raw'
 import obsidianIcon from '@/assets/faction/obsidian.svg?raw'
 import sardakkNorrIcon from '@/assets/faction/sardakk_norr.svg?raw'
 import titansOfUlIcon from '@/assets/faction/titans_of_ul.svg?raw'
@@ -19,6 +22,10 @@ import {
   collectCopyable,
   createTfSingularity,
 } from '@/data/abilities/tf-ability/create-tf-singularity'
+import { proximaTargetingVi } from '@/data/abilities/tf-ability/proxima-targeting-vi'
+import { smotheringPresence } from '@/data/abilities/tf-ability/smothering-presence'
+import { supercharge } from '@/data/abilities/tf-ability/supercharge'
+import { createTfTemporalCommandSuite } from '@/data/abilities/tf-ability/temporal-command-suite'
 import { atomize } from '@/data/abilities/tf-action-card/atomize'
 import { converge } from '@/data/abilities/tf-action-card/converge'
 import { divinity } from '@/data/abilities/tf-action-card/divinity'
@@ -43,11 +50,13 @@ import { dimensionalSplicer } from './ghosts_of_creuss/dimensional-splicer'
 import { harrow } from './l1z1x_mindnet/harrow'
 import { ambush } from './mentak_coalition/ambush'
 import { sleeperCell } from './mentak_coalition/sleeper-cell'
+import { thundarian } from './nomad/thundarian'
 import { unrelenting } from './sardakk_norr/unrelenting'
 import { valkyrieParticleWeave } from './sardakk_norr/valkyrie-particle-weave'
 import { tellurian } from './titans_of_ul/tellurian'
 import { agnlanOln } from './universities_of_jol_nar/agnlan-oln'
 import { devotion } from './yin_brotherhood/devotion'
+import { indoctrination } from './yin_brotherhood/indoctrination'
 
 // Twilight's Fall replaces TI4's faction-locked kit with shared draw decks —
 // Abilities, Genomes, Paradigms, Action Cards, Unit Upgrades — that any TF
@@ -123,6 +132,15 @@ const tfAbilities: RegisteredAbility[] = [
   {
     slot: 'TF_ABILITY',
     ability: brand(
+      indoctrination,
+      'Indoctrination',
+      "At the start of a ground combat: You may spend 2 influence to replace 1 of your opponent's participating infantry with 1 infantry from your reinforcements.",
+      yinBrotherhoodIcon,
+    ),
+  },
+  {
+    slot: 'TF_ABILITY',
+    ability: brand(
       munitionsReserves,
       'Munitions Reserves',
       'At the start of each round of space combat: You may spend 2 trade goods; you may reroll any number of your dice during that combat round.',
@@ -137,6 +155,29 @@ const tfAbilities: RegisteredAbility[] = [
       'When 1 of your units uses Sustain Damage: Cancel 2 hits instead of 1.',
       baronyOfLetnevIcon,
     ),
+  },
+  // Bespoke TF implementations (mechanics differ from the TI4/TE cards of the
+  // same name — see each file's header comment).
+  {
+    slot: 'TF_ABILITY',
+    ability: { ...proximaTargetingVi, icon: lastBastionIcon },
+  },
+  {
+    slot: 'TF_ABILITY',
+    ability: { ...smotheringPresence, icon: crimsonRebellionIcon },
+  },
+  {
+    slot: 'TF_ABILITY',
+    ability: { ...supercharge, icon: naazRokhaAllianceIcon },
+  },
+  {
+    slot: 'TF_ABILITY',
+    // The genome deck is injected lazily — `tfGenomes` is defined further
+    // down, and the getter only runs at UI render / combat PREPARE time.
+    ability: {
+      ...createTfTemporalCommandSuite(() => tfGenomes.map(r => r.ability)),
+      icon: nomadIcon,
+    },
   },
   {
     slot: 'TF_ABILITY',
@@ -236,6 +277,15 @@ const tfGenomesUnsorted: RegisteredAbility[] = [
   {
     slot: 'TF_GENOME',
     ability: { ...splittingGenome, icon: yinBrotherhoodIcon },
+  },
+  {
+    slot: 'TF_GENOME',
+    ability: brand(
+      thundarian,
+      'Temporal Genome',
+      'After the "Roll Dice" step of combat: You may exhaust this card. If you do, hits are not assigned to either player\'s units. Return to the start of this combat round\'s "Roll Dice" step.',
+      nomadIcon,
+    ),
   },
   { slot: 'TF_GENOME', ability: { ...valiantGenome, icon: lastBastionIcon } },
 ]
