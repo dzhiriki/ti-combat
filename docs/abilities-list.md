@@ -271,9 +271,16 @@ Each TF faction carries its own logo (traced to SVG from the bern/ti4lookup PNGs
 
 ### Shared pool — reused TI4 implementations (mechanic + timing identical)
 
-- [x] Abilities: Unrelenting, Ambush, Harrow, Munitions Reserves, Non-Euclidean Shielding, Dimensional Splicer, Raid Formation, Valkyrie Particle Weave, Devotion, Zealous, Tactical Brilliance
-- [x] Genomes (reused): Altruistic Genome, Aristocratic Genome, Human Genome
+- [x] Abilities: Unrelenting, Ambush, Harrow, Indoctrination, Munitions Reserves, Non-Euclidean Shielding, Dimensional Splicer, Raid Formation, Valkyrie Particle Weave, Devotion, Zealous, Tactical Brilliance
+- [x] Genomes (reused): Altruistic Genome, Aristocratic Genome, Human Genome, Temporal Genome (= The Thundarian: after the Roll Dice step, hits are not assigned; restart the round's roll)
 - [x] Action Cards (reused): Meddle (= Heart of Ixth)
+
+### Abilities (bespoke — mechanics differ from the same-named TI4/TE cards)
+
+- [x] **Smothering Presence** — Opponent units lose ALL unit abilities (structure presence/adjacency is asserted by enabling the card — not derivable in a single-system calculator).
+- [x] **Proxima Targeting VI** — Cancel 1 hit per Bombardment roll against you; optional Bombardment 7(x3) against opponent AND self each ground round. Distinct from the TE Last Bastion card (which scales with Galvanize and rolls 8s).
+- [x] **Supercharge** — +2 to ONE chosen unit's combat rolls every round (the TI4 technology is +1 to all rolls for one round, exhaust-based).
+- [x] **Temporal Command Suite** — `uses` = command tokens spent re-readying the chosen genome; extra genome uses are pre-granted at PREPARE (math-equivalent to readying after each exhaust). The TI4 version readies agents.
 
 ### Genomes (bespoke)
 

@@ -36,6 +36,33 @@ describe('TF genomes', () => {
     expect(t.attacker.units.FIGHTER).toHaveLength(2)
   })
 
+  it('Temporal Genome (Thundarian reuse) restarts a bad roll for a TF faction', () => {
+    const t = combatTest({
+      mode: 'SPACE',
+      attacker: {
+        faction: 'AVARICE_REX',
+        units: { CRUISER: 2 },
+        abilities: {
+          THUNDARIAN: {
+            isEnabled: true,
+            uses: 1,
+            combinator: 'OR',
+            ownStrategyKind: 'IF_HITS_AMOUNT_LE',
+            ownStrategyThreshold: 0,
+            opponentStrategyKind: 'NEVER',
+            opponentStrategyThreshold: 0,
+          },
+        },
+      },
+      defender: { faction: 'AVARICE_REX', units: { CARRIER: 1 } },
+    })
+
+    t.advanceTo('SPACE_COMBAT')
+    t.advanceRound()
+
+    expect(t.abilityLog('THUNDARIAN')).not.toHaveLength(0)
+  })
+
   it('Valiant Genome rolls 1 die against the opponent when your unit dies', () => {
     const t = combatTest({
       mode: 'SPACE',
