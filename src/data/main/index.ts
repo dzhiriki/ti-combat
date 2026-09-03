@@ -10,8 +10,8 @@ import technology from './abilities/technology'
 
 // Twilight Imperium 4 (base + expansions): the faction roster, the generic
 // unit roster, and the shared (non-faction) ability pool. `src/data/tf`
-// exposes the same shape for Twilight's Fall; code outside `src/data` must
-// import only these index modules.
+// exposes the same shape for Twilight's Fall (see `GameData`); code outside
+// `src/data` must import only these index modules.
 
 export { SHARED_UNIT_ABILITY_KEYS } from './abilities/general'
 export { default as baseUnits } from './base-units'

@@ -5,7 +5,6 @@ import type { Faction } from '@/types'
 export const avarice_rex: Faction = {
   name: 'Avarice Rex',
   icon: avariceRexIcon,
-  system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {
       BASE: {

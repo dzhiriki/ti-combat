@@ -6,11 +6,12 @@ import {
   extractDefaults,
 } from '@/combat'
 import { UNIT_TYPES } from '@/constants/units'
-import { factions } from '@/data'
+import * as main from '@/data/main'
+import * as tf from '@/data/tf'
 import { CombatSetup } from '@/hooks/combat-setup'
 import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
 import type { FactionKey, GameSystem } from '@/types'
-import { getFactionSystem } from '@/utils/get-faction-system'
+import { getFactionKeysBySystem } from '@/utils/get-faction-system'
 
 // Static invariants over every registered ability. Each check here enforces a
 // rule that previously lived only in docs/engine-gotchas.md or the ability
@@ -27,8 +28,10 @@ function collectAllAbilities(): Map<Ability, string> {
   }
   // getAllAbilities skips unit-attached abilities with no UI — walk the unit
   // definitions too so engine-level checks cover them.
-  for (const [factionKey, faction] of Object.entries(factions)) {
-    if (!faction) continue
+  for (const [factionKey, faction] of [
+    ...Object.entries(main.factions),
+    ...Object.entries(tf.factions),
+  ]) {
     for (const unitDef of Object.values(faction.units)) {
       if (!unitDef) continue
       for (const stats of [unitDef.BASE, unitDef.UPGRADED]) {
@@ -115,11 +118,8 @@ interface DisplayedEntry {
 
 function collectDisplayed(): DisplayedEntry[] {
   const bySystem: Record<GameSystem, FactionKey[]> = {
-    TI4: [],
-    TWILIGHTS_FALL: [],
-  }
-  for (const key of Object.keys(factions) as FactionKey[]) {
-    bySystem[getFactionSystem(key)].push(key)
+    TI4: getFactionKeysBySystem('TI4'),
+    TWILIGHTS_FALL: getFactionKeysBySystem('TWILIGHTS_FALL'),
   }
 
   const seen = new Set<Ability>()

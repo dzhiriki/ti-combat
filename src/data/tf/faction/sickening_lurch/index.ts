@@ -7,7 +7,6 @@ import { bonePickedClean } from './bone-picked-clean'
 export const sickening_lurch: Faction = {
   name: 'A Sickening Lurch',
   icon: sickeningLurchIcon,
-  system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {
       BASE: {

@@ -8,7 +8,6 @@ import { starlancerXI } from './starlancer-xi'
 export const il_na_viroset: Faction = {
   name: 'Il Na Viroset',
   icon: ilNaVirosetIcon,
-  system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {
       BASE: {

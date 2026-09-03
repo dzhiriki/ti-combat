@@ -2,7 +2,7 @@
 
 ## File Structure
 
-Data is split by game system: `src/data/main/` (Twilight Imperium 4) and `src/data/tf/` (Twilight's Fall). Each has an `index.ts` that re-exports everything (`factions`, `baseUnits`, `abilities`); code outside `src/data` imports only those index modules (or the `src/data/index.ts` aggregator for the merged `factions` record). Shared TI4 abilities are organized in `src/data/main/abilities/` by category:
+Data is split by game system: `src/data/main/` (Twilight Imperium 4) and `src/data/tf/` (Twilight's Fall). Each has an `index.ts` exporting the same `GameData` shape (`factions`, `baseUnits`, `abilities` — the full shared pool available in that system, generic mechanics included); code outside `src/data` reads it through `getGameData(system)` (`src/utils/get-game-data.ts`) and never imports data files directly. Shared TI4 abilities are organized in `src/data/main/abilities/` by category:
 
 ```
 src/data/main/abilities/

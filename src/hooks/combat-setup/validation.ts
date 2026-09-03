@@ -2,12 +2,17 @@ import { z } from 'zod/mini'
 
 import { type Ability, extractDefaults } from '@/combat'
 import { UNIT_LIMITS, UNIT_TYPES } from '@/constants/units'
-import { factions } from '@/data'
+import * as main from '@/data/main'
+import * as tf from '@/data/tf'
 
 import type { SerializedConfig } from './serialization'
 
-const factionKeys = Object.keys(factions)
-const factionKeySet = new Set<string>(factionKeys)
+// TI4 first so the fallback faction is TI4's default.
+const factionKeySet = new Set<string>([
+  ...Object.keys(main.factions),
+  ...Object.keys(tf.factions),
+])
+const factionKeys = [...factionKeySet]
 const unitTypeSet = new Set<string>(UNIT_TYPES)
 const defaultFaction = factionKeys[0]
 

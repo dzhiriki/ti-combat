@@ -1,4 +1,5 @@
-import { factions, main, tf } from '@/data'
+import * as main from '@/data/main'
+import * as tf from '@/data/tf'
 import type {
   CombatSide,
   Faction,
@@ -6,8 +7,9 @@ import type {
   GameSystem,
   UnitBaseType,
 } from '@/types'
-import { getFactionSystem } from '@/utils/get-faction-system'
+import { getFaction } from '@/utils/get-faction'
 import { getFactionUnitConfig } from '@/utils/get-faction-unit-config'
+import { getGameData } from '@/utils/get-game-data'
 import { getEffectiveStats } from '@/utils/get-simulation-units'
 
 import type {
@@ -44,22 +46,35 @@ function unitSlot(baseType: UnitBaseType): AbilitySlot {
   return 'FACTION_UNIT'
 }
 
-const allPromissoryAbilities = Object.values(factions).flatMap(
-  faction => faction?.abilities?.promissory ?? [],
+// Every faction in every system (Neutral is in both rosters — dedup by
+// reference).
+const allFactions: Faction[] = [
+  ...new Set([...Object.values(main.factions), ...Object.values(tf.factions)]),
+]
+
+// ── TI4 cross-faction pools ────────────────────────────────────────────
+// Promissory notes, agents, and commanders are TI4 decks any TI4 faction may
+// hold. Twilight's Fall has none of them (its shared decks are already part
+// of `tf.abilities`), so these pools are built from the TI4 roster only.
+const ti4Factions = Object.values(main.factions)
+
+const allPromissoryAbilities = ti4Factions.flatMap(
+  faction => faction.abilities?.promissory ?? [],
 ) as Ability[]
 
-const allAgentAbilities = Object.values(factions).flatMap(
-  faction => faction?.abilities?.agent ?? [],
+const allAgentAbilities = ti4Factions.flatMap(
+  faction => faction.abilities?.agent ?? [],
 ) as Ability[]
 
-const allCommanderAbilities = Object.values(factions).flatMap(
-  faction => faction?.abilities?.commander ?? [],
+const allCommanderAbilities = ti4Factions.flatMap(
+  faction => faction.abilities?.commander ?? [],
 ) as Ability[]
 
 // Keys already displayed via dedicated slots — agents/commanders/promissories
 // have their own cross-faction pools, generic abilities (technology, action
-// cards, etc.) live in baseRegistered. Such abilities must NOT also appear
-// in the catch-all OTHER slot, even if their invokes are marked external.
+// cards, etc.) live in the system's shared pool. Such abilities must NOT also
+// appear in the catch-all OTHER slot, even if their invokes are marked
+// external.
 const alreadyDisplayedKeys = new Set<string>([
   ...main.abilities.map(r => r.ability.key),
   ...allPromissoryAbilities.map(a => a.key),
@@ -81,8 +96,7 @@ const allExternalAbilities: RegisteredAbility[] = []
       slot: 'OTHER',
     })
   }
-  for (const faction of Object.values(factions)) {
-    if (!faction) continue
+  for (const faction of ti4Factions) {
     for (const unitDef of Object.values(faction.units)) {
       if (!unitDef) continue
       for (const ability of [
@@ -102,11 +116,24 @@ const allExternalAbilities: RegisteredAbility[] = []
   }
 }
 
+// The full shared pool per system: the system's own generic abilities plus,
+// for TI4, the cross-faction decks and the OTHER catch-all for externally
+// displayed faction abilities.
+const registeredBySystem: Record<GameSystem, readonly RegisteredAbility[]> = {
+  TI4: [
+    ...main.abilities,
+    ...tag(allPromissoryAbilities, 'PROMISSORY'),
+    ...tag(allAgentAbilities, 'AGENT'),
+    ...tag(allCommanderAbilities, 'COMMANDER'),
+    ...allExternalAbilities,
+  ],
+  TWILIGHTS_FALL: tf.abilities,
+}
+
 const allUnitAbilities: Ability[] = []
 {
   const seen = new Set<string>()
-  for (const faction of Object.values(factions)) {
-    if (!faction) continue
+  for (const faction of allFactions) {
     for (const unitDef of Object.values(faction.units)) {
       if (!unitDef) continue
       for (const ability of [
@@ -122,19 +149,11 @@ const allUnitAbilities: Ability[] = []
   }
 }
 
-const baseRegistered: RegisteredAbility[] = [
-  ...main.abilities,
-  ...tag(allPromissoryAbilities, 'PROMISSORY'),
-  ...tag(allAgentAbilities, 'AGENT'),
-  ...tag(allCommanderAbilities, 'COMMANDER'),
-  ...allExternalAbilities,
-]
-
 const allFactionAbilities: Ability[] = []
 {
   const seen = new Set<string>()
-  for (const faction of Object.values(factions)) {
-    if (!faction?.abilities) continue
+  for (const faction of allFactions) {
+    if (!faction.abilities) continue
     for (const list of Object.values(faction.abilities)) {
       if (!list) continue
       for (const ability of list as Ability[]) {
@@ -146,12 +165,13 @@ const allFactionAbilities: Ability[] = []
   }
 }
 
+// Lookup pool for URL/refresh validation. TI4 first: many TF deck cards are
+// rebranded TI4 abilities under the same key, and the lookup keeps the first
+// entry per key. TF's bespoke keys (TF_*) live nowhere else.
 const allAbilitiesForLookup: Ability[] = [
-  ...baseRegistered.map(r => r.ability),
+  ...registeredBySystem.TI4.map(r => r.ability),
   ...allUnitAbilities,
   ...allFactionAbilities,
-  // The Twilight's Fall shared pool — bespoke keys (TF_*) live nowhere else,
-  // and without them URL/refresh validation drops any saved TF card config.
   ...tf.abilities.map(r => r.ability),
 ]
 
@@ -159,6 +179,11 @@ export function getAllAbilities(): Ability[] {
   return allAbilitiesForLookup
 }
 
+// Neutral is a stat-only opponent: it holds no faction-locked decks in either
+// system (agendas, TI4 technologies, action cards, commanders, relics,
+// promissory notes; TF abilities, paradigms, action cards, unit upgrades) and
+// has no fleet pool to enforce. It keeps the phase drivers, terrain effects,
+// and the agent-style pool of its system (TI4 agents / TF genomes).
 const NEUTRAL_HIDDEN_SLOTS: ReadonlySet<AbilitySlot> = new Set<AbilitySlot>([
   'AGENDA',
   'TECHNOLOGY',
@@ -166,29 +191,11 @@ const NEUTRAL_HIDDEN_SLOTS: ReadonlySet<AbilitySlot> = new Set<AbilitySlot>([
   'COMMANDER',
   'RELIC',
   'PROMISSORY',
+  'TF_ABILITY',
+  'TF_PARADIGM',
+  'TF_ACTION_CARD',
+  'TF_UNIT_UPGRADE',
 ])
-
-// Twilight's Fall has none of TI4's shared decks — no agendas, promissory
-// notes, TI4 technologies, action cards, relics, agents, or commanders. Only
-// general/advanced combat mechanics and terrain effects carry over; TF's own
-// shared ability pool is layered in separately.
-//
-// NOTE: 'ADVANCED' must NOT be hidden — those are the phase drivers (AFB,
-// Space Cannon, Bombardment, Retreat, Fleet Pool, Capacity, Ability Order),
-// which are universal combat mechanics the engine needs to run every phase.
-const TF_HIDDEN_SLOTS: ReadonlySet<AbilitySlot> = new Set<AbilitySlot>([
-  'AGENDA',
-  'TECHNOLOGY',
-  'ACTION_CARD',
-  'COMMANDER',
-  'AGENT',
-  'PROMISSORY',
-  'OTHER',
-])
-
-// Individual cards that survive the slot filter but reference mechanics
-// Twilight's Fall doesn't have (there is no Galvanize in TF).
-const TF_HIDDEN_KEYS: ReadonlySet<string> = new Set(['PRE_GALVANIZED'])
 
 function collectUnitAbilities(
   faction: Faction,
@@ -247,8 +254,6 @@ export function getUnitDefinitionAbilityKeys(
   const cached = unitDefAbilityKeysCache.get(factionKey)
   if (cached) return cached
   const keys = new Set<string>()
-  const faction = factions[factionKey]
-  if (!faction) return keys
   const mergedUnits = getFactionUnitConfig(factionKey)
   for (const unitDef of Object.values(mergedUnits)) {
     if (!unitDef?.BASE) continue
@@ -275,8 +280,8 @@ export function getFactionOwnedAbilityKeys(
   const cached = factionOwnedKeysCache.get(factionKey)
   if (cached) return cached
   const keys = new Set(getUnitDefinitionAbilityKeys(factionKey))
-  const faction = factions[factionKey]
-  if (faction?.abilities) {
+  const faction = getFaction(factionKey)
+  if (faction.abilities) {
     const a = faction.abilities
     for (const list of Object.values(a)) {
       if (list) {
@@ -289,35 +294,22 @@ export function getFactionOwnedAbilityKeys(
 }
 
 export function getAvailableAbilities(
+  system: GameSystem,
   side: CombatSide,
   factionKey: FactionKey,
   upgradedTypes?: ReadonlySet<UnitBaseType>,
-  system?: GameSystem,
 ): RegisteredAbility[] {
   const isNeutral = factionKey === 'NEUTRAL'
-  const isTwilightsFall = getFactionSystem(factionKey) === 'TWILIGHTS_FALL'
-  // Neutral belongs to every system, so its own `system` field can't tell TF
-  // apart — callers pass the session's active system. In a TF session the
-  // neutral panel matches the TF layout: no OTHER catch-all, no Galvanize,
-  // and the TI4 agent pool is replaced by the TF genome deck (genomes are
-  // TF's agent-style exhaust effects).
-  const isTfNeutral = isNeutral && system === 'TWILIGHTS_FALL'
-
-  const faction = factions[factionKey]
+  const faction = getGameData(system).factions[factionKey] as
+    | Faction
+    | undefined
   const ownedKeys = getFactionOwnedAbilityKeys(factionKey)
 
-  const base: RegisteredAbility[] = baseRegistered.filter(reg => {
+  const base: RegisteredAbility[] = registeredBySystem[system].filter(reg => {
     const a = reg.ability
     if (a.side && a.side !== side) return false
-    if (isTwilightsFall) {
-      return !TF_HIDDEN_SLOTS.has(reg.slot) && !TF_HIDDEN_KEYS.has(a.key)
-    }
     if (isNeutral) {
       if (NEUTRAL_HIDDEN_SLOTS.has(reg.slot)) return false
-      if (isTfNeutral) {
-        if (reg.slot === 'AGENT' || reg.slot === 'OTHER') return false
-        if (TF_HIDDEN_KEYS.has(a.key)) return false
-      }
       if (a.key === 'FLEET_POOL') return false
       return true
     }
@@ -354,34 +346,5 @@ export function getAvailableAbilities(
     ? collectUnitAbilities(faction, side, upgradedTypes)
     : []
 
-  // Twilight's Fall factions all draw from the same shared ability pool.
-  // Neutral in a TF session gets only the genome deck — the TF analog of the
-  // agent pool a TI4 neutral is offered.
-  const tfShared: RegisteredAbility[] = isTwilightsFall
-    ? tf.abilities.filter(reg => !reg.ability.side || reg.ability.side === side)
-    : isTfNeutral
-      ? tf.abilities.filter(
-          reg =>
-            reg.slot === 'TF_GENOME' &&
-            (!reg.ability.side || reg.ability.side === side),
-        )
-      : []
-
-  // TF unit-upgrade cards are the TF analog of TI4's build-time UPGRADED
-  // stats: their PREPARE applies the stat block that the ADVANCED phase
-  // drivers (Capacity, Fleet Pool) read during their own PREPARE
-  // enforcement. Register them ahead of everything else so the stats settle
-  // first — registration order drives invoke resolution order within a
-  // timing pass, while panel display is unaffected (slots are grouped via
-  // SLOT_DISPLAY, not list order).
-  const tfUpgrades = tfShared.filter(r => r.slot === 'TF_UNIT_UPGRADE')
-  const tfRest = tfShared.filter(r => r.slot !== 'TF_UNIT_UPGRADE')
-
-  return [
-    ...tfUpgrades,
-    ...base,
-    ...factionAbilities,
-    ...tfRest,
-    ...unitAbilities,
-  ]
+  return [...base, ...factionAbilities, ...unitAbilities]
 }

@@ -1,29 +1,28 @@
 import { UNIT_TYPES } from '@/constants/units'
-import { factions, main, tf } from '@/data'
 import {
   type FactionKey,
   type UnitBaseType,
   type UnitDefinition,
 } from '@/types'
 
+import { getFaction } from './get-faction'
+import { getFactionSystem } from './get-faction-system'
+import { getGameData } from './get-game-data'
+
 /**
  * Returns merged unit definitions for a faction.
  * Structure is identical to base_units.json: Record<UnitBaseType, UnitDefinition>
- * Faction-specific units override base units.
+ * Faction-specific units override the generic roster of the faction's system.
  */
 export function getFactionUnitConfig(
   factionKey: FactionKey,
 ): Record<UnitBaseType, UnitDefinition> {
-  const faction = factions[factionKey]
-  const factionUnits = faction.units
+  const factionUnits = getFaction(factionKey).units
+  const roster = getGameData(getFactionSystem(factionKey)).baseUnits
   const result = {} as Record<UnitBaseType, UnitDefinition>
 
-  // Twilight's Fall factions use a different generic unit roster.
-  const roster =
-    faction.system === 'TWILIGHTS_FALL' ? tf.baseUnits : main.baseUnits
-
   for (const unitType of UNIT_TYPES) {
-    const baseUnit = roster[unitType as keyof typeof roster] as UnitDefinition
+    const baseUnit = roster[unitType] as UnitDefinition
     const factionUnit = factionUnits[unitType]
 
     // Faction unit takes precedence, otherwise use base unit

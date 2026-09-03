@@ -8,7 +8,6 @@ import { starlancerII } from './starlancer-ii'
 export const radiant_aur: Faction = {
   name: 'Radiant Aur',
   icon: radiantAurIcon,
-  system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {
       BASE: {

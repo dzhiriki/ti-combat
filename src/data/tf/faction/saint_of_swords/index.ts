@@ -7,7 +7,6 @@ import { colada } from './colada'
 export const saint_of_swords: Faction = {
   name: 'The Saint of Swords',
   icon: saintOfSwordsIcon,
-  system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {
       BASE: {

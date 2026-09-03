@@ -104,16 +104,16 @@ export class CombatSetup {
     this._abilities = { attacker: {}, defender: {} }
 
     const attackerRegistered = getAvailableAbilities(
+      this._system,
       'attacker',
       defaultFaction,
       this.getUpgradedTypes('attacker'),
-      this._system,
     )
     const defenderRegistered = getAvailableAbilities(
+      this._system,
       'defender',
       defaultFaction,
       this.getUpgradedTypes('defender'),
-      this._system,
     )
     this._sideRegistered = {
       attacker: attackerRegistered,
@@ -258,10 +258,10 @@ export class CombatSetup {
 
     // Reload abilities for the changed side
     const reg = getAvailableAbilities(
+      this._system,
       side,
       faction,
       this.getUpgradedTypes(side),
-      this._system,
     )
     this._sideRegistered[side] = reg
     this._sideAbilities[side] = flattenUnique(reg)
@@ -372,10 +372,10 @@ export class CombatSetup {
 
     // Upgrades may have changed — recalculate available abilities
     const regReset = getAvailableAbilities(
+      this._system,
       side,
       faction,
       this.getUpgradedTypes(side),
-      this._system,
     )
     this._sideRegistered[side] = regReset
     this._sideAbilities[side] = flattenUnique(regReset)
@@ -438,16 +438,16 @@ export class CombatSetup {
     // abilities (e.g. attacker-only commanders) need re-filtering against the
     // new side. Swapping the cached lists alone leaks old entries through.
     const attackerRegistered = getAvailableAbilities(
+      this._system,
       'attacker',
       this._attackerFaction,
       this.getUpgradedTypes('attacker'),
-      this._system,
     )
     const defenderRegistered = getAvailableAbilities(
+      this._system,
       'defender',
       this._defenderFaction,
       this.getUpgradedTypes('defender'),
-      this._system,
     )
     this._sideRegistered = {
       attacker: attackerRegistered,
@@ -568,16 +568,16 @@ export class CombatSetup {
 
     // Rebuild abilities for new factions
     const attackerReg = getAvailableAbilities(
+      this._system,
       'attacker',
       af,
       this.getUpgradedTypes('attacker'),
-      this._system,
     )
     const defenderReg = getAvailableAbilities(
+      this._system,
       'defender',
       df,
       this.getUpgradedTypes('defender'),
-      this._system,
     )
     this._sideRegistered = {
       attacker: attackerReg,
@@ -697,10 +697,10 @@ export class CombatSetup {
 
     if (upgradeChanged) {
       const regUpd = getAvailableAbilities(
+        this._system,
         side,
         faction,
         this.getUpgradedTypes(side),
-        this._system,
       )
       this._sideRegistered[side] = regUpd
       this._sideAbilities[side] = flattenUnique(regUpd)

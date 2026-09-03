@@ -1,3 +1,4 @@
+import { neutral } from '@/data/main/faction/neutral'
 import type { Faction } from '@/types'
 
 import { avarice_rex } from './avarice_rex'
@@ -9,7 +10,8 @@ import { ruby_monarch } from './ruby_monarch'
 import { saint_of_swords } from './saint_of_swords'
 import { sickening_lurch } from './sickening_lurch'
 
-// Twilight's Fall factions. Each contributes only a unique flagship and mech;
+// Twilight's Fall factions, in registry order (the first is the system's
+// default). Each contributes only a unique flagship and mech;
 // all other units come from the shared TF roster (see ../base-units.ts).
 // Kept separate from the TI4 roster so cross-faction TI4 aggregations
 // (e.g. Nekro's flagship pool) don't pull in TF units.
@@ -22,4 +24,6 @@ export default {
   RUBY_MONARCH: ruby_monarch,
   SAINT_OF_SWORDS: saint_of_swords,
   SICKENING_LURCH: sickening_lurch,
+  // Neutral has base-game stats and is offered in every system.
+  NEUTRAL: neutral,
 } satisfies Record<string, Faction>

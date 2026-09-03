@@ -63,11 +63,11 @@ export function prepareSimulationConfig(
       : 'TI4'
   const registered: Record<CombatSide, RegisteredAbility[]> = {
     attacker: [
-      ...getAvailableAbilities('attacker', attackerFaction, undefined, system),
+      ...getAvailableAbilities(system, 'attacker', attackerFaction),
       ...customRegistered,
     ],
     defender: [
-      ...getAvailableAbilities('defender', defenderFaction, undefined, system),
+      ...getAvailableAbilities(system, 'defender', defenderFaction),
       ...customRegistered,
     ],
   }

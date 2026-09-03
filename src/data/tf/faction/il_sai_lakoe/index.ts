@@ -5,7 +5,6 @@ import type { Faction } from '@/types'
 export const il_sai_lakoe: Faction = {
   name: 'Il Sai Lakoe, Herald of Thorns',
   icon: ilSaiLakoeIcon,
-  system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {
       BASE: {

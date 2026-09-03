@@ -7,7 +7,6 @@ import { facesOfJanovet } from './faces-of-janovet'
 export const el_nen_janovet: Faction = {
   name: 'El Nen Janovet',
   icon: elNenJanovetIcon,
-  system: 'TWILIGHTS_FALL',
   units: {
     FLAGSHIP: {
       BASE: {

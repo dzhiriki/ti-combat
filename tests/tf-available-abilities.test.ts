@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { UNIT_DISPLAY_NAMES } from '@/constants/units'
-import { tf } from '@/data'
+import * as tf from '@/data/tf'
 import { CombatSetup } from '@/hooks/combat-setup'
 import { getAvailableAbilities } from '@/hooks/combat-setup/get-available-abilities'
 import type { UnitBaseType } from '@/types'
@@ -10,7 +10,11 @@ import { combatTest } from './utils/combat-test'
 
 describe("Twilight's Fall available abilities", () => {
   it('hides Galvanized Units — there is no Galvanize mechanic in TF', () => {
-    const regs = getAvailableAbilities('attacker', 'AVARICE_REX')
+    const regs = getAvailableAbilities(
+      'TWILIGHTS_FALL',
+      'attacker',
+      'AVARICE_REX',
+    )
     expect(regs.some(r => r.ability.key === 'PRE_GALVANIZED')).toBe(false)
     // Sanity: the GENERAL slot itself and the ADVANCED phase drivers stay.
     expect(regs.some(r => r.slot === 'GENERAL')).toBe(true)
@@ -20,12 +24,16 @@ describe("Twilight's Fall available abilities", () => {
   })
 
   it('keeps Galvanized Units for TI4 factions', () => {
-    const regs = getAvailableAbilities('attacker', 'ARBOREC')
+    const regs = getAvailableAbilities('TI4', 'attacker', 'ARBOREC')
     expect(regs.some(r => r.ability.key === 'PRE_GALVANIZED')).toBe(true)
   })
 
   it('Temporal Command Suite offers every genome, Clever Genome included', () => {
-    const regs = getAvailableAbilities('attacker', 'AVARICE_REX')
+    const regs = getAvailableAbilities(
+      'TWILIGHTS_FALL',
+      'attacker',
+      'AVARICE_REX',
+    )
     const tcs = regs.find(
       r => r.ability.key === 'TF_TEMPORAL_COMMAND_SUITE',
     )!.ability
@@ -42,7 +50,11 @@ describe("Twilight's Fall available abilities", () => {
   })
 
   it('lists TF abilities and genomes alphabetically', () => {
-    const regs = getAvailableAbilities('attacker', 'AVARICE_REX')
+    const regs = getAvailableAbilities(
+      'TWILIGHTS_FALL',
+      'attacker',
+      'AVARICE_REX',
+    )
     const names = (slot: string) =>
       regs.filter(r => r.slot === slot).map(r => r.ability.name)
     const sorted = (arr: string[]) =>
@@ -52,7 +64,11 @@ describe("Twilight's Fall available abilities", () => {
   })
 
   it("lists TF unit upgrades in the UI's unit order, alphabetical within type", () => {
-    const regs = getAvailableAbilities('attacker', 'AVARICE_REX')
+    const regs = getAvailableAbilities(
+      'TWILIGHTS_FALL',
+      'attacker',
+      'AVARICE_REX',
+    )
     const upgrades = regs.filter(r => r.slot === 'TF_UNIT_UPGRADE')
     // Non-mech cards carry their unit type in the exclusive group; mechs
     // (the stacking cards) have none.
@@ -83,7 +99,11 @@ describe("Twilight's Fall available abilities", () => {
   })
 
   it('tags every TF unit upgrade with its unit type as the panel sub-header', () => {
-    const regs = getAvailableAbilities('attacker', 'AVARICE_REX')
+    const regs = getAvailableAbilities(
+      'TWILIGHTS_FALL',
+      'attacker',
+      'AVARICE_REX',
+    )
     const upgrades = regs.filter(r => r.slot === 'TF_UNIT_UPGRADE')
     const typeOf = (r: (typeof upgrades)[number]) =>
       r.ability.exclusiveGroup?.replace('TF_UNIT_UPGRADE_', '') ?? 'MECH'
@@ -109,12 +129,7 @@ describe("Twilight's Fall available abilities", () => {
   })
 
   it('neutral in a TF session matches the TF slot layout', () => {
-    const regs = getAvailableAbilities(
-      'attacker',
-      'NEUTRAL',
-      undefined,
-      'TWILIGHTS_FALL',
-    )
+    const regs = getAvailableAbilities('TWILIGHTS_FALL', 'attacker', 'NEUTRAL')
     // No OTHER catch-all, no Galvanize, no TI4 agent pool.
     expect(regs.some(r => r.slot === 'OTHER')).toBe(false)
     expect(regs.some(r => r.ability.key === 'PRE_GALVANIZED')).toBe(false)
@@ -129,7 +144,7 @@ describe("Twilight's Fall available abilities", () => {
   })
 
   it('neutral in a TI4 session keeps the agent pool, OTHER, and Galvanize', () => {
-    const regs = getAvailableAbilities('attacker', 'NEUTRAL', undefined, 'TI4')
+    const regs = getAvailableAbilities('TI4', 'attacker', 'NEUTRAL')
     expect(regs.some(r => r.slot === 'AGENT')).toBe(true)
     expect(regs.some(r => r.slot === 'OTHER')).toBe(true)
     expect(regs.some(r => r.ability.key === 'PRE_GALVANIZED')).toBe(true)
@@ -198,6 +213,7 @@ describe("Twilight's Fall available abilities", () => {
 
   it('every TF faction carries its own logo', () => {
     for (const [key, faction] of Object.entries(tf.factions)) {
+      if (key === 'NEUTRAL') continue
       expect(faction.icon, `${key} is missing an icon`).toEqual(
         expect.stringContaining('<svg'),
       )
@@ -205,7 +221,11 @@ describe("Twilight's Fall available abilities", () => {
   })
 
   it('every TF ability, genome, paradigm, and unit upgrade carries its faction logo', () => {
-    const regs = getAvailableAbilities('attacker', 'AVARICE_REX')
+    const regs = getAvailableAbilities(
+      'TWILIGHTS_FALL',
+      'attacker',
+      'AVARICE_REX',
+    )
     for (const slot of [
       'TF_ABILITY',
       'TF_GENOME',
