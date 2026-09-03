@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import type { SavedRetreatData } from '../../src/data/abilities/advanced/retreat'
+import type { SavedRetreatData } from '@/data/main'
+
 import { combatTest } from '../utils/combat-test'
 
 function getRetreatSaved(

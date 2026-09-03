@@ -6,7 +6,7 @@ import {
   extractDefaults,
 } from '@/combat'
 import { UNIT_TYPES } from '@/constants/units'
-import factions from '@/data/faction'
+import { factions } from '@/data'
 import { CombatSetup } from '@/hooks/combat-setup'
 import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
 import type { FactionKey, GameSystem } from '@/types'

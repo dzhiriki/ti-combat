@@ -106,7 +106,7 @@ describe('validateSerializedConfig', () => {
     expect(result.config.aa['FAKE_ABILITY']).toBeUndefined()
   })
 
-  // Twilight's Fall shared-deck abilities live only in TF_SHARED_REGISTERED —
+  // Twilight's Fall shared-deck abilities live only in the TF shared pool (`tf.abilities`) —
   // if the lookup misses them, every saved TF card is stripped on page
   // refresh ("Unknown ability skipped").
   it("keeps Twilight's Fall shared-deck abilities across a save/load round-trip", () => {

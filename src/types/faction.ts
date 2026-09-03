@@ -1,5 +1,5 @@
 import type { Ability } from '@/combat'
-import factions from '@/data/faction'
+import type { factions } from '@/data'
 
 import type { UnitBaseType, UnitDefinition } from './unit'
 

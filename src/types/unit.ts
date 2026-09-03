@@ -1,5 +1,5 @@
 import type { Ability } from '@/combat'
-import type baseUnits from '@/data/base-units'
+import type { baseUnits } from '@/data/main'
 
 import type { DiceGroup } from './die'
 

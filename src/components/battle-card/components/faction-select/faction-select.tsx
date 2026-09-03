@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import factions from '@/data/faction'
+import { factions } from '@/data'
 import type { Faction, FactionKey, GameSystem } from '@/types'
 import { GAME_SYSTEMS, getFactionSystem } from '@/utils/get-faction-system'
 import { namespaceSvgIds } from '@/utils/namespace-svg-ids'

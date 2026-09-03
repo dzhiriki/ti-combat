@@ -1,5 +1,4 @@
 import type { UnitCategory } from '@/constants/units'
-import { enforceFleetPool } from '@/data/abilities/advanced/fleet-pool'
 import type {
   CombatSide,
   DiceGroup,
@@ -67,6 +66,7 @@ import type {
   RuntimeAbilityList,
 } from '../types'
 import { type AbilityUtils, abilityUtils } from './ability-utils'
+import { enforceFleetPool } from './enforce-fleet-pool'
 
 // ============================================================================
 // BRANCH TYPES

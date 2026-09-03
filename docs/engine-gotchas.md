@@ -15,7 +15,17 @@ a check there too.
 - **One invoke per (ability, timing).** A second invoke with the same timing
   on one ability is silently skipped. Compose extra work into the single
   invoke instead (see `onPrepare` in
-  `tf-unit-upgrade/create-tf-unit-upgrade.ts`, added for Hel-Titan).
+  `src/data/tf/abilities/unit-upgrade/create-tf-unit-upgrade.ts`, added for Hel-Titan).
+
+- **The engine must never import from `src/data`.** The data barrels
+  (`src/data/main`, `src/data/tf`, `src/data`) evaluate every ability at
+  load time, and abilities import `declareParam` etc. from `@/combat`. An
+  engine module importing a data barrel closes a cycle where the `@/combat`
+  barrel is still mid-evaluation and `declareParam` is `undefined` for the
+  first ability that runs ("declareParam is not a function" on every test
+  file). Helpers the engine needs (`enforceFleetPool`, `collectFreeCargo`)
+  live in `src/combat/abilities-engine/api/` and are imported by the data
+  side, never the reverse.
 
 - **`resolveStep` side overrides are ability-relative.** Pass `OWN` /
   `OPPONENT` in `firing`; `resolveStep` maps them to attacker / defender from
@@ -26,7 +36,7 @@ a check there too.
   invoke objects (e.g. a shallow-cloned ability with a new key) fire only
   once between them. When re-keying a clone, clone the invokes too:
   `invoke: original.invoke.map(inv => ({ ...inv }))` (see TF_MEDDLE in
-  `twilights-fall-abilities.ts`).
+  `src/data/tf/abilities/index.ts`).
 
 - **Unit-linked GENERAL abilities become always-on when no unit definition
   carries them.** `collectAbilityCandidates` runs a config ability

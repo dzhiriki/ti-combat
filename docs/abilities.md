@@ -2,10 +2,10 @@
 
 ## File Structure
 
-Abilities are organized in `src/data/abilities/` by category:
+Data is split by game system: `src/data/main/` (Twilight Imperium 4) and `src/data/tf/` (Twilight's Fall). Each has an `index.ts` that re-exports everything (`factions`, `baseUnits`, `abilities`); code outside `src/data` imports only those index modules (or the `src/data/index.ts` aggregator for the merged `factions` record). Shared TI4 abilities are organized in `src/data/main/abilities/` by category:
 
 ```
-src/data/abilities/
+src/data/main/abilities/
   general/          — core/unit abilities (SETTINGS, UNIT_PRIORITY, PRE_DAMAGED, PRE_GALVANIZED, SUSTAIN_DAMAGE, PLANETARY_SHIELD, DISABLE_PLANETARY_SHIELD)
   advanced/         — phase/system abilities (ANTI_FIGHTER_BARRAGE, BOMBARDMENT, SPACE_CANNON_OFFENSE/DEFENSE, RETREAT, ABILITY_ORDER, CAPACITY, FLEET_POOL)
   technology/       — tech cards (ASSAULT_CANNON, PLASMA_SCORING, ...)
@@ -15,7 +15,7 @@ src/data/abilities/
   relic/            — relics (LIGHTRAIL_ORDNANCE, METALI_VOID_ARMAMENTS, ...)
 ```
 
-Faction abilities live in `src/data/faction/[faction_name]/` alongside the faction definition.
+Faction abilities live in `src/data/main/faction/[faction_name]/` (TI4) or `src/data/tf/faction/[faction_name]/` (Twilight's Fall) alongside the faction definition. Twilight's Fall shared decks live in `src/data/tf/abilities/` (`ability/`, `genome/`, `paradigm/`, `action-card/`, `unit-upgrade/`) and are assembled in `src/data/tf/abilities/index.ts`.
 
 Each ability is one file (kebab-case matching the key). File exports a single `Ability` object.
 
@@ -377,14 +377,14 @@ The call context also offers richer declarations for conditional/reroll/trigger 
 
 ### Category Abilities (technology, action-card, etc.)
 
-1. Create ability file in `src/data/abilities/[category]/`
+1. Create ability file in `src/data/main/abilities/[category]/`
 2. Export ability object
-3. Add import + array entry in `src/data/abilities/[category]/index.ts`
+3. Add import + array entry in `src/data/main/abilities/[category]/index.ts`
 
 Example — adding to technology:
 
 ```typescript
-// src/data/abilities/technology/my-tech.ts
+// src/data/main/abilities/technology/my-tech.ts
 import { type Ability } from '@/combat'
 
 type Params = { isEnabled: boolean }
@@ -401,7 +401,7 @@ export const myTech: Ability<Params> = {
 ```
 
 ```typescript
-// src/data/abilities/technology/index.ts
+// src/data/main/abilities/technology/index.ts
 import { myTech } from './my-tech'
 export default [/* ...existing */ myTech]
 ```
@@ -411,7 +411,7 @@ export default [/* ...existing */ myTech]
 Faction abilities are registered in the faction's `index.ts`:
 
 ```typescript
-// src/data/faction/my_faction/index.ts
+// src/data/main/faction/my_faction/index.ts
 import type { Faction } from '@/types'
 import { myAbility } from './my-ability'
 
@@ -442,7 +442,7 @@ Abilities attached to specific units via `ABILITIES` array in unit stats. These 
 Use `ctx.this.key` for the restriction `reason` rather than hardcoding the ability key — it keeps the ability self-contained and rename-safe.
 
 ```typescript
-// src/data/faction/mentak_coalition/fourth-moon.ts
+// src/data/main/faction/mentak_coalition/fourth-moon.ts
 export const fourthMoon: Ability = {
   key: 'FOURTH_MOON',
   name: 'Fourth Moon',

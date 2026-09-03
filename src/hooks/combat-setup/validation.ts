@@ -2,7 +2,7 @@ import { z } from 'zod/mini'
 
 import { type Ability, extractDefaults } from '@/combat'
 import { UNIT_LIMITS, UNIT_TYPES } from '@/constants/units'
-import factions from '@/data/faction'
+import { factions } from '@/data'
 
 import type { SerializedConfig } from './serialization'
 

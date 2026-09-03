@@ -1,7 +1,5 @@
 import { UNIT_TYPES } from '@/constants/units'
-import baseUnits from '@/data/base-units'
-import factions from '@/data/faction'
-import tfBaseUnits from '@/data/tf-base-units'
+import { factions, main, tf } from '@/data'
 import {
   type FactionKey,
   type UnitBaseType,
@@ -21,7 +19,8 @@ export function getFactionUnitConfig(
   const result = {} as Record<UnitBaseType, UnitDefinition>
 
   // Twilight's Fall factions use a different generic unit roster.
-  const roster = faction.system === 'TWILIGHTS_FALL' ? tfBaseUnits : baseUnits
+  const roster =
+    faction.system === 'TWILIGHTS_FALL' ? tf.baseUnits : main.baseUnits
 
   for (const unitType of UNIT_TYPES) {
     const baseUnit = roster[unitType as keyof typeof roster] as UnitDefinition

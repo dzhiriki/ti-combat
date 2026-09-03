@@ -1,6 +1,4 @@
-import { SHARED_UNIT_ABILITY_KEYS } from '@/data/abilities/general'
-import factions from '@/data/faction'
-import { TF_SHARED_REGISTERED } from '@/data/faction/twilights-fall-abilities'
+import { factions, main, tf } from '@/data'
 import type {
   CombatSide,
   Faction,
@@ -17,13 +15,6 @@ import type {
   AbilitySlot,
   RegisteredAbility,
 } from '../../combat/abilities-engine/types'
-import actionCard from '../../data/abilities/action-card'
-import advanced from '../../data/abilities/advanced'
-import agenda from '../../data/abilities/agenda'
-import environment from '../../data/abilities/environment'
-import general from '../../data/abilities/general'
-import relic from '../../data/abilities/relic'
-import technology from '../../data/abilities/technology'
 
 function tag(
   abilities: readonly Ability[],
@@ -70,13 +61,7 @@ const allCommanderAbilities = Object.values(factions).flatMap(
 // cards, etc.) live in baseRegistered. Such abilities must NOT also appear
 // in the catch-all OTHER slot, even if their invokes are marked external.
 const alreadyDisplayedKeys = new Set<string>([
-  ...general.map(a => a.key),
-  ...advanced.map(a => a.key),
-  ...environment.map(a => a.key),
-  ...agenda.map(a => a.key),
-  ...technology.map(a => a.key),
-  ...actionCard.map(a => a.key),
-  ...relic.map(a => a.key),
+  ...main.abilities.map(r => r.ability.key),
   ...allPromissoryAbilities.map(a => a.key),
   ...allAgentAbilities.map(a => a.key),
   ...allCommanderAbilities.map(a => a.key),
@@ -138,13 +123,7 @@ const allUnitAbilities: Ability[] = []
 }
 
 const baseRegistered: RegisteredAbility[] = [
-  ...tag(general, 'GENERAL'),
-  ...tag(advanced, 'ADVANCED'),
-  ...tag(environment, 'ENVIRONMENT'),
-  ...tag(agenda, 'AGENDA'),
-  ...tag(technology, 'TECHNOLOGY'),
-  ...tag(actionCard, 'ACTION_CARD'),
-  ...tag(relic, 'RELIC'),
+  ...main.abilities,
   ...tag(allPromissoryAbilities, 'PROMISSORY'),
   ...tag(allAgentAbilities, 'AGENT'),
   ...tag(allCommanderAbilities, 'COMMANDER'),
@@ -173,7 +152,7 @@ const allAbilitiesForLookup: Ability[] = [
   ...allFactionAbilities,
   // The Twilight's Fall shared pool — bespoke keys (TF_*) live nowhere else,
   // and without them URL/refresh validation drops any saved TF card config.
-  ...TF_SHARED_REGISTERED.map(r => r.ability),
+  ...tf.abilities.map(r => r.ability),
 ]
 
 export function getAllAbilities(): Ability[] {
@@ -228,7 +207,7 @@ function collectUnitAbilities(
       ...(unitDef.BASE.ABILITIES ?? []),
       ...(unitDef.UPGRADED?.ABILITIES ?? []),
     ]) {
-      if (SHARED_UNIT_ABILITY_KEYS.has(ability.key)) continue
+      if (main.SHARED_UNIT_ABILITY_KEYS.has(ability.key)) continue
       if (seen.has(ability.key)) continue
       if (!ability.headerUI && !ability.uiConfig) continue
       if (ability.side && ability.side !== side) continue
@@ -379,11 +358,9 @@ export function getAvailableAbilities(
   // Neutral in a TF session gets only the genome deck — the TF analog of the
   // agent pool a TI4 neutral is offered.
   const tfShared: RegisteredAbility[] = isTwilightsFall
-    ? TF_SHARED_REGISTERED.filter(
-        reg => !reg.ability.side || reg.ability.side === side,
-      )
+    ? tf.abilities.filter(reg => !reg.ability.side || reg.ability.side === side)
     : isTfNeutral
-      ? TF_SHARED_REGISTERED.filter(
+      ? tf.abilities.filter(
           reg =>
             reg.slot === 'TF_GENOME' &&
             (!reg.ability.side || reg.ability.side === side),

@@ -1,4 +1,4 @@
-import factions from '@/data/faction'
+import { factions } from '@/data'
 import type { FactionKey, GameSystem } from '@/types'
 
 export const GAME_SYSTEMS: readonly GameSystem[] = ['TI4', 'TWILIGHTS_FALL']

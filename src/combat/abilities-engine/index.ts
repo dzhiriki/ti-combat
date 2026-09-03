@@ -19,6 +19,8 @@ export {
   type SideApi,
 } from './api/ability-api'
 export { abilityUtils } from './api/ability-utils'
+export { collectFreeCargo } from './api/collect-free-cargo'
+export { enforceFleetPool } from './api/enforce-fleet-pool'
 export { declareParam } from './declare-param'
 export type {
   AbilitiesOverride,

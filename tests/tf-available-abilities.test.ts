@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { UNIT_DISPLAY_NAMES } from '@/constants/units'
-import { twilightsFallFactions } from '@/data/faction/twilights-fall'
+import { tf } from '@/data'
 import { CombatSetup } from '@/hooks/combat-setup'
 import { getAvailableAbilities } from '@/hooks/combat-setup/get-available-abilities'
 import type { UnitBaseType } from '@/types'
@@ -197,7 +197,7 @@ describe("Twilight's Fall available abilities", () => {
   })
 
   it('every TF faction carries its own logo', () => {
-    for (const [key, faction] of Object.entries(twilightsFallFactions)) {
+    for (const [key, faction] of Object.entries(tf.factions)) {
       expect(faction.icon, `${key} is missing an icon`).toEqual(
         expect.stringContaining('<svg'),
       )
