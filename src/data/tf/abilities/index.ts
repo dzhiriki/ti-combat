@@ -16,7 +16,11 @@ import titansOfUlIcon from '@/assets/faction/titans_of_ul.svg?raw'
 import universitiesOfJolNarIcon from '@/assets/faction/universities_of_jol_nar.svg?raw'
 import yinBrotherhoodIcon from '@/assets/faction/yin_brotherhood.svg?raw'
 import yssarilTribesIcon from '@/assets/faction/yssaril_tribes.svg?raw'
-import type { Ability, RegisteredAbility } from '@/combat'
+import {
+  type Ability,
+  hasStaticInvokes,
+  type RegisteredAbility,
+} from '@/combat'
 import { UNIT_DISPLAY_NAMES } from '@/constants/units'
 import { solarFlare } from '@/data/main/abilities/action-card/solar-flare'
 import { heartOfIxth } from '@/data/main/abilities/relic/heart-of-ixth'
@@ -40,15 +44,12 @@ import { tellurian } from '@/data/main/faction/titans_of_ul/tellurian'
 import { agnlanOln } from '@/data/main/faction/universities_of_jol_nar/agnlan-oln'
 import { devotion } from '@/data/main/faction/yin_brotherhood/devotion'
 import { indoctrination } from '@/data/main/faction/yin_brotherhood/indoctrination'
-import {
-  collectCopyable,
-  createTfSingularity,
-} from '@/data/tf/abilities/ability/create-tf-singularity'
+import { createTfSingularity } from '@/data/tf/abilities/ability/create-tf-singularity'
 import { planesplitter } from '@/data/tf/abilities/ability/planesplitter'
 import { proximaTargetingVi } from '@/data/tf/abilities/ability/proxima-targeting-vi'
 import { smotheringPresence } from '@/data/tf/abilities/ability/smothering-presence'
 import { supercharge } from '@/data/tf/abilities/ability/supercharge'
-import { createTfTemporalCommandSuite } from '@/data/tf/abilities/ability/temporal-command-suite'
+import { tfTemporalCommandSuite } from '@/data/tf/abilities/ability/temporal-command-suite'
 import { atomize } from '@/data/tf/abilities/action-card/atomize'
 import { converge } from '@/data/tf/abilities/action-card/converge'
 import { divinity } from '@/data/tf/abilities/action-card/divinity'
@@ -57,7 +58,7 @@ import { hardlight } from '@/data/tf/abilities/action-card/hardlight'
 import { lash } from '@/data/tf/abilities/action-card/lash'
 import { meld } from '@/data/tf/abilities/action-card/meld'
 import { spark } from '@/data/tf/abilities/action-card/spark'
-import { createCleverGenome } from '@/data/tf/abilities/genome/clever-genome'
+import { cleverGenome } from '@/data/tf/abilities/genome/clever-genome'
 import { mirrorGenome } from '@/data/tf/abilities/genome/mirror-genome'
 import { splittingGenome } from '@/data/tf/abilities/genome/splitting-genome'
 import { valiantGenome } from '@/data/tf/abilities/genome/valiant-genome'
@@ -182,18 +183,13 @@ const tfAbilities: RegisteredAbility[] = [
   },
   {
     slot: 'TF_ABILITY',
-    // The genome deck is injected lazily — `tfGenomes` is defined further
-    // down, and the getter only runs at UI render / combat PREPARE time.
     // Clever Genome IS a row of its own: as a separate ability instance it
     // fires the copied text a SECOND time in the same timing window (2×
     // Splitting Genome on one destruction), which extra uses on the copied
     // genome cannot do — the engine runs a config ability once per pass.
     // Its tokens ready the Clever card itself; which text it fires stays
     // governed by the Clever panel's own genome dropdown.
-    ability: {
-      ...createTfTemporalCommandSuite(() => tfGenomes.map(r => r.ability)),
-      icon: nomadIcon,
-    },
+    ability: { ...tfTemporalCommandSuite, icon: nomadIcon },
   },
   {
     slot: 'TF_ABILITY',
@@ -251,18 +247,13 @@ const tfAbilities: RegisteredAbility[] = [
   },
 ]
 
-// Singularity X / Y / Z copy from the Abilities deck only (never unit upgrades,
-// and — since they are built from `tfAbilities` — never each other).
+// Singularity X / Y / Z copy from the Abilities deck only (never unit
+// upgrades or singularities themselves — see `copyables` in
+// create-tf-singularity.ts).
 const tfSingularities: RegisteredAbility[] = (['X', 'Y', 'Z'] as const).map(
   letter => ({
     slot: 'TF_ABILITY' as const,
-    ability: {
-      ...createTfSingularity(
-        letter,
-        tfAbilities.map(r => collectCopyable(r.ability)),
-      ),
-      icon: nekroVirusIcon,
-    },
+    ability: { ...createTfSingularity(letter), icon: nekroVirusIcon },
   }),
 )
 
@@ -270,7 +261,10 @@ const byName = (a: RegisteredAbility, b: RegisteredAbility) =>
   a.ability.name.localeCompare(b.ability.name)
 
 // ── Genomes (agent-style exhaust effects), alphabetized ────────────────
-const tfGenomesUnsorted: RegisteredAbility[] = [
+// Clever Genome (the TF Ssruu) copies the text of one other genome from the
+// side's registered TF_GENOME abilities at runtime, so it joins the deck
+// alongside them like any other genome.
+const tfGenomes: RegisteredAbility[] = [
   {
     slot: 'TF_GENOME',
     ability: brand(
@@ -288,6 +282,10 @@ const tfGenomesUnsorted: RegisteredAbility[] = [
       'At the start of a space combat round: You may exhaust this card to choose 1 ship in the active system; that ship rolls 1 additional die during this combat round.',
       baronyOfLetnevIcon,
     ),
+  },
+  {
+    slot: 'TF_GENOME',
+    ability: { ...cleverGenome, icon: yssarilTribesIcon },
   },
   {
     slot: 'TF_GENOME',
@@ -314,19 +312,7 @@ const tfGenomesUnsorted: RegisteredAbility[] = [
   },
   { slot: 'TF_GENOME', ability: { ...valiantGenome, icon: lastBastionIcon } },
 ]
-// Clever Genome (the TF Ssruu) copies the text of one other genome from the
-// deck above, so it is built from the final branded genome objects and joins
-// the deck alongside them.
-const tfGenomes = [
-  ...tfGenomesUnsorted,
-  {
-    slot: 'TF_GENOME' as const,
-    ability: {
-      ...createCleverGenome(tfGenomesUnsorted.map(r => r.ability)),
-      icon: yssarilTribesIcon,
-    },
-  },
-].sort(byName)
+tfGenomes.sort(byName)
 
 export const TF_SHARED_REGISTERED: readonly RegisteredAbility[] = [
   ...[...tfAbilities, ...tfSingularities].sort(byName),
@@ -398,7 +384,9 @@ export const TF_SHARED_REGISTERED: readonly RegisteredAbility[] = [
       key: 'TF_MEDDLE',
       name: 'Meddle',
       description: 'When any die is rolled: Add or subtract 1 from its result.',
-      invoke: heartOfIxth.invoke.map(inv => ({ ...inv })),
+      invoke: hasStaticInvokes(heartOfIxth)
+        ? heartOfIxth.invoke.map(inv => ({ ...inv }))
+        : heartOfIxth.invoke,
     },
   },
   { slot: 'TF_ACTION_CARD', ability: meld },

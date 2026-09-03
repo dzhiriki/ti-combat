@@ -1,4 +1,4 @@
-import type { Ability, AbilityReadContext } from '@/combat'
+import type { AbilityInvoke, AbilityReadContext } from '@/combat'
 import { UNIT_WORTH } from '@/constants/units'
 import { janovetInherits } from '@/data/tf/faction/el_nen_janovet/faces-of-janovet'
 import type { UnitBaseType, UnitId, UnitType } from '@/types'
@@ -42,7 +42,8 @@ function bestTarget(ctx: AbilityReadContext): UnitId | undefined {
 // unit). Attached to the Linkship upgrade ability, so it only runs while that
 // upgrade is enabled. The Faces of Janovet inherits the text ability, so its
 // retreating flagship also triggers the destroy.
-export const linkshipRetreatInvoke: Ability['invoke'][number] = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const linkshipRetreatInvoke: AbilityInvoke<any> = {
   timing: 'WHEN_RETREAT',
   isCallable: (_params, ctx, unitId) => {
     const key = ctx.api.own.getUnitVariantKey(unitId)

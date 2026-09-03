@@ -77,10 +77,53 @@ a check there too.
 
 - **One external invoke poisons the rest on non-owner sides.** An ability
   with ANY `external: true` invoke dispatches ONLY its external invokes on a
-  side that doesn't own it (`passesCrossFactionFilter`). A wrapper ability
-  that aggregates invokes from mixed sources (some agent-derived/external,
-  some not) must mark ALL of them external, or the non-external ones
-  silently never fire (see `wrapInvoke` in `tf-genome/clever-genome.ts`).
+  side that doesn't own it (the cross-faction filter inlined in
+  `buildInvokes` / `addAbilityInvokes`, `abilities-engine.ts`). A wrapper
+  ability that aggregates invokes from mixed sources (some agent-derived/
+  external, some not) must mark ALL of them external, or the non-external
+  ones silently never fire (see `wrapInvoke` in `tf-genome/clever-genome.ts`).
+
+- **`invoke` may be a factory, but only for config abilities.**
+  `Ability.invoke` can be `(params, ctx) => AbilityInvoke[]` instead of a
+  static array — the engine calls `resolveInvokes` to resolve it when it
+  builds a side's invoke index and again on every param change to that
+  ability (`updateAbilityConfig` → `hasDynamicInvokes` in `ability-api.ts`),
+  so the list can depend on the ability's own params (see
+  `tests/engine/function-invoke.test.ts`). The no-unit external fallback in
+  `collectAbilityCandidates` and the OTHER-slot detection in
+  `get-available-abilities` read `ability.invoke` without a side context and
+  treat a factory as "no external invokes", and `removeUnitInvokes`'s
+  per-unit-death sweep skips candidates that fail `hasStaticInvokes` rather
+  than resolving them, since resolving would need per-unit params/ctx it
+  doesn't have on that path — so unit-sourced candidates must keep the array
+  form (`tests/ability-invariants.test.ts` enforces it). Code that reads
+  `ability.invoke` directly as an array (clone-for-rekey copies,
+  PREPARE-invoke extraction for Singularity/Ssruu-style copiers) must guard
+  with `hasStaticInvokes(ability)` first — see the guards in
+  `nekro_virus/index.ts`, `nekro_virus/technological-singularity.ts`,
+  `create-tf-singularity.ts`, `ssruu.ts`, `clever-genome.ts`, and the
+  TF_MEDDLE clone in `tf/abilities/index.ts`.
+
+- **Factory `invoke` is re-resolved on every param change** of that ability
+  (`updateAbilityConfig`), not only on `isEnabled`/`uses` — `addAbilityInvokes`
+  calls `removeInvokeEntries` and then repopulates that ability's entries,
+  while a dispatch pass may still be iterating that side's invoke
+  collections. Keep factories pure and cheap; never cache by params inside
+  them. `tests/engine/function-invoke.test.ts` (the SWITCHER case) is the
+  only coverage of this resolve-and-splice path today. Reconcile and the
+  engine also don't resolve a factory identically: `reconcileAbilityOrder`
+  (`reconcile.ts`) calls it with `sideConfig[key] ?? ability.params` — the
+  UI config, no live overlay — while the engine (`abilities-engine.ts`)
+  resolves it with the merged base+live params. The two agree before combat
+  starts; a factory that branches on a live-overlay-only value would see
+  different lists in the two places. `updateAbilityConfig` re-resolves the
+  factory BEFORE it runs the ability's `onParamSet`, so a factory must not
+  branch on a value that `onParamSet` derives; key it on the raw param the
+  caller wrote (Ssruu keys on `agentKey`, Clever Genome on `genomeKey`).
+
+- **A lazy faction sees only static factions.** `DataRegistry.factions`
+  excludes every definition that has a lazy part, so two lazy factions
+  cannot read each other. Nekro is the only lazy faction today.
 
 - **Config abilities resolve before unit-attached abilities within a timing
   pass.** A unit ability's PREPARE cannot pre-empt an ADVANCED phase driver's

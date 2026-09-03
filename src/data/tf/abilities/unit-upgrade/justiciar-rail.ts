@@ -1,5 +1,5 @@
 import { parseVariantId } from '@/combat'
-import type { Ability } from '@/combat/abilities-engine/types'
+import type { AbilityInvoke } from '@/combat/abilities-engine/types'
 import type { UnitType } from '@/types'
 
 // "Hits produced by this unit must be assigned to non-fighter ships, if
@@ -7,7 +7,8 @@ import type { UnitType } from '@/types'
 // pattern), NOT via the step-wide Graviton hook in the SCO phase driver —
 // other Space Cannon sources on the same side (e.g. Lightrail Ordnance space
 // docks) keep their unrestricted hits.
-export const justiciarRailScInvoke: Ability['invoke'][number] = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const justiciarRailScInvoke: AbilityInvoke<any> = {
   timing: 'BEFORE_UNIT_ABILITY_ROLL',
   context: 'SPACE_CANNON_OFFENSE',
   call: ctx => {

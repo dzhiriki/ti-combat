@@ -1,3 +1,4 @@
+import { createLookups } from '@/combat'
 import type { CombatSide, FactionKey, GameSystem } from '@/types'
 import { getFactionSystem } from '@/utils/get-faction-system'
 
@@ -88,6 +89,7 @@ export function prepareSimulationConfig(
     attacker: flattenUnique(registered.attacker),
     defender: flattenUnique(registered.defender),
   }
+  const lookups = createLookups(registered)
 
   const savedParams = snapshotConsumerParams(config, abilities)
   // Materialize every registered ability's static defaults into the config so
@@ -96,14 +98,21 @@ export function prepareSimulationConfig(
   // snapshot/restore must not capture these defaults and overwrite reconciled
   // sync values. Mirrors the UI store's setup (combat-setup.ts).
   initializeAbilityDefaults(config, abilities)
-  reconcileAbilitiesConfig(config, abilities, combatMode)
+  reconcileAbilitiesConfig(
+    config,
+    abilities,
+    combatMode,
+    undefined,
+    undefined,
+    lookups,
+  )
   restoreConsumerParams(config, abilities, savedParams)
   // After restore, sync-source params with declared limits may carry
   // user-supplied values that exceed the cap. Clamp them in place without
   // re-expanding the valid list so that order-mode params (single-element
   // tuples) and user-trimmed lists are not affected.
   clampLimitParams(config, abilities)
-  resetSettingsToBase(config, abilities)
+  resetSettingsToBase(config, abilities, lookups)
 
   return {
     attacker: {

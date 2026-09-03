@@ -5,6 +5,7 @@ import {
   type CombatMode,
   CombatState,
   type CombatStateData,
+  createLookups,
   extractDefaults,
   getOpponentSide,
   type RegisteredAbility,
@@ -36,6 +37,7 @@ import {
 import {
   initializeAbilityDefaults,
   reconcileAbilitiesConfig,
+  type SideLookups,
   type SyncSnapshots,
 } from './reconcile'
 import {
@@ -85,6 +87,7 @@ export class CombatSetup {
   private _abilities: Record<CombatSide, SideAbilitiesConfig>
   private _sideAbilities: Record<CombatSide, Ability[]>
   private _sideRegistered!: Record<CombatSide, RegisteredAbility[]>
+  private _lookups!: SideLookups
   private _unitAbilityKeys: Record<CombatSide, ReadonlySet<string>>
   private _factionOwnedKeys: Record<CombatSide, ReadonlySet<string>>
   private _stateData: CombatStateData
@@ -119,6 +122,7 @@ export class CombatSetup {
       attacker: attackerRegistered,
       defender: defenderRegistered,
     }
+    this._lookups = createLookups(this._sideRegistered)
     this._sideAbilities = {
       attacker: flattenUnique(attackerRegistered),
       defender: flattenUnique(defenderRegistered),
@@ -163,6 +167,7 @@ export class CombatSetup {
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
 
     const wrapState = CombatState.fromDataStandalone(
@@ -264,6 +269,7 @@ export class CombatSetup {
       this.getUpgradedTypes(side),
     )
     this._sideRegistered[side] = reg
+    this._lookups = createLookups(this._sideRegistered)
     this._sideAbilities[side] = flattenUnique(reg)
     this._unitAbilityKeys[side] = getUnitDefinitionAbilityKeys(faction)
     this._factionOwnedKeys[side] = getFactionOwnedAbilityKeys(faction)
@@ -299,6 +305,7 @@ export class CombatSetup {
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     this.rebuildEngine()
   }
@@ -336,6 +343,7 @@ export class CombatSetup {
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     // Force new stateData reference so React memoization triggers
     this._stateData = { ...this._stateData }
@@ -354,6 +362,7 @@ export class CombatSetup {
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     this.rebuildEngine()
   }
@@ -378,6 +387,7 @@ export class CombatSetup {
       this.getUpgradedTypes(side),
     )
     this._sideRegistered[side] = regReset
+    this._lookups = createLookups(this._sideRegistered)
     this._sideAbilities[side] = flattenUnique(regReset)
     reconcileAbilitiesConfig(
       this._abilities,
@@ -385,6 +395,7 @@ export class CombatSetup {
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     this.rebuildEngine()
   }
@@ -402,6 +413,7 @@ export class CombatSetup {
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     // Force new stateData reference so React memoization triggers
     this._stateData = { ...this._stateData }
@@ -453,6 +465,7 @@ export class CombatSetup {
       attacker: attackerRegistered,
       defender: defenderRegistered,
     }
+    this._lookups = createLookups(this._sideRegistered)
     this._sideAbilities = {
       attacker: flattenUnique(attackerRegistered),
       defender: flattenUnique(defenderRegistered),
@@ -484,6 +497,7 @@ export class CombatSetup {
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     this.rebuildEngine()
   }
@@ -518,6 +532,7 @@ export class CombatSetup {
       this._combatMode,
       undefined,
       this._stateData,
+      this._lookups,
     )
 
     return {
@@ -583,6 +598,7 @@ export class CombatSetup {
       attacker: attackerReg,
       defender: defenderReg,
     }
+    this._lookups = createLookups(this._sideRegistered)
     this._sideAbilities = {
       attacker: flattenUnique(attackerReg),
       defender: flattenUnique(defenderReg),
@@ -605,6 +621,7 @@ export class CombatSetup {
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
 
     // Apply URL ability params on top of reconciled defaults
@@ -650,6 +667,7 @@ export class CombatSetup {
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     this.rebuildEngine()
   }
@@ -703,6 +721,7 @@ export class CombatSetup {
         this.getUpgradedTypes(side),
       )
       this._sideRegistered[side] = regUpd
+      this._lookups = createLookups(this._sideRegistered)
       this._sideAbilities[side] = flattenUnique(regUpd)
     }
     reconcileAbilitiesConfig(
@@ -711,6 +730,7 @@ export class CombatSetup {
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     this.rebuildEngine()
   }
@@ -762,10 +782,12 @@ export class CombatSetup {
     if (ability?.onParamSet) {
       const oldParams = this._abilities[side][abilityKey]
       if (oldParams) {
+        const ctx = { abilities: this._lookups[side], this: ability }
         for (const key of Object.keys(params)) {
           if (params[key] !== oldParams[key]) {
             finalParams =
-              ability.onParamSet(finalParams, key, params[key]) ?? finalParams
+              ability.onParamSet(finalParams, key, params[key], ctx) ??
+              finalParams
           }
         }
       }

@@ -1,3 +1,5 @@
+import { hasStaticInvokes } from '@/combat'
+import { FACTION_KEY_TO_SLOT, unitSlot } from '@/constants/ability-slots'
 import * as main from '@/data/main'
 import * as tf from '@/data/tf'
 import type {
@@ -26,24 +28,10 @@ function tag(
 }
 
 function hasExternalInvoke(ability: Ability): boolean {
-  return ability.invoke.some(inv => inv.external === true)
-}
-
-const FACTION_KEY_TO_SLOT = {
-  faction: 'FACTION_ABILITY',
-  technology: 'FACTION_TECHNOLOGY',
-  unit: 'FACTION_UNIT',
-  promissory: 'PROMISSORY',
-  agent: 'AGENT',
-  commander: 'COMMANDER',
-  hero: 'FACTION_HERO',
-  breakthrough: 'FACTION_BREAKTHROUGH',
-} as const satisfies Record<string, AbilitySlot>
-
-function unitSlot(baseType: UnitBaseType): AbilitySlot {
-  if (baseType === 'FLAGSHIP') return 'FACTION_FLAGSHIP'
-  if (baseType === 'MECH') return 'FACTION_MECH'
-  return 'FACTION_UNIT'
+  return (
+    hasStaticInvokes(ability) &&
+    ability.invoke.some(inv => inv.external === true)
+  )
 }
 
 // Every faction in every system (Neutral is in both rosters — dedup by

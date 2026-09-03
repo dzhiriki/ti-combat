@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import {
   type Ability,
-  type AbilityReadContext,
   extractDefaults,
+  hasStaticInvokes,
+  withRunningAbility,
 } from '@/combat'
 import { UNIT_TYPES } from '@/constants/units'
 import * as main from '@/data/main'
@@ -56,8 +57,13 @@ describe('engine invariants', () => {
     // Guarded invokes with mutually exclusive isCallable are a legitimate
     // pattern (Ssruu wraps every agent's invokes), but two UNGUARDED invokes
     // sharing a timing means the second can never fire.
+    // Factory invokes are resolved per params and produce fresh wrapper
+    // objects, so neither rule can be checked statically; they return the
+    // selected target's invokes, which are checked here on the target
+    // itself.
     const violations: string[] = []
     for (const [ability, label] of collectAllAbilities()) {
+      if (!hasStaticInvokes(ability)) continue
       const unguarded = new Set<string>()
       for (const inv of ability.invoke) {
         if (inv.isCallable) continue
@@ -76,9 +82,14 @@ describe('engine invariants', () => {
     // Invoke dedup is by object identity: two abilities sharing an invoke
     // object fire only once between them. Re-keyed clones must clone their
     // invokes too (see TF_MEDDLE in engine-gotchas.md).
+    // Factory invokes are resolved per params and produce fresh wrapper
+    // objects, so neither rule can be checked statically; they return the
+    // selected target's invokes, which are checked here on the target
+    // itself.
     const violations: string[] = []
     const owner = new Map<object, string>()
     for (const [ability, label] of collectAllAbilities()) {
+      if (!hasStaticInvokes(ability)) continue
       for (const inv of ability.invoke) {
         const prev = owner.get(inv)
         if (prev !== undefined && prev !== label) {
@@ -87,6 +98,27 @@ describe('engine invariants', () => {
           )
         }
         owner.set(inv, label)
+      }
+    }
+    expect(violations).toEqual([])
+  })
+
+  it('no unit-attached ability uses the factory invoke form', () => {
+    // The no-unit external fallback and the OTHER-slot detection cannot
+    // evaluate a factory without a side context (engine-gotchas.md).
+    const violations: string[] = []
+    for (const faction of [
+      ...Object.values(main.factions),
+      ...Object.values(tf.factions),
+    ]) {
+      for (const unitDef of Object.values(faction.units)) {
+        if (!unitDef) continue
+        for (const stats of [unitDef.BASE, unitDef.UPGRADED]) {
+          for (const a of stats?.ABILITIES ?? []) {
+            if (!hasStaticInvokes(a))
+              violations.push(`${faction.name} ${a.key}`)
+          }
+        }
       }
     }
     expect(violations).toEqual([])
@@ -155,16 +187,11 @@ function collectDisplayed(): DisplayedEntry[] {
           }
           let items: unknown
           if (typeof ability.uiConfig === 'function') {
-            const ctx = setup.getReadContext(side) as AbilityReadContext & {
-              ability?: Ability
-            }
-            const prev = ctx.ability
-            ctx.ability = ability
-            try {
-              items = ability.uiConfig(ctx, params)
-            } finally {
-              ctx.ability = prev
-            }
+            const ctx = setup.getReadContext(side)
+            const uiConfig = ability.uiConfig
+            items = withRunningAbility(ctx, ability, () =>
+              uiConfig(ctx, params),
+            )
           } else {
             items = ability.uiConfig
           }

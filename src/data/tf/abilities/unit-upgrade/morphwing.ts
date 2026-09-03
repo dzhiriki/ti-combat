@@ -1,4 +1,4 @@
-import type { Ability } from '@/combat'
+import type { Ability, AbilityInvoke } from '@/combat'
 import type { UnitBaseType } from '@/types'
 
 export const morphwingDeclareParamChange: NonNullable<
@@ -12,7 +12,8 @@ export const morphwingDeclareParamChange: NonNullable<
 // Defense onwards. Matriarch scopes this with `side: 'attacker'`; a shared
 // upgrade card can't — the ability also carries the stat block both sides
 // need — so the invoke gates on the side itself.
-export const morphwingCommitInvoke: Ability['invoke'][number] = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const morphwingCommitInvoke: AbilityInvoke<any> = {
   timing: 'COMMIT_UNITS',
   isCallable: (_params, ctx) => ctx.side === 'attacker',
   call: ctx => {

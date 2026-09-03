@@ -17,4 +17,5 @@ dist
 .worktrees
 docs/plans
 docs/superpowers
+.superpowers
 .wrangler

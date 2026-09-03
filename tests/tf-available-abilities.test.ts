@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { extractDefaults, withRunningAbility } from '@/combat'
 import { UNIT_DISPLAY_NAMES } from '@/constants/units'
 import * as tf from '@/data/tf'
 import { CombatSetup } from '@/hooks/combat-setup'
@@ -29,18 +30,20 @@ describe("Twilight's Fall available abilities", () => {
   })
 
   it('Temporal Command Suite offers every genome, Clever Genome included', () => {
-    const regs = getAvailableAbilities(
-      'TWILIGHTS_FALL',
-      'attacker',
-      'AVARICE_REX',
+    const setup = new CombatSetup()
+    setup.setSystem('TWILIGHTS_FALL')
+    setup.setFaction('attacker', 'AVARICE_REX')
+    const tcs = setup
+      .getAvailableAbilities('attacker')
+      .find(r => r.ability.key === 'TF_TEMPORAL_COMMAND_SUITE')!.ability
+    const ctx = setup.getReadContext('attacker')
+    type UiFn = (
+      c: typeof ctx,
+      p: Record<string, unknown>,
+    ) => { items: { value: string }[] }[]
+    const [genomeList] = withRunningAbility(ctx, tcs, () =>
+      (tcs.uiConfig as unknown as UiFn)(ctx, extractDefaults(tcs)),
     )
-    const tcs = regs.find(
-      r => r.ability.key === 'TF_TEMPORAL_COMMAND_SUITE',
-    )!.ability
-    // The factory's uiConfig ignores its arguments — safe to call bare.
-    const [genomeList] = (
-      tcs.uiConfig as unknown as () => { items: { value: string }[] }[]
-    )()
     const values = genomeList.items.map(i => i.value)
     // Clever Genome is a separate ability instance — re-readying it fires
     // the copied text a second time in the same window, so it gets a row.

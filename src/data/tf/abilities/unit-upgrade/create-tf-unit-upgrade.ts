@@ -1,4 +1,4 @@
-import type { Ability, AbilityCallContext } from '@/combat'
+import type { Ability, AbilityCallContext, AbilityInvoke } from '@/combat'
 import { planetaryShield } from '@/data/main/abilities/general/planetary-shield'
 import { sustainDamage } from '@/data/main/abilities/general/sustain-damage'
 import type { DiceGroup, UnitBaseType, UnitStats } from '@/types'
@@ -54,7 +54,7 @@ export interface TfUnitUpgradeConfig {
   onPrepare?: (ctx: AbilityCallContext) => void
   // Extra ability invokes beyond the PREPARE stat application (e.g. Linkship's
   // WHEN_RETREAT destroy). They fire only while the upgrade is enabled.
-  invokes?: Ability['invoke']
+  invokes?: AbilityInvoke[]
   // Extra params merged onto { isEnabled, uses } — e.g. Exotrireme's
   // sacrifice/target priorities (and its finite `uses` override).
   extraParams?: Record<string, unknown>

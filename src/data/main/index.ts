@@ -1,5 +1,7 @@
 import type { Ability, AbilitySlot, RegisteredAbility } from '@/combat'
+import type { UnitDefinition } from '@/types'
 
+import { resolveFactions } from '../registry'
 import actionCard from './abilities/action-card'
 import advanced from './abilities/advanced'
 import agenda from './abilities/agenda'
@@ -7,6 +9,8 @@ import environment from './abilities/environment'
 import general from './abilities/general'
 import relic from './abilities/relic'
 import technology from './abilities/technology'
+import baseUnits from './base-units'
+import factionDefinitions from './faction'
 
 // Twilight Imperium 4 (base + expansions): the faction roster, the generic
 // unit roster, and the shared (non-faction) ability pool. `src/data/tf`
@@ -15,7 +19,6 @@ import technology from './abilities/technology'
 
 export { SHARED_UNIT_ABILITY_KEYS } from './abilities/general'
 export { default as baseUnits } from './base-units'
-export { default as factions } from './faction'
 
 function tag(
   abilities: readonly Ability[],
@@ -36,6 +39,18 @@ export const abilities: readonly RegisteredAbility[] = [
   ...tag(actionCard, 'ACTION_CARD'),
   ...tag(relic, 'RELIC'),
 ]
+
+// Lazy faction definitions (Nekro) resolve against the static roster and
+// the shared decks above; the shared decks import no faction module, so
+// there is no cycle here.
+export const factions = resolveFactions(
+  'TI4',
+  // base-units' literal COMBAT: number[] doesn't structurally match
+  // DiceGroup's tuple type, so the cast needs an `unknown` bridge.
+  baseUnits as unknown as Readonly<Record<string, UnitDefinition>>,
+  abilities,
+  factionDefinitions,
+)
 
 // Engine hooks that live next to the ability they belong to.
 export type { SavedRetreatData } from './abilities/advanced/retreat'

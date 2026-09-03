@@ -136,6 +136,21 @@ context: 'AFB' // Only during AFB phase
 context: ['BOMBARDMENT', 'SPACE_CANNON_OFFENSE'] // During either phase
 ```
 
+### Factory form
+
+`invoke` may be a function of the ability's merged params and a lookup context. The engine calls it when it builds a side's invoke index and again after any param of the ability changes, so a selector ability registers only what it selected:
+
+```typescript
+invoke: (params, ctx) => {
+  const agent = ctx.abilities.own
+    .get('AGENT')
+    .find(a => a.key === params.agentKey)
+  return agent ? resolveInvokes(agent, params, ctx).map(wrap) : []
+}
+```
+
+Factories must be pure and cheap. Only config abilities may use this form; unit-attached abilities keep the array (see engine-gotchas). Use `resolveInvokes(ability, params, ctx)` from `@/combat` to read another ability's list, and `hasStaticInvokes(ability)` when you need the array itself.
+
 ## Timing System
 
 Timings define when abilities fire. They run in this order during combat:
@@ -244,6 +259,23 @@ interface AbilityCallContext {
 ```
 
 `own` / `opponent` are relative to the ability's side, not attacker/defender. The call context additionally exposes dice-roll declaration helpers (`declareReroll`, `declareHitPoolTransform`), `transitionTo`, `rollDice`, and `resolveStep`. Its `firing` override likewise accepts ability-relative `OWN` / `OPPONENT` values and maps them to combat sides internally — see `docs/dice-math.md` and the type definitions in `abilities-engine/types.ts`.
+
+### AbilityLookupContext (declare hooks, invoke factories)
+
+`onParamSet`, `declareParamChange`, `declareSubtype`, and factory `invoke` receive a trailing `ctx: AbilityLookupContext`:
+
+```typescript
+interface AbilityLookupContext {
+  readonly abilities: OwnOpponentContext<RuntimeAbilityList> // own / opponent
+  readonly this: Ability // the ability being evaluated
+}
+interface RuntimeAbilityList {
+  readonly all: readonly Ability[]
+  get(slot: AbilitySlot): readonly Ability[] // registration order, cached
+}
+```
+
+`AbilityReadContext` and `AbilityCallContext` carry the same members, so `uiConfig` and invokes use `ctx.abilities.own.get('AGENT')` directly (Ssruu, Nomad's Temporal Command Suite, TF Clever Genome).
 
 ### `getUnit()`
 
@@ -434,6 +466,19 @@ export const my_faction: Faction = {
 ```
 
 `faction` abilities only appear for that faction. `promissory`, `agent`, `commander`, `hero`, and `breakthrough` are collected across all factions and available to everyone.
+
+### Registry (data side)
+
+A faction module exports a `FactionDefinition`. Its `abilities` and any unit `ABILITIES` may be a function of the `DataRegistry`, resolved once by the system index (`resolveFactions` in `src/data/registry.ts`):
+
+```typescript
+export const nekro_virus: FactionDefinition = {
+  abilities: registry => ({ technology: copyTechnologies(registry.factions) }),
+  units: { FLAGSHIP: { BASE: { ABILITIES: registry => [...] } } },
+}
+```
+
+`registry` exposes `system`, `baseUnits`, the static `factions` of the system, and `getAbilities(slot)`. A lazy faction never sees another lazy faction. Use this instead of importing other faction modules.
 
 ### Unit Abilities
 

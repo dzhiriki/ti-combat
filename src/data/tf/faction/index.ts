@@ -1,5 +1,5 @@
 import { neutral } from '@/data/main/faction/neutral'
-import type { Faction } from '@/types'
+import type { FactionDefinition } from '@/types'
 
 import { avarice_rex } from './avarice_rex'
 import { el_nen_janovet } from './el_nen_janovet'
@@ -26,4 +26,4 @@ export default {
   SICKENING_LURCH: sickening_lurch,
   // Neutral has base-game stats and is offered in every system.
   NEUTRAL: neutral,
-} satisfies Record<string, Faction>
+} satisfies Record<string, FactionDefinition>

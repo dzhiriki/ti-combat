@@ -1,5 +1,10 @@
 import nekroVirusIcon from '@/assets/faction/nekro_virus.svg?raw'
-import type { Ability } from '@/combat'
+import {
+  type Ability,
+  createRuntimeAbilityList,
+  hasStaticInvokes,
+  resolveInvokes,
+} from '@/combat'
 import type {
   AbilityCallContext,
   ParamChange,
@@ -7,67 +12,29 @@ import type {
 } from '@/combat/abilities-engine/types'
 import { SHARED_UNIT_ABILITY_KEYS } from '@/data/main/abilities/general'
 import { sustainDamage } from '@/data/main/abilities/general/sustain-damage'
-import technology from '@/data/main/abilities/technology'
-import type { Faction, UnitBaseType, UnitDefinition } from '@/types'
+import type {
+  DataRegistry,
+  Faction,
+  FactionDefinition,
+  UnitBaseType,
+  UnitDefinition,
+} from '@/types'
 import { getEffectiveStats } from '@/utils/get-simulation-units'
 
-import { otherFactions } from '../other-factions'
 import { createGenericUnitUpgrades } from './generic-unit-upgrades'
 import { mordred } from './mordred'
 import { createTechnologicalSingularity } from './technological-singularity'
 import { theAlastor } from './the-alastor'
 
 // ---------------------------------------------------------------------------
-// Collect flagship abilities from other factions
+// createFactionUnitAbility helpers
 // ---------------------------------------------------------------------------
 
-const flagshipAbilities = Object.values(otherFactions).flatMap(faction =>
-  (faction.units.FLAGSHIP?.BASE?.ABILITIES ?? [])
-    .filter(a => !SHARED_UNIT_ABILITY_KEYS.has(a.key))
-    .map(ability => ({
-      ...ability,
-      key: `NEKRO_FLAGSHIP_${ability.key}`,
-      name: ability.name,
-      icon: faction.icon,
-      readOnly: false,
-      // Clone the invoke entries so each copy has its own references — the
-      // engine dedups "already invoked" by invoke identity, and originals
-      // with external invokes can share a side with this copy via the OTHER
-      // slot (same fix as the technology copies below).
-      invoke: ability.invoke.map(inv => ({ ...inv })),
-      params: {
-        ...ability.params,
-        isEnabled: ability.headerUI === 'isEnabled' ? false : true,
-      },
-    })),
-)
-
-// ---------------------------------------------------------------------------
-// Collect technology abilities from other factions
-// ---------------------------------------------------------------------------
-
-const technologyAbilities = Object.values(otherFactions).flatMap(faction =>
-  (faction.abilities?.technology ?? []).map(ability => {
-    const external = ability.invoke.some(inv => inv.external === true)
-    return {
-      ...ability,
-      // External techs keep both the original and Nekro's copy visible.
-      // Rename the copy so the two entries don't dedup, and shallow-clone
-      // the invoke entries so each copy has its own references — the engine
-      // tracks "already invoked" by invoke object identity.
-      key: external ? `NEKRO_${ability.key}` : ability.key,
-      invoke: external
-        ? ability.invoke.map(inv => ({ ...inv }))
-        : ability.invoke,
-      name: ability.name,
-      icon: faction.icon,
-    }
-  }),
-)
-
-// ---------------------------------------------------------------------------
-// Collect unit abilities from other factions
-// ---------------------------------------------------------------------------
+// createFactionUnitAbility runs while collecting Nekro's copies, forwarding
+// unit abilities' declareParamChange before any side context exists — pass
+// an empty lookup.
+const EMPTY_LIST = createRuntimeAbilityList([], new Map())
+const EMPTY_LOOKUPS = { own: EMPTY_LIST, opponent: EMPTY_LIST }
 
 const EXCLUDED_UNIT_TYPES = new Set(['FLAGSHIP', 'MECH', 'SPACE_DOCK'])
 
@@ -111,7 +78,12 @@ function createFactionUnitAbility(
   // Collect declareParamChange from unit abilities (e.g. Hel-Titan adds PDS to groundForces)
   const paramChanges = (stats.ABILITIES ?? [])
     .filter(a => a.declareParamChange)
-    .flatMap(a => a.declareParamChange!(a.params, {} as SettingsParams))
+    .flatMap(a =>
+      a.declareParamChange!(a.params, {} as SettingsParams, {
+        abilities: EMPTY_LOOKUPS,
+        this: a,
+      }),
+    )
 
   return {
     key,
@@ -149,7 +121,13 @@ function createFactionUnitAbility(
           ctx.api.own.modifyUnitType(unitType, effectiveStats)
           // Run child ability's config-level PREPARE invokes
           if (mainAbility) {
-            for (const inv of mainAbility.invoke) {
+            const invokes = resolveInvokes(
+              mainAbility,
+              (ctx.api.own.getAbilityConfig(key as keyof AbilityConfigMap) ??
+                {}) as Record<string, unknown>,
+              ctx,
+            )
+            for (const inv of invokes) {
               if (inv.timing !== 'PREPARE') continue
               ;(inv.call as (c: AbilityCallContext) => void)(ctx)
             }
@@ -160,72 +138,142 @@ function createFactionUnitAbility(
   }
 }
 
-const unitAbilities = Object.entries(otherFactions)
-  .filter(([factionKey]) => factionKey !== 'NEUTRAL')
-  .flatMap(([factionKey, faction]) =>
-    (Object.entries(faction.units) as [UnitBaseType, UnitDefinition][])
-      .filter(([unitType]) => !EXCLUDED_UNIT_TYPES.has(unitType))
-      .map(([unitType, unitDef]) =>
-        createFactionUnitAbility(factionKey, faction, unitType, unitDef),
-      ),
+// ---------------------------------------------------------------------------
+// Collect and memoize the copies made from the registry's faction roster
+// ---------------------------------------------------------------------------
+
+interface NekroCopies {
+  flagship: Ability[]
+  technology: Ability[]
+  unit: Ability[]
+  singularity: Ability
+}
+
+const copiesByRegistry = new WeakMap<DataRegistry, NekroCopies>()
+
+function collect(registry: DataRegistry): NekroCopies {
+  const cached = copiesByRegistry.get(registry)
+  if (cached) return cached
+
+  const others = registry.factions
+
+  const flagship = Object.values(others).flatMap(faction =>
+    (faction.units.FLAGSHIP?.BASE?.ABILITIES ?? [])
+      .filter(a => !SHARED_UNIT_ABILITY_KEYS.has(a.key))
+      .map(ability => ({
+        ...ability,
+        key: `NEKRO_FLAGSHIP_${ability.key}`,
+        name: ability.name,
+        icon: faction.icon,
+        readOnly: false,
+        // Clone the invoke entries so each copy has its own references — the
+        // engine dedups "already invoked" by invoke identity, and originals
+        // with external invokes can share a side with this copy via the
+        // OTHER slot (same fix as the technology copies below).
+        invoke: hasStaticInvokes(ability)
+          ? ability.invoke.map(inv => ({ ...inv }))
+          : ability.invoke,
+        params: {
+          ...ability.params,
+          isEnabled: ability.headerUI === 'isEnabled' ? false : true,
+        },
+      })),
   )
 
-// Conflict map for generic unit upgrades: each unit type maps to the
-// list of faction-unit ability keys that target the same unit type. If
-// any such ability is enabled at fire time, the generic upgrade is
-// skipped (e.g. Letani II already overrode INFANTRY).
-const genericUpgradeConflicts: Partial<Record<UnitBaseType, string[]>> = {}
-for (const a of unitAbilities) {
-  const ut = a.exclusiveGroup as UnitBaseType | undefined
-  if (!ut) continue
-  ;(genericUpgradeConflicts[ut] ??= []).push(a.key)
+  const technology = Object.values(others).flatMap(faction =>
+    (faction.abilities?.technology ?? []).map(ability => {
+      const external =
+        hasStaticInvokes(ability) &&
+        ability.invoke.some(inv => inv.external === true)
+      return {
+        ...ability,
+        // External techs keep both the original and Nekro's copy visible.
+        // Rename the copy so the two entries don't dedup, and shallow-clone
+        // the invoke entries so each copy has its own references — the
+        // engine tracks "already invoked" by invoke object identity.
+        key: external ? `NEKRO_${ability.key}` : ability.key,
+        invoke:
+          external && hasStaticInvokes(ability)
+            ? ability.invoke.map(inv => ({ ...inv }))
+            : ability.invoke,
+        name: ability.name,
+        icon: faction.icon,
+      }
+    }),
+  )
+
+  const unit = Object.entries(others)
+    .filter(([factionKey]) => factionKey !== 'NEUTRAL')
+    .flatMap(([factionKey, faction]) =>
+      (Object.entries(faction.units) as [UnitBaseType, UnitDefinition][])
+        .filter(([unitType]) => !EXCLUDED_UNIT_TYPES.has(unitType))
+        .map(([unitType, unitDef]) =>
+          createFactionUnitAbility(factionKey, faction, unitType, unitDef),
+        ),
+    )
+
+  // Conflict map for generic unit upgrades: each unit type maps to the
+  // list of faction-unit ability keys that target the same unit type. If
+  // any such ability is enabled at fire time, the generic upgrade is
+  // skipped (e.g. Letani II already overrode INFANTRY).
+  const genericUpgradeConflicts: Partial<Record<UnitBaseType, string[]>> = {}
+  for (const a of unit) {
+    const ut = a.exclusiveGroup as UnitBaseType | undefined
+    if (!ut) continue
+    ;(genericUpgradeConflicts[ut] ??= []).push(a.key)
+  }
+  const genericUnitUpgrades = createGenericUnitUpgrades(
+    registry.baseUnits,
+    genericUpgradeConflicts,
+  )
+
+  const taggedGenericTechs = registry
+    .getAbilities('TECHNOLOGY')
+    .map(a => ({ ability: a, subcategory: 'TECHNOLOGY' as const }))
+  const taggedUnitUpgrades = genericUnitUpgrades.map(a => ({
+    ability: a,
+    subcategory: 'UNIT_UPGRADE' as const,
+  }))
+  const taggedTechnologies = technology.map(a => ({
+    ability: a,
+    subcategory: 'FACTION_TECHNOLOGY' as const,
+  }))
+  const taggedUnits = unit.map(a => ({
+    ability: a,
+    subcategory: 'FACTION_UNIT' as const,
+  }))
+  const taggedFlagships = flagship.map(a => ({
+    ability: a,
+    subcategory: 'FLAGSHIP' as const,
+  }))
+
+  const singularity = createTechnologicalSingularity(
+    [
+      ...taggedGenericTechs,
+      ...taggedUnitUpgrades,
+      ...taggedTechnologies,
+      ...taggedUnits,
+      ...taggedFlagships,
+    ],
+    [...taggedTechnologies, ...taggedUnits],
+    mordred,
+  )
+
+  const copies = { flagship, technology, unit, singularity }
+  copiesByRegistry.set(registry, copies)
+  return copies
 }
-const genericUnitUpgrades = createGenericUnitUpgrades(genericUpgradeConflicts)
-
-const taggedGenericTechs = technology.map(a => ({
-  ability: a,
-  subcategory: 'TECHNOLOGY' as const,
-}))
-const taggedUnitUpgrades = genericUnitUpgrades.map(a => ({
-  ability: a,
-  subcategory: 'UNIT_UPGRADE' as const,
-}))
-const taggedTechnologies = technologyAbilities.map(a => ({
-  ability: a,
-  subcategory: 'FACTION_TECHNOLOGY' as const,
-}))
-const taggedUnits = unitAbilities.map(a => ({
-  ability: a,
-  subcategory: 'FACTION_UNIT' as const,
-}))
-const taggedFlagships = flagshipAbilities.map(a => ({
-  ability: a,
-  subcategory: 'FLAGSHIP' as const,
-}))
-
-const technologicalSingularity = createTechnologicalSingularity(
-  [
-    ...taggedGenericTechs,
-    ...taggedUnitUpgrades,
-    ...taggedTechnologies,
-    ...taggedUnits,
-    ...taggedFlagships,
-  ],
-  [...taggedTechnologies, ...taggedUnits],
-  mordred,
-)
 
 // ---------------------------------------------------------------------------
 // Export faction
 // ---------------------------------------------------------------------------
 
-export const nekro_virus: Faction = {
+export const nekro_virus: FactionDefinition = {
   name: 'Nekro Virus',
   icon: nekroVirusIcon,
-  abilities: {
-    faction: [technologicalSingularity],
-    technology: technologyAbilities,
-    unit: unitAbilities,
+  abilities: registry => {
+    const { singularity, technology, unit } = collect(registry)
+    return { faction: [singularity], technology, unit }
   },
   units: {
     FLAGSHIP: {
@@ -241,7 +289,11 @@ export const nekro_virus: Faction = {
         UNIT_ABILITIES: {
           SUSTAIN_DAMAGE: true,
         },
-        ABILITIES: [theAlastor, sustainDamage, ...flagshipAbilities],
+        ABILITIES: registry => [
+          theAlastor,
+          sustainDamage,
+          ...collect(registry).flagship,
+        ],
       },
     },
     MECH: {

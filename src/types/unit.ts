@@ -2,6 +2,7 @@ import type { Ability } from '@/combat'
 import type { baseUnits } from '@/data/main'
 
 import type { DiceGroup } from './die'
+import type { Lazy } from './faction'
 
 export type UnitVariantId = string & { readonly __brand: 'UnitVariantId' }
 
@@ -44,6 +45,17 @@ export interface UnitStats {
 export interface UnitDefinition {
   BASE: UnitStats
   UPGRADED?: Partial<UnitStats>
+}
+
+/** Authoring shape of a unit's stats: `ABILITIES` may be computed from the
+ *  data registry. Resolved to `UnitStats` by the system index. */
+export type UnitStatsInput = Omit<UnitStats, 'ABILITIES'> & {
+  ABILITIES?: Lazy<readonly Ability[]>
+}
+
+export interface UnitDefinitionInput {
+  BASE: UnitStatsInput
+  UPGRADED?: Partial<UnitStatsInput>
 }
 
 export interface UnitState {

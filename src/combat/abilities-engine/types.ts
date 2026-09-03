@@ -186,14 +186,21 @@ export type AbilityTiming = keyof TimingContextMap
 // ============================================================================
 
 export interface RuntimeAbilityList {
-  /** Flat list of all abilities for this side. */
+  /** Flat deduped list of all abilities registered for this side. */
   readonly all: readonly Ability[]
-  /** Faction agent abilities (slot === 'AGENT'). */
-  readonly agents: readonly Ability[]
-  /** Faction commander abilities (slot === 'COMMANDER'). */
-  readonly commanders: readonly Ability[]
-  /** Faction promissory abilities (slot === 'PROMISSORY'). */
-  readonly promissories: readonly Ability[]
+  /** Abilities registered on this side under `slot`, in registration
+   *  order. Cached per slot. */
+  get(slot: AbilitySlot): readonly Ability[]
+}
+
+/** What a declare hook or invoke factory may look at: the abilities
+ *  registered on each side and the ability being evaluated.
+ *  `AbilityReadContext` carries both members, so the engine and the UI pass
+ *  their full context; reconcile builds a bare one from the registered
+ *  lists (`createLookups`). */
+export interface AbilityLookupContext {
+  readonly abilities: OwnOpponentContext<RuntimeAbilityList>
+  readonly this: Ability
 }
 
 /** Read-only context for isCallable (no Immer, no mutations) */
@@ -536,26 +543,36 @@ export interface Ability<Params extends Record<string, unknown> = any> {
   /** Abilities sharing the same exclusiveGroup are mutually exclusive — enabling one disables others in the group. */
   exclusiveGroup?: string
   /** Called when a user changes a param. Can modify other params in response.
-   *  Receives the params with the new value already applied, the changed key, and value.
+   *  Receives the params with the new value already applied, the changed key,
+   *  the value, and a lookup context (`ctx.this` is this ability; `ctx.abilities`
+   *  the registered abilities per side).
    *  Return modified params or void to keep unchanged. */
   onParamSet?: (
     currentParams: AbilityBaseParams & Params,
     key: string,
     value: unknown,
+    ctx: AbilityLookupContext,
   ) => (AbilityBaseParams & Params) | void
   /** Declare param changes (subtypes, group additions) based on ability params.
-   *  `settings` contains the current SETTINGS values (ships, groundForces, etc.) during reconciliation. */
+   *  `settings` contains the current SETTINGS values (ships, groundForces, etc.) during reconciliation.
+   *  `ctx` is a lookup context (`ctx.this` is this ability; `ctx.abilities` the
+   *  registered abilities per side). */
   declareParamChange?: (
     params: AbilityBaseParams & Params,
     settings: SettingsParams,
+    ctx: AbilityLookupContext,
   ) => ParamChange[]
   /** Declare subtype variants this ability registers. Called during reconcile.
    *  Each entry's `statsFactory` is invoked once at config time to compute the
    *  variant's stats from its parent variant's stats. Subtypes are surfaced in
    *  `getUnitVariantsOptions` and pre-populated into `s.unitStats` at combat
    *  start, so runtime callers (`addSubtype`, `placeUnits` with variant keys)
-   *  don't need to supply factories. */
-  declareSubtype?: (params: AbilityBaseParams & Params) => DeclaredSubtype[]
+   *  don't need to supply factories. `ctx` is a lookup context (`ctx.this` is
+   *  this ability; `ctx.abilities` the registered abilities per side). */
+  declareSubtype?: (
+    params: AbilityBaseParams & Params,
+    ctx: AbilityLookupContext,
+  ) => DeclaredSubtype[]
   /** Pre-sort the unit-sourced invoke entries of this ability before the
    *  engine iterates them. Called with the ability's merged params, a
    *  read-only context, and the list of UnitIds that currently carry this
@@ -583,7 +600,17 @@ export interface Ability<Params extends Record<string, unknown> = any> {
     ids: UnitId[],
     api: SideApi,
   ) => UnitId[]
-  invoke: AbilityInvoke<AbilityBaseParams & Params>[]
+  /** Static list, or a factory of the list given the ability's merged params
+   *  and a lookup context. The engine resolves the factory when it builds a
+   *  side's invoke index and again whenever any param of this ability
+   *  changes (`updateAbilityConfig`). Factories must be cheap and pure.
+   *  Only config abilities may use the factory form — see engine-gotchas. */
+  invoke:
+    | AbilityInvoke<AbilityBaseParams & Params>[]
+    | ((
+        params: AbilityBaseParams & Params,
+        ctx: AbilityLookupContext,
+      ) => AbilityInvoke<AbilityBaseParams & Params>[])
 }
 
 export interface RegisteredAbility {

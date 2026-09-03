@@ -26,7 +26,10 @@ import {
   type AbilityBranch,
   AbilityBranchInterrupt,
   AbilityContext,
+  withRunningAbility,
 } from './api/ability-api'
+import { hasStaticInvokes, resolveInvokes } from './resolve-invokes'
+import { createRuntimeAbilityList } from './runtime-ability-list'
 import type {
   Ability,
   AbilityInvoke,
@@ -159,20 +162,11 @@ const hasExternalInvokeCache = new WeakMap<Ability, boolean>()
 function hasExternalInvoke(ability: Ability): boolean {
   const cached = hasExternalInvokeCache.get(ability)
   if (cached !== undefined) return cached
-  const value = ability.invoke.some(inv => inv.external === true)
+  const value =
+    hasStaticInvokes(ability) &&
+    ability.invoke.some(inv => inv.external === true)
   hasExternalInvokeCache.set(ability, value)
   return value
-}
-
-/** When this side doesn't own an externalizable ability (cross-faction usage),
- *  drop non-external invokes — they belong to the owner's side only. */
-function passesCrossFactionFilter(
-  invoke: AbilityInvoke,
-  candidate: AbilityCandidate,
-): boolean {
-  if (candidate.ownerFaction !== undefined) return true
-  if (!hasExternalInvoke(candidate.ability)) return true
-  return invoke.external === true
 }
 
 function buildEntry(
@@ -470,6 +464,10 @@ export class AbilitiesEngine {
   private _unitAbilityKeys!: Record<CombatSide, ReadonlySet<string>>
   private _attackerCtx!: AbilityContext
   private _defenderCtx!: AbilityContext
+  private _runtimeLists?: Partial<Record<CombatSide, RuntimeAbilityList>>
+  private _abilityByKey?: Partial<
+    Record<CombatSide, ReadonlyMap<string, Ability>>
+  >
 
   /** Run-state of the `runAbilities` pass currently executing, or undefined
    *  when no pass is active. Set at the top of `runAbilities` (seeded from
@@ -602,7 +600,12 @@ export class AbilitiesEngine {
         merged.uses <= 0
       )
         continue
-      if (!ability.invoke.some(inv => timingSet.has(inv.timing))) continue
+      if (
+        !resolveInvokes(ability, merged, this.context(side)).some(inv =>
+          timingSet.has(inv.timing),
+        )
+      )
+        continue
       results.push({ key: ability.key, name: ability.name })
     }
     return results
@@ -743,16 +746,21 @@ export class AbilitiesEngine {
   }
 
   runtimeAbilityList(side: CombatSide): RuntimeAbilityList {
-    const all = this._abilities[side]
-    const slots = this._abilitySlots[side]
-    const filterSlot = (slot: AbilitySlot) =>
-      all.filter(a => slots.get(a.key) === slot)
-    return {
-      all,
-      agents: filterSlot('AGENT'),
-      commanders: filterSlot('COMMANDER'),
-      promissories: filterSlot('PROMISSORY'),
-    }
+    const lists = (this._runtimeLists ??= {})
+    return (lists[side] ??= createRuntimeAbilityList(
+      this._abilities[side],
+      this._abilitySlots[side],
+    ))
+  }
+
+  /** Registered ability for `key` on `side`, or undefined. O(1) after the
+   *  first call per side; `_abilities[side]` never changes after creation. */
+  abilityForKey(side: CombatSide, key: string): Ability | undefined {
+    const maps = (this._abilityByKey ??= {})
+    const map = (maps[side] ??= new Map(
+      this._abilities[side].map(a => [a.key, a]),
+    ))
+    return map.get(key)
   }
 
   /** Collect unit abilities from units on the field */
@@ -1193,9 +1201,17 @@ export class AbilitiesEngine {
       for (const candidate of candidates) {
         const mergedParams = resolveMergedParams(sideData, candidate.ability)
         if (!mergedParams) continue
-        for (const invoke of candidate.ability.invoke) {
+        const invokes = resolveInvokes(
+          candidate.ability,
+          mergedParams,
+          this.context(side),
+        )
+        const crossFaction =
+          candidate.ownerFaction === undefined &&
+          invokes.some(inv => inv.external === true)
+        for (const invoke of invokes) {
           if (!passesInvoke(invoke, mergedParams)) continue
-          if (!passesCrossFactionFilter(invoke, candidate)) continue
+          if (crossFaction && invoke.external !== true) continue
           pushInvokeEntry(
             sideMap,
             buildEntry(
@@ -1267,9 +1283,17 @@ export class AbilitiesEngine {
       if (candidate.ability.key !== key) continue
       const mergedParams = resolveMergedParams(sideData, candidate.ability)
       if (!mergedParams) continue
-      for (const invoke of candidate.ability.invoke) {
+      const invokes = resolveInvokes(
+        candidate.ability,
+        mergedParams,
+        this.context(side),
+      )
+      const crossFaction =
+        candidate.ownerFaction === undefined &&
+        invokes.some(inv => inv.external === true)
+      for (const invoke of invokes) {
         if (!passesInvoke(invoke, mergedParams)) continue
-        if (!passesCrossFactionFilter(invoke, candidate)) continue
+        if (crossFaction && invoke.external !== true) continue
         if (!pushed) {
           this._combatState.ensureOwnInvokes(side)
           pushed = true
@@ -1418,6 +1442,9 @@ export class AbilitiesEngine {
       const ability = removed[ri].ability
       if (seenAbilities.has(ability)) continue
       seenAbilities.add(ability)
+      // Unit-sourced candidates never use the factory form — only config
+      // abilities may resolve invokes dynamically.
+      if (!hasStaticInvokes(ability)) continue
       const invokes = ability.invoke
       for (let ii = 0; ii < invokes.length; ii++) {
         const invoke = invokes[ii]
@@ -1460,13 +1487,20 @@ export class AbilitiesEngine {
     }
   }
 
+  /** True when the ability's invoke list is a factory, so a param change
+   *  may change which invokes exist. */
+  hasDynamicInvokes(side: CombatSide, key: string): boolean {
+    const ability = this.abilityForKey(side, key)
+    return ability !== undefined && !hasStaticInvokes(ability)
+  }
+
   invokeOnParamSet(
     side: CombatSide,
     targetKey: string,
     changedKeys: string[],
     draft: CombatStateData,
   ): void {
-    const ability = this._abilities[side].find(a => a.key === targetKey)
+    const ability = this.abilityForKey(side, targetKey)
     if (!ability?.onParamSet) return
     // Give onParamSet a mutable merged view. It writes derived fields back
     // (e.g. ships → nonFighterShips/spaceCombatParticipating). Capture any
@@ -1474,9 +1508,12 @@ export class AbilitiesEngine {
     // so subsequent reads see the derived values.
     const params = { ...CombatSideState.getLiveParams(draft[side], targetKey) }
     const before = { ...params }
-    for (const key of changedKeys) {
-      ability.onParamSet(params, key, params[key])
-    }
+    const ctx = this.context(side)
+    withRunningAbility(ctx, ability, () => {
+      for (const key of changedKeys) {
+        ability.onParamSet!(params, key, params[key], ctx)
+      }
+    })
     let liveEntry: Record<string, unknown> | undefined
     for (const key of Object.keys(params)) {
       if (params[key] !== before[key]) {
@@ -1526,7 +1563,7 @@ export class AbilitiesEngine {
    *  and on re-registration) so dispatch iterates entries in the
    *  pre-sorted order. */
   private applyUnitSourceSort(side: CombatSide, abilityKey: string): void {
-    const ability = this._abilities[side].find(a => a.key === abilityKey)
+    const ability = this.abilityForKey(side, abilityKey)
     if (!ability?.sort) return
 
     const sideMap = this._combatState._invokes[side]

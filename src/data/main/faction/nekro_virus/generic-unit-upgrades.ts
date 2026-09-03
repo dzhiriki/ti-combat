@@ -1,25 +1,19 @@
 import type { Ability, AbilityCallContext } from '@/combat'
 import { UNIT_TYPES } from '@/constants/units'
-import baseUnits from '@/data/main/base-units'
-import type { UnitBaseType, UnitStats } from '@/types'
+import type { UnitBaseType, UnitDefinition } from '@/types'
 import { getEffectiveStats } from '@/utils/get-simulation-units'
 
 export function createGenericUnitUpgrades(
+  baseUnits: Readonly<Record<string, UnitDefinition>>,
   conflictsByUnitType: Partial<Record<UnitBaseType, readonly string[]>>,
 ): Ability[] {
   const out: Ability[] = []
   for (const type of UNIT_TYPES) {
-    const def = (
-      baseUnits as Record<string, (typeof baseUnits)[keyof typeof baseUnits]>
-    )[type]
+    const def = baseUnits[type]
     if (!def) continue
     const upgraded = def.UPGRADED
     if (!upgraded?.NAME) continue
-    const effectiveStats = getEffectiveStats(
-      def.BASE as UnitStats,
-      upgraded as Partial<UnitStats>,
-      true,
-    )
+    const effectiveStats = getEffectiveStats(def.BASE, upgraded, true)
     const conflicts = conflictsByUnitType[type] ?? []
     const key = `NEKRO_GENERIC_UPGRADE_${type}`
     out.push({

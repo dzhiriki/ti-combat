@@ -1,4 +1,4 @@
-import type { Ability } from '@/combat'
+import type { AbilityInvoke } from '@/combat'
 import { janovetInherits } from '@/data/tf/faction/el_nen_janovet/faces-of-janovet'
 import type { UnitType } from '@/types'
 
@@ -8,7 +8,8 @@ import type { UnitType } from '@/types'
 // variant, which covers every Strike Wing Alpha destroyer's AFB dice. The
 // Faces of Janovet inherits the text ability, so its flagship's AFB dice
 // (gained from the same card) trigger too.
-export const strikeWingAlphaAfbInvoke: Ability['invoke'][number] = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const strikeWingAlphaAfbInvoke: AbilityInvoke<any> = {
   timing: 'BEFORE_UNIT_ABILITY_ROLL',
   context: 'AFB',
   declaration: true,

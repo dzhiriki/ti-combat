@@ -3,8 +3,12 @@ import advanced from '@/data/main/abilities/advanced'
 import environment from '@/data/main/abilities/environment'
 import general from '@/data/main/abilities/general'
 import relic from '@/data/main/abilities/relic'
+import type { UnitDefinition } from '@/types'
 
+import { resolveFactions } from '../registry'
 import { TF_SHARED_REGISTERED } from './abilities'
+import baseUnits from './base-units'
+import factionDefinitions from './faction'
 
 // Twilight's Fall: the faction roster, the generic unit roster, and every
 // shared (non-faction) ability available in a TF session. Same shape as
@@ -12,7 +16,6 @@ import { TF_SHARED_REGISTERED } from './abilities'
 // these index modules.
 
 export { default as baseUnits } from './base-units'
-export { default as factions } from './faction'
 
 function tag(
   abilities: readonly Ability[],
@@ -45,3 +48,12 @@ export const abilities: readonly RegisteredAbility[] = [
   ...tag(relic, 'RELIC'),
   ...decks,
 ]
+
+export const factions = resolveFactions(
+  'TWILIGHTS_FALL',
+  // base-units' literal COMBAT: number[] doesn't structurally match
+  // DiceGroup's tuple type, so the cast needs an `unknown` bridge.
+  baseUnits as unknown as Readonly<Record<string, UnitDefinition>>,
+  abilities,
+  factionDefinitions,
+)

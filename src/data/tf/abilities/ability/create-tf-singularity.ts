@@ -1,38 +1,23 @@
-import type { Ability, AbilityCallContext } from '@/combat'
-
-// A copyable Abilities-deck entry: its key/name plus any PREPARE-timing invokes
-// (so a mid-combat copy can apply stat-style effects that normally run once at
-// setup). Most Abilities apply at combat timings (BEFORE_DICE_ROLL, etc.) and
-// just need their config enabled — their own invokes then fire from that point.
-export interface SingularityCopyable {
-  key: string
-  name: string
-  prepareCalls: ((
-    ctx: AbilityCallContext,
-    params: Record<string, unknown>,
-  ) => void)[]
-}
-
-export function collectCopyable(ability: Ability): SingularityCopyable {
-  const prepareCalls: SingularityCopyable['prepareCalls'] = []
-  for (const inv of ability.invoke) {
-    if (inv.timing === 'PREPARE') {
-      prepareCalls.push(
-        inv.call as (
-          ctx: AbilityCallContext,
-          p: Record<string, unknown>,
-        ) => void,
-      )
-    }
-  }
-  return { key: ability.key, name: ability.name, prepareCalls }
-}
+import type {
+  Ability,
+  AbilityCallContext,
+  AbilityLookupContext,
+} from '@/combat'
+import { resolveInvokes } from '@/combat'
 
 const NONE = 'none'
 
 type SingularityParams = {
   copyKey: string
   triggered: boolean
+}
+
+/** The Abilities deck minus the singularities themselves (they copy
+ *  Abilities only, never each other). */
+function copyables(ctx: AbilityLookupContext): readonly Ability[] {
+  return ctx.abilities.own
+    .get('TF_ABILITY')
+    .filter(a => !a.key.startsWith('TF_SINGULARITY_'))
 }
 
 /**
@@ -44,9 +29,7 @@ type SingularityParams = {
  */
 export function createTfSingularity(
   letter: 'X' | 'Y' | 'Z',
-  copyables: readonly SingularityCopyable[],
 ): Ability<SingularityParams> {
-  const lookup = new Map(copyables.map(c => [c.key, c]))
   return {
     key: `TF_SINGULARITY_${letter}`,
     name: `Singularity ${letter}`,
@@ -59,14 +42,14 @@ export function createTfSingularity(
       triggered: false,
     },
     headerUI: 'isEnabled',
-    uiConfig: () => [
+    uiConfig: ctx => [
       {
         key: 'copyKey',
         label: 'Copy ability',
         type: 'select',
         items: [
           { label: 'None', value: NONE },
-          ...copyables.map(c => ({ label: c.name, value: c.key })),
+          ...copyables(ctx).map(c => ({ label: c.name, value: c.key })),
         ],
       },
     ],
@@ -82,14 +65,23 @@ export function createTfSingularity(
         },
         call: (ctx: AbilityCallContext, params) => {
           ctx.api.own.updateAbilityConfig({ triggered: true })
-          const entry = lookup.get(params.copyKey)
-          if (!entry) return
+          const target = copyables(ctx).find(a => a.key === params.copyKey)
+          if (!target) return
           const copiedParams =
             (ctx.api.own.getAbilityConfig(
-              entry.key as Parameters<typeof ctx.api.own.getAbilityConfig>[0],
+              target.key as Parameters<typeof ctx.api.own.getAbilityConfig>[0],
             ) as Record<string, unknown>) ?? {}
-          for (const call of entry.prepareCalls) call(ctx, copiedParams)
-          ctx.api.own.updateAbilityConfig(entry.key, { isEnabled: true })
+          // Apply any PREPARE-timing effect the copied card would normally
+          // run once at setup, then enable it so its combat-timing invokes
+          // fire from here on.
+          for (const inv of resolveInvokes(target, copiedParams, ctx)) {
+            if (inv.timing !== 'PREPARE') continue
+            ;(inv.call as (c: typeof ctx, p: Record<string, unknown>) => void)(
+              ctx,
+              copiedParams,
+            )
+          }
+          ctx.api.own.updateAbilityConfig(target.key, { isEnabled: true })
         },
       },
     ],

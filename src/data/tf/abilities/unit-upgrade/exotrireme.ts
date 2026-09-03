@@ -1,4 +1,4 @@
-import { type Ability, declareParam } from '@/combat'
+import { type Ability, type AbilityInvoke, declareParam } from '@/combat'
 import { UNIT_LIMITS } from '@/constants/units'
 import type { UnitList } from '@/types'
 
@@ -28,7 +28,8 @@ export const exotriremeParams = {
   }),
 }
 
-export const exotriremeSelfDestructInvoke: Ability['invoke'][number] = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const exotriremeSelfDestructInvoke: AbilityInvoke<any> = {
   timing: 'AFTER_COMBAT_ROUND',
   context: 'SPACE_COMBAT',
   isCallable: (params, ctx) =>

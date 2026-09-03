@@ -1,3 +1,4 @@
+import { hasStaticInvokes } from '@/combat'
 import { extractDefaults } from '@/combat/abilities-engine/declare-param'
 import type {
   Ability,
@@ -72,7 +73,7 @@ export function createTechnologicalSingularity(
       disableMordred: false,
     },
     headerUI: 'isEnabled',
-    declareParamChange: (params, settings) => {
+    declareParamChange: (params, settings, ctx) => {
       if (!params.isEnabled) return []
       if (params.enableAbilityKey === NONE) return []
       const target = enableAbilityByKey.get(params.enableAbilityKey)
@@ -81,7 +82,10 @@ export function createTechnologicalSingularity(
         ...extractDefaults(target),
         [target.headerUI ?? 'isEnabled']: true,
       } as Parameters<NonNullable<typeof target.declareParamChange>>[0]
-      return target.declareParamChange(synth, settings)
+      return target.declareParamChange(synth, settings, {
+        abilities: ctx.abilities,
+        this: target,
+      })
     },
     uiConfig: ctx => {
       const disableGroups = buildSelectGroups(
@@ -214,11 +218,13 @@ function collectInvokes(
     ctx: AbilityCallContext,
     ...rest: unknown[]
   ) => void)[] = []
-  for (const inv of ability.invoke) {
-    if (inv.timing === 'PREPARE')
-      prepareCalls.push(
-        inv.call as (ctx: AbilityCallContext, ...rest: unknown[]) => void,
-      )
+  if (hasStaticInvokes(ability)) {
+    for (const inv of ability.invoke) {
+      if (inv.timing === 'PREPARE')
+        prepareCalls.push(
+          inv.call as (ctx: AbilityCallContext, ...rest: unknown[]) => void,
+        )
+    }
   }
   return {
     key: ability.key,
