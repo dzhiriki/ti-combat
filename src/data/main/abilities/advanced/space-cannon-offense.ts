@@ -66,7 +66,7 @@ export const spaceCannonOffense: Ability<Params> = {
         // force ALL of a side's Space Cannon hits onto non-fighter ships if
         // able. (The Justiciar Rail PDS restricts only its own hits — that's a
         // per-source hit-pool transform on the card itself, not a step-wide
-        // hook; see src/data/tf/abilities/unit-upgrade/justiciar-rail.ts.)
+        // hook; see src/data/tf/abilities/unit-upgrade/pds/justiciar-rail.ts.)
         const own = ctx.api.own
         const glsEnabled =
           own.getAbilityConfig('GRAVITON_LASER_SYSTEM')?.isEnabled === true ||

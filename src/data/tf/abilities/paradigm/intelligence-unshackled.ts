@@ -1,3 +1,4 @@
+import lastBastionIcon from '@/assets/faction/last_bastion.svg?raw'
 import type { Ability } from '@/combat'
 import type { DiceGroup, UnitId } from '@/types'
 
@@ -15,6 +16,7 @@ export const intelligenceUnshackled: Ability<Params> = {
   name: 'Intelligence Unshackled',
   description:
     "When one of your units is destroyed: Roll 1 die for each of your opponent's units in the system. For each result equal to or greater than the destroyed unit's combat value, destroy that unit.",
+  icon: lastBastionIcon,
   params: {
     isEnabled: false,
     uses: 1,

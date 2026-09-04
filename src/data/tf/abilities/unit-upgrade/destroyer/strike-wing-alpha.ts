@@ -1,6 +1,9 @@
-import type { AbilityInvoke } from '@/combat'
+import argentFlightIcon from '@/assets/faction/argent_flight.svg?raw'
+import type { Ability, AbilityInvoke } from '@/combat'
 import { janovetInherits } from '@/data/tf/faction/el_nen_janovet/faces-of-janovet'
 import type { UnitType } from '@/types'
+
+import { createTfUnitUpgrade } from '../create-tf-unit-upgrade'
 
 // AFB roll trigger for the Strike Wing Alpha destroyer upgrade: each natural 9
 // or 10 on the destroyer's Anti-Fighter Barrage also destroys 1 of the
@@ -9,7 +12,7 @@ import type { UnitType } from '@/types'
 // Faces of Janovet inherits the text ability, so its flagship's AFB dice
 // (gained from the same card) trigger too.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const strikeWingAlphaAfbInvoke: AbilityInvoke<any> = {
+const strikeWingAlphaAfbInvoke: AbilityInvoke<any> = {
   timing: 'BEFORE_UNIT_ABILITY_ROLL',
   context: 'AFB',
   declaration: true,
@@ -47,3 +50,18 @@ export const strikeWingAlphaAfbInvoke: AbilityInvoke<any> = {
     })
   },
 }
+
+export const strikeWingAlpha: Ability = createTfUnitUpgrade({
+  key: 'TF_UPGRADE_STRIKE_WING_ALPHA',
+  icon: argentFlightIcon,
+  name: 'Strike Wing Alpha',
+  description:
+    "When this unit uses Anti-Fighter Barrage, each result of 9 or 10 also destroys 1 of your opponent's infantry in the space area of the active system.",
+  unitType: 'DESTROYER',
+  cost: 1,
+  combat: [7, 1],
+  move: 2,
+  capacity: 1,
+  afb: [6, 3],
+  invokes: [strikeWingAlphaAfbInvoke],
+})

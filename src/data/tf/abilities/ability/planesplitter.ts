@@ -1,3 +1,4 @@
+import obsidianIcon from '@/assets/faction/obsidian.svg?raw'
 import type { Ability } from '@/combat'
 
 // Twilight's Fall Abilities-deck card (from Obsidian's kit). The full card:
@@ -12,6 +13,7 @@ export const planesplitter: Ability = {
   name: 'Planesplitter',
   description:
     'Apply +2 to the result of each of your units’ combat rolls in The Fracture.',
+  icon: obsidianIcon,
   warning: 'Enable only when the combat takes place in The Fracture.',
   params: {
     isEnabled: false,

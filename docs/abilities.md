@@ -15,7 +15,7 @@ src/data/main/abilities/
   relic/            — relics (LIGHTRAIL_ORDNANCE, METALI_VOID_ARMAMENTS, ...)
 ```
 
-Faction abilities live in `src/data/main/faction/[faction_name]/` (TI4) or `src/data/tf/faction/[faction_name]/` (Twilight's Fall) alongside the faction definition. Twilight's Fall shared decks live in `src/data/tf/abilities/` (`ability/`, `genome/`, `paradigm/`, `action-card/`, `unit-upgrade/`) and are assembled in `src/data/tf/abilities/index.ts`.
+Faction abilities live in `src/data/main/faction/[faction_name]/` (TI4) or `src/data/tf/faction/[faction_name]/` (Twilight's Fall) alongside the faction definition. Twilight's Fall shared decks live in `src/data/tf/abilities/` (`ability/`, `genome/`, `paradigm/`, `action-card/`, `unit-upgrade/`); each deck folder has an `index.ts` listing its cards in display order, and `src/data/tf/index.ts` tags each deck with its slot. A TF card that reuses a TI4 implementation is still its own file: it imports the TI4 ability, clones it with `cloneAbility(ability, overrides)` from `src/data/tf/clone-ability.ts`, and exports the result. Always pass a `TF_`-prefixed `key` of the card's own (`TF_ALTRUISTIC_GENOME`), plus only the fields that differ from the source (TF name, description, or the originating faction icon when the source has none). The clone copies the invoke entries, points a self-excluding `excludeSubtypeSource` filter at the new key, and makes the card an opt-in toggle.
 
 Each ability is one file (kebab-case matching the key). File exports a single `Ability` object.
 

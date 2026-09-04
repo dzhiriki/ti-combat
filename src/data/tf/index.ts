@@ -1,12 +1,17 @@
 import type { Ability, AbilitySlot, RegisteredAbility } from '@/combat'
+import { UNIT_DISPLAY_NAMES } from '@/constants/units'
 import advanced from '@/data/main/abilities/advanced'
 import environment from '@/data/main/abilities/environment'
 import general from '@/data/main/abilities/general'
 import relic from '@/data/main/abilities/relic'
-import type { UnitDefinition } from '@/types'
+import type { UnitBaseType, UnitDefinition } from '@/types'
 
 import { resolveFactions } from '../registry'
-import { TF_SHARED_REGISTERED } from './abilities'
+import ability from './abilities/ability'
+import actionCard from './abilities/action-card'
+import genome from './abilities/genome'
+import paradigm from './abilities/paradigm'
+import unitUpgrade from './abilities/unit-upgrade'
 import baseUnits from './base-units'
 import factionDefinitions from './faction'
 
@@ -30,10 +35,18 @@ function tag(
 // which TF doesn't have), the ADVANCED phase drivers, terrain effects, and
 // relics. TF's own draw decks are layered on top.
 const tfGeneral = general.filter(a => a.key !== 'PRE_GALVANIZED')
-const unitUpgrades = TF_SHARED_REGISTERED.filter(
-  r => r.slot === 'TF_UNIT_UPGRADE',
+
+// The unit-upgrade deck spans every unit type, so each card carries its unit
+// type as the panel sub-header (the deck is grouped by unit type in display
+// order — see `abilities/unit-upgrade`).
+const unitUpgrades: RegisteredAbility[] = Object.entries(unitUpgrade).flatMap(
+  ([unitType, cards]) =>
+    cards.map(card => ({
+      slot: 'TF_UNIT_UPGRADE' as const,
+      subcategory: UNIT_DISPLAY_NAMES[unitType as UnitBaseType],
+      ability: card,
+    })),
 )
-const decks = TF_SHARED_REGISTERED.filter(r => r.slot !== 'TF_UNIT_UPGRADE')
 
 // Registration order drives invoke resolution order within a timing pass
 // (panel display is grouped by slot instead, so it is unaffected). TF
@@ -46,7 +59,10 @@ export const abilities: readonly RegisteredAbility[] = [
   ...tag(advanced, 'ADVANCED'),
   ...tag(environment, 'ENVIRONMENT'),
   ...tag(relic, 'RELIC'),
-  ...decks,
+  ...tag(ability, 'TF_ABILITY'),
+  ...tag(genome, 'TF_GENOME'),
+  ...tag(paradigm, 'TF_PARADIGM'),
+  ...tag(actionCard, 'TF_ACTION_CARD'),
 ]
 
 export const factions = resolveFactions(

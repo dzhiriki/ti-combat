@@ -1,25 +1,23 @@
 import type { Ability, SideApi } from '@/combat'
 import { sustainDamage } from '@/data/main/abilities/general/sustain-damage'
-import { TF_UNIT_UPGRADE_CONFIGS } from '@/data/tf/abilities/unit-upgrade'
-import type { TfUnitUpgradeConfig } from '@/data/tf/abilities/unit-upgrade/create-tf-unit-upgrade'
-import type { UnitBaseType } from '@/types'
+import unitUpgrades from '@/data/tf/abilities/unit-upgrade'
+import {
+  getTfUnitUpgradeConfig,
+  type TfUnitUpgradeConfig,
+} from '@/data/tf/abilities/unit-upgrade/create-tf-unit-upgrade'
 
 // The card grants the abilities of the destroyer, cruiser, and dreadnought
 // unit-upgrade technologies specifically — not carriers, PDS, or war suns.
-const INHERIT_TYPES: ReadonlySet<UnitBaseType> = new Set<UnitBaseType>([
-  'CRUISER',
-  'DESTROYER',
-  'DREADNOUGHT',
-])
-
 // Lazy: this module sits in an import cycle with the unit-upgrade deck (its
-// card invokes call `janovetInherits`), so the configs must not be touched
-// at module-evaluation time.
+// card invokes call `janovetInherits`), so the deck must not be touched at
+// module-evaluation time.
 let inheritable: readonly TfUnitUpgradeConfig[] | undefined
 const getInheritable = () =>
-  (inheritable ??= TF_UNIT_UPGRADE_CONFIGS.filter(cfg =>
-    INHERIT_TYPES.has(cfg.unitType),
-  ))
+  (inheritable ??= [
+    ...unitUpgrades.CRUISER,
+    ...unitUpgrades.DESTROYER,
+    ...unitUpgrades.DREADNOUGHT,
+  ].flatMap(card => getTfUnitUpgradeConfig(card) ?? []))
 
 /** Is the given inheritable upgrade card enabled on this side? Exposed for the
  *  card invokes that extend their text ability to the flagship (Strike Wing
@@ -40,7 +38,7 @@ export function janovetInherits(api: SideApi, upgradeKey: string): boolean {
 // technologies." At PREPARE, merge the enabled cards' unit abilities (AFB,
 // Bombardment, Sustain Damage) and Spark immunity onto the flagship's stats.
 // The invoke-based text abilities extend to the flagship inside their own
-// cards (see strike-wing-alpha.ts / linkship-retreat.ts). Exotrireme's
+// cards (see strike-wing-alpha.ts / linkship.ts). Exotrireme's
 // self-destruct stays dreadnought-only — "destroy this unit" sacrifices the
 // dreadnought itself, which the Exotrireme invoke already covers.
 export const facesOfJanovet: Ability = {

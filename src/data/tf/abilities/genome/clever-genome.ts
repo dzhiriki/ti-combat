@@ -1,5 +1,6 @@
 import { z } from 'zod/mini'
 
+import yssarilTribesIcon from '@/assets/faction/yssaril_tribes.svg?raw'
 import type {
   Ability,
   AbilityCallContext,
@@ -40,6 +41,7 @@ export const cleverGenome: Ability<Params> = {
   key: 'TF_CLEVER_GENOME',
   name: 'Clever Genome',
   description: 'This card has the text ability of 1 other genome.',
+  icon: yssarilTribesIcon,
   paramsSchema: z.object({ genomeKey: z.string() }),
   params: {
     isEnabled: false,

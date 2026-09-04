@@ -35,8 +35,16 @@ a check there too.
 - **Invoke dedup is by object identity.** Two abilities sharing the same
   invoke objects (e.g. a shallow-cloned ability with a new key) fire only
   once between them. When re-keying a clone, clone the invokes too:
-  `invoke: original.invoke.map(inv => ({ ...inv }))` (see TF_MEDDLE in
-  `src/data/tf/abilities/index.ts`).
+  `invoke: original.invoke.map(inv => ({ ...inv }))` — `cloneAbility` in
+  `src/data/tf/clone-ability.ts` does this for every TF clone.
+
+- **TF clones never share a key with their TI4 source.** Every `cloneAbility`
+  call passes its own `TF_<NAME>` key, so a TF session addresses Altruistic
+  Genome as `TF_ALTRUISTIC_GENOME`, not `TELLURIAN`. Anything
+  keyed by the source's literal key breaks for the clone: declared subtypes
+  are stamped with the declaring ability's key, so `cloneAbility` rewrites a
+  self-referencing `excludeSubtypeSource`; in ability code prefer
+  `ctx.this.key` over a literal (see Thundarian's restart log).
 
 - **Unit-linked GENERAL abilities become always-on when no unit definition
   carries them.** `collectAbilityCandidates` runs a config ability
@@ -102,7 +110,7 @@ a check there too.
   with `hasStaticInvokes(ability)` first — see the guards in
   `nekro_virus/index.ts`, `nekro_virus/technological-singularity.ts`,
   `create-tf-singularity.ts`, `ssruu.ts`, `clever-genome.ts`, and the
-  TF_MEDDLE clone in `tf/abilities/index.ts`.
+  `cloneAbility` in `tf/clone-ability.ts`.
 
 - **Factory `invoke` is re-resolved on every param change** of that ability
   (`updateAbilityConfig`), not only on `isEnabled`/`uses` — `addAbilityInvokes`

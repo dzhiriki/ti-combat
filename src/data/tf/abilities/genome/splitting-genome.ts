@@ -1,3 +1,4 @@
+import yinBrotherhoodIcon from '@/assets/faction/yin_brotherhood.svg?raw'
 import type { Ability } from '@/combat'
 
 // Twilight's Fall genome. After one of your destroyers or cruisers is destroyed,
@@ -8,6 +9,7 @@ export const splittingGenome: Ability = {
   name: 'Splitting Genome',
   description:
     "After your destroyer or cruiser is destroyed: Place up to 2 fighters from your reinforcements in that unit's system.",
+  icon: yinBrotherhoodIcon,
   context: 'SPACE',
   params: {
     isEnabled: false,

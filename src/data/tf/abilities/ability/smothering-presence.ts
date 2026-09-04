@@ -1,3 +1,4 @@
+import crimsonRebellionIcon from '@/assets/faction/crimson_rebellion.svg?raw'
 import type { Ability } from '@/combat'
 import { UNIT_ABILITIES } from '@/constants/units'
 
@@ -11,6 +12,7 @@ export const smotheringPresence: Ability = {
   name: 'Smothering Presence',
   description:
     "Other players' units in or adjacent to systems that contain your structures lose all of their unit abilities.",
+  icon: crimsonRebellionIcon,
   warning:
     'Enable only when the combat system is in or adjacent to a system that contains your structures — the calculator cannot check this.',
   params: {

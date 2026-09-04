@@ -93,9 +93,19 @@ function buildStats(cfg: TfUnitUpgradeConfig): Partial<UnitStats> {
   return stats
 }
 
+const configs = new WeakMap<Ability, TfUnitUpgradeConfig>()
+
+/** The config a deck card was built from — for cards that inherit other
+ *  cards' unit abilities (The Faces of Janovet). */
+export function getTfUnitUpgradeConfig(
+  ability: Ability,
+): TfUnitUpgradeConfig | undefined {
+  return configs.get(ability)
+}
+
 export function createTfUnitUpgrade(cfg: TfUnitUpgradeConfig): Ability {
   const stats = cfg.apply ? undefined : buildStats(cfg)
-  return {
+  const ability: Ability = {
     key: cfg.key,
     name: cfg.name,
     description: cfg.description,
@@ -127,4 +137,6 @@ export function createTfUnitUpgrade(cfg: TfUnitUpgradeConfig): Ability {
       ...(cfg.invokes ?? []),
     ],
   }
+  configs.set(ability, cfg)
+  return ability
 }

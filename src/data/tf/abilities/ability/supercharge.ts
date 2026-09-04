@@ -1,5 +1,6 @@
 import { z } from 'zod/mini'
 
+import naazRokhaAllianceIcon from '@/assets/faction/naaz_rokha_alliance.svg?raw'
 import { type Ability, declareParam } from '@/combat'
 import type { UnitList } from '@/types'
 import { UnitListSchema } from '@/types'
@@ -26,6 +27,7 @@ export const supercharge: Ability<Params> = {
   name: 'Supercharge',
   description:
     'Before making a combat roll: Choose 1 of your units and apply +2 to the results of its combat roll.',
+  icon: naazRokhaAllianceIcon,
   paramsSchema: z.object({
     spacePriority: UnitListSchema,
     groundPriority: UnitListSchema,

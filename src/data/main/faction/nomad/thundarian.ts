@@ -96,7 +96,7 @@ export const thundarian: Ability<Params> = {
           : buildCombatDiceRollGroup({ phase: ctx.currentDiceRollPhase })
         ctx.api.own.discardCurrentGroupScript()
         ctx.api.own.pushSteps([group])
-        ctx.logger?.child('THUNDARIAN').child('RESTART').log()
+        ctx.logger?.child(ctx.this.key).child('RESTART').log()
       },
     },
   ],

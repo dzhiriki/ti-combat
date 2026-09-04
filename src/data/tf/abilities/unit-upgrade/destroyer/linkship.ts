@@ -1,7 +1,10 @@
-import type { AbilityInvoke, AbilityReadContext } from '@/combat'
+import ralNelIcon from '@/assets/faction/ral_nel.svg?raw'
+import type { Ability, AbilityInvoke, AbilityReadContext } from '@/combat'
 import { UNIT_WORTH } from '@/constants/units'
 import { janovetInherits } from '@/data/tf/faction/el_nen_janovet/faces-of-janovet'
 import type { UnitBaseType, UnitId, UnitType } from '@/types'
+
+import { createTfUnitUpgrade } from '../create-tf-unit-upgrade'
 
 // A target is eligible for Linkship's retreat destroy if it is damaged OR does
 // not (effectively) have Sustain Damage.
@@ -43,7 +46,7 @@ function bestTarget(ctx: AbilityReadContext): UnitId | undefined {
 // upgrade is enabled. The Faces of Janovet inherits the text ability, so its
 // retreating flagship also triggers the destroy.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const linkshipRetreatInvoke: AbilityInvoke<any> = {
+const linkshipRetreatInvoke: AbilityInvoke<any> = {
   timing: 'WHEN_RETREAT',
   isCallable: (_params, ctx, unitId) => {
     const key = ctx.api.own.getUnitVariantKey(unitId)
@@ -64,3 +67,17 @@ export const linkshipRetreatInvoke: AbilityInvoke<any> = {
     if (target) ctx.api.opponent.destroyUnits(target)
   },
 }
+
+export const linkship: Ability = createTfUnitUpgrade({
+  key: 'TF_UPGRADE_LINKSHIP',
+  icon: ralNelIcon,
+  name: 'Linkship',
+  description:
+    'When this unit retreats, you may destroy 1 ship in the active system that is damaged or does not have Sustain Damage.',
+  unitType: 'DESTROYER',
+  cost: 1,
+  combat: [8, 1],
+  move: 2,
+  afb: [6, 3],
+  invokes: [linkshipRetreatInvoke],
+})

@@ -1,5 +1,6 @@
 import { z } from 'zod/mini'
 
+import lastBastionIcon from '@/assets/faction/last_bastion.svg?raw'
 import type { Ability } from '@/combat'
 
 type Params = {
@@ -23,6 +24,7 @@ export const proximaTargetingVi: Ability<Params> = {
   name: 'Proxima Targeting VI',
   description:
     "Cancel 1 hit produced by each Bombardment roll against your units. At the start of a round of ground combat, you may resolve Bombardment 7 (x3) against your opponent's ground forces; if you do, resolve Bombardment 7 (x3) against your own ground forces.",
+  icon: lastBastionIcon,
   context: 'GROUND',
   paramsSchema: z.object({
     resolveBombardment: z.boolean(),

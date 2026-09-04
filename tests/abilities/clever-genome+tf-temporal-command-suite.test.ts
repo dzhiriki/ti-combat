@@ -12,8 +12,11 @@ describe.forEachSide('TF_CLEVER_GENOME + TF_TEMPORAL_COMMAND_SUITE', () => {
         abilities: {
           // Real Altruistic Genome (Tellurian) + Clever Genome copying it —
           // two ability instances, so BOTH cancel in the same window.
-          TELLURIAN: true,
-          TF_CLEVER_GENOME: { isEnabled: true, genomeKey: 'TELLURIAN' },
+          TF_ALTRUISTIC_GENOME: true,
+          TF_CLEVER_GENOME: {
+            isEnabled: true,
+            genomeKey: 'TF_ALTRUISTIC_GENOME',
+          },
           // The token readies the Clever card itself.
           TF_TEMPORAL_COMMAND_SUITE: {
             isEnabled: true,

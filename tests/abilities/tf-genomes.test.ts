@@ -43,7 +43,7 @@ describe('TF genomes', () => {
         faction: 'AVARICE_REX',
         units: { CRUISER: 2 },
         abilities: {
-          THUNDARIAN: {
+          TF_TEMPORAL_GENOME: {
             isEnabled: true,
             uses: 1,
             combinator: 'OR',
@@ -60,7 +60,7 @@ describe('TF genomes', () => {
     t.advanceTo('SPACE_COMBAT')
     t.advanceRound()
 
-    expect(t.abilityLog('THUNDARIAN')).not.toHaveLength(0)
+    expect(t.abilityLog('TF_TEMPORAL_GENOME')).not.toHaveLength(0)
   })
 
   it('Valiant Genome rolls 1 die against the opponent when your unit dies', () => {

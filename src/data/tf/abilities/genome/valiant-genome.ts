@@ -1,5 +1,6 @@
 import { z } from 'zod/mini'
 
+import lastBastionIcon from '@/assets/faction/last_bastion.svg?raw'
 import {
   type Ability,
   type AbilityReadContext,
@@ -51,6 +52,7 @@ export const valiantGenome: Ability<Params> = {
   name: 'Valiant Genome',
   description:
     "After one of your units is destroyed during combat: Roll 1 die. If the result is equal to or greater than that unit's combat value, your opponent must destroy 1 of their units.",
+  icon: lastBastionIcon,
   paramsSchema: z.object({
     spaceTriggers: UnitListBooleanSchema,
     groundTriggers: UnitListBooleanSchema,

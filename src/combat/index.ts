@@ -18,6 +18,7 @@ export {
   type DicePool,
   enforceFleetPool,
   hasStaticInvokes,
+  isDeclaredParam,
   type OwnOpponentContext,
   type ParamChange,
   type ParamFilter,

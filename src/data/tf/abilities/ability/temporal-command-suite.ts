@@ -1,5 +1,6 @@
 import { z } from 'zod/mini'
 
+import nomadIcon from '@/assets/faction/nomad.svg?raw'
 import type { Ability } from '@/combat'
 import type { UnitList } from '@/types'
 import { UnitListNumberSchema } from '@/types'
@@ -22,6 +23,7 @@ export const tfTemporalCommandSuite: Ability<Params> = {
   name: 'Temporal Command Suite',
   description:
     "After any player's genome becomes exhausted: You may spend 1 command token from any pool to ready that genome.",
+  icon: nomadIcon,
   paramsSchema: z.object({ genomes: UnitListNumberSchema }),
   params: {
     isEnabled: false,

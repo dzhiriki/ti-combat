@@ -1,6 +1,9 @@
+import sardakkNorrIcon from '@/assets/faction/sardakk_norr.svg?raw'
 import { type Ability, type AbilityInvoke, declareParam } from '@/combat'
 import { UNIT_LIMITS } from '@/constants/units'
 import type { UnitList } from '@/types'
+
+import { createTfUnitUpgrade } from '../create-tf-unit-upgrade'
 
 // After a round of space combat, destroy 1 of your dreadnoughts to destroy up
 // to 2 of the opponent's ships (picked by target priority). Opt-in via the
@@ -9,7 +12,7 @@ import type { UnitList } from '@/types'
 // Sardakk N'orr Exotrireme II. `sacrificePriority` has no UI item (the card
 // upgrades every dreadnought, so there's only one option) — it exists so
 // reconcile keeps the sacrifice lookup synced with dreadnought variants.
-export const exotriremeParams = {
+const exotriremeParams = {
   uses: 0,
   sacrificePriority: declareParam({
     default: [] as UnitList<boolean>,
@@ -29,7 +32,7 @@ export const exotriremeParams = {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const exotriremeSelfDestructInvoke: AbilityInvoke<any> = {
+const exotriremeSelfDestructInvoke: AbilityInvoke<any> = {
   timing: 'AFTER_COMBAT_ROUND',
   context: 'SPACE_COMBAT',
   isCallable: (params, ctx) =>
@@ -67,7 +70,7 @@ export const exotriremeSelfDestructInvoke: AbilityInvoke<any> = {
   },
 }
 
-export const exotriremeUiConfig: Ability['uiConfig'] = ctx => [
+const exotriremeUiConfig: Ability['uiConfig'] = ctx => [
   {
     key: 'uses',
     label: 'Uses',
@@ -84,3 +87,22 @@ export const exotriremeUiConfig: Ability['uiConfig'] = ctx => [
     items: ctx.api.opponent.getUnitVariantsOptions('targetPriority'),
   },
 ]
+
+export const exotrireme: Ability = createTfUnitUpgrade({
+  key: 'TF_UPGRADE_EXOTRIREME',
+  icon: sardakkNorrIcon,
+  name: 'Exotrireme',
+  description:
+    "This unit cannot be destroyed by 'Spark' action cards. After a round of space combat, you may destroy this unit to destroy up to 2 ships in this system.",
+  unitType: 'DREADNOUGHT',
+  cost: 4,
+  combat: [4, 1],
+  move: 2,
+  capacity: 1,
+  sustain: true,
+  bombardment: [4, 2],
+  directHitImmune: true,
+  extraParams: exotriremeParams,
+  uiConfig: exotriremeUiConfig,
+  invokes: [exotriremeSelfDestructInvoke],
+})

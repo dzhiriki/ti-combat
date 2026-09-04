@@ -1,3 +1,4 @@
+import nekroVirusIcon from '@/assets/faction/nekro_virus.svg?raw'
 import type {
   Ability,
   AbilityCallContext,
@@ -27,7 +28,7 @@ function copyables(ctx: AbilityLookupContext): readonly Ability[] {
  * chosen Ability on your side at that moment (so it applies mid-combat, not
  * from the start). Copies Abilities only (never unit upgrades or singularities).
  */
-export function createTfSingularity(
+export function createSingularity(
   letter: 'X' | 'Y' | 'Z',
 ): Ability<SingularityParams> {
   return {
@@ -35,6 +36,7 @@ export function createTfSingularity(
     name: `Singularity ${letter}`,
     description:
       "Once per combat, after 1 of your opponent's units is destroyed: gain the text of one of your opponent's abilities for the rest of the combat.",
+    icon: nekroVirusIcon,
     params: {
       isEnabled: false,
       uses: Infinity,

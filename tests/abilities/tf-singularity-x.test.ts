@@ -10,7 +10,7 @@ describe('TF_SINGULARITY_X', () => {
         faction: 'AVARICE_REX',
         units: { CRUISER: 3 },
         abilities: {
-          TF_SINGULARITY_X: { isEnabled: true, copyKey: 'UNRELENTING' },
+          TF_SINGULARITY_X: { isEnabled: true, copyKey: 'TF_UNRELENTING' },
         },
       },
       defender: { faction: 'AVARICE_REX', units: { CRUISER: 3 } },

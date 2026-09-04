@@ -48,7 +48,7 @@ describe("Twilight's Fall available abilities", () => {
     // Clever Genome is a separate ability instance — re-readying it fires
     // the copied text a second time in the same window, so it gets a row.
     expect(values).toContain('TF_CLEVER_GENOME')
-    expect(values).toContain('TELLURIAN')
+    expect(values).toContain('TF_ALTRUISTIC_GENOME')
     expect(values.length).toBeGreaterThan(5)
   })
 
@@ -160,7 +160,7 @@ describe("Twilight's Fall available abilities", () => {
       attacker: {
         faction: 'AVARICE_REX',
         units: { CRUISER: 1 },
-        abilities: { OVERWING_ZETA: true },
+        abilities: { TF_ARTEMIRIS_ASCENDANT: true },
       },
       defender: { faction: 'AVARICE_REX', units: { CRUISER: 1 } },
     })

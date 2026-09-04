@@ -1,3 +1,4 @@
+import obsidianIcon from '@/assets/faction/obsidian.svg?raw'
 import type { Ability } from '@/combat'
 
 // Twilight's Fall genome. Its combat-relevant effect matches Cloak / Solar
@@ -8,6 +9,7 @@ export const mirrorGenome: Ability = {
   name: 'Mirror Genome',
   description:
     'When you move ships: Space Cannon cannot be used against those ships.',
+  icon: obsidianIcon,
   context: 'SPACE',
   params: {
     isEnabled: false,
