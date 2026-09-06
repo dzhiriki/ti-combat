@@ -101,6 +101,7 @@
       "userName": "Bot"
     }
   ],
+  "ringCount": 3,
   "tileUnitData": {
     "104": {
       "planets": {},

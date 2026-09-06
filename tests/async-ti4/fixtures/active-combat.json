@@ -242,6 +242,7 @@
       "userName": "Bot"
     }
   ],
+  "ringCount": 3,
   "tileUnitData": {
     "bl": {
       "planets": {

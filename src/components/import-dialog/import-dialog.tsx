@@ -1,4 +1,5 @@
 import { DownloadIcon } from '@radix-ui/react-icons'
+import { clsx } from 'clsx'
 import { useMemo, useState } from 'react'
 
 import {
@@ -10,6 +11,7 @@ import {
   findActiveCombat,
   isMappedFaction,
   listBattleLocations,
+  locationAreaLabel,
   parseGameId,
   type WebData,
 } from '@/async-ti4'
@@ -33,6 +35,7 @@ import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
 import { buildAbilityLookup } from '@/hooks/combat-setup/validation'
 
 import styles from './import-dialog.module.css'
+import { SystemMap } from './system-map'
 
 interface ImportDialogProps {
   allAbilities: Ability[]
@@ -62,12 +65,22 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
   const [locationId, setLocationId] = useState('')
   const [attacker, setAttacker] = useState('')
   const [defender, setDefender] = useState('')
+  const [selectedTile, setSelectedTile] = useState<string | null>(null)
 
   const locations = useMemo(
     () => (game ? listBattleLocations(game) : []),
     [game],
   )
   const location = locations.find(l => l.id === locationId)
+  const tileLocations = locations.filter(l => l.tile === selectedTile)
+
+  /** Tapping a system selects it outright when there is only one place to
+   *  fight there; otherwise its areas are listed to choose from. */
+  function selectTile(tile: string): void {
+    setSelectedTile(tile)
+    const here = locations.filter(l => l.tile === tile)
+    if (here.length === 1) selectLocation(here[0].id)
+  }
 
   const players = useMemo(
     () =>
@@ -82,18 +95,28 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
     [game],
   )
 
-  /** Point both sides at whoever is fighting over the chosen location, leaving
-   *  any side it can't fill on its previous pick. */
+  /** Fill the sides from the chosen location.
+   *
+   *  Whoever holds it is the defender — the import's job is to say what you
+   *  would be attacking into, and the attacker's fleet is assembled by hand
+   *  because it rarely comes from one place. A live combat is the exception:
+   *  its participants are already ordered with the active player first. */
   function selectLocation(id: string): void {
     setLocationId(id)
+    const tile = locations.find(l => l.id === id)?.tile
+    if (tile) setSelectedTile(tile)
     const active = game ? findActiveCombat(game) : null
-    const present = (
-      active?.locationId === id && active.factions.length > 1
-        ? active.factions
-        : (locations.find(l => l.id === id)?.factions ?? [])
-    ).filter(isMappedFaction)
-    if (present[0]) setAttacker(present[0])
-    if (present[1]) setDefender(present[1])
+    if (active?.locationId === id && active.factions.length > 1) {
+      const [first, second] = active.factions.filter(isMappedFaction)
+      if (first) setAttacker(first)
+      if (second) setDefender(second)
+      return
+    }
+    const present = (locations.find(l => l.id === id)?.factions ?? []).filter(
+      isMappedFaction,
+    )
+    if (present[0]) setDefender(present[0])
+    if (present[1]) setAttacker(present[1])
   }
 
   async function handleLoad(): Promise<void> {
@@ -120,15 +143,19 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
       // (its space cannon fires from a planet it still owns).
       const target = found[0]
       const active = findActiveCombat(data)
-      const sides = (
+      const inCombat =
         active?.locationId === target.id && active.factions.length > 1
-          ? active.factions
-          : target.factions
-      ).filter(isMappedFaction)
+      const sides = (inCombat ? active.factions : target.factions).filter(
+        isMappedFaction,
+      )
+      // A live combat lists the active player first; anywhere else the side
+      // standing there is the one being attacked.
+      const [first, second] = inCombat ? sides : [sides[1], sides[0]]
 
       setLocationId(target.id)
-      setAttacker(sides[0] ?? '')
-      setDefender(sides[1] ?? sides[0] ?? '')
+      setSelectedTile(target.tile)
+      setAttacker(first ?? second ?? '')
+      setDefender(second ?? first ?? '')
     } catch (e) {
       setError(
         e instanceof AsyncTi4Error ? e.message : 'Could not load that game',
@@ -197,21 +224,43 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
               {game.gameRound ? ` · round ${game.gameRound}` : ''}
             </p>
 
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>Battle</span>
-              <Select value={locationId} onValueChange={selectLocation}>
-                <SelectTrigger className={styles.select}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className={styles.selectContent}>
-                  {locations.map(l => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {locationLabel(l)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
+            <SystemMap
+              positions={Object.keys(game.tileUnitData)}
+              locations={locations}
+              ringCount={game.ringCount ?? 3}
+              selectedTile={selectedTile}
+              onSelectTile={selectTile}
+            />
+
+            {tileLocations.length > 0 && (
+              <div className={styles.areas}>
+                {tileLocations.map(l => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    className={clsx(styles.area, {
+                      [styles.area_selected]: l.id === locationId,
+                    })}
+                    onClick={() => selectLocation(l.id)}
+                  >
+                    <span className={styles.areaName}>
+                      {locationAreaLabel(l)}
+                      {l.isActiveCombat && (
+                        <span className={styles.areaBadge}>in combat</span>
+                      )}
+                    </span>
+                    <span className={styles.areaWho}>
+                      {l.factions.map(factionLabel).join(' vs ')} ·{' '}
+                      {l.unitCount}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <p className={styles.chosen}>
+              {location ? locationLabel(location) : 'Pick a system above'}
+            </p>
 
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Attacker</span>

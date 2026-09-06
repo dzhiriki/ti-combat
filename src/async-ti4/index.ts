@@ -6,5 +6,6 @@ export {
   findActiveCombat,
   isMappedFaction,
   listBattleLocations,
+  locationAreaLabel,
 } from './locations'
 export type { BattleLocation, WebData } from './types'

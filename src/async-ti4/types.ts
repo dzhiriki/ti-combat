@@ -70,6 +70,9 @@ export const WebDataSchema = z.object({
   gameName: soft(z.string()),
   gameCustomName: soft(z.string()),
   gameRound: soft(z.number()),
+  /** How many rings the map has: 3 for a six-player game, 4 for seven or
+   *  eight, more with expansions. Drives where the off-grid slots sit. */
+  ringCount: soft(z.number()),
   gameState: soft(z.object({ activeCombat: ActiveCombatSchema })),
   playerData: z.array(PlayerSchema),
   tileUnitData: z.record(z.string(), TileSchema),
@@ -93,6 +96,9 @@ export interface BattleLocation {
   mode: 'SPACE' | 'GROUND'
   /** AsyncTI4 faction ids holding units here, most units first. */
   factions: string[]
+  /** Modelled units standing here, across every faction. Drives the map's
+   *  at-a-glance sense of where the weight is. */
+  unitCount: number
   /** Set when this is the battle AsyncTI4 currently has open. */
   isActiveCombat?: boolean
 }

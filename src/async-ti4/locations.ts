@@ -11,9 +11,14 @@ function isModelledUnit(entity: AsyncEntity): boolean {
   )
 }
 
-/** AsyncTI4 faction ids present in a group, ordered by unit count descending so
- *  a location's label leads with whoever is actually holding it. */
-function occupants(groups: EntityGroups): string[] {
+interface Occupancy {
+  /** AsyncTI4 faction ids, ordered by unit count descending so a location's
+   *  label leads with whoever is actually holding it. */
+  factions: string[]
+  unitCount: number
+}
+
+function occupants(groups: EntityGroups): Occupancy {
   const totals = new Map<string, number>()
   for (const [asyncFaction, entities] of Object.entries(groups)) {
     let total = 0
@@ -22,9 +27,11 @@ function occupants(groups: EntityGroups): string[] {
     }
     if (total > 0) totals.set(asyncFaction, total)
   }
-  return [...totals.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([asyncFaction]) => asyncFaction)
+  const ordered = [...totals.entries()].sort((a, b) => b[1] - a[1])
+  return {
+    factions: ordered.map(([asyncFaction]) => asyncFaction),
+    unitCount: ordered.reduce((sum, [, count]) => sum + count, 0),
+  }
 }
 
 export function factionLabel(asyncFactionId: string): string {
@@ -85,27 +92,29 @@ export function listBattleLocations(data: WebData): BattleLocation[] {
 
   for (const [tile, tileData] of Object.entries(data.tileUnitData)) {
     const space = occupants(tileData.space ?? {})
-    if (space.length > 0) {
+    if (space.factions.length > 0) {
       locations.push({
         id: tile,
         tile,
         label: `${tile} · space`,
         mode: 'SPACE',
-        factions: space,
+        factions: space.factions,
+        unitCount: space.unitCount,
         isActiveCombat: tile === activeId,
       })
     }
 
     for (const [planet, planetData] of Object.entries(tileData.planets ?? {})) {
       const ground = occupants(planetData?.entities ?? {})
-      if (ground.length === 0) continue
+      if (ground.factions.length === 0) continue
       locations.push({
         id: `${tile}/${planet}`,
         tile,
         planet,
         label: `${tile} · ${titleCase(planet)}`,
         mode: 'GROUND',
-        factions: ground,
+        factions: ground.factions,
+        unitCount: ground.unitCount,
         isActiveCombat: `${tile}/${planet}` === activeId,
       })
     }
@@ -137,6 +146,11 @@ export function entitiesAt(
 /** Whether this calculator has a faction sheet for an AsyncTI4 faction id.
  *  AsyncTI4 carries Discordant Stars and a long tail of homebrew that this
  *  calculator doesn't model, and those players can't be imported. */
+/** How a location's area reads on its own — `Space`, or the planet's name. */
+export function locationAreaLabel(location: { planet?: string }): string {
+  return location.planet ? titleCase(location.planet) : 'Space'
+}
+
 export function isMappedFaction(asyncFactionId: string): boolean {
   return asyncFactionId in FACTION_BY_ASYNC_ID
 }

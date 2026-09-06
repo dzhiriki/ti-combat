@@ -1,0 +1,81 @@
+.map {
+  position: relative;
+  width: 100%;
+  margin: var(--space-1) 0;
+}
+
+.hex {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  background: var(--color-background-input-field);
+  border: 0;
+  transition:
+    background 0.12s ease,
+    filter 0.12s ease;
+
+  /* Flat-top hexagon. Neighbouring hexes tile with no gap between them, so a
+     tap that misses the centre still lands on a system rather than nothing. */
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+.hex:hover {
+  filter: brightness(1.25);
+}
+
+.hex:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.hex_contested {
+  background: var(--color-accent-20);
+}
+
+.hex_active {
+  background: var(--color-accent-40);
+}
+
+.hex_selected {
+  background: var(--color-accent-60);
+}
+
+.icon {
+  display: flex;
+  width: 45%;
+  height: 45%;
+  opacity: 70%;
+  color: var(--color-text-main);
+}
+
+.icon :global(svg) {
+  width: 100%;
+  height: 100%;
+  fill: currentcolor;
+}
+
+.hex_selected .icon {
+  opacity: 100%;
+}
+
+.count {
+  position: absolute;
+  right: 22%;
+  bottom: 12%;
+  font-family: var(--font-mono);
+  font-size: clamp(7px, 2.2vw, 11px);
+  line-height: 1;
+  color: var(--color-text-muted);
+}
+
+.hex_selected .count {
+  color: var(--color-text-main);
+}
+
+.hex_empty {
+  background: var(--color-overlay-light);
+  pointer-events: none;
+}
