@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react'
 
 import {
   AsyncTi4Error,
-  type BattleLocation,
   buildImportConfig,
   factionLabel,
   fetchGame,
@@ -42,12 +41,6 @@ interface ImportDialogProps {
   onImport: (config: SerializedConfig) => void
 }
 
-function locationLabel(location: BattleLocation): string {
-  const who = location.factions.map(factionLabel).join(' vs ')
-  const suffix = location.isActiveCombat ? ' (in combat)' : ''
-  return `${location.label} — ${who}${suffix}`
-}
-
 /** Pull a battle straight out of a live AsyncTI4 game: the units standing in a
  *  chosen system or planet, plus each side's researched technologies. */
 export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
@@ -72,22 +65,27 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
     [game],
   )
   const location = locations.find(l => l.id === locationId)
-  // Space first, then planets: an invasion is decided in orbit before it
-  // reaches the ground, and it is the commoner pick.
-  const tileLocations = locations
-    .filter(l => l.tile === selectedTile)
-    .sort((a, b) => {
-      if (a.mode !== b.mode) return a.mode === 'SPACE' ? -1 : 1
-      return (a.planet ?? '').localeCompare(b.planet ?? '')
-    })
+  /** A system's areas, space first and then its planets by name: an invasion
+   *  is decided in orbit before it reaches the ground, and space is the
+   *  commoner pick. */
+  function areasIn(tile: string | null) {
+    return locations
+      .filter(l => l.tile === tile)
+      .sort((a, b) => {
+        if (a.mode !== b.mode) return a.mode === 'SPACE' ? -1 : 1
+        return (a.planet ?? '').localeCompare(b.planet ?? '')
+      })
+  }
+
+  const tileLocations = areasIn(selectedTile)
   const groundAreaCount = tileLocations.filter(l => l.mode === 'GROUND').length
 
-  /** Tapping a system selects it outright when there is only one place to
-   *  fight there; otherwise its areas are listed to choose from. */
+  /** Tapping a system picks a fight in it straight away — the space battle,
+   *  or its first planet where nobody is in orbit. */
   function selectTile(tile: string): void {
     setSelectedTile(tile)
-    const here = locations.filter(l => l.tile === tile)
-    if (here.length === 1) selectLocation(here[0].id)
+    const first = areasIn(tile)[0]
+    if (first) selectLocation(first.id)
   }
 
   const players = useMemo(
@@ -277,10 +275,6 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
               )}
             </div>
 
-            <p className={styles.chosen}>
-              {location ? locationLabel(location) : 'Pick a system above'}
-            </p>
-
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Attacker</span>
               <Select value={attacker} onValueChange={setAttacker}>
@@ -313,19 +307,16 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
               </Select>
             </label>
 
-            <p className={styles.hint}>
-              Brings across the units standing there — damage and galvanize
-              included — plus each side&rsquo;s researched technologies.
-            </p>
-
-            <button
-              className={styles.importButton}
-              type="button"
-              onClick={handleImport}
-              disabled={!attacker || !defender}
-            >
-              Import battle
-            </button>
+            <div className={styles.importRow}>
+              <button
+                className={styles.importButton}
+                type="button"
+                onClick={handleImport}
+                disabled={!attacker || !defender}
+              >
+                Import battle
+              </button>
+            </div>
           </>
         )}
       </DialogContent>
