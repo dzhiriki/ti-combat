@@ -154,7 +154,7 @@ export function SystemMap({
                 }, ${summary.space.unitCount} units`
               : 'empty space',
             summary.groundPlanets > 0 &&
-              `${summary.groundPlanets} planet${summary.groundPlanets > 1 ? 's' : ''} with ground forces`,
+              `${summary.groundPlanets} planet${summary.groundPlanets > 1 ? 's' : ''}`,
           ]
             .filter(Boolean)
             .join('; ')

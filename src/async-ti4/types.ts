@@ -103,6 +103,9 @@ export interface BattleLocation {
   /** Modelled units standing here, across every faction. Drives the map's
    *  at-a-glance sense of where the weight is. */
   unitCount: number
+  /** Those units in the notation the outcomes table uses — `Ca, 3F, De`, with
+   *  a trailing `-` on a damaged stack. Empty when nothing is here. */
+  unitSummary: string
   /** Set when this is the battle AsyncTI4 currently has open. */
   isActiveCombat?: boolean
 }

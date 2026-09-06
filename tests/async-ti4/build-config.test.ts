@@ -83,6 +83,19 @@ describe('listBattleLocations', () => {
     expect(everra?.factions).toEqual(['sol'])
   })
 
+  it('summarises units in the notation the outcomes table uses', () => {
+    // Short name, a count in front only when there is more than one, and a
+    // trailing `-` for a damaged stack — the Cabal war sun at frac4 is
+    // sustained. Ordered like every other unit list in the app.
+    expect(locationAt('frac4').unitSummary).toBe('W-, 2Cr, 3F')
+    expect(locationAt('106/lodor').unitSummary).toBe('M, 5I, 2PDS')
+    expect(locationAt('308').unitSummary).toBe('De')
+    // Galvanize is a mark, not damage: both Bastion cruisers at 104 are
+    // healthy, one of them galvanized.
+    expect(locationAt('104').unitSummary).toBe('2Cr, F, I')
+    expect(locationAt('308/everra').unitSummary).toBe('')
+  })
+
   it('sorts contested locations first', () => {
     const firstUncontested = locations.findIndex(l => l.factions.length < 2)
     const lastContested = locations.findLastIndex(l => l.factions.length > 1)

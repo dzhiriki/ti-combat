@@ -1,4 +1,6 @@
+import { UNIT_SHORT_NAMES, UNIT_TYPES } from '@/constants/units'
 import factions from '@/data/faction'
+import type { UnitBaseType } from '@/types'
 
 import { FACTION_BY_ASYNC_ID, UNIT_TYPE_BY_ASYNC_ID } from './mappings'
 import { PLANET_NAMES } from './planet-names'
@@ -17,21 +19,53 @@ interface Occupancy {
    *  label leads with whoever is actually holding it. */
   factions: string[]
   unitCount: number
+  unitSummary: string
+}
+
+/** The units here in the notation the outcomes table uses: a short unit name,
+ *  a count in front of it when there is more than one, and a trailing `-` on a
+ *  damaged stack. Ordered like every other unit list in the app. */
+function summariseUnits(
+  healthy: Map<UnitBaseType, number>,
+  damaged: Map<UnitBaseType, number>,
+): string {
+  const parts: string[] = []
+  for (const type of UNIT_TYPES) {
+    const name = UNIT_SHORT_NAMES[type]
+    const alive = healthy.get(type) ?? 0
+    const hurt = damaged.get(type) ?? 0
+    if (alive > 0) parts.push(alive > 1 ? `${alive}${name}` : name)
+    if (hurt > 0) parts.push(hurt > 1 ? `${hurt}${name}-` : `${name}-`)
+  }
+  return parts.join(', ')
 }
 
 function occupants(groups: EntityGroups): Occupancy {
   const totals = new Map<string, number>()
+  const healthy = new Map<UnitBaseType, number>()
+  const damaged = new Map<UnitBaseType, number>()
+
   for (const [asyncFaction, entities] of Object.entries(groups)) {
     let total = 0
     for (const entity of entities) {
-      if (isModelledUnit(entity)) total += entity.count
+      if (!isModelledUnit(entity)) continue
+      total += entity.count
+      const type = UNIT_TYPE_BY_ASYNC_ID[entity.entityId]
+      // `[healthy, damaged, galvanized, damaged galvanized]`; galvanize is a
+      // separate mark from damage, so it folds into the same two buckets.
+      const states = entity.unitStates
+      const hurt = states ? (states[1] ?? 0) + (states[3] ?? 0) : 0
+      healthy.set(type, (healthy.get(type) ?? 0) + entity.count - hurt)
+      damaged.set(type, (damaged.get(type) ?? 0) + hurt)
     }
     if (total > 0) totals.set(asyncFaction, total)
   }
+
   const ordered = [...totals.entries()].sort((a, b) => b[1] - a[1])
   return {
     factions: ordered.map(([asyncFaction]) => asyncFaction),
     unitCount: ordered.reduce((sum, [, count]) => sum + count, 0),
+    unitSummary: summariseUnits(healthy, damaged),
   }
 }
 
@@ -105,6 +139,7 @@ export function listBattleLocations(data: WebData): BattleLocation[] {
         mode: 'SPACE',
         factions: space.factions,
         unitCount: space.unitCount,
+        unitSummary: space.unitSummary,
         isActiveCombat: tile === activeId,
       })
     }
@@ -130,6 +165,7 @@ export function listBattleLocations(data: WebData): BattleLocation[] {
         mode: 'GROUND',
         factions,
         unitCount: ground.unitCount,
+        unitSummary: ground.unitSummary,
         isActiveCombat: `${tile}/${planet}` === activeId,
       })
     }

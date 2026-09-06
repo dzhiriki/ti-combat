@@ -80,6 +80,7 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
       if (a.mode !== b.mode) return a.mode === 'SPACE' ? -1 : 1
       return (a.planet ?? '').localeCompare(b.planet ?? '')
     })
+  const groundAreaCount = tileLocations.filter(l => l.mode === 'GROUND').length
 
   /** Tapping a system selects it outright when there is only one place to
    *  fight there; otherwise its areas are listed to choose from. */
@@ -249,7 +250,9 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
                       className={clsx(styles.area, {
                         // Space takes the full width: it is a different fight
                         // from the ground below it, not one planet among many.
-                        [styles.area_space]: l.mode === 'SPACE',
+                        // A lone planet takes it too — nothing sits beside it.
+                        [styles.area_full]:
+                          l.mode === 'SPACE' || groundAreaCount === 1,
                         [styles.area_selected]: l.id === locationId,
                       })}
                       onClick={() => selectLocation(l.id)}
@@ -264,9 +267,7 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
                         {l.factions.length === 0
                           ? 'Unclaimed'
                           : l.factions.map(factionLabel).join(' vs ')}
-                        {l.unitCount > 0
-                          ? ` · ${l.unitCount} ${l.unitCount === 1 ? 'unit' : 'units'}`
-                          : ' · no units'}
+                        {l.unitSummary ? ` · ${l.unitSummary}` : ' · no units'}
                       </span>
                     </button>
                   ))}
