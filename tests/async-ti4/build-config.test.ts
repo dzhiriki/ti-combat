@@ -17,18 +17,18 @@ function loadFixture(name: string) {
   )
 }
 
-// A real AsyncTI4 game (sample-ti4), trimmed to five tiles that between them
-// cover damaged and galvanized stacks, structures under a space battle, and
-// the tokens and attachments that share the units' shape.
+// Board states taken from real games and anonymised. Between them these five
+// tiles cover damaged and galvanized stacks, structures under a space battle,
+// and the tokens and attachments that share the units' shape.
 const data = loadFixture('ti4-game.json')
 
-// A real Twilight's Fall game (sample-tf), where the upgrade cards live in
-// `unitsOwned` rather than in the researched techs.
+// A Twilight's Fall game, where the upgrade cards live in `unitsOwned` rather
+// than in the researched techs.
 const tfData = loadFixture('twilights-fall-game.json')
 
-// A real game (sample-combat) paused mid-battle. Nothing on its map looks
-// contested — the losing fleet is already gone — so `activeCombat` is the
-// only thing that says where the fight is.
+// A game paused mid-battle. Nothing on its map looks contested — the losing
+// fleet is already gone — so `activeCombat` is the only thing that says where
+// the fight is.
 const activeData = loadFixture('active-combat.json')
 
 const abilityLookup = buildAbilityLookup(getAllAbilities())
@@ -50,10 +50,10 @@ function importAt(id: string, attacker: string, defender: string) {
 
 describe('parseGameId', () => {
   it('accepts a bare id, a web link, and rejects anything else', () => {
-    expect(parseGameId('sample-ti4')).toBe('sample-ti4')
-    expect(parseGameId('https://asyncti4.com/game/sample-ti4')).toBe('sample-ti4')
-    expect(parseGameId(' https://asyncti4.com/game/sample-ti4/map ')).toBe(
-      'sample-ti4',
+    expect(parseGameId('abc12345')).toBe('abc12345')
+    expect(parseGameId('https://asyncti4.com/game/abc12345')).toBe('abc12345')
+    expect(parseGameId(' https://asyncti4.com/game/abc12345/map ')).toBe(
+      'abc12345',
     )
     expect(parseGameId('not a game')).toBeNull()
     expect(parseGameId('')).toBeNull()

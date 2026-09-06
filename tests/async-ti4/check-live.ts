@@ -21,9 +21,21 @@ import {
 } from '@/async-ti4/mappings'
 import { EXPECTED_SCHEMA_VERSION, WebDataSchema } from '@/async-ti4/types'
 
-// The games the committed fixtures were cut from: a TI4 game, a Twilight's
-// Fall game, and one paused mid-combat.
-const GAMES = []
+/** Games to probe, named at call time:
+ *
+ *      ASYNCTI4_GAMES=abc123,def456 npm run check:asyncti4
+ *
+ *  There is no default. The games belong to other people, and committing their
+ *  ids would put a lasting pointer to them — and to whoever is playing — in
+ *  this repository's history. They are also poor constants: games get played
+ *  on, finish, and are eventually archived, so any list hardcoded here would
+ *  rot. Pick a couple of games currently in progress; a combat in flight is a
+ *  bonus, not a requirement.
+ */
+const GAMES = (process.env.ASYNCTI4_GAMES ?? '')
+  .split(',')
+  .map(id => id.trim())
+  .filter(Boolean)
 
 const GAME_DATA_URL = 'https://bot.asyncti4.com/api/public/game'
 
@@ -58,20 +70,29 @@ function looksLikeUnitUpgrade(alias: string): boolean {
   return /\d$/.test(alias) && !alias.startsWith('tf-')
 }
 
-async function checkGame(gameId: string): Promise<void> {
+/** Returns false when the game could not be checked at all, so the run can
+ *  tell "upstream is fine" from "we checked nothing". */
+async function checkGame(gameId: string): Promise<boolean> {
   console.info(`\n${gameId}`)
 
   const response = await fetch(`${GAME_DATA_URL}/${gameId}/web-data`)
+  // Upstream answers 400 for a game it doesn't have, 404 for a route it
+  // doesn't have. Either way the game is gone, which says nothing about
+  // compatibility — it just means this sample needs replacing.
+  if (response.status === 400 || response.status === 404) {
+    warn('no longer available — pick another sample game')
+    return false
+  }
   if (!response.ok) {
     fail(`fetch returned ${response.status}`)
-    return
+    return false
   }
 
   const raw: unknown = await response.json()
   const parsed = WebDataSchema.safeParse(raw)
   if (!parsed.success) {
     fail(`payload no longer matches the schema: ${parsed.error.message}`)
-    return
+    return false
   }
   const data = parsed.data
   ok('payload parses')
@@ -139,23 +160,27 @@ async function checkGame(gameId: string): Promise<void> {
   if (locations.length === 0) fail('no importable locations')
   else ok(`${locations.length} importable locations`)
 
+  // Combats resolve within a turn or two, so most of the time there won't be
+  // one. Only its shape is checked, never its presence.
   const active = findActiveCombat(data)
-  if (active) {
-    const known = locations.some(l => l.id === active.locationId)
-    if (!known) {
+  if (!active) {
+    ok('no combat open (nothing to check there)')
+  } else {
+    if (!locations.some(l => l.id === active.locationId)) {
       warn(
         `active combat at "${active.locationId}" is not an importable location`,
       )
+    } else if (active.factions.length !== 2) {
+      warn(`active combat has ${active.factions.length} resolved participants`)
     } else {
       ok(`active combat resolves to ${active.locationId}`)
     }
-    if (active.factions.length !== 2) {
-      warn(`active combat has ${active.factions.length} resolved participants`)
-    }
   }
+  return true
 }
 
 console.info('Checking the AsyncTI4 import against live games…')
+let checked = 0
 for (const game of GAMES) {
   const id = parseGameId(game)
   if (!id) {
@@ -163,16 +188,30 @@ for (const game of GAMES) {
     continue
   }
   try {
-    await checkGame(id)
+    if (await checkGame(id)) checked++
   } catch (e) {
     fail(`${id} threw: ${String(e)}`)
   }
 }
+// A run that reached no game has proved nothing, and mustn't pass as if it
+// had. It is a different problem from an incompatible payload, though, so say
+// so rather than pointing at the mappings.
+const nothingChecked = checked === 0
+if (nothingChecked) {
+  fail(GAMES.length === 0 ? 'no games given' : 'no game could be checked')
+}
 
-console.info(
-  `\n${failures.size} failure(s), ${warnings.size} warning(s).` +
-    (failures.size
-      ? '\nThe import is out of date with AsyncTI4 — see src/async-ti4/mappings.ts.'
-      : ''),
-)
+console.info(`\n${failures.size} failure(s), ${warnings.size} warning(s).`)
+if (nothingChecked) {
+  console.info(
+    (GAMES.length === 0
+      ? 'Name some games in progress to probe:'
+      : 'Those games have probably finished. Try some that are in progress:') +
+      '\n  ASYNCTI4_GAMES=abc123,def456 npm run check:asyncti4',
+  )
+} else if (failures.size > 0) {
+  console.info(
+    'The import looks out of date with AsyncTI4 — see src/async-ti4/mappings.ts.',
+  )
+}
 process.exit(failures.size > 0 ? 1 : 0)

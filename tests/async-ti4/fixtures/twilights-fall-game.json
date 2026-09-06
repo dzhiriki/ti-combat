@@ -1,12 +1,10 @@
 {
-  "gameCustomName": "Sample Twilight’s Fall Game",
+  "gameCustomName": "Sample Twilight\u2019s Fall Game",
   "gameName": "sample-tf",
   "gameRound": 5,
-  "isTwilightsFallMode": true,
   "playerData": [
     {
       "color": "yellow",
-      "eliminated": false,
       "faction": "yellowtf",
       "galvanizeTokensReinf": 0,
       "techs": [
@@ -36,7 +34,6 @@
     },
     {
       "color": "purple",
-      "eliminated": false,
       "faction": "purpletf",
       "galvanizeTokensReinf": 0,
       "techs": ["tf-vpw", "tf-nes", "antimatter", "tf-nomadic"],
@@ -58,7 +55,6 @@
     },
     {
       "color": "aberration",
-      "eliminated": false,
       "faction": "neutral",
       "galvanizeTokensReinf": 0,
       "techs": ["ff2", "dd2", "cv2", "cr2", "ws"],

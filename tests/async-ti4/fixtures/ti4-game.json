@@ -2,11 +2,9 @@
   "gameCustomName": "Sample TI4 Game",
   "gameName": "sample-ti4",
   "gameRound": 4,
-  "isTwilightsFallMode": false,
   "playerData": [
     {
       "color": "sunset",
-      "eliminated": false,
       "faction": "sardakk",
       "galvanizeTokensReinf": 0,
       "techs": [
@@ -34,7 +32,6 @@
     },
     {
       "color": "azure",
-      "eliminated": false,
       "faction": "deepwrought",
       "galvanizeTokensReinf": 0,
       "techs": [
@@ -59,7 +56,6 @@
     },
     {
       "color": "gray",
-      "eliminated": false,
       "faction": "sol",
       "galvanizeTokensReinf": 0,
       "techs": [
@@ -78,7 +74,6 @@
     },
     {
       "color": "bloodred",
-      "eliminated": false,
       "faction": "cabal",
       "galvanizeTokensReinf": 0,
       "techs": ["sar", "vtx", "aida", "ws", "asc", "bs", "sr"],
@@ -86,7 +81,6 @@
     },
     {
       "color": "copper",
-      "eliminated": false,
       "faction": "muaat",
       "galvanizeTokensReinf": 0,
       "techs": ["ps", "sar", "td", "asc", "x89c4", "dd2", "aida"],
@@ -94,7 +88,6 @@
     },
     {
       "color": "tropical",
-      "eliminated": false,
       "faction": "bastion",
       "galvanizeTokensReinf": 4,
       "techs": ["sdn", "ie", "helios2", "cr2", "md", "proxima", "pds2"],
@@ -102,7 +95,6 @@
     },
     {
       "color": "aberration",
-      "eliminated": false,
       "faction": "neutral",
       "galvanizeTokensReinf": 0,
       "techs": ["ff2", "dd2", "cv2", "cr2", "ws"],

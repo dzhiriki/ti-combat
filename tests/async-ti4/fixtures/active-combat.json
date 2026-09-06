@@ -10,11 +10,9 @@
       "unitHolder": "space"
     }
   },
-  "isTwilightsFallMode": true,
   "playerData": [
     {
       "color": "orange",
-      "eliminated": false,
       "faction": "orangetf",
       "galvanizeTokensReinf": 0,
       "techs": [
@@ -49,7 +47,6 @@
     },
     {
       "color": "red",
-      "eliminated": false,
       "faction": "redtf",
       "galvanizeTokensReinf": 0,
       "techs": [
@@ -81,7 +78,6 @@
     },
     {
       "color": "green",
-      "eliminated": false,
       "faction": "greentf",
       "galvanizeTokensReinf": 0,
       "techs": [
@@ -115,7 +111,6 @@
     },
     {
       "color": "purple",
-      "eliminated": false,
       "faction": "purpletf",
       "galvanizeTokensReinf": 0,
       "techs": [
@@ -150,7 +145,6 @@
     },
     {
       "color": "pink",
-      "eliminated": false,
       "faction": "pinktf",
       "galvanizeTokensReinf": 0,
       "techs": [
@@ -190,7 +184,6 @@
     },
     {
       "color": "yellow",
-      "eliminated": false,
       "faction": "yellowtf",
       "galvanizeTokensReinf": 0,
       "techs": [
@@ -230,7 +223,6 @@
     },
     {
       "color": "aberration",
-      "eliminated": false,
       "faction": "neutral",
       "galvanizeTokensReinf": 0,
       "techs": ["ff2", "dd2", "cv2", "cr2", "ws"],
