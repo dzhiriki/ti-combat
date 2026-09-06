@@ -245,6 +245,55 @@
         ]
       }
     },
+    "316": {
+      "planets": {
+        "ordinian": {
+          "controlledBy": "bastion",
+          "entities": {
+            "bastion": [
+              {
+                "count": 1,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              },
+              {
+                "count": 1,
+                "entityId": "sd",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              }
+            ],
+            "neutral": [
+              {
+                "count": 1,
+                "entityId": "helios2",
+                "entityType": "attachment",
+                "sustained": null,
+                "unitStates": null
+              }
+            ]
+          }
+        },
+        "revelation": {
+          "controlledBy": "bastion",
+          "entities": {}
+        }
+      },
+      "space": {
+        "bastion": [
+          {
+            "count": 1,
+            "entityId": "ff",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          }
+        ]
+      }
+    },
     "317": {
       "planets": {
         "hercalor": {

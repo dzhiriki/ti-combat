@@ -3,7 +3,7 @@ import factions from '@/data/faction'
 import type { UnitBaseType } from '@/types'
 
 import { FACTION_BY_ASYNC_ID, UNIT_TYPE_BY_ASYNC_ID } from './mappings'
-import { PLANET_NAMES } from './planet-names'
+import { PLANET_NAMES, SPACE_STATIONS } from './planet-names'
 import type { AsyncEntity, BattleLocation, WebData } from './types'
 
 type EntityGroups = Record<string, AsyncEntity[]>
@@ -153,6 +153,9 @@ export function listBattleLocations(data: WebData): BattleLocation[] {
     }
 
     for (const [planet, planetData] of Object.entries(tileData.planets ?? {})) {
+      // A space station sits in a system's planet list without being a place
+      // ground forces can be landed, so it is no kind of battle.
+      if (SPACE_STATIONS.has(planet)) continue
       const holder = planetData?.controlledBy
       const ground = occupants(planetData?.entities ?? {}, holder)
       // Every planet is listed, units or not: an undefended planet is a

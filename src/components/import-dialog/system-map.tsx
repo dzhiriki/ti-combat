@@ -151,7 +151,9 @@ export function SystemMap({
             summary.space
               ? `space held by ${factionLabel(summary.space.faction)}${
                   summary.space.contested ? ' (contested)' : ''
-                }, ${summary.space.unitCount} units`
+                }, ${summary.space.unitCount} ${
+                  summary.space.unitCount === 1 ? 'unit' : 'units'
+                }`
               : 'empty space',
             summary.groundPlanets > 0 &&
               `${summary.groundPlanets} planet${summary.groundPlanets > 1 ? 's' : ''}`,

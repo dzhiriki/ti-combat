@@ -1,4 +1,4 @@
-/** AsyncTI4 planet keys to their printed names.
+/** Planet reference data AsyncTI4 does not put in its game payload.
  *
  *  `tileUnitData` keys planets by a squashed identifier — `mrte`,
  *  `meharxull` — which is no use in a list someone has to read, and no public
@@ -587,3 +587,25 @@ export const PLANET_NAMES: Readonly<Record<string, string>> = {
   zhgen: 'Zhgen',
   zohbat: 'Zohbat',
 }
+
+/** Planet slots that are space stations rather than planets. AsyncTI4 lists
+ *  them among a system's planets, but there is no ground to fight over: they
+ *  can be left out of a system's planet count and out of the places a battle
+ *  can be chosen.
+ */
+export const SPACE_STATIONS: ReadonlySet<string> = new Set([
+  'atropos',
+  'aurelionstation',
+  'briareus',
+  'clotho',
+  'conviction',
+  'fabricatestation',
+  'gedustation',
+  'lachesis',
+  'loststation',
+  'oluzstation',
+  'revelation',
+  'sisyphus',
+  'thewatchtower',
+  'tsionstation',
+])

@@ -106,6 +106,15 @@ describe('listBattleLocations', () => {
     expect(locationAt('308/everra').unitSummary).toBe('')
   })
 
+  it('leaves space stations out of the places a battle can happen', () => {
+    // AsyncTI4 lists Revelation among 316's planets, but it is a space
+    // station: there is no ground for an invasion to land on. Ordinian, the
+    // real planet in that system, stays.
+    const ids = locations.filter(l => l.tile === '316').map(l => l.id)
+    expect(ids).toContain('316/ordinian')
+    expect(ids).not.toContain('316/revelation')
+  })
+
   it('sorts contested locations first', () => {
     const firstUncontested = locations.findIndex(l => l.factions.length < 2)
     const lastContested = locations.findLastIndex(l => l.factions.length > 1)
