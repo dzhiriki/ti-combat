@@ -83,6 +83,24 @@ describe('listBattleLocations', () => {
     expect(everra?.factions).toEqual(['sol'])
   })
 
+  it('counts only the controller\u2019s forces where units coexist', () => {
+    // The Cabal hold Styx with two mechs and a PDS; a Deepwrought infantry
+    // coexists there without defending it. Counting it would overstate what an
+    // invasion faces, and make a quiet planet look like a battle.
+    const styx = locationAt('frac4/styx')
+    expect(styx.factions).toEqual(['cabal'])
+    expect(styx.unitSummary).toBe('2M, PDS')
+    expect(styx.unitCount).toBe(3)
+  })
+
+  it('falls back to everyone when the controller holds nothing', () => {
+    // Showing an empty planet while hiding somebody's army would be worse.
+    const doctored = structuredClone(data)
+    doctored.tileUnitData.frac4.planets!.styx!.controlledBy = 'sol'
+    const styx = listBattleLocations(doctored).find(l => l.id === 'frac4/styx')
+    expect(styx?.factions).toEqual(['cabal', 'deepwrought'])
+  })
+
   it('summarises units in the notation the outcomes table uses', () => {
     // Short name, a count in front only when there is more than one, and a
     // trailing `-` for a damaged stack — the Cabal war sun at frac4 is
@@ -111,6 +129,8 @@ describe('listBattleLocations', () => {
     doctored.tileUnitData.frac4.space!.deepwrought = [
       { entityType: 'unit', entityId: 'dd', count: 1, unitStates: null },
     ]
+    // Styx is coexistence, not a contest, until nobody controls it.
+    doctored.tileUnitData.frac4.planets!.styx!.controlledBy = null
     const ranked = listBattleLocations(doctored)
     expect(ranked[0].id).toBe('frac4')
     expect(ranked[0].mode).toBe('SPACE')

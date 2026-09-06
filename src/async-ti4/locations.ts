@@ -40,12 +40,21 @@ function summariseUnits(
   return parts.join(', ')
 }
 
-function occupants(groups: EntityGroups): Occupancy {
+/** `owner` restricts a planet to the forces of whoever controls it. Units of
+ *  other players can coexist on a planet without being part of its defence, so
+ *  counting them would overstate what an invasion actually faces. Ignored when
+ *  the controller has nothing standing there, where showing an empty planet
+ *  while hiding somebody's army would be worse. */
+function occupants(groups: EntityGroups, owner?: string | null): Occupancy {
+  const ownerUnits = owner ? groups[owner] : undefined
+  const defending =
+    ownerUnits?.some(isModelledUnit) && owner ? { [owner]: ownerUnits } : groups
+
   const totals = new Map<string, number>()
   const healthy = new Map<UnitBaseType, number>()
   const damaged = new Map<UnitBaseType, number>()
 
-  for (const [asyncFaction, entities] of Object.entries(groups)) {
+  for (const [asyncFaction, entities] of Object.entries(defending)) {
     let total = 0
     for (const entity of entities) {
       if (!isModelledUnit(entity)) continue
@@ -145,12 +154,12 @@ export function listBattleLocations(data: WebData): BattleLocation[] {
     }
 
     for (const [planet, planetData] of Object.entries(tileData.planets ?? {})) {
-      const ground = occupants(planetData?.entities ?? {})
+      const holder = planetData?.controlledBy
+      const ground = occupants(planetData?.entities ?? {}, holder)
       // Every planet is listed, units or not: an undefended planet is a
       // perfectly good thing to be planning an invasion of, and leaving it out
       // hid it from the map entirely. With nobody standing on it, whoever
       // holds it is the only clue to who you would be fighting.
-      const holder = planetData?.controlledBy
       const factions =
         ground.factions.length > 0
           ? ground.factions
