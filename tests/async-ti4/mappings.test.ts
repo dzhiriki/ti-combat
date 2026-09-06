@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs'
+
 import { describe, expect, it } from 'vitest'
 
+import { locationAreaLabel } from '@/async-ti4/locations'
 import {
   ABILITY_BY_TECH,
   ABILITY_BY_TF_UNIT,
@@ -7,6 +10,7 @@ import {
   UNIT_TYPE_BY_ASYNC_ID,
   UNIT_UPGRADE_BY_TECH,
 } from '@/async-ti4/mappings'
+import { PLANET_NAMES } from '@/async-ti4/planet-names'
 import { WebDataSchema } from '@/async-ti4/types'
 import { UNIT_TYPES } from '@/constants/units'
 import technology from '@/data/abilities/technology'
@@ -17,6 +21,17 @@ import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
 // on the right-hand side is one of our own keys. Renaming an ability or a
 // faction here would otherwise break the import silently — nothing throws, the
 // card simply stops arriving. Assert each target still resolves.
+function loadFixture(name: string) {
+  return WebDataSchema.parse(
+    JSON.parse(
+      readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf-8'),
+    ),
+  )
+}
+const ti4Data = loadFixture('ti4-game.json')
+const tfData = loadFixture('twilights-fall-game.json')
+const activeData = loadFixture('active-combat.json')
+
 const abilityKeys = new Set(getAllAbilities().map(a => a.key))
 const factionKeys = new Set(Object.keys(factions))
 const unitTypes = new Set<string>(UNIT_TYPES)
@@ -126,5 +141,32 @@ describe('payload tolerance', () => {
   it('still refuses a payload with no players or map', () => {
     expect(WebDataSchema.safeParse({ playerData: [] }).success).toBe(false)
     expect(WebDataSchema.safeParse({ tileUnitData: {} }).success).toBe(false)
+  })
+})
+
+describe('planet names', () => {
+  it('turns squashed keys into printed names', () => {
+    // `tileUnitData` keys planets by a squashed identifier, which is no use in
+    // a list someone reads: `mrte` has to come out as Mecatol Rex.
+    expect(locationAreaLabel({ planet: 'mrte' })).toBe('Mecatol Rex')
+    expect(locationAreaLabel({ planet: 'meharxull' })).toBe('Mehar Xull')
+    expect(locationAreaLabel({ planet: 'rigelii' })).toBe('Rigel II')
+    // Homebrew reskins reuse other planets' holder keys; the real planet wins.
+    expect(locationAreaLabel({ planet: 'mirage' })).toBe('Mirage')
+  })
+
+  it('falls back to the key rather than showing nothing', () => {
+    expect(locationAreaLabel({ planet: 'notaplanet' })).toBe('Notaplanet')
+    expect(locationAreaLabel({})).toBe('Space')
+  })
+
+  it('names every planet the sample games use', () => {
+    for (const data of [ti4Data, tfData, activeData]) {
+      for (const tile of Object.values(data.tileUnitData)) {
+        for (const planet of Object.keys(tile.planets ?? {})) {
+          expect(PLANET_NAMES[planet], `no name for "${planet}"`).toBeDefined()
+        }
+      }
+    }
   })
 })

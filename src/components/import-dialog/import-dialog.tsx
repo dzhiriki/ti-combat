@@ -213,13 +213,13 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
             placeholder="Game id or link"
             onChange={e => setInput(e.target.value)}
           />
-          <ButtonIcon
+          <button
             className={styles.loadButton}
             type="submit"
-            isLoading={loading}
+            disabled={loading}
           >
-            Load
-          </ButtonIcon>
+            {loading ? 'Loading' : 'Load'}
+          </button>
         </form>
 
         {error && <p className={styles.error}>{error}</p>}
@@ -247,15 +247,15 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
                       key={l.id}
                       type="button"
                       className={clsx(styles.area, {
+                        // Space takes the full width: it is a different fight
+                        // from the ground below it, not one planet among many.
+                        [styles.area_space]: l.mode === 'SPACE',
                         [styles.area_selected]: l.id === locationId,
                       })}
                       onClick={() => selectLocation(l.id)}
                     >
                       <span className={styles.areaName}>
                         {locationAreaLabel(l)}
-                        {l.mode === 'GROUND' && (
-                          <span className={styles.areaMode}>ground</span>
-                        )}
                         {l.isActiveCombat && (
                           <span className={styles.areaBadge}>in combat</span>
                         )}
@@ -311,13 +311,14 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
               included — plus each side&rsquo;s researched technologies.
             </p>
 
-            <ButtonIcon
+            <button
               className={styles.importButton}
+              type="button"
               onClick={handleImport}
               disabled={!attacker || !defender}
             >
               Import battle
-            </ButtonIcon>
+            </button>
           </>
         )}
       </DialogContent>

@@ -1,6 +1,7 @@
 import factions from '@/data/faction'
 
 import { FACTION_BY_ASYNC_ID, UNIT_TYPE_BY_ASYNC_ID } from './mappings'
+import { PLANET_NAMES } from './planet-names'
 import type { AsyncEntity, BattleLocation, WebData } from './types'
 
 type EntityGroups = Record<string, AsyncEntity[]>
@@ -39,8 +40,12 @@ export function factionLabel(asyncFactionId: string): string {
   return key ? factions[key].name : asyncFactionId
 }
 
-function titleCase(name: string): string {
-  return name.charAt(0).toUpperCase() + name.slice(1)
+/** A planet's printed name. AsyncTI4 keys planets by a squashed identifier,
+ *  so `mrte` has to become `Mecatol Rex` rather than `Mrte`. */
+function planetName(planet: string): string {
+  return (
+    PLANET_NAMES[planet] ?? planet.charAt(0).toUpperCase() + planet.slice(1)
+  )
 }
 
 /** The battle AsyncTI4 has open right now, resolved to a location id and the
@@ -111,7 +116,7 @@ export function listBattleLocations(data: WebData): BattleLocation[] {
         id: `${tile}/${planet}`,
         tile,
         planet,
-        label: `${tile} · ${titleCase(planet)}`,
+        label: `${tile} · ${planetName(planet)}`,
         mode: 'GROUND',
         factions: ground.factions,
         unitCount: ground.unitCount,
@@ -148,7 +153,7 @@ export function entitiesAt(
  *  calculator doesn't model, and those players can't be imported. */
 /** How a location's area reads on its own — `Space`, or the planet's name. */
 export function locationAreaLabel(location: { planet?: string }): string {
-  return location.planet ? titleCase(location.planet) : 'Space'
+  return location.planet ? planetName(location.planet) : 'Space'
 }
 
 export function isMappedFaction(asyncFactionId: string): boolean {
