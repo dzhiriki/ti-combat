@@ -302,7 +302,12 @@
       }
     },
     "frac1": {
-      "planets": {},
+      "planets": {
+        "cocytus": {
+          "controlledBy": "yellowtf",
+          "entities": {}
+        }
+      },
       "space": {
         "redtf": [
           {

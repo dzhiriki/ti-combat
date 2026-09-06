@@ -72,6 +72,17 @@ describe('listBattleLocations', () => {
     expect(locationAt('317/hercalor').factions).toEqual(['bastion'])
   })
 
+  it('lists a planet with no units on it', () => {
+    // Everra on 308 is held by Sol with nothing standing on it. Skipping such
+    // planets hid them from the map, and an undefended planet is exactly the
+    // kind you would be planning an invasion of.
+    const everra = locations.find(l => l.id === '308/everra')
+    expect(everra).toBeDefined()
+    expect(everra?.unitCount).toBe(0)
+    // With nobody standing there, the planet's holder is who you would face.
+    expect(everra?.factions).toEqual(['sol'])
+  })
+
   it('sorts contested locations first', () => {
     const firstUncontested = locations.findIndex(l => l.factions.length < 2)
     const lastContested = locations.findLastIndex(l => l.factions.length > 1)

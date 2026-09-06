@@ -261,8 +261,12 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
                         )}
                       </span>
                       <span className={styles.areaWho}>
-                        {l.factions.map(factionLabel).join(' vs ')} ·{' '}
-                        {l.unitCount} {l.unitCount === 1 ? 'unit' : 'units'}
+                        {l.factions.length === 0
+                          ? 'Unclaimed'
+                          : l.factions.map(factionLabel).join(' vs ')}
+                        {l.unitCount > 0
+                          ? ` · ${l.unitCount} ${l.unitCount === 1 ? 'unit' : 'units'}`
+                          : ' · no units'}
                       </span>
                     </button>
                   ))}

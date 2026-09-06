@@ -28,6 +28,10 @@ const EntitySchema = z.object({
 
 const PlanetSchema = z.nullish(
   z.object({
+    /** Who holds the planet. The only thing that identifies an owner when the
+     *  planet has no units standing on it, which is the commonest state for an
+     *  invasion target. */
+    controlledBy: soft(z.string()),
     entities: soft(z.record(z.string(), z.array(EntitySchema))),
   }),
 )

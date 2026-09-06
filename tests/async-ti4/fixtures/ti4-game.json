@@ -226,6 +226,25 @@
         ]
       }
     },
+    "308": {
+      "planets": {
+        "everra": {
+          "controlledBy": "sol",
+          "entities": {}
+        }
+      },
+      "space": {
+        "cabal": [
+          {
+            "count": 1,
+            "entityId": "dd",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          }
+        ]
+      }
+    },
     "317": {
       "planets": {
         "hercalor": {
@@ -271,6 +290,10 @@
               }
             ]
           }
+        },
+        "tiamat": {
+          "controlledBy": "bastion",
+          "entities": {}
         }
       },
       "space": {

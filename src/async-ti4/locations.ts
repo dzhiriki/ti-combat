@@ -111,14 +111,24 @@ export function listBattleLocations(data: WebData): BattleLocation[] {
 
     for (const [planet, planetData] of Object.entries(tileData.planets ?? {})) {
       const ground = occupants(planetData?.entities ?? {})
-      if (ground.factions.length === 0) continue
+      // Every planet is listed, units or not: an undefended planet is a
+      // perfectly good thing to be planning an invasion of, and leaving it out
+      // hid it from the map entirely. With nobody standing on it, whoever
+      // holds it is the only clue to who you would be fighting.
+      const holder = planetData?.controlledBy
+      const factions =
+        ground.factions.length > 0
+          ? ground.factions
+          : holder && isMappedFaction(holder)
+            ? [holder]
+            : []
       locations.push({
         id: `${tile}/${planet}`,
         tile,
         planet,
         label: `${tile} · ${planetName(planet)}`,
         mode: 'GROUND',
-        factions: ground.factions,
+        factions,
         unitCount: ground.unitCount,
         isActiveCombat: `${tile}/${planet}` === activeId,
       })
