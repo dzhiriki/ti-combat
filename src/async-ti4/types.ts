@@ -37,6 +37,9 @@ const PlanetSchema = z.nullish(
 )
 
 const TileSchema = z.object({
+  /** Any anomaly — nebula, gravity rift, asteroid field, supernova, scar.
+   *  Which kind is not said here; the tile catalogue knows. */
+  anomaly: soft(z.boolean()),
   space: soft(z.record(z.string(), z.array(EntitySchema))),
   planets: soft(z.record(z.string(), PlanetSchema)),
 })
@@ -77,6 +80,9 @@ export const WebDataSchema = z.object({
   /** How many rings the map has: 3 for a six-player game, 4 for seven or
    *  eight, more with expansions. Drives where the off-grid slots sit. */
   ringCount: soft(z.number()),
+  /** `position:tileId` pairs. The tile id is what identifies which anomaly a
+   *  system is. */
+  tilePositions: soft(z.array(z.string())),
   gameState: soft(z.object({ activeCombat: ActiveCombatSchema })),
   playerData: z.array(PlayerSchema),
   tileUnitData: z.record(z.string(), TileSchema),
@@ -108,4 +114,11 @@ export interface BattleLocation {
   unitSummary: string
   /** Set when this is the battle AsyncTI4 currently has open. */
   isActiveCombat?: boolean
+  /** Set for any anomaly, whether or not its effect is modelled. */
+  isAnomaly?: boolean
+  /** Ability key of the environment this system imposes, where there is one. */
+  environment?: string
+  /** The name printed on the system's tile, where it is known. A system whose
+   *  planets are all locked or unclaimed has nothing else to identify it. */
+  systemName?: string
 }

@@ -2,8 +2,13 @@ import { UNIT_SHORT_NAMES, UNIT_TYPES } from '@/constants/units'
 import factions from '@/data/faction'
 import type { UnitBaseType } from '@/types'
 
-import { FACTION_BY_ASYNC_ID, UNIT_TYPE_BY_ASYNC_ID } from './mappings'
+import {
+  ENVIRONMENT_BY_TILE,
+  FACTION_BY_ASYNC_ID,
+  UNIT_TYPE_BY_ASYNC_ID,
+} from './mappings'
 import { PLANET_NAMES, SPACE_STATIONS } from './planet-names'
+import { TILE_NAMES } from './tile-names'
 import type { AsyncEntity, BattleLocation, WebData } from './types'
 
 type EntityGroups = Record<string, AsyncEntity[]>
@@ -136,21 +141,36 @@ function rank(location: BattleLocation): number {
 export function listBattleLocations(data: WebData): BattleLocation[] {
   const locations: BattleLocation[] = []
   const activeId = findActiveCombat(data)?.locationId
+  // `position:tileId`. The tile id is what says which anomaly a system is.
+  const tileIds = new Map(
+    (data.tilePositions ?? []).map(entry => {
+      const [position, tileId] = entry.split(':')
+      return [position, tileId] as const
+    }),
+  )
 
   for (const [tile, tileData] of Object.entries(data.tileUnitData)) {
+    const tileId = tileIds.get(tile) ?? ''
+    const environment = ENVIRONMENT_BY_TILE[tileId]
+    const systemName = TILE_NAMES[tileId]
+    const anomaly = tileData.anomaly ?? undefined
+
+    // Every system offers its space, empty or not: a fight can be planned in
+    // one that nobody is sitting in, and an anomaly changes how it goes.
     const space = occupants(tileData.space ?? {})
-    if (space.factions.length > 0) {
-      locations.push({
-        id: tile,
-        tile,
-        label: `${tile} · space`,
-        mode: 'SPACE',
-        factions: space.factions,
-        unitCount: space.unitCount,
-        unitSummary: space.unitSummary,
-        isActiveCombat: tile === activeId,
-      })
-    }
+    locations.push({
+      id: tile,
+      tile,
+      label: `${tile} · space`,
+      mode: 'SPACE',
+      factions: space.factions,
+      unitCount: space.unitCount,
+      unitSummary: space.unitSummary,
+      isActiveCombat: tile === activeId,
+      ...(anomaly && { isAnomaly: true }),
+      ...(environment && { environment }),
+      ...(systemName && { systemName }),
+    })
 
     for (const [planet, planetData] of Object.entries(tileData.planets ?? {})) {
       // A space station sits in a system's planet list without being a place
@@ -158,6 +178,10 @@ export function listBattleLocations(data: WebData): BattleLocation[] {
       if (SPACE_STATIONS.has(planet)) continue
       const holder = planetData?.controlledBy
       const ground = occupants(planetData?.entities ?? {}, holder)
+      // A planet nobody holds and nobody is standing on is not somewhere a
+      // battle happens — troops just land on it. Leaving it out keeps such
+      // systems reading like the empty ones they are.
+      if (!holder && ground.factions.length === 0) continue
       // Every planet is listed, units or not: an undefended planet is a
       // perfectly good thing to be planning an invasion of, and leaving it out
       // hid it from the map entirely. With nobody standing on it, whoever
@@ -178,6 +202,9 @@ export function listBattleLocations(data: WebData): BattleLocation[] {
         unitCount: ground.unitCount,
         unitSummary: ground.unitSummary,
         isActiveCombat: `${tile}/${planet}` === activeId,
+        ...(anomaly && { isAnomaly: true }),
+        ...(environment && { environment }),
+        ...(systemName && { systemName }),
       })
     }
   }

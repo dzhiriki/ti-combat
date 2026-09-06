@@ -75,8 +75,10 @@
     }
   ],
   "ringCount": 3,
+  "tilePositions": ["101:64", "313:54"],
   "tileUnitData": {
     "101": {
+      "anomaly": false,
       "planets": {
         "atlas": {
           "controlledBy": "yellowtf",
@@ -129,6 +131,7 @@
       }
     },
     "313": {
+      "anomaly": false,
       "planets": {
         "acheron": {
           "controlledBy": "purpletf",

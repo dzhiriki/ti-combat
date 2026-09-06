@@ -257,6 +257,14 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
                     >
                       <span className={styles.areaName}>
                         {locationAreaLabel(l)}
+                        {/* The system's own name, so a hexagon whose planets
+                            are all locked or unclaimed still says where it
+                            is — Mallice behind its locked nexus, say. */}
+                        {l.mode === 'SPACE' && l.systemName && (
+                          <span className={styles.areaSystem}>
+                            {l.systemName}
+                          </span>
+                        )}
                         {l.isActiveCombat && (
                           <span className={styles.areaBadge}>in combat</span>
                         )}

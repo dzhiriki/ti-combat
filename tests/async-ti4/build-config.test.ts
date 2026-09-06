@@ -115,6 +115,62 @@ describe('listBattleLocations', () => {
     expect(ids).not.toContain('316/revelation')
   })
 
+  it('offers every system\u2019s space, empty or not', () => {
+    // A fight can be planned in a system nobody is sitting in, and an anomaly
+    // there changes how it goes, so space is always on offer.
+    const spaces = locations.filter(l => l.mode === 'SPACE')
+    expect(spaces).toHaveLength(Object.keys(data.tileUnitData).length)
+
+    const empty = locationAt('309')
+    expect(empty.unitCount).toBe(0)
+    expect(empty.factions).toEqual([])
+    expect(empty.unitSummary).toBe('')
+  })
+
+  it('skips a planet nobody holds and nobody stands on', () => {
+    // Such a planet is not a battle — troops just land on it — so a system
+    // full of them should read as empty as it is.
+    const tiamat = locations.find(l => l.id === '317/tiamat')
+    expect(tiamat).toBeDefined() // held by Bastion, no units
+    expect(locations.find(l => l.id === '303/nothing')).toBeUndefined()
+    for (const l of locations) {
+      if (l.mode !== 'GROUND') continue
+      expect(
+        l.factions.length,
+        `${l.id} has neither holder nor units`,
+      ).toBeGreaterThan(0)
+    }
+  })
+
+  it('marks the anomalies and names the ones it models', () => {
+    // Everra (308) is a nebula, 303 is an entropic scar; both are anomalies.
+    expect(locationAt('308').isAnomaly).toBe(true)
+    expect(locationAt('308').environment).toBe('NEBULA')
+    expect(locationAt('303').environment).toBe('ENTROPIC_SCAR')
+    // A gravity rift is an anomaly with no combat effect this models.
+    expect(locationAt('212').isAnomaly).toBe(true)
+    expect(locationAt('212').environment).toBeUndefined()
+    expect(locationAt('104').isAnomaly).toBeUndefined()
+  })
+
+  it('sets the system environment on both sides of the import', () => {
+    const nebula = importAt('308', 'cabal', 'sol').config
+    expect(nebula.aa.NEBULA).toEqual({ isEnabled: true })
+    expect(nebula.da.NEBULA).toEqual({ isEnabled: true })
+
+    const scar = importAt('303', 'cabal', 'sol').config
+    expect(scar.aa.ENTROPIC_SCAR).toEqual({ isEnabled: true })
+    expect(scar.da.ENTROPIC_SCAR).toEqual({ isEnabled: true })
+  })
+
+  it('names the system, so an anonymous hexagon still says where it is', () => {
+    expect(locationAt('308').systemName).toBe('Everra')
+    expect(locationAt('303').systemName).toBe('Entropic Scar')
+    // Mallice sits behind a locked nexus with no claimable planet, so the
+    // tile name is the only thing identifying it.
+    expect(locationAt('212').systemName).toBe('Gravity Rift')
+  })
+
   it('sorts contested locations first', () => {
     const firstUncontested = locations.findIndex(l => l.factions.length < 2)
     const lastContested = locations.findLastIndex(l => l.factions.length > 1)

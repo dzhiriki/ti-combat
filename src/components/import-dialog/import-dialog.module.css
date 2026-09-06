@@ -163,6 +163,14 @@
   color: var(--color-text-main);
 }
 
+.areaSystem {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
+
 .areaBadge {
   font-family: var(--font-mono);
   font-size: var(--text-xs);

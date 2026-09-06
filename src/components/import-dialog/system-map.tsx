@@ -32,12 +32,17 @@ interface TileSummary {
   /** The space area: who holds it, how many ships, and whether more than one
    *  player is up there — which is the case worth spotting, since it means a
    *  fight rather than a garrison. Null when nobody has ships here. */
-  space: { faction: string; unitCount: number; contested: boolean } | null
+  space: {
+    faction: string | undefined
+    unitCount: number
+    contested: boolean
+  } | null
   /** Ground forces below, summarised only as "how many planets hold units".
    *  Counts are left to the area list: a planet can hold dozens of infantry,
    *  and a three-digit number in a 56px hexagon reads as noise. */
   groundPlanets: number
   isActiveCombat: boolean
+  isAnomaly: boolean
 }
 
 function summariseTiles(
@@ -51,7 +56,9 @@ function summariseTiles(
       space: null,
       groundPlanets: 0,
       isActiveCombat: false,
+      isAnomaly: false,
     }
+    summary.isAnomaly ||= !!location.isAnomaly
     if (location.mode === 'SPACE') {
       summary.space = {
         // `factions` is ordered strongest first.
@@ -120,9 +127,8 @@ export function SystemMap({
       >
         {layout.cells.map(cell => {
           const summary = summaries.get(cell.position)
-          const factionKey = summary?.space
-            ? FACTION_BY_ASYNC_ID[summary.space.faction]
-            : undefined
+          const holder = summary?.space?.faction
+          const factionKey = holder ? FACTION_BY_ASYNC_ID[holder] : undefined
           const icon = factionKey ? factions[factionKey].icon : undefined
           const selected = selectedTile === cell.position
           const style = {
@@ -148,7 +154,8 @@ export function SystemMap({
           }
 
           const description = [
-            summary.space
+            summary.isAnomaly && 'anomaly',
+            summary.space?.faction
               ? `space held by ${factionLabel(summary.space.faction)}${
                   summary.space.contested ? ' (contested)' : ''
                 }, ${summary.space.unitCount} ${
@@ -169,6 +176,7 @@ export function SystemMap({
                 [styles.hex_selected]: selected,
                 [styles.hex_contested]: summary.space?.contested,
                 [styles.hex_active]: summary.isActiveCombat,
+                [styles.hex_anomaly]: summary.isAnomaly,
               })}
               style={style}
               onClick={() => onSelectTile(cell.position)}
@@ -177,7 +185,7 @@ export function SystemMap({
             >
               <span className={styles.face} aria-hidden="true" />
               {icon ? <FactionIcon icon={icon} /> : null}
-              {summary.space ? (
+              {summary.space && summary.space.unitCount > 0 ? (
                 <span className={styles.count}>{summary.space.unitCount}</span>
               ) : null}
               {summary.groundPlanets > 0 ? (

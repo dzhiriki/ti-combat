@@ -222,3 +222,43 @@ export const UNMODELLED_TF_UNITS: ReadonlySet<string> = new Set([
   'tf-productionbiomes',
   'tf-valefarprime',
 ])
+
+/** AsyncTI4 tile ids whose system imposes a combat environment this
+ *  calculator models. The game payload says only whether a tile is an anomaly,
+ *  not which kind, so the type comes from the tile catalogue: `isNebula` and
+ *  `isScar`. Gravity rifts, asteroid fields and supernovae are anomalies too,
+ *  but they bear on movement rather than on a combat, and are not modelled.
+ */
+export const ENVIRONMENT_BY_TILE: Readonly<Record<string, string>> = {
+  '114': 'ENTROPIC_SCAR',
+  '116': 'ENTROPIC_SCAR',
+  '42': 'NEBULA',
+  '56': 'NEBULA',
+  '68': 'NEBULA',
+  '92': 'NEBULA',
+  be1: 'NEBULA',
+  c05: 'NEBULA',
+  c10: 'NEBULA',
+  c41: 'NEBULA',
+  cpti20lachesis: 'ENTROPIC_SCAR',
+  d104: 'NEBULA',
+  d119: 'NEBULA',
+  d120: 'NEBULA',
+  d17: 'NEBULA',
+  ef6: 'ENTROPIC_SCAR',
+  ef8: 'NEBULA',
+  er02: 'NEBULA',
+  er10: 'NEBULA',
+  er103: 'NEBULA',
+  er119: 'NEBULA',
+  er15: 'NEBULA',
+  er18: 'NEBULA',
+  er21: 'NEBULA',
+  er27: 'NEBULA',
+  er31: 'NEBULA',
+  er36: 'NEBULA',
+  er40: 'NEBULA',
+  er45: 'NEBULA',
+  er67: 'NEBULA',
+  er99: 'NEBULA',
+}

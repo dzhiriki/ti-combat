@@ -55,6 +55,17 @@
   background: var(--color-overlay-medium);
 }
 
+/* An anomaly — nebula, rift, asteroid field, supernova, scar. Hatched rather
+   than tinted, so it reads as different ground without competing with the
+   colours that mark a fight. */
+.hex_anomaly .face {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 3px,
+    var(--color-overlay-bold) 3px 6px
+  );
+}
+
 /* More than one player has ships here — the systems actually worth looking at.
    The ring alone is thin at this size, so each state tints its face too. */
 .hex_contested {

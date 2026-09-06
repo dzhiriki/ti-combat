@@ -243,8 +243,10 @@
     }
   ],
   "ringCount": 3,
+  "tilePositions": ["bl:118", "frac1:fracture1", "frac7:fracture7"],
   "tileUnitData": {
     "bl": {
+      "anomaly": false,
       "planets": {
         "ahkcreuxx": {
           "controlledBy": "pinktf",
@@ -302,6 +304,7 @@
       }
     },
     "frac1": {
+      "anomaly": false,
       "planets": {
         "cocytus": {
           "controlledBy": "yellowtf",
@@ -328,6 +331,7 @@
       }
     },
     "frac7": {
+      "anomaly": false,
       "planets": {
         "lethe": {
           "controlledBy": "yellowtf",

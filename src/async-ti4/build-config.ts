@@ -248,6 +248,18 @@ export function buildImportConfig(
     notes,
   )
 
+  // A nebula or an entropic scar is a property of the system, so it applies to
+  // whoever fights there. Both sides get it: the scar syncs across them, and
+  // the nebula is registered on the defender alone, so an entry for a side
+  // that doesn't have the card is dropped when the config loads.
+  if (location.environment) {
+    const environment = abilityLookup.get(location.environment)
+    if (environment) {
+      attacker.abilities[location.environment] = { isEnabled: true }
+      defender.abilities[location.environment] = { isEnabled: true }
+    }
+  }
+
   return {
     config: {
       v: 1,

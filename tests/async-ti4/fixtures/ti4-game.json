@@ -102,8 +102,21 @@
     }
   ],
   "ringCount": 3,
+  "tilePositions": [
+    "104:39",
+    "106:26",
+    "212:41",
+    "303:114",
+    "308:68",
+    "309:77",
+    "314:79",
+    "316:92",
+    "317:107",
+    "frac4:fracture4"
+  ],
   "tileUnitData": {
     "104": {
+      "anomaly": false,
       "planets": {},
       "space": {
         "bastion": [
@@ -132,6 +145,7 @@
       }
     },
     "106": {
+      "anomaly": false,
       "planets": {
         "lodor": {
           "controlledBy": "bastion",
@@ -182,6 +196,7 @@
       }
     },
     "212": {
+      "anomaly": true,
       "planets": {
         "mirage": {
           "controlledBy": "sardakk",
@@ -226,7 +241,23 @@
         ]
       }
     },
+    "303": {
+      "anomaly": true,
+      "planets": {},
+      "space": {
+        "sardakk": [
+          {
+            "count": 1,
+            "entityId": "ca",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          }
+        ]
+      }
+    },
     "308": {
+      "anomaly": true,
       "planets": {
         "everra": {
           "controlledBy": "sol",
@@ -245,7 +276,38 @@
         ]
       }
     },
+    "309": {
+      "anomaly": false,
+      "planets": {},
+      "space": {
+        "neutral": [
+          {
+            "count": 1,
+            "entityId": "ionbeta",
+            "entityType": "token",
+            "sustained": null,
+            "unitStates": null
+          }
+        ]
+      }
+    },
+    "314": {
+      "anomaly": true,
+      "planets": {},
+      "space": {
+        "neutral": [
+          {
+            "count": 1,
+            "entityId": "frontier",
+            "entityType": "token",
+            "sustained": null,
+            "unitStates": null
+          }
+        ]
+      }
+    },
     "316": {
+      "anomaly": true,
       "planets": {
         "ordinian": {
           "controlledBy": "bastion",
@@ -295,6 +357,7 @@
       }
     },
     "317": {
+      "anomaly": false,
       "planets": {
         "hercalor": {
           "controlledBy": "bastion",
@@ -358,6 +421,7 @@
       }
     },
     "frac4": {
+      "anomaly": false,
       "planets": {
         "styx": {
           "controlledBy": "cabal",
