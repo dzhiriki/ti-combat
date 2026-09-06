@@ -32,6 +32,7 @@ const PlayerSchema = z.object({
   techs: z.nullish(z.array(z.string())),
   eliminated: z.nullish(z.boolean()),
   galvanizeTokensReinf: z.nullish(z.number()),
+  unitsOwned: z.nullish(z.array(z.string())),
 })
 
 /** The slice of AsyncTI4's `/web-data` payload this import reads. Unknown

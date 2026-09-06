@@ -7,6 +7,7 @@ import { AsyncTi4Error } from './fetch-game'
 import { entitiesAt, factionLabel } from './locations'
 import {
   ABILITY_BY_TECH,
+  ABILITY_BY_TF_UNIT,
   FACTION_BY_ASYNC_ID,
   UNIT_TYPE_BY_ASYNC_ID,
   UNIT_UPGRADE_BY_TECH,
@@ -62,6 +63,33 @@ function structuresInSystem(
   )
 }
 
+/** Everything a side brings to a battle at this location.
+ *
+ *  Neither combat is confined to its own area of the map. A space battle is
+ *  fought by the fleet in the space area — ground forces riding along in it
+ *  included, since they are what an invasion commits — plus the structures on
+ *  the system's planets, which is where its space cannon fire comes from. A
+ *  ground battle adds the fleet overhead to whoever already holds the planet:
+ *  those ships carry the invading troops and fire the bombardment. */
+function entitiesForBattle(
+  data: WebData,
+  location: BattleLocation,
+  asyncFactionId: string,
+): AsyncEntity[] {
+  const inSpace = entitiesAt(
+    data,
+    { ...location, planet: undefined },
+    asyncFactionId,
+  )
+  if (location.mode === 'SPACE') {
+    return [
+      ...inSpace,
+      ...structuresInSystem(data, location.tile, asyncFactionId),
+    ]
+  }
+  return [...entitiesAt(data, location, asyncFactionId), ...inSpace]
+}
+
 function buildSide(
   data: WebData,
   location: BattleLocation,
@@ -76,12 +104,7 @@ function buildSide(
     )
   }
 
-  const entities = [
-    ...entitiesAt(data, location, asyncFactionId),
-    ...(location.mode === 'SPACE'
-      ? structuresInSystem(data, location.tile, asyncFactionId)
-      : []),
-  ]
+  const entities = entitiesForBattle(data, location, asyncFactionId)
 
   const counts: UnitCounts = {}
   const damaged: UnitCounts = {}
@@ -129,6 +152,15 @@ function buildSide(
     // owning one has to grant a use rather than flip `isEnabled`.
     abilities[abilityKey] =
       ability.headerUI === 'uses' ? { uses: 1 } : { isEnabled: true }
+  }
+
+  // Twilight's Fall keeps its unit upgrades in the shared card deck, so they
+  // arrive as owned unit sheets rather than researched techs.
+  for (const owned of player?.unitsOwned ?? []) {
+    const abilityKey = ABILITY_BY_TF_UNIT[owned]
+    if (abilityKey && abilityLookup.has(abilityKey)) {
+      abilities[abilityKey] = { isEnabled: true }
+    }
   }
 
   const units: Record<string, [number, 0 | 1]> = {}

@@ -10,14 +10,20 @@ import { parseGameId } from './fetch-game'
 import { listBattleLocations } from './locations'
 import { type BattleLocation, WebDataSchema } from './types'
 
+function loadFixture(name: string) {
+  return WebDataSchema.parse(
+    JSON.parse(readFileSync(new URL(name, import.meta.url), 'utf-8')),
+  )
+}
+
 // A real AsyncTI4 game (sample-ti4), trimmed to five tiles that between them
 // cover damaged and galvanized stacks, structures under a space battle, and
 // the tokens and attachments that share the units' shape.
-const data = WebDataSchema.parse(
-  JSON.parse(
-    readFileSync(new URL('./game-fixture.json', import.meta.url), 'utf-8'),
-  ),
-)
+const data = loadFixture('./game-fixture.json')
+
+// A real Twilight's Fall game (sample-tf), where the upgrade cards live in
+// `unitsOwned` rather than in the researched techs.
+const tfData = loadFixture('./tf-game-fixture.json')
 
 const abilityLookup = buildAbilityLookup(getAllAbilities())
 const locations = listBattleLocations(data)
@@ -124,13 +130,36 @@ describe('buildImportConfig', () => {
     expect(config.au.CRUISER).toEqual([0, 1])
   })
 
+  it('adds the fleet overhead to a ground battle', () => {
+    // Sardakk holds the space at 106 with 2 fighters and 2 dreadnoughts —
+    // the ships that carry the invasion and fire the bombardment.
+    const { config } = importAt('106/lodor', 'sardakk', 'bastion')
+    expect(config.au.FIGHTER).toEqual([2, 1])
+    expect(config.au.DREADNOUGHT).toEqual([2, 1])
+  })
+
+  it('keeps ground forces riding in the space area of a space battle', () => {
+    // Bastion has an infantry up in the space at 104, aboard the fleet.
+    const { config } = importAt('104', 'bastion', 'sardakk')
+    expect(config.au.INFANTRY).toEqual([1, 0])
+  })
+
+  it('leaves units on the planet out of a space battle', () => {
+    // Bastion's infantry and mech are down on Lodor, not in the fight.
+    const { config } = importAt('106', 'sardakk', 'bastion')
+    expect(config.du.INFANTRY).toBeUndefined()
+    expect(config.du.MECH).toBeUndefined()
+  })
+
   it('stays quiet when everything maps', () => {
     expect(importAt('frac4', 'cabal', 'deepwrought').notes).toEqual([])
   })
 
   it('reports units and cards it could not bring across', () => {
-    // Give the Cabal a monument (no combat model) and the pre-Omega X-89
-    // (a different card from the one implemented here).
+    // Nothing in the fixture game is unmappable, so plant the two kinds of
+    // thing that are: a Monument — a structure from AsyncTI4's Monuments
+    // expansion, which this calculator has no unit for — and the pre-Omega
+    // X-89, which is a different card from the ΩΩ printing implemented here.
     const doctored = structuredClone(data)
     doctored.tileUnitData.frac4.space!.cabal.push({
       entityType: 'unit',
@@ -156,5 +185,50 @@ describe('buildImportConfig', () => {
     expect(notes.join(' ')).toContain(
       'X-89 Bacterial Weapon (pre-\u03a9 printing)',
     )
+  })
+})
+
+describe('Twilight\u2019s Fall games', () => {
+  function tfImport(id: string, attacker: string, defender: string) {
+    const location = listBattleLocations(tfData).find(l => l.id === id)
+    if (!location) throw new Error(`No location "${id}" in TF fixture`)
+    return buildImportConfig(
+      tfData,
+      { location, attacker, defender },
+      abilityLookup,
+    )
+  }
+
+  it('maps the colour ids upstream uses to the TF faction sheets', () => {
+    const { config } = tfImport('313/acheron', 'yellowtf', 'purpletf')
+    expect(config.af).toBe('AVARICE_REX')
+    expect(config.df).toBe('IL_NA_VIROSET')
+  })
+
+  it('takes unit upgrades from the owned cards, not the techs', () => {
+    const { config } = tfImport('313/acheron', 'yellowtf', 'purpletf')
+    // Neither player has a single unit-upgrade tech; the cards are all in
+    // `unitsOwned`.
+    expect(config.aa.TF_UPGRADE_DAWNCRUSHER).toEqual({ isEnabled: true })
+    expect(config.aa.TF_UPGRADE_HYBRID_CRYSTAL_FIGHTER).toEqual({
+      isEnabled: true,
+    })
+    expect(config.da.TF_UPGRADE_THE_DRAGON_FREED).toEqual({ isEnabled: true })
+    expect(config.da.TF_UPGRADE_LETANI_WARRIOR).toEqual({ isEnabled: true })
+  })
+
+  it('imports the TF shared ability deck', () => {
+    const { config } = tfImport('313/acheron', 'yellowtf', 'purpletf')
+    // Il Na Viroset holds Valkyrie Particle Weave and Non-Euclidean Shielding.
+    expect(config.da.VALKYRIE_PARTICLE_WEAVE).toEqual({ isEnabled: true })
+    expect(config.da.NON_EUCLIDEAN_SHIELDING).toEqual({ isEnabled: true })
+  })
+
+  it('carries the fleet and the damaged mechs into a ground battle', () => {
+    const { config } = tfImport('101/atlas', 'yellowtf', 'yellowtf')
+    expect(config.au.MECH).toEqual([2, 0])
+    expect(config.au.CRUISER).toEqual([1, 0])
+    expect(config.au.DREADNOUGHT).toEqual([4, 0])
+    expect(config.aa.PRE_DAMAGED).toEqual({ damagedUnits: [['MECH', 2]] })
   })
 })

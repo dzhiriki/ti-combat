@@ -157,3 +157,42 @@ export const UNMODELLED_TECHS: Readonly<Record<string, string>> = {
   x89_base: 'X-89 Bacterial Weapon (pre-Ω printing)',
   x89: 'X-89 Bacterial Weapon Ω',
 }
+
+/** Twilight's Fall unit upgrades come from a shared card deck rather than a
+ *  researched technology, so upstream tracks them in `unitsOwned` (the unit
+ *  sheets a player has in front of them) and not in `techs`. Here they are
+ *  ability cards, so they are switched on rather than flipping a unit's
+ *  UPGRADED flag the way TI4's upgrades do.
+ *
+ *  The four cards upstream carries that are missing here — Floating Factories,
+ *  Helios Entity, Production Biomes and Valefar Prime — differ only in
+ *  movement, production or cost, so they have no bearing on a combat. */
+export const ABILITY_BY_TF_UNIT: Readonly<Record<string, string>> = {
+  'tf-echoofascension': 'TF_UPGRADE_ECHO_OF_ASCENSION',
+  'tf-dragonfreed': 'TF_UPGRADE_THE_DRAGON_FREED',
+  'tf-pws': 'TF_UPGRADE_PROTOTYPE_WAR_SUN',
+  'tf-universitywarsun': 'TF_UPGRADE_UNIVERSITY_WAR_SUN',
+  'tf-dawncrusher': 'TF_UPGRADE_DAWNCRUSHER',
+  'tf-exotrireme': 'TF_UPGRADE_EXOTRIREME',
+  'tf-superdread': 'TF_UPGRADE_SUPER_DREADNOUGHT',
+  'tf-advancedcarrier': 'TF_UPGRADE_ADVANCED_CARRIER',
+  'tf-ambassador': 'TF_UPGRADE_AMBASSADOR',
+  'tf-vortexer': 'TF_UPGRADE_VORTEXER',
+  'tf-ahksylfier': 'TF_UPGRADE_AHK_SYL_FIER',
+  'tf-corsair': 'TF_UPGRADE_CORSAIR',
+  'tf-saggitaria': 'TF_UPGRADE_SAGGITARIA',
+  'tf-exile': 'TF_UPGRADE_EXILE',
+  'tf-linkship': 'TF_UPGRADE_LINKSHIP',
+  'tf-swa': 'TF_UPGRADE_STRIKE_WING_ALPHA',
+  'tf-hcf': 'TF_UPGRADE_HYBRID_CRYSTAL_FIGHTER',
+  'tf-morphwing': 'TF_UPGRADE_MORPHWING',
+  'tf-triune': 'TF_UPGRADE_TRIUNE',
+  'tf-eidolonlandwaster': 'TF_UPGRADE_EIDOLON_LANDWASTER',
+  'tf-eidolonterminus': 'TF_UPGRADE_EIDOLON_TERMINUS',
+  'tf-yssarilinfantry': 'TF_UPGRADE_GUILD_AGENTS',
+  'tf-lataniwarrior': 'TF_UPGRADE_LETANI_WARRIOR',
+  'tf-yinclone': 'TF_UPGRADE_YIN_CLONE',
+  'tf-heltitan': 'TF_UPGRADE_HEL_TITAN',
+  'tf-justicerrail': 'TF_UPGRADE_JUSTICIAR_RAIL',
+  'tf-keepermatrix': 'TF_UPGRADE_KEEPER_MATRIX',
+}
