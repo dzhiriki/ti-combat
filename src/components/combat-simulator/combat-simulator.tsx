@@ -12,6 +12,7 @@ import {
   type AbilityFilterMode,
 } from '@/components/abilities-panel'
 import { BattleCard } from '@/components/battle-card'
+import { ImportDialog } from '@/components/import-dialog'
 import { useToast } from '@/components/toast'
 import { ButtonIcon } from '@/components/ui/button-icon'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -358,6 +359,9 @@ export function CombatSimulator({
           onUnitCountChange={setUnitCount}
           onUpgradeToggle={handleUpgradeToggle}
           onResetUnits={resetUnits}
+          topActions={
+            <ImportDialog allAbilities={allAbilities} onImport={loadConfig} />
+          }
           attackerActions={
             <ButtonIcon
               className={clsx(styles.gearButton, 'theme-attacker')}

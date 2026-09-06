@@ -1,0 +1,87 @@
+.content {
+  max-width: 30rem;
+  gap: var(--space-3);
+}
+
+.loadRow {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.textInput {
+  flex: 1;
+  min-width: 0;
+  height: var(--control-size);
+  padding: 0 var(--space-3);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-main);
+  background: var(--color-background-input-field);
+  border: 1px solid var(--color-border-main);
+  border-radius: var(--radius-md);
+}
+
+.textInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+.textInput:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -1px;
+}
+
+.loadButton,
+.importButton {
+  width: auto;
+  padding: 0 var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.importButton {
+  align-self: flex-end;
+  margin-top: var(--space-2);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-amber-500);
+}
+
+.meta {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.field {
+  display: grid;
+  align-items: center;
+  gap: var(--space-3);
+  grid-template-columns: 5rem 1fr;
+}
+
+.fieldLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.select {
+  width: 100%;
+  min-width: 0;
+}
+
+.selectContent {
+  max-width: min(24rem, calc(100vw - var(--space-8)));
+}
+
+.hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
