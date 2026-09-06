@@ -7,7 +7,7 @@ import { buildAbilityLookup } from '@/hooks/combat-setup/validation'
 
 import { buildImportConfig } from './build-config'
 import { parseGameId } from './fetch-game'
-import { listBattleLocations } from './locations'
+import { findActiveCombat, listBattleLocations } from './locations'
 import { type BattleLocation, WebDataSchema } from './types'
 
 function loadFixture(name: string) {
@@ -24,6 +24,11 @@ const data = loadFixture('./game-fixture.json')
 // A real Twilight's Fall game (sample-tf), where the upgrade cards live in
 // `unitsOwned` rather than in the researched techs.
 const tfData = loadFixture('./tf-game-fixture.json')
+
+// A real game (sample-combat) paused mid-battle. Nothing on its map looks
+// contested — the losing fleet is already gone — so `activeCombat` is the
+// only thing that says where the fight is.
+const activeData = loadFixture('./active-combat-fixture.json')
 
 const abilityLookup = buildAbilityLookup(getAllAbilities())
 const locations = listBattleLocations(data)
@@ -70,6 +75,56 @@ describe('listBattleLocations', () => {
     const firstUncontested = locations.findIndex(l => l.factions.length < 2)
     const lastContested = locations.findLastIndex(l => l.factions.length > 1)
     expect(lastContested).toBeLessThan(firstUncontested)
+  })
+
+  it('ranks a shared space area above a shared planet', () => {
+    // Two players sharing a space area are fighting; two on a planet may just
+    // be a structure sitting on ground someone else holds. No real game here
+    // has a space contest — a space combat resolves before the next snapshot —
+    // so put an enemy destroyer in with the Cabal fleet.
+    const doctored = structuredClone(data)
+    doctored.tileUnitData.frac4.space!.deepwrought = [
+      { entityType: 'unit', entityId: 'dd', count: 1, unitStates: null },
+    ]
+    const ranked = listBattleLocations(doctored)
+    expect(ranked[0].id).toBe('frac4')
+    expect(ranked[0].mode).toBe('SPACE')
+    // The ground contest on the same tile still ranks above everything quiet.
+    const ground = ranked.findIndex(l => l.id === 'frac4/styx')
+    const quiet = ranked.findIndex(l => l.factions.length < 2)
+    expect(ground).toBeLessThan(quiet)
+  })
+})
+
+describe('a game paused mid-combat', () => {
+  it('resolves the open battle from the player colours', () => {
+    expect(findActiveCombat(activeData)).toEqual({
+      locationId: 'frac7',
+      factions: ['yellowtf', 'redtf'],
+    })
+  })
+
+  it('floats the open battle to the top, however quiet the map looks', () => {
+    const found = listBattleLocations(activeData)
+    // Not one location in this game holds two players' units.
+    expect(found.every(l => l.factions.length < 2)).toBe(true)
+    expect(found[0].id).toBe('frac7')
+    expect(found[0].isActiveCombat).toBe(true)
+  })
+
+  it('imports a side that is in the fight without holding the system', () => {
+    const location = listBattleLocations(activeData)[0]
+    const { config } = buildImportConfig(
+      activeData,
+      { location, attacker: 'yellowtf', defender: 'redtf' },
+      abilityLookup,
+    )
+    // Yellow holds the space; Red's ships are gone and only its structures on
+    // Phlegethon remain, firing space cannon into the battle.
+    expect(config.au.CARRIER).toEqual([1, 0])
+    expect(config.au.FIGHTER).toEqual([6, 0])
+    expect(config.du.PDS).toEqual([1, 0])
+    expect(config.du.SPACE_DOCK).toEqual([1, 0])
   })
 })
 

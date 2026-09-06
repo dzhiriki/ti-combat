@@ -20,6 +20,10 @@ export const preDamaged: Ability<Params> = {
     damagedUnits: declareParam<UnitList<number>>({
       source: 'units',
       default: [],
+      // Without this, reconciliation fills unlisted units in as bare `[type]`
+      // 1-tuples, which the URL codec can't tell from an order-mode list —
+      // the damage counts are then lost on refresh or through a shared link.
+      defaultItemValue: 0,
       filter: { exclude: ['FIGHTER'], includeOnlyAvailable: true },
       limit: 'IN_COMBAT',
     }),

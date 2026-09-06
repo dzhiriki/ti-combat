@@ -35,6 +35,17 @@ const PlayerSchema = z.object({
   unitsOwned: z.nullish(z.array(z.string())),
 })
 
+/** The battle AsyncTI4 has open right now, if any. `unitHolder` is either
+ *  `space` or a planet name, and participants are identified by player colour
+ *  rather than by faction. */
+const ActiveCombatSchema = z.nullish(
+  z.object({
+    system: z.nullish(z.string()),
+    unitHolder: z.nullish(z.string()),
+    participantColors: z.nullish(z.array(z.string())),
+  }),
+)
+
 /** The slice of AsyncTI4's `/web-data` payload this import reads. Unknown
  *  fields are dropped rather than rejected, so upstream additions to the
  *  payload don't break the import. */
@@ -43,6 +54,7 @@ export const WebDataSchema = z.object({
   gameCustomName: z.nullish(z.string()),
   gameRound: z.nullish(z.number()),
   isTwilightsFallMode: z.nullish(z.boolean()),
+  gameState: z.nullish(z.object({ activeCombat: ActiveCombatSchema })),
   playerData: z.array(PlayerSchema),
   tileUnitData: z.record(z.string(), TileSchema),
 })
@@ -65,4 +77,6 @@ export interface BattleLocation {
   mode: 'SPACE' | 'GROUND'
   /** AsyncTI4 faction ids holding units here, most units first. */
   factions: string[]
+  /** Set when this is the battle AsyncTI4 currently has open. */
+  isActiveCombat?: boolean
 }

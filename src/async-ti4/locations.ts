@@ -36,11 +36,52 @@ function titleCase(name: string): string {
   return name.charAt(0).toUpperCase() + name.slice(1)
 }
 
+/** The battle AsyncTI4 has open right now, resolved to a location id and the
+ *  AsyncTI4 faction ids of its two participants (upstream identifies them by
+ *  player colour). Returns `null` when no combat is live. */
+export function findActiveCombat(data: WebData): {
+  locationId: string
+  factions: string[]
+} | null {
+  const combat = data.gameState?.activeCombat
+  if (!combat?.system) return null
+
+  const factionByColor = new Map(
+    data.playerData.flatMap(p => (p.color ? [[p.color, p.faction]] : [])),
+  )
+  const factions = (combat.participantColors ?? [])
+    .map(color => factionByColor.get(color))
+    .filter((f): f is string => f !== undefined)
+
+  // `unitHolder` names the planet, or `space` for the system's space area.
+  const holder = combat.unitHolder
+  return {
+    locationId:
+      !holder || holder === 'space'
+        ? combat.system
+        : `${combat.system}/${holder}`,
+    factions,
+  }
+}
+
+/** How readily a location suggests a battle worth simulating.
+ *
+ *  Two players sharing a space area means a fight — barring homebrew that
+ *  allows coexistence there. Two players on a planet is a weaker signal: one
+ *  side's structures can sit on ground the other holds without a shot being
+ *  fired. Neither beats AsyncTI4 telling us outright which combat is open. */
+function rank(location: BattleLocation): number {
+  if (location.isActiveCombat) return 0
+  if (location.factions.length < 2) return 3
+  return location.mode === 'SPACE' ? 1 : 2
+}
+
 /** Every place in the game that holds units this calculator can model, ground
  *  locations split out per planet because ground combat is fought per planet.
- *  Contested locations sort first — those are the ones worth simulating. */
+ *  The likeliest battles sort first. */
 export function listBattleLocations(data: WebData): BattleLocation[] {
   const locations: BattleLocation[] = []
+  const activeId = findActiveCombat(data)?.locationId
 
   for (const [tile, tileData] of Object.entries(data.tileUnitData)) {
     const space = occupants(tileData.space ?? {})
@@ -51,6 +92,7 @@ export function listBattleLocations(data: WebData): BattleLocation[] {
         label: `${tile} · space`,
         mode: 'SPACE',
         factions: space,
+        isActiveCombat: tile === activeId,
       })
     }
 
@@ -64,14 +106,14 @@ export function listBattleLocations(data: WebData): BattleLocation[] {
         label: `${tile} · ${titleCase(planet)}`,
         mode: 'GROUND',
         factions: ground,
+        isActiveCombat: `${tile}/${planet}` === activeId,
       })
     }
   }
 
   return locations.sort((a, b) => {
-    const contested =
-      Number(b.factions.length > 1) - Number(a.factions.length > 1)
-    if (contested !== 0) return contested
+    const byRank = rank(a) - rank(b)
+    if (byRank !== 0) return byRank
     return a.id.localeCompare(b.id, undefined, { numeric: true })
   })
 }

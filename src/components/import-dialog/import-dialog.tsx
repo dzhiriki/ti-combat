@@ -7,6 +7,7 @@ import {
   buildImportConfig,
   factionLabel,
   fetchGame,
+  findActiveCombat,
   isMappedFaction,
   listBattleLocations,
   parseGameId,
@@ -40,7 +41,8 @@ interface ImportDialogProps {
 
 function locationLabel(location: BattleLocation): string {
   const who = location.factions.map(factionLabel).join(' vs ')
-  return `${location.label} — ${who}`
+  const suffix = location.isActiveCombat ? ' (in combat)' : ''
+  return `${location.label} — ${who}${suffix}`
 }
 
 /** Pull a battle straight out of a live AsyncTI4 game: the units standing in a
@@ -80,13 +82,16 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
     [game],
   )
 
-  /** Point both sides at whoever actually holds the chosen location, leaving
+  /** Point both sides at whoever is fighting over the chosen location, leaving
    *  any side it can't fill on its previous pick. */
   function selectLocation(id: string): void {
     setLocationId(id)
-    const present = (locations.find(l => l.id === id)?.factions ?? []).filter(
-      isMappedFaction,
-    )
+    const active = game ? findActiveCombat(game) : null
+    const present = (
+      active?.locationId === id && active.factions.length > 1
+        ? active.factions
+        : (locations.find(l => l.id === id)?.factions ?? [])
+    ).filter(isMappedFaction)
     if (present[0]) setAttacker(present[0])
     if (present[1]) setDefender(present[1])
   }
@@ -109,14 +114,21 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
       }
       setGame(data)
 
-      const first = found.find(
-        l => l.factions.filter(isMappedFaction).length > 1,
-      )
-      const fallback = found[0]
-      const present = (first ?? fallback).factions.filter(isMappedFaction)
-      setLocationId((first ?? fallback).id)
-      setAttacker(present[0] ?? '')
-      setDefender(present[1] ?? present[0] ?? '')
+      // `found` is already ordered likeliest-battle-first, so its head is the
+      // best default. Sides come from the live combat's own participants when
+      // there is one — a side can be in a fight without holding the location
+      // (its space cannon fires from a planet it still owns).
+      const target = found[0]
+      const active = findActiveCombat(data)
+      const sides = (
+        active?.locationId === target.id && active.factions.length > 1
+          ? active.factions
+          : target.factions
+      ).filter(isMappedFaction)
+
+      setLocationId(target.id)
+      setAttacker(sides[0] ?? '')
+      setDefender(sides[1] ?? sides[0] ?? '')
     } catch (e) {
       setError(
         e instanceof AsyncTi4Error ? e.message : 'Could not load that game',

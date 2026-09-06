@@ -1,0 +1,404 @@
+{
+  "gameCustomName": "Sample Game In Combat",
+  "gameName": "sample-combat",
+  "gameRound": 5,
+  "gameState": {
+    "activeCombat": {
+      "participantColors": ["yellow", "red"],
+      "round": 1,
+      "system": "frac7",
+      "unitHolder": "space"
+    }
+  },
+  "isTwilightsFallMode": true,
+  "playerData": [
+    {
+      "color": "orange",
+      "eliminated": false,
+      "faction": "orangetf",
+      "galvanizeTokensReinf": 0,
+      "techs": [
+        "wavelength",
+        "antimatter",
+        "tf-tcs",
+        "tf-supercharge",
+        "tf-proxima",
+        "tf-mr",
+        "tf-distantsuns",
+        "tf-abundance",
+        "tf-singularityz",
+        "tf-mc",
+        "tf-foresight",
+        "tf-puppetcouncil",
+        "tf-couriertransport"
+      ],
+      "unitsOwned": [
+        "carrier",
+        "orangetf_flagship",
+        "spacedock",
+        "tf-exotrireme",
+        "tf-morphwing",
+        "destroyer",
+        "orangetf_mech",
+        "tf-lataniwarrior",
+        "cruiser",
+        "pds",
+        "tf-universitywarsun"
+      ],
+      "userName": "Ada"
+    },
+    {
+      "color": "red",
+      "eliminated": false,
+      "faction": "redtf",
+      "galvanizeTokensReinf": 0,
+      "techs": [
+        "tf-nomadic",
+        "antimatter",
+        "tf-ambush",
+        "tf-it",
+        "wavelength",
+        "tf-neuralparasite",
+        "tf-orbitaldrop",
+        "tf-devotion",
+        "tf-stellargenesis"
+      ],
+      "unitsOwned": [
+        "redtf_mech",
+        "tf-heltitan",
+        "tf-echoofascension",
+        "spacedock",
+        "tf_warsun",
+        "redtf_flagship",
+        "tf-advancedcarrier",
+        "fighter",
+        "tf-yinclone",
+        "dreadnought",
+        "destroyer",
+        "tf-corsair"
+      ],
+      "userName": "Bruno"
+    },
+    {
+      "color": "green",
+      "eliminated": false,
+      "faction": "greentf",
+      "galvanizeTokensReinf": 0,
+      "techs": [
+        "tf-telepathic",
+        "tf-dimensionaltear",
+        "wavelength",
+        "tf-bio",
+        "tf-sledfactories",
+        "tf-fabrication",
+        "tf-amalgamation",
+        "tf-planesplitter",
+        "tf-vpw",
+        "tf-inheritancesystems",
+        "tf-yinascendant",
+        "antimatter"
+      ],
+      "unitsOwned": [
+        "tf-triune",
+        "carrier",
+        "greentf_flagship",
+        "tf_warsun",
+        "destroyer",
+        "infantry",
+        "tf-superdread",
+        "greentf_mech",
+        "cruiser",
+        "pds",
+        "tf-heliosentity"
+      ],
+      "userName": "Cleo"
+    },
+    {
+      "color": "purple",
+      "eliminated": false,
+      "faction": "purpletf",
+      "galvanizeTokensReinf": 0,
+      "techs": [
+        "tf-entropicharvest",
+        "tf-survivalinstinct",
+        "tf-as",
+        "tf-specops",
+        "tf-ng",
+        "tf-chaos",
+        "tf-nes",
+        "tf-zealous",
+        "tf-terraform",
+        "tf-guildships",
+        "tf-crucible",
+        "tf-smotheringpresence",
+        "tf-theburningeye"
+      ],
+      "unitsOwned": [
+        "purpletf_flagship",
+        "tf_warsun",
+        "tf-linkship",
+        "fighter",
+        "tf-yssarilinfantry",
+        "tf-dawncrusher",
+        "tf-ambassador",
+        "cruiser",
+        "pds",
+        "purpletf_mech",
+        "tf-floatingfactory"
+      ],
+      "userName": "Dara"
+    },
+    {
+      "color": "pink",
+      "eliminated": false,
+      "faction": "pinktf",
+      "galvanizeTokensReinf": 0,
+      "techs": [
+        "tf-versatile",
+        "tf-singularityx",
+        "tf-armada",
+        "antimatter",
+        "wavelength",
+        "tf-pillage",
+        "tf-peaceaccords",
+        "tf-reclamation",
+        "tf-radicaladvancement",
+        "tf-overwatch",
+        "tf-ng",
+        "tf-futurepath",
+        "tf-voidborn",
+        "tf-pacifist",
+        "tf-quantumentanglement",
+        "tf-quantumdrive"
+      ],
+      "unitsOwned": [
+        "tf-exile",
+        "tf-saggitaria",
+        "dreadnought",
+        "infantry",
+        "carrier",
+        "pinktf_flagship",
+        "tf-valefarprime",
+        "spacedock",
+        "pinktf_mech",
+        "tf_warsun",
+        "fighter",
+        "tf-eidolonlandwaster",
+        "pds"
+      ],
+      "userName": "Ewan"
+    },
+    {
+      "color": "yellow",
+      "eliminated": false,
+      "faction": "yellowtf",
+      "galvanizeTokensReinf": 0,
+      "techs": [
+        "tf-asn",
+        "tf-mc",
+        "wavelength",
+        "tf-awaken",
+        "tf-scc",
+        "tf-slipstream",
+        "tf-singularityy",
+        "tf-lazaxgatefolding",
+        "tf-raidformation",
+        "tf-nanomachines",
+        "tf-geneticresearch",
+        "tf-tacticalbrilliance",
+        "tf-indoctrination",
+        "tf-unrelenting",
+        "tf-scavenge",
+        "tf-zealous",
+        "tf-ds",
+        "tf-crafty"
+      ],
+      "unitsOwned": [
+        "tf-justicerrail",
+        "tf-vortexer",
+        "yellowtf_flagship",
+        "yellowtf_mech",
+        "tf-pws",
+        "tf-hcf",
+        "tf-swa",
+        "tf-productionbiomes",
+        "dreadnought",
+        "infantry",
+        "tf-ahksylfier"
+      ],
+      "userName": "Fenna"
+    },
+    {
+      "color": "aberration",
+      "eliminated": false,
+      "faction": "neutral",
+      "galvanizeTokensReinf": 0,
+      "techs": ["ff2", "dd2", "cv2", "cr2", "ws"],
+      "unitsOwned": [
+        "spacedock",
+        "flagship",
+        "warsun",
+        "dreadnought",
+        "cruiser2",
+        "carrier2",
+        "infantry",
+        "fighter2",
+        "destroyer2",
+        "mech",
+        "pds"
+      ],
+      "userName": "Bot"
+    }
+  ],
+  "tileUnitData": {
+    "bl": {
+      "planets": {
+        "ahkcreuxx": {
+          "controlledBy": "pinktf",
+          "entities": {
+            "pinktf": [
+              {
+                "count": 1,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              },
+              {
+                "count": 1,
+                "entityId": "sd",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              }
+            ]
+          }
+        }
+      },
+      "space": {
+        "pinktf": [
+          {
+            "count": 2,
+            "entityId": "dn",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [2, 0, 0, 0]
+          },
+          {
+            "count": 1,
+            "entityId": "cv",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          },
+          {
+            "count": 2,
+            "entityId": "ff",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [2, 0, 0, 0]
+          },
+          {
+            "count": 1,
+            "entityId": "ca",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          }
+        ]
+      }
+    },
+    "frac1": {
+      "planets": {},
+      "space": {
+        "redtf": [
+          {
+            "count": 1,
+            "entityId": "fs",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          },
+          {
+            "count": 1,
+            "entityId": "cv",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          }
+        ]
+      }
+    },
+    "frac7": {
+      "planets": {
+        "lethe": {
+          "controlledBy": "yellowtf",
+          "entities": {
+            "yellowtf": [
+              {
+                "count": 1,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              }
+            ]
+          }
+        },
+        "phlegethon": {
+          "controlledBy": "redtf",
+          "entities": {
+            "redtf": [
+              {
+                "count": 1,
+                "entityId": "sd",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              },
+              {
+                "count": 1,
+                "entityId": "mf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              },
+              {
+                "count": 1,
+                "entityId": "pd",
+                "entityType": "unit",
+                "sustained": 1,
+                "unitStates": [0, 1, 0, 0]
+              }
+            ]
+          }
+        }
+      },
+      "space": {
+        "yellowtf": [
+          {
+            "count": 1,
+            "entityId": "cv",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          },
+          {
+            "count": 6,
+            "entityId": "ff",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [6, 0, 0, 0]
+          },
+          {
+            "count": 1,
+            "entityId": "ca",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          }
+        ]
+      }
+    }
+  }
+}
