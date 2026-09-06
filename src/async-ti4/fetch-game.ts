@@ -37,6 +37,11 @@ export async function fetchGame(gameId: string): Promise<WebData> {
 
   const parsed = WebDataSchema.safeParse(await response.json())
   if (!parsed.success) {
+    // AsyncTI4 is maintained by another project, and this is what it looks
+    // like when their payload moves out from under the import. `npm run
+    // check:asyncti4` probes live games and reports which assumption broke;
+    // the mappings it points at are in ./mappings.ts. The message stays plain
+    // because it is read by someone in a browser, not by whoever fixes it.
     throw new AsyncTi4Error('Unexpected data format from AsyncTI4')
   }
   return parsed.data

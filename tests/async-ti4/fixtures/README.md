@@ -18,9 +18,12 @@ vocabulary under test, and inventing them would defeat the point.
 Being snapshots, these never go stale on their own; the risk runs the other
 way, that they keep passing against a payload shape AsyncTI4 has since changed.
 `npm run check:asyncti4` probes live games for that — schema version, faction
-and unit vocabulary, and the positional meaning of `unitStates`. Name the games
-to probe when you run it; there is no default list, since game ids point at
-other people's games and go stale as those games finish:
+and unit vocabulary, and the positional meaning of `unitStates`.
+
+It takes the games to probe from `.asyncti4-games` at the repo root, one id per
+line. That file is gitignored and holds no default: game ids point at other
+people's games, and they go stale as those games finish. Create it once with a
+couple of games in progress, or name them inline:
 
 ```sh
 ASYNCTI4_GAMES=abc123,def456 npm run check:asyncti4

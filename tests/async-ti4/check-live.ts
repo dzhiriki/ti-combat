@@ -9,6 +9,8 @@
  *
  *      npm run check:asyncti4
  */
+import { readFileSync } from 'node:fs'
+
 import { findActiveCombat, listBattleLocations, parseGameId } from '@/async-ti4'
 import {
   ABILITY_BY_TECH,
@@ -21,21 +23,42 @@ import {
 } from '@/async-ti4/mappings'
 import { EXPECTED_SCHEMA_VERSION, WebDataSchema } from '@/async-ti4/types'
 
-/** Games to probe, named at call time:
+/** Where the game ids come from: `ASYNCTI4_GAMES` if set, otherwise the
+ *  gitignored `.asyncti4-games` at the repo root, one id per line.
  *
  *      ASYNCTI4_GAMES=abc123,def456 npm run check:asyncti4
  *
- *  There is no default. The games belong to other people, and committing their
- *  ids would put a lasting pointer to them — and to whoever is playing — in
- *  this repository's history. They are also poor constants: games get played
- *  on, finish, and are eventually archived, so any list hardcoded here would
- *  rot. Pick a couple of games currently in progress; a combat in flight is a
- *  bonus, not a requirement.
- */
-const GAMES = (process.env.ASYNCTI4_GAMES ?? '')
-  .split(',')
-  .map(id => id.trim())
-  .filter(Boolean)
+ *  Nothing is committed. The games belong to other people, so their ids would
+ *  put a lasting pointer to them — and to whoever is playing — in this
+ *  repository's history. They are poor constants besides: games get played on,
+ *  finish, and are archived, so a hardcoded list would rot. Keep a couple of
+ *  games in progress in the local file; a combat in flight is a bonus, not a
+ *  requirement. */
+const GAMES_FILE = new URL('../../.asyncti4-games', import.meta.url)
+
+function readGameIds(): string[] {
+  let raw = process.env.ASYNCTI4_GAMES
+  if (raw === undefined) {
+    try {
+      raw = readFileSync(GAMES_FILE, 'utf-8')
+    } catch {
+      // No local list — the run says so and explains how to make one.
+      raw = ''
+    }
+  }
+  return (
+    raw
+      .split('\n')
+      // Comments are stripped per line before anything splits on commas, or a
+      // comma inside a comment leaves its tail behind as a bogus game id.
+      .map(line => line.replace(/#.*$/, ''))
+      .flatMap(line => line.split(','))
+      .map(id => id.trim())
+      .filter(Boolean)
+  )
+}
+
+const GAMES = readGameIds()
 
 const GAME_DATA_URL = 'https://bot.asyncti4.com/api/public/game'
 
@@ -205,8 +228,9 @@ console.info(`\n${failures.size} failure(s), ${warnings.size} warning(s).`)
 if (nothingChecked) {
   console.info(
     (GAMES.length === 0
-      ? 'Name some games in progress to probe:'
-      : 'Those games have probably finished. Try some that are in progress:') +
+      ? 'Name some games in progress to probe.'
+      : 'Those games have probably finished. Try some that are in progress.') +
+      '\nEither list them one per line in .asyncti4-games (gitignored), or:' +
       '\n  ASYNCTI4_GAMES=abc123,def456 npm run check:asyncti4',
   )
 } else if (failures.size > 0) {
