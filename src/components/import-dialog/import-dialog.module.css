@@ -148,17 +148,6 @@
   grid-column: 1 / -1;
 }
 
-/* A planet with no holder and nobody on it: still selectable, but drawn as
-   the open ground it is rather than as somewhere defended. */
-.area_unclaimed {
-  border-style: dashed;
-}
-
-.area_unclaimed .areaName,
-.area_unclaimed .areaUnits {
-  color: var(--color-text-muted);
-}
-
 .area_selected {
   background: var(--color-accent-10);
   border-color: var(--color-accent);
