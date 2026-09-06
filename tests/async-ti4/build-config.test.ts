@@ -85,20 +85,12 @@ describe('listBattleLocations', () => {
 
   it('counts only the controller\u2019s forces where units coexist', () => {
     // The Cabal hold Styx with two mechs and a PDS; a Deepwrought infantry
-    // coexists there without defending it. Counting it would overstate what an
-    // invasion faces, and make a quiet planet look like a battle.
+    // coexists there. Landing troops means fighting the Cabal for control, not
+    // the infantry beside them, so only the Cabal's forces are the defence.
     const styx = locationAt('frac4/styx')
     expect(styx.factions).toEqual(['cabal'])
     expect(styx.unitSummary).toBe('2M, PDS')
     expect(styx.unitCount).toBe(3)
-  })
-
-  it('falls back to everyone when the controller holds nothing', () => {
-    // Showing an empty planet while hiding somebody's army would be worse.
-    const doctored = structuredClone(data)
-    doctored.tileUnitData.frac4.planets!.styx!.controlledBy = 'sol'
-    const styx = listBattleLocations(doctored).find(l => l.id === 'frac4/styx')
-    expect(styx?.factions).toEqual(['cabal', 'deepwrought'])
   })
 
   it('summarises units in the notation the outcomes table uses', () => {

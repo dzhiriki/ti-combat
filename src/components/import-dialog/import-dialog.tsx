@@ -267,7 +267,9 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
                         {l.factions.length === 0
                           ? 'Unclaimed'
                           : l.factions.map(factionLabel).join(' vs ')}
-                        {l.unitSummary ? ` · ${l.unitSummary}` : ' · no units'}
+                      </span>
+                      <span className={styles.areaUnits}>
+                        {l.unitSummary || 'no units'}
                       </span>
                     </button>
                   ))}

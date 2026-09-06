@@ -40,15 +40,14 @@ function summariseUnits(
   return parts.join(', ')
 }
 
-/** `owner` restricts a planet to the forces of whoever controls it. Units of
- *  other players can coexist on a planet without being part of its defence, so
- *  counting them would overstate what an invasion actually faces. Ignored when
- *  the controller has nothing standing there, where showing an empty planet
- *  while hiding somebody's army would be worse. */
+/** `owner` restricts a planet to the forces of whoever controls it. Landing
+ *  troops means fighting the owner for control, not the players coexisting
+ *  alongside them, so nobody else's units here are part of the defence.
+ *
+ *  An owner with no units on their own planet needs no handling: a coexisting
+ *  player would have taken control of it. */
 function occupants(groups: EntityGroups, owner?: string | null): Occupancy {
-  const ownerUnits = owner ? groups[owner] : undefined
-  const defending =
-    ownerUnits?.some(isModelledUnit) && owner ? { [owner]: ownerUnits } : groups
+  const defending = owner && groups[owner] ? { [owner]: groups[owner] } : groups
 
   const totals = new Map<string, number>()
   const healthy = new Map<UnitBaseType, number>()
