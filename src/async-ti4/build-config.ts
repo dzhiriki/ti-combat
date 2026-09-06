@@ -13,7 +13,12 @@ import {
   UNIT_UPGRADE_BY_TECH,
   UNMODELLED_TECHS,
 } from './mappings'
-import type { AsyncEntity, BattleLocation, WebData } from './types'
+import {
+  type AsyncEntity,
+  type BattleLocation,
+  EXPECTED_SCHEMA_VERSION,
+  type WebData,
+} from './types'
 
 export interface ImportSelection {
   location: BattleLocation
@@ -210,6 +215,19 @@ export function buildImportConfig(
 ): ImportResult {
   const notes = new Set<string>()
   const { location } = selection
+
+  // AsyncTI4 is maintained by another project, so treat a schema bump as a
+  // hint that these mappings may have gone stale. It is only a warning: most
+  // bumps won't touch the few fields read here, and refusing the import over
+  // one would be worse than a slightly wrong one the user can see and correct.
+  if (
+    data.versionSchema != null &&
+    data.versionSchema !== EXPECTED_SCHEMA_VERSION
+  ) {
+    notes.add(
+      `AsyncTI4 data format is v${data.versionSchema}, this import expects v${EXPECTED_SCHEMA_VERSION} — some of it may be out of date`,
+    )
+  }
   const attacker = buildSide(
     data,
     location,

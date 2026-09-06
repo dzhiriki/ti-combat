@@ -1,5 +1,18 @@
 import { z } from 'zod/mini'
 
+/** The `versionSchema` this import was built against. AsyncTI4 stamps every
+ *  payload with one and its own UI reads it, so a bump is the earliest warning
+ *  that the shape has moved. A mismatch is reported, never fatal — most bumps
+ *  won't touch the handful of fields read here. */
+export const EXPECTED_SCHEMA_VERSION = 7
+
+/** Optional upstream detail: absent, malformed and unexpected all collapse to
+ *  `null` rather than failing the whole parse. Only the fields a battle can't
+ *  be built without are allowed to be fatal. */
+function soft<T extends z.ZodMiniType>(schema: T) {
+  return z.catch(z.nullish(schema), null)
+}
+
 /** A stack of identical units (or a token/attachment) at one map location.
  *
  *  `unitStates` is `[healthy, damaged, galvanized, damaged galvanized]` and is
@@ -10,51 +23,54 @@ const EntitySchema = z.object({
   entityType: z.string(),
   entityId: z.string(),
   count: z.number(),
-  unitStates: z.nullish(z.array(z.number())),
+  unitStates: soft(z.array(z.number())),
 })
 
 const PlanetSchema = z.nullish(
   z.object({
-    controlledBy: z.nullish(z.string()),
-    entities: z.nullish(z.record(z.string(), z.array(EntitySchema))),
+    entities: soft(z.record(z.string(), z.array(EntitySchema))),
   }),
 )
 
 const TileSchema = z.object({
-  space: z.nullish(z.record(z.string(), z.array(EntitySchema))),
-  planets: z.nullish(z.record(z.string(), PlanetSchema)),
+  space: soft(z.record(z.string(), z.array(EntitySchema))),
+  planets: soft(z.record(z.string(), PlanetSchema)),
 })
 
 const PlayerSchema = z.object({
   faction: z.string(),
-  color: z.nullish(z.string()),
-  userName: z.nullish(z.string()),
-  techs: z.nullish(z.array(z.string())),
-  eliminated: z.nullish(z.boolean()),
-  galvanizeTokensReinf: z.nullish(z.number()),
-  unitsOwned: z.nullish(z.array(z.string())),
+  color: soft(z.string()),
+  userName: soft(z.string()),
+  techs: soft(z.array(z.string())),
+  /** Twilight's Fall keeps its unit upgrades here rather than in `techs`. */
+  unitsOwned: soft(z.array(z.string())),
+  galvanizeTokensReinf: soft(z.number()),
 })
 
 /** The battle AsyncTI4 has open right now, if any. `unitHolder` is either
  *  `space` or a planet name, and participants are identified by player colour
  *  rather than by faction. */
-const ActiveCombatSchema = z.nullish(
+const ActiveCombatSchema = soft(
   z.object({
-    system: z.nullish(z.string()),
-    unitHolder: z.nullish(z.string()),
-    participantColors: z.nullish(z.array(z.string())),
+    system: soft(z.string()),
+    unitHolder: soft(z.string()),
+    participantColors: soft(z.array(z.string())),
   }),
 )
 
-/** The slice of AsyncTI4's `/web-data` payload this import reads. Unknown
- *  fields are dropped rather than rejected, so upstream additions to the
- *  payload don't break the import. */
+/** The slice of AsyncTI4's `/web-data` payload this import reads — deliberately
+ *  small, since every field here is a chance for an upstream change to break
+ *  the import. Only `playerData` and `tileUnitData` are load-bearing; the rest
+ *  is either a display label or an optional refinement.
+ *
+ *  Unknown fields are dropped rather than rejected, so upstream additions to
+ *  the payload cost nothing. */
 export const WebDataSchema = z.object({
-  gameName: z.nullish(z.string()),
-  gameCustomName: z.nullish(z.string()),
-  gameRound: z.nullish(z.number()),
-  isTwilightsFallMode: z.nullish(z.boolean()),
-  gameState: z.nullish(z.object({ activeCombat: ActiveCombatSchema })),
+  versionSchema: soft(z.number()),
+  gameName: soft(z.string()),
+  gameCustomName: soft(z.string()),
+  gameRound: soft(z.number()),
+  gameState: soft(z.object({ activeCombat: ActiveCombatSchema })),
   playerData: z.array(PlayerSchema),
   tileUnitData: z.record(z.string(), TileSchema),
 })

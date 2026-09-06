@@ -19,6 +19,7 @@
     "test:snapshots": "vitest --no-isolate --pool=threads --config tests/snapshots/vitest.config.ts",
     "test:snapshots:run": "vitest run --no-isolate --pool=threads --config tests/snapshots/vitest.config.ts",
     "test:snapshots:update": "vitest run --config tests/snapshots/vitest.config.ts --update",
+    "check:asyncti4": "vite-node tests/async-ti4/check-live.ts",
     "profile": "vite-node tests/profile/run.ts",
     "prepare": "husky"
   },

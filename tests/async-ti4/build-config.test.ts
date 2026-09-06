@@ -2,33 +2,34 @@ import { readFileSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
+import { buildImportConfig } from '@/async-ti4/build-config'
+import { parseGameId } from '@/async-ti4/fetch-game'
+import { findActiveCombat, listBattleLocations } from '@/async-ti4/locations'
+import { type BattleLocation, WebDataSchema } from '@/async-ti4/types'
 import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
 import { buildAbilityLookup } from '@/hooks/combat-setup/validation'
 
-import { buildImportConfig } from './build-config'
-import { parseGameId } from './fetch-game'
-import { findActiveCombat, listBattleLocations } from './locations'
-import { type BattleLocation, WebDataSchema } from './types'
-
 function loadFixture(name: string) {
   return WebDataSchema.parse(
-    JSON.parse(readFileSync(new URL(name, import.meta.url), 'utf-8')),
+    JSON.parse(
+      readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf-8'),
+    ),
   )
 }
 
 // A real AsyncTI4 game (sample-ti4), trimmed to five tiles that between them
 // cover damaged and galvanized stacks, structures under a space battle, and
 // the tokens and attachments that share the units' shape.
-const data = loadFixture('./game-fixture.json')
+const data = loadFixture('ti4-game.json')
 
 // A real Twilight's Fall game (sample-tf), where the upgrade cards live in
 // `unitsOwned` rather than in the researched techs.
-const tfData = loadFixture('./tf-game-fixture.json')
+const tfData = loadFixture('twilights-fall-game.json')
 
 // A real game (sample-combat) paused mid-battle. Nothing on its map looks
 // contested — the losing fleet is already gone — so `activeCombat` is the
 // only thing that says where the fight is.
-const activeData = loadFixture('./active-combat-fixture.json')
+const activeData = loadFixture('active-combat.json')
 
 const abilityLookup = buildAbilityLookup(getAllAbilities())
 const locations = listBattleLocations(data)
@@ -204,6 +205,22 @@ describe('buildImportConfig', () => {
     const { config } = importAt('106', 'sardakk', 'bastion')
     expect(config.du.INFANTRY).toBeUndefined()
     expect(config.du.MECH).toBeUndefined()
+  })
+
+  it('warns when AsyncTI4 bumps its data format', () => {
+    const doctored = structuredClone(data)
+    doctored.versionSchema = 99
+    const { notes } = buildImportConfig(
+      doctored,
+      {
+        location: locationAt('frac4'),
+        attacker: 'cabal',
+        defender: 'deepwrought',
+      },
+      abilityLookup,
+    )
+    expect(notes.join(' ')).toContain('v99')
+    expect(notes.join(' ')).toContain('may be out of date')
   })
 
   it('stays quiet when everything maps', () => {

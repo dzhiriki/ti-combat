@@ -164,9 +164,8 @@ export const UNMODELLED_TECHS: Readonly<Record<string, string>> = {
  *  ability cards, so they are switched on rather than flipping a unit's
  *  UPGRADED flag the way TI4's upgrades do.
  *
- *  The four cards upstream carries that are missing here — Floating Factories,
- *  Helios Entity, Production Biomes and Valefar Prime — differ only in
- *  movement, production or cost, so they have no bearing on a combat. */
+ *  Cards upstream carries that are deliberately absent here are listed in
+ *  {@link UNMODELLED_TF_UNITS}. */
 export const ABILITY_BY_TF_UNIT: Readonly<Record<string, string>> = {
   'tf-echoofascension': 'TF_UPGRADE_ECHO_OF_ASCENSION',
   'tf-dragonfreed': 'TF_UPGRADE_THE_DRAGON_FREED',
@@ -196,3 +195,15 @@ export const ABILITY_BY_TF_UNIT: Readonly<Record<string, string>> = {
   'tf-justicerrail': 'TF_UPGRADE_JUSTICIAR_RAIL',
   'tf-keepermatrix': 'TF_UPGRADE_KEEPER_MATRIX',
 }
+
+/** Twilight's Fall unit cards this calculator knowingly does not model: each
+ *  differs from its base unit only in movement, production or cost, so none of
+ *  them changes a combat. Listed rather than merely absent so the live
+ *  contract check can tell a card we decided to skip from one that appeared or
+ *  was renamed upstream. */
+export const UNMODELLED_TF_UNITS: ReadonlySet<string> = new Set([
+  'tf-floatingfactory',
+  'tf-heliosentity',
+  'tf-productionbiomes',
+  'tf-valefarprime',
+])

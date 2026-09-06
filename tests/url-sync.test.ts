@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { CombatSetup } from '@/hooks/combat-setup'
 import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
 import {
@@ -82,6 +83,35 @@ describe('URL round-trip', () => {
     expect(result.warnings).toEqual([])
     expect(result.config.da['UNIT_PRIORITY']).toBeDefined()
     expect(result.config.da['SPACE_CANNON_OFFENSE']).toBeDefined()
+  })
+
+  it('round-trips what reconciliation produces, not just hand-built config', () => {
+    // The cases above hand-write well-formed tuple arrays. Reconciliation is
+    // what fills in the units a player did not set, and if a declared param
+    // has no `defaultItemValue` it fills them in as bare `[type]` 1-tuples —
+    // indistinguishable from an order-mode list once encoded, so the counts
+    // are dropped on the way back. PRE_GALVANIZED declares one; PRE_DAMAGED
+    // did not, and lost its damage on every refresh until it did.
+    const setup = new CombatSetup()
+    setup.setFaction('attacker', 'SARDAKK_NORR')
+    setup.setUnitCount('attacker', 'DREADNOUGHT', 2)
+    setup.setUnitCount('attacker', 'CRUISER', 1)
+    setup.setAbilityParam('attacker', 'PRE_DAMAGED', {
+      ...setup.abilities.attacker['PRE_DAMAGED'],
+      damagedUnits: [['DREADNOUGHT', 1]],
+    })
+
+    const search = configToSearchString(setup.toSerializedConfig())
+    const decoded = searchParamsToConfig(`?${search}`, abilityLookup)
+    const result = validateSerializedConfig(decoded, abilityLookup)
+
+    expect(result.warnings).toEqual([])
+    const restored = new CombatSetup()
+    restored.loadConfig(result.config)
+    expect(restored.abilities.attacker['PRE_DAMAGED'].damagedUnits).toEqual([
+      ['CRUISER', 0],
+      ['DREADNOUGHT', 1],
+    ])
   })
 
   it('surfaces a warning for legacy URLs with flat-encoded tuple arrays', () => {
