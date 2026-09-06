@@ -98,81 +98,95 @@ export function SystemMap({
 
   if (layout.cells.length === 0) return null
 
+  // Below this a hexagon stops being a comfortable tap target, so the map
+  // scrolls sideways instead of shrinking any further. A three-ring six-player
+  // board fits a phone with room to spare; the four-ring boards a seven- or
+  // eight-player game uses still fit; only larger ones start to scroll.
+  // Flat-top hexes are shorter than they are wide, so the width floor has to
+  // clear the ~44px tap target with room for the 0.87 ratio.
+  const minHexWidth = 52
+  const minWidth = Math.round((layout.width * minHexWidth) / HEX_WIDTH)
+
   return (
-    <div
-      className={styles.map}
-      style={{ aspectRatio: `${layout.width} / ${layout.height}` }}
-      role="group"
-      aria-label="Systems"
-    >
-      {layout.cells.map(cell => {
-        const summary = summaries.get(cell.position)
-        const factionKey = summary?.space
-          ? FACTION_BY_ASYNC_ID[summary.space.faction]
-          : undefined
-        const icon = factionKey ? factions[factionKey].icon : undefined
-        const selected = selectedTile === cell.position
-        const style = {
-          left: `${((cell.col - layout.minCol) * COL_PITCH * 100) / layout.width}%`,
-          top: `${((cell.halfRow - layout.minHalfRow) * HALF_ROW_PITCH * 100) / layout.height}%`,
-          width: `${(HEX_WIDTH * 100) / layout.width}%`,
-          height: `${(HEX_HEIGHT * 100) / layout.height}%`,
-        }
+    <div className={styles.viewport}>
+      <div
+        className={styles.map}
+        style={{
+          aspectRatio: `${layout.width} / ${layout.height}`,
+          minWidth: `${minWidth}px`,
+        }}
+        role="group"
+        aria-label="Systems"
+      >
+        {layout.cells.map(cell => {
+          const summary = summaries.get(cell.position)
+          const factionKey = summary?.space
+            ? FACTION_BY_ASYNC_ID[summary.space.faction]
+            : undefined
+          const icon = factionKey ? factions[factionKey].icon : undefined
+          const selected = selectedTile === cell.position
+          const style = {
+            left: `${((cell.col - layout.minCol) * COL_PITCH * 100) / layout.width}%`,
+            top: `${((cell.halfRow - layout.minHalfRow) * HALF_ROW_PITCH * 100) / layout.height}%`,
+            width: `${(HEX_WIDTH * 100) / layout.width}%`,
+            height: `${(HEX_HEIGHT * 100) / layout.height}%`,
+          }
 
-        // A system holding nothing this calculator models is drawn but not
-        // offered: it keeps the board's shape without adding a dead tab stop.
-        if (!summary) {
-          return (
-            <span
-              key={cell.position}
-              className={clsx(styles.hex, styles.hex_empty)}
-              style={style}
-              aria-hidden="true"
-            >
-              <span className={styles.face} />
-            </span>
-          )
-        }
-
-        const description = [
-          summary.space
-            ? `space held by ${factionLabel(summary.space.faction)}${
-                summary.space.contested ? ' (contested)' : ''
-              }, ${summary.space.unitCount} units`
-            : 'empty space',
-          summary.groundPlanets > 0 &&
-            `${summary.groundPlanets} planet${summary.groundPlanets > 1 ? 's' : ''} with ground forces`,
-        ]
-          .filter(Boolean)
-          .join('; ')
-
-        return (
-          <button
-            key={cell.position}
-            type="button"
-            className={clsx(styles.hex, {
-              [styles.hex_selected]: selected,
-              [styles.hex_contested]: summary.space?.contested,
-              [styles.hex_active]: summary.isActiveCombat,
-            })}
-            style={style}
-            onClick={() => onSelectTile(cell.position)}
-            aria-pressed={selected}
-            title={`${cell.position} — ${description}`}
-          >
-            <span className={styles.face} aria-hidden="true" />
-            {icon ? <FactionIcon icon={icon} /> : null}
-            {summary.space ? (
-              <span className={styles.count}>{summary.space.unitCount}</span>
-            ) : null}
-            {summary.groundPlanets > 0 ? (
-              <span className={styles.ground} aria-hidden="true">
-                {'\u2022'.repeat(Math.min(summary.groundPlanets, 3))}
+          // A system holding nothing this calculator models is drawn but not
+          // offered: it keeps the board's shape without adding a dead tab stop.
+          if (!summary) {
+            return (
+              <span
+                key={cell.position}
+                className={clsx(styles.hex, styles.hex_empty)}
+                style={style}
+                aria-hidden="true"
+              >
+                <span className={styles.face} />
               </span>
-            ) : null}
-          </button>
-        )
-      })}
+            )
+          }
+
+          const description = [
+            summary.space
+              ? `space held by ${factionLabel(summary.space.faction)}${
+                  summary.space.contested ? ' (contested)' : ''
+                }, ${summary.space.unitCount} units`
+              : 'empty space',
+            summary.groundPlanets > 0 &&
+              `${summary.groundPlanets} planet${summary.groundPlanets > 1 ? 's' : ''} with ground forces`,
+          ]
+            .filter(Boolean)
+            .join('; ')
+
+          return (
+            <button
+              key={cell.position}
+              type="button"
+              className={clsx(styles.hex, {
+                [styles.hex_selected]: selected,
+                [styles.hex_contested]: summary.space?.contested,
+                [styles.hex_active]: summary.isActiveCombat,
+              })}
+              style={style}
+              onClick={() => onSelectTile(cell.position)}
+              aria-pressed={selected}
+              title={`${cell.position} — ${description}`}
+            >
+              <span className={styles.face} aria-hidden="true" />
+              {icon ? <FactionIcon icon={icon} /> : null}
+              {summary.space ? (
+                <span className={styles.count}>{summary.space.unitCount}</span>
+              ) : null}
+              {summary.groundPlanets > 0 ? (
+                <span className={styles.ground} aria-hidden="true">
+                  {'\u2022'.repeat(Math.min(summary.groundPlanets, 3))}
+                </span>
+              ) : null}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
