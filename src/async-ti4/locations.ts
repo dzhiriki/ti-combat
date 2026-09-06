@@ -184,10 +184,6 @@ export function listBattleLocations(data: WebData): BattleLocation[] {
       if (SPACE_STATIONS.has(planet)) continue
       const holder = planetData?.controlledBy
       const ground = occupants(planetData?.entities ?? {}, holder)
-      // A planet nobody holds and nobody is standing on is not somewhere a
-      // battle happens — troops just land on it. Leaving it out keeps such
-      // systems reading like the empty ones they are.
-      if (!holder && ground.factions.length === 0) continue
       // Every planet is listed, units or not: an undefended planet is a
       // perfectly good thing to be planning an invasion of, and leaving it out
       // hid it from the map entirely. With nobody standing on it, whoever

@@ -106,13 +106,15 @@
     "104:39",
     "106:26",
     "212:41",
+    "302:30",
     "303:114",
     "308:68",
     "309:77",
     "314:79",
     "316:92",
     "317:107",
-    "frac4:fracture4"
+    "frac4:fracture4",
+    "tl:82a"
   ],
   "tileUnitData": {
     "104": {
@@ -240,6 +242,67 @@
           }
         ]
       }
+    },
+    "302": {
+      "anomaly": false,
+      "planets": {
+        "mellon": {
+          "controlledBy": "sardakk",
+          "entities": {
+            "neutral": [
+              {
+                "count": 1,
+                "entityId": "paradiseworld",
+                "entityType": "attachment",
+                "sustained": null,
+                "unitStates": null
+              }
+            ],
+            "sardakk": [
+              {
+                "count": 1,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              }
+            ]
+          }
+        },
+        "zohbat": {
+          "controlledBy": "sardakk",
+          "entities": {
+            "deepwrought": [
+              {
+                "count": 1,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              }
+            ],
+            "neutral": [
+              {
+                "count": 1,
+                "entityId": "warfare",
+                "entityType": "attachment",
+                "sustained": null,
+                "unitStates": null
+              }
+            ],
+            "sardakk": [
+              {
+                "count": 2,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [2, 0, 0, 0]
+              }
+            ]
+          }
+        }
+      },
+      "space": {}
     },
     "303": {
       "anomaly": true,
@@ -479,6 +542,16 @@
           }
         ]
       }
+    },
+    "tl": {
+      "anomaly": false,
+      "planets": {
+        "lockedmallice": {
+          "controlledBy": null,
+          "entities": {}
+        }
+      },
+      "space": {}
     }
   },
   "versionSchema": 7

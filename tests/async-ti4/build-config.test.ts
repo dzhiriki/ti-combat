@@ -127,19 +127,19 @@ describe('listBattleLocations', () => {
     expect(empty.unitSummary).toBe('')
   })
 
-  it('skips a planet nobody holds and nobody stands on', () => {
-    // Such a planet is not a battle — troops just land on it — so a system
-    // full of them should read as empty as it is.
-    const tiamat = locations.find(l => l.id === '317/tiamat')
-    expect(tiamat).toBeDefined() // held by Bastion, no units
-    expect(locations.find(l => l.id === '303/nothing')).toBeUndefined()
-    for (const l of locations) {
-      if (l.mode !== 'GROUND') continue
-      expect(
-        l.factions.length,
-        `${l.id} has neither holder nor units`,
-      ).toBeGreaterThan(0)
-    }
+  it('offers a planet nobody holds, locked or not', () => {
+    // Mallice sits behind a locked nexus on a corner slot, unclaimed and
+    // empty. It is still a planet, and still somewhere a landing can be
+    // planned, so it has to be pickable.
+    const mallice = locations.find(l => l.id === 'tl/lockedmallice')
+    expect(mallice).toBeDefined()
+    expect(mallice?.factions).toEqual([])
+    expect(mallice?.unitCount).toBe(0)
+
+    // Held but empty is a different thing again, and also offered.
+    expect(locations.find(l => l.id === '317/tiamat')?.factions).toEqual([
+      'bastion',
+    ])
   })
 
   it('marks the anomalies and names the ones it models', () => {

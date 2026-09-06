@@ -251,6 +251,11 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
                         // A lone planet takes it too — nothing sits beside it.
                         [styles.area_full]:
                           l.mode === 'SPACE' || groundAreaCount === 1,
+                        // Nobody holds it and nobody is standing on it. Still
+                        // worth picking — an undefended planet is a fine thing
+                        // to plan a landing on — but it is not a fight yet.
+                        [styles.area_unclaimed]:
+                          l.mode === 'GROUND' && l.factions.length === 0,
                         [styles.area_selected]: l.id === locationId,
                       })}
                       onClick={() => selectLocation(l.id)}
