@@ -72,7 +72,14 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
     [game],
   )
   const location = locations.find(l => l.id === locationId)
-  const tileLocations = locations.filter(l => l.tile === selectedTile)
+  // Space first, then planets: an invasion is decided in orbit before it
+  // reaches the ground, and it is the commoner pick.
+  const tileLocations = locations
+    .filter(l => l.tile === selectedTile)
+    .sort((a, b) => {
+      if (a.mode !== b.mode) return a.mode === 'SPACE' ? -1 : 1
+      return (a.planet ?? '').localeCompare(b.planet ?? '')
+    })
 
   /** Tapping a system selects it outright when there is only one place to
    *  fight there; otherwise its areas are listed to choose from. */
@@ -224,39 +231,44 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
               {game.gameRound ? ` · round ${game.gameRound}` : ''}
             </p>
 
-            <SystemMap
-              positions={Object.keys(game.tileUnitData)}
-              locations={locations}
-              ringCount={game.ringCount ?? 3}
-              selectedTile={selectedTile}
-              onSelectTile={selectTile}
-            />
+            <div className={clsx(styles.board, 'theme-defender')}>
+              <SystemMap
+                positions={Object.keys(game.tileUnitData)}
+                locations={locations}
+                ringCount={game.ringCount ?? 3}
+                selectedTile={selectedTile}
+                onSelectTile={selectTile}
+              />
 
-            {tileLocations.length > 0 && (
-              <div className={styles.areas}>
-                {tileLocations.map(l => (
-                  <button
-                    key={l.id}
-                    type="button"
-                    className={clsx(styles.area, {
-                      [styles.area_selected]: l.id === locationId,
-                    })}
-                    onClick={() => selectLocation(l.id)}
-                  >
-                    <span className={styles.areaName}>
-                      {locationAreaLabel(l)}
-                      {l.isActiveCombat && (
-                        <span className={styles.areaBadge}>in combat</span>
-                      )}
-                    </span>
-                    <span className={styles.areaWho}>
-                      {l.factions.map(factionLabel).join(' vs ')} ·{' '}
-                      {l.unitCount}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
+              {tileLocations.length > 0 && (
+                <div className={styles.areas}>
+                  {tileLocations.map(l => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      className={clsx(styles.area, {
+                        [styles.area_selected]: l.id === locationId,
+                      })}
+                      onClick={() => selectLocation(l.id)}
+                    >
+                      <span className={styles.areaName}>
+                        {locationAreaLabel(l)}
+                        {l.mode === 'GROUND' && (
+                          <span className={styles.areaMode}>ground</span>
+                        )}
+                        {l.isActiveCombat && (
+                          <span className={styles.areaBadge}>in combat</span>
+                        )}
+                      </span>
+                      <span className={styles.areaWho}>
+                        {l.factions.map(factionLabel).join(' vs ')} ·{' '}
+                        {l.unitCount} {l.unitCount === 1 ? 'unit' : 'units'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <p className={styles.chosen}>
               {location ? locationLabel(location) : 'Pick a system above'}

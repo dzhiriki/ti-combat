@@ -4,6 +4,10 @@
   margin: var(--space-1) 0;
 }
 
+/* Two clipped layers: the hex itself paints the outline colour, and `.face`
+   sits inset on top of it. A single clipped element can't show a border —
+   clip-path cuts it away — and the states worth spotting (a contested space,
+   a live combat) need to read as a ring rather than another shade of fill. */
 .hex {
   position: absolute;
   display: flex;
@@ -11,43 +15,77 @@
   justify-content: center;
   padding: 0;
   cursor: pointer;
-  background: var(--color-background-input-field);
+  background: transparent;
   border: 0;
-  transition:
-    background 0.12s ease,
-    filter 0.12s ease;
+  transition: filter 0.12s ease;
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
 
-  /* Flat-top hexagon. Neighbouring hexes tile with no gap between them, so a
-     tap that misses the centre still lands on a system rather than nothing. */
+.face {
+  position: absolute;
+  inset: 3px;
+
+  /* Muted, not the input-field colour: in dark mode that is 80% of the very
+     colour the dialog is painted in, so every hexagon dissolved into the
+     background and only the icons were left floating. */
+  background: var(--color-background-muted);
   clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
 }
 
 .hex:hover {
-  filter: brightness(1.25);
+  filter: brightness(1.2);
 }
 
 .hex:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
+  outline: none;
+  filter: brightness(1.35);
 }
 
+.hex_empty {
+  pointer-events: none;
+}
+
+.hex_empty .face {
+  background: var(--color-overlay-medium);
+}
+
+/* More than one player has ships here — the systems actually worth looking at.
+   The ring alone is thin at this size, so each state tints its face too. */
 .hex_contested {
+  background: var(--color-accent);
+}
+
+.hex_contested .face {
   background: var(--color-accent-20);
 }
 
 .hex_active {
-  background: var(--color-accent-40);
+  background: hsl(var(--color-amber-500));
 }
 
-.hex_selected {
-  background: var(--color-accent-60);
+.hex_active .face {
+  background: hsl(var(--color-amber-500) / 20%);
+}
+
+/* Filled solid rather than tinted: the defender accent and the amber used for
+   a live combat are close enough in hue that another shade would not read as
+   a different thing. */
+.hex_selected,
+.hex_selected.hex_contested,
+.hex_selected.hex_active {
+  background: var(--color-accent);
+}
+
+.hex_selected .face {
+  background: var(--color-accent);
 }
 
 .icon {
   display: flex;
-  width: 45%;
-  height: 45%;
-  opacity: 70%;
+  width: 42%;
+  height: 42%;
+  margin-bottom: 8%;
+  opacity: 65%;
   color: var(--color-text-main);
 }
 
@@ -57,25 +95,35 @@
   fill: currentcolor;
 }
 
-.hex_selected .icon {
+.hex_selected .icon,
+.hex_contested .icon {
   opacity: 100%;
 }
 
-.count {
-  position: absolute;
-  right: 22%;
-  bottom: 12%;
-  font-family: var(--font-mono);
-  font-size: clamp(7px, 2.2vw, 11px);
-  line-height: 1;
-  color: var(--color-text-muted);
+.hex_selected .icon,
+.hex_selected .count,
+.hex_selected .ground {
+  color: var(--color-background-main);
 }
 
-.hex_selected .count {
+/* Ships in the space area only. Ground forces are counted in the area list,
+   where a planet holding sixty infantry has room to say so. */
+.count {
+  position: absolute;
+  bottom: 8%;
+  font-family: var(--font-mono);
+  font-size: clamp(8px, 2.4vw, 12px);
+  font-weight: 500;
+  line-height: 1;
   color: var(--color-text-main);
 }
 
-.hex_empty {
-  background: var(--color-overlay-light);
-  pointer-events: none;
+/* One dot per planet holding ground forces, capped at three. */
+.ground {
+  position: absolute;
+  top: 12%;
+  font-size: clamp(6px, 1.8vw, 9px);
+  letter-spacing: 1px;
+  line-height: 1;
+  color: var(--color-text-muted);
 }

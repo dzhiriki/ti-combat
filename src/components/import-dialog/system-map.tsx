@@ -29,45 +29,41 @@ interface SystemMapProps {
 
 interface TileSummary {
   tile: string
-  /** Whoever holds the most here — the map shows one icon per system. */
-  faction: string | null
-  unitCount: number
+  /** The space area: who holds it, how many ships, and whether more than one
+   *  player is up there — which is the case worth spotting, since it means a
+   *  fight rather than a garrison. Null when nobody has ships here. */
+  space: { faction: string; unitCount: number; contested: boolean } | null
+  /** Ground forces below, summarised only as "how many planets hold units".
+   *  Counts are left to the area list: a planet can hold dozens of infantry,
+   *  and a three-digit number in a 56px hexagon reads as noise. */
+  groundPlanets: number
   isActiveCombat: boolean
-  contested: boolean
 }
 
 function summariseTiles(
   locations: readonly BattleLocation[],
 ): Map<string, TileSummary> {
   const byTile = new Map<string, TileSummary>()
-  const strength = new Map<string, Map<string, number>>()
 
   for (const location of locations) {
-    const existing = byTile.get(location.tile)
-    byTile.set(location.tile, {
+    const summary = byTile.get(location.tile) ?? {
       tile: location.tile,
-      faction: null,
-      unitCount: (existing?.unitCount ?? 0) + location.unitCount,
-      isActiveCombat: existing?.isActiveCombat || !!location.isActiveCombat,
-      contested: existing?.contested || location.factions.length > 1,
-    })
-
-    // Weight by position in the list: `factions` is ordered strongest first,
-    // which is enough to pick whose icon a system wears.
-    const counts = strength.get(location.tile) ?? new Map<string, number>()
-    location.factions.forEach((faction, index) => {
-      counts.set(faction, (counts.get(faction) ?? 0) + (index === 0 ? 2 : 1))
-    })
-    strength.set(location.tile, counts)
-  }
-
-  for (const [tile, summary] of byTile) {
-    const counts = [...(strength.get(tile) ?? new Map())].sort(
-      (a, b) => b[1] - a[1],
-    )
-    summary.faction = counts[0]?.[0] ?? null
-    // More than one faction anywhere in the system, space or ground.
-    summary.contested = summary.contested || counts.length > 1
+      space: null,
+      groundPlanets: 0,
+      isActiveCombat: false,
+    }
+    if (location.mode === 'SPACE') {
+      summary.space = {
+        // `factions` is ordered strongest first.
+        faction: location.factions[0],
+        unitCount: location.unitCount,
+        contested: location.factions.length > 1,
+      }
+    } else {
+      summary.groundPlanets += 1
+    }
+    summary.isActiveCombat ||= !!location.isActiveCombat
+    byTile.set(location.tile, summary)
   }
   return byTile
 }
@@ -111,8 +107,8 @@ export function SystemMap({
     >
       {layout.cells.map(cell => {
         const summary = summaries.get(cell.position)
-        const factionKey = summary?.faction
-          ? FACTION_BY_ASYNC_ID[summary.faction]
+        const factionKey = summary?.space
+          ? FACTION_BY_ASYNC_ID[summary.space.faction]
           : undefined
         const icon = factionKey ? factions[factionKey].icon : undefined
         const selected = selectedTile === cell.position
@@ -132,9 +128,23 @@ export function SystemMap({
               className={clsx(styles.hex, styles.hex_empty)}
               style={style}
               aria-hidden="true"
-            />
+            >
+              <span className={styles.face} />
+            </span>
           )
         }
+
+        const description = [
+          summary.space
+            ? `space held by ${factionLabel(summary.space.faction)}${
+                summary.space.contested ? ' (contested)' : ''
+              }, ${summary.space.unitCount} units`
+            : 'empty space',
+          summary.groundPlanets > 0 &&
+            `${summary.groundPlanets} planet${summary.groundPlanets > 1 ? 's' : ''} with ground forces`,
+        ]
+          .filter(Boolean)
+          .join('; ')
 
         return (
           <button
@@ -142,21 +152,23 @@ export function SystemMap({
             type="button"
             className={clsx(styles.hex, {
               [styles.hex_selected]: selected,
-              [styles.hex_contested]: summary.contested,
+              [styles.hex_contested]: summary.space?.contested,
               [styles.hex_active]: summary.isActiveCombat,
             })}
             style={style}
             onClick={() => onSelectTile(cell.position)}
             aria-pressed={selected}
-            title={
-              summary.faction
-                ? `${cell.position} — ${factionLabel(summary.faction)}, ${summary.unitCount} units`
-                : cell.position
-            }
+            title={`${cell.position} — ${description}`}
           >
+            <span className={styles.face} aria-hidden="true" />
             {icon ? <FactionIcon icon={icon} /> : null}
-            {summary.unitCount ? (
-              <span className={styles.count}>{summary.unitCount}</span>
+            {summary.space ? (
+              <span className={styles.count}>{summary.space.unitCount}</span>
+            ) : null}
+            {summary.groundPlanets > 0 ? (
+              <span className={styles.ground} aria-hidden="true">
+                {'\u2022'.repeat(Math.min(summary.groundPlanets, 3))}
+              </span>
             ) : null}
           </button>
         )
