@@ -75,7 +75,7 @@
     }
   ],
   "ringCount": 3,
-  "tilePositions": ["101:64", "313:54"],
+  "tilePositions": ["101:64", "104:86a", "204:87a240", "313:54"],
   "tileUnitData": {
     "101": {
       "anomaly": false,
@@ -129,6 +129,16 @@
           }
         ]
       }
+    },
+    "104": {
+      "anomaly": false,
+      "planets": {},
+      "space": {}
+    },
+    "204": {
+      "anomaly": false,
+      "planets": {},
+      "space": {}
     },
     "313": {
       "anomaly": false,

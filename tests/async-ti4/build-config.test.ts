@@ -171,10 +171,16 @@ describe('listBattleLocations', () => {
     expect(locationAt('212').systemName).toBe('Gravity Rift')
   })
 
-  it('sorts contested locations first', () => {
+  it('sorts contested locations first, and empty ones last', () => {
     const firstUncontested = locations.findIndex(l => l.factions.length < 2)
     const lastContested = locations.findLastIndex(l => l.factions.length > 1)
     expect(lastContested).toBeLessThan(firstUncontested)
+
+    // Opening the dialog should land on a battle that can be run, not on bare
+    // space, so anywhere with somebody in it outranks anywhere empty.
+    const firstEmpty = locations.findIndex(l => l.factions.length === 0)
+    const lastOccupied = locations.findLastIndex(l => l.factions.length > 0)
+    expect(lastOccupied).toBeLessThan(firstEmpty)
   })
 
   it('ranks a shared space area above a shared planet', () => {
@@ -372,6 +378,15 @@ describe('buildImportConfig', () => {
 })
 
 describe('Twilight\u2019s Fall games', () => {
+  it('offers no battle on a hyperlane', () => {
+    // Hyperlanes join systems rather than being one — ships pass through and
+    // cannot stop — so 104 and 204 are drawn but never offered.
+    const tiles = new Set(listBattleLocations(tfData).map(l => l.tile))
+    expect(tiles.has('313')).toBe(true)
+    expect(tiles.has('104')).toBe(false)
+    expect(tiles.has('204')).toBe(false)
+  })
+
   function tfImport(id: string, attacker: string, defender: string) {
     const location = listBattleLocations(tfData).find(l => l.id === id)
     if (!location) throw new Error(`No location "${id}" in TF fixture`)

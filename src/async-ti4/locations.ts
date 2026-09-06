@@ -8,7 +8,7 @@ import {
   UNIT_TYPE_BY_ASYNC_ID,
 } from './mappings'
 import { PLANET_NAMES, SPACE_STATIONS } from './planet-names'
-import { TILE_NAMES } from './tile-names'
+import { TILE_NAMES, UNPLAYABLE_TILES } from './tile-names'
 import type { AsyncEntity, BattleLocation, WebData } from './types'
 
 type EntityGroups = Record<string, AsyncEntity[]>
@@ -128,11 +128,14 @@ export function findActiveCombat(data: WebData): {
  *  Two players sharing a space area means a fight — barring homebrew that
  *  allows coexistence there. Two players on a planet is a weaker signal: one
  *  side's structures can sit on ground the other holds without a shot being
- *  fired. Neither beats AsyncTI4 telling us outright which combat is open. */
+ *  fired. Neither beats AsyncTI4 telling us outright which combat is open.
+ *
+ *  Somewhere with anybody in it beats somewhere empty, so that opening the
+ *  dialog lands on a battle that can be run rather than on bare space. */
 function rank(location: BattleLocation): number {
   if (location.isActiveCombat) return 0
-  if (location.factions.length < 2) return 3
-  return location.mode === 'SPACE' ? 1 : 2
+  if (location.factions.length > 1) return location.mode === 'SPACE' ? 1 : 2
+  return location.factions.length === 1 ? 3 : 4
 }
 
 /** Every place in the game that holds units this calculator can model, ground
@@ -151,6 +154,9 @@ export function listBattleLocations(data: WebData): BattleLocation[] {
 
   for (const [tile, tileData] of Object.entries(data.tileUnitData)) {
     const tileId = tileIds.get(tile) ?? ''
+    // A hyperlane joins systems without being one, and a blank draft tile is
+    // setup left over. Ships cannot stop on either, so neither is a battle.
+    if (UNPLAYABLE_TILES.has(tileId)) continue
     const environment = ENVIRONMENT_BY_TILE[tileId]
     const systemName = TILE_NAMES[tileId]
     const anomaly = tileData.anomaly ?? undefined
