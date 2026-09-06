@@ -149,14 +149,19 @@ function buildSide(
       )
     }
 
-    const abilityKey = ABILITY_BY_TECH[tech]
-    if (!abilityKey) continue
-    const ability = abilityLookup.get(abilityKey)
-    if (!ability) continue
-    // Cards gated on a charge count (`headerUI: 'uses'`) start at zero uses, so
-    // owning one has to grant a use rather than flip `isEnabled`.
-    abilities[abilityKey] =
-      ability.headerUI === 'uses' ? { uses: 1 } : { isEnabled: true }
+    const mapped = ABILITY_BY_TECH[tech]
+    if (!mapped) continue
+    // One tech can name more than one key where a faction reimplements the
+    // card. Every candidate is set; `loadConfig` drops the ones the side's
+    // faction doesn't have.
+    for (const abilityKey of typeof mapped === 'string' ? [mapped] : mapped) {
+      const ability = abilityLookup.get(abilityKey)
+      if (!ability) continue
+      // Cards gated on a charge count (`headerUI: 'uses'`) start at zero uses,
+      // so owning one has to grant a use rather than flip `isEnabled`.
+      abilities[abilityKey] =
+        ability.headerUI === 'uses' ? { uses: 1 } : { isEnabled: true }
+    }
   }
 
   // Twilight's Fall keeps its unit upgrades in the shared card deck, so they

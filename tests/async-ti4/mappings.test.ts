@@ -9,6 +9,7 @@ import {
 } from '@/async-ti4/mappings'
 import { WebDataSchema } from '@/async-ti4/types'
 import { UNIT_TYPES } from '@/constants/units'
+import technology from '@/data/abilities/technology'
 import factions from '@/data/faction'
 import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
 
@@ -37,12 +38,32 @@ describe('AsyncTI4 mapping tables', () => {
   })
 
   it('maps only to abilities that exist', () => {
-    for (const [alias, key] of Object.entries({
+    for (const [alias, mapped] of Object.entries({
       ...ABILITY_BY_TECH,
       ...ABILITY_BY_TF_UNIT,
     })) {
-      expect(abilityKeys, `${alias} → ${key}`).toContain(key)
+      for (const key of typeof mapped === 'string' ? [mapped] : mapped) {
+        expect(abilityKeys, `${alias} → ${key}`).toContain(key)
+      }
     }
+  })
+
+  it('reaches every technology the calculator models as a card', () => {
+    // Both the generic technology deck and each faction's own technologies.
+    // A card modelled here but unreachable from any alias can never be
+    // imported, which is exactly how Valkyrie Particle Weave went missing.
+    const mapped = new Set(
+      Object.values(ABILITY_BY_TECH).flatMap(v =>
+        typeof v === 'string' ? [v] : [...v],
+      ),
+    )
+    const modelled = [
+      ...technology.map(a => a.key),
+      ...Object.values(factions).flatMap(f =>
+        (f.abilities?.technology ?? []).map(a => a.key),
+      ),
+    ]
+    expect([...new Set(modelled)].filter(k => !mapped.has(k))).toEqual([])
   })
 
   it('covers every faction the calculator models', () => {

@@ -207,6 +207,16 @@ describe('buildImportConfig', () => {
     expect(config.du.MECH).toBeUndefined()
   })
 
+  it('imports faction technologies, not just the generic deck', () => {
+    // Valkyrie Particle Weave is Sardakk's own tech rather than one of the
+    // seven generic ones, and was silently dropped until the faction decks
+    // were mapped. Sardakk holds no units on Styx, so this also covers a side
+    // picked by hand rather than because it is standing there.
+    const { config } = importAt('frac4/styx', 'sardakk', 'cabal')
+    expect(config.aa.VALKYRIE_PARTICLE_WEAVE).toEqual({ isEnabled: true })
+    expect(config.aa.X_89_BACTERIAL_WEAPON).toEqual({ isEnabled: true })
+  })
+
   it('warns when AsyncTI4 bumps its data format', () => {
     const doctored = structuredClone(data)
     doctored.versionSchema = 99

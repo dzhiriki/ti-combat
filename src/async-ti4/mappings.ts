@@ -116,7 +116,10 @@ export const UNIT_UPGRADE_BY_TECH: Readonly<Record<string, UnitBaseType>> = {
  *  `x89`/`x89_base` are left out for that reason — the pre-Omega Magen and both
  *  earlier X-89 printings do something else entirely, so importing them would
  *  quietly simulate the wrong card. */
-export const ABILITY_BY_TECH: Readonly<Record<string, string>> = {
+export const ABILITY_BY_TECH: Readonly<
+  Record<string, string | readonly string[]>
+> = {
+  // Generic technologies
   amd: 'ANTIMASS_DEFLECTORS',
   asc: 'ASSAULT_CANNON',
   da: 'DURANIUM_ARMOR',
@@ -125,6 +128,18 @@ export const ABILITY_BY_TECH: Readonly<Record<string, string>> = {
   md: 'MAGEN_DEFENSE_GRID', // Magen Defense Grid ΩΩ
   ps: 'PLASMA_SCORING',
   x89c4: 'X_89_BACTERIAL_WEAPON', // X-89 Bacterial Weapon ΩΩ
+  // Faction technologies. Nekro can hold any of these through Technological
+  // Singularity and reuses the same keys, except for Temporal Command Suite —
+  // hence the pair. A side is only given the key its faction actually has.
+  ds: 'DIMENSIONAL_SPLICER', // Ghosts of Creuss
+  ic: 'IMPULSE_CORE', // Yin Brotherhood
+  l4: 'L4_DISRUPTORS', // Barony of Letnev
+  nes: 'NON_EUCLIDEAN_SHIELDING', // Barony of Letnev
+  proxima: 'PROXIMA_TARGETING_VI', // Last Bastion
+  sc: 'SUPERCHARGE', // Naaz-Rokha Alliance
+  so: 'SALVAGE_OPERATIONS', // Mentak Coalition
+  tcs: ['TEMPORAL_COMMAND_SUITE', 'NEKRO_TEMPORAL_COMMAND_SUITE'], // Nomad
+  vpw: 'VALKYRIE_PARTICLE_WEAVE', // Sardakk N'orr
   // Twilight's Fall shared deck
   'tf-ambush': 'AMBUSH',
   'tf-devotion': 'DEVOTION',
