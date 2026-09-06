@@ -12,7 +12,9 @@
 .textInput {
   flex: 1;
   min-width: 0;
-  height: var(--control-size);
+
+  /* Matches the Load button beside it. */
+  height: var(--space-9);
   padding: 0 var(--space-3);
 
   /* A game id is an identifier, and the app sets those in mono. */

@@ -87,6 +87,11 @@
 }
 
 .icon {
+  /* Positioned so it paints above `.face`, which is. Without this the icon
+     only cleared the face by accident, through the stacking context its own
+     `opacity` created — so raising the opacity to full on a selected or
+     contested system made the icon vanish behind the fill. */
+  position: relative;
   display: flex;
   width: 42%;
   height: 42%;
