@@ -20,7 +20,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 var(--space-4);
+
+  /* Vertical padding as well as horizontal: it is what leaves room for a tall
+     dialog to stop short of the screen edges instead of running past them. */
+  padding: var(--space-4);
   pointer-events: none;
 }
 
@@ -30,6 +33,11 @@
   flex-direction: column;
   width: 100%;
   max-width: 24rem;
+
+  /* `overflow-y: auto` alone does nothing without a height to overflow: a tall
+     dialog simply grew past the viewport, and the centring above pushed it off
+     the top and the bottom at once, out of reach of any scrollbar. */
+  max-height: 100%;
   padding: var(--space-6);
   overflow-y: auto;
   pointer-events: auto;

@@ -18,3 +18,7 @@ dist
 docs/plans
 docs/superpowers
 .wrangler
+
+# Game ids for `npm run check:asyncti4`. Local because they point at other
+# people's games and go stale as those games finish.
+.asyncti4-games

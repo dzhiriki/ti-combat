@@ -1,0 +1,338 @@
+import { DownloadIcon } from '@radix-ui/react-icons'
+import { clsx } from 'clsx'
+import { useMemo, useState } from 'react'
+
+import {
+  AsyncTi4Error,
+  buildImportConfig,
+  factionLabel,
+  fetchGame,
+  findActiveCombat,
+  isMappedFaction,
+  listBattleLocations,
+  locationAreaLabel,
+  parseGameId,
+  type WebData,
+} from '@/async-ti4'
+import type { Ability } from '@/combat'
+import { useToast } from '@/components/toast'
+import { ButtonIcon } from '@/components/ui/button-icon'
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
+import { buildAbilityLookup } from '@/hooks/combat-setup/validation'
+
+import styles from './import-dialog.module.css'
+import { SystemMap } from './system-map'
+
+interface ImportDialogProps {
+  allAbilities: Ability[]
+  onImport: (config: SerializedConfig) => void
+}
+
+/** Pull a battle straight out of a live AsyncTI4 game: the units standing in a
+ *  chosen system or planet, plus each side's researched technologies. */
+export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
+  const { toast } = useToast()
+  const abilityLookup = useMemo(
+    () => buildAbilityLookup(allAbilities),
+    [allAbilities],
+  )
+
+  const [open, setOpen] = useState(false)
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [game, setGame] = useState<WebData | null>(null)
+  const [locationId, setLocationId] = useState('')
+  const [attacker, setAttacker] = useState('')
+  const [defender, setDefender] = useState('')
+  const [selectedTile, setSelectedTile] = useState<string | null>(null)
+
+  const locations = useMemo(
+    () => (game ? listBattleLocations(game) : []),
+    [game],
+  )
+  const location = locations.find(l => l.id === locationId)
+  /** A system's areas, space first and then its planets by name: an invasion
+   *  is decided in orbit before it reaches the ground, and space is the
+   *  commoner pick. */
+  function areasIn(tile: string | null) {
+    return locations
+      .filter(l => l.tile === tile)
+      .sort((a, b) => {
+        if (a.mode !== b.mode) return a.mode === 'SPACE' ? -1 : 1
+        return (a.planet ?? '').localeCompare(b.planet ?? '')
+      })
+  }
+
+  const tileLocations = areasIn(selectedTile)
+  const groundAreaCount = tileLocations.filter(l => l.mode === 'GROUND').length
+
+  /** Tapping a system picks a fight in it straight away — the space battle,
+   *  or its first planet where nobody is in orbit. */
+  function selectTile(tile: string): void {
+    setSelectedTile(tile)
+    const first = areasIn(tile)[0]
+    if (first) selectLocation(first.id)
+  }
+
+  const players = useMemo(
+    () =>
+      (game?.playerData ?? [])
+        .filter(player => isMappedFaction(player.faction))
+        .map(player => ({
+          value: player.faction,
+          label: player.userName
+            ? `${factionLabel(player.faction)} · ${player.userName}`
+            : factionLabel(player.faction),
+        })),
+    [game],
+  )
+
+  /** Fill the sides from the chosen location.
+   *
+   *  Whoever holds it is the defender — the import's job is to say what you
+   *  would be attacking into, and the attacker's fleet is assembled by hand
+   *  because it rarely comes from one place. A live combat is the exception:
+   *  its participants are already ordered with the active player first. */
+  function selectLocation(id: string): void {
+    setLocationId(id)
+    const tile = locations.find(l => l.id === id)?.tile
+    if (tile) setSelectedTile(tile)
+    const active = game ? findActiveCombat(game) : null
+    if (active?.locationId === id && active.factions.length > 1) {
+      const [first, second] = active.factions.filter(isMappedFaction)
+      if (first) setAttacker(first)
+      if (second) setDefender(second)
+      return
+    }
+    const present = (locations.find(l => l.id === id)?.factions ?? []).filter(
+      isMappedFaction,
+    )
+    if (present[0]) setDefender(present[0])
+    if (present[1]) setAttacker(present[1])
+  }
+
+  async function handleLoad(): Promise<void> {
+    const gameId = parseGameId(input)
+    if (!gameId) {
+      setError('Enter a game id or a link to one')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await fetchGame(gameId)
+      const found = listBattleLocations(data)
+      if (found.length === 0) {
+        setError('That game has no units on the map yet')
+        return
+      }
+      setGame(data)
+
+      // `found` is already ordered likeliest-battle-first, so its head is the
+      // best default. Sides come from the live combat's own participants when
+      // there is one — a side can be in a fight without holding the location
+      // (its space cannon fires from a planet it still owns).
+      const target = found[0]
+      const active = findActiveCombat(data)
+      const inCombat =
+        active?.locationId === target.id && active.factions.length > 1
+      const sides = (inCombat ? active.factions : target.factions).filter(
+        isMappedFaction,
+      )
+      // A live combat lists the active player first; anywhere else the side
+      // standing there is the one being attacked.
+      const [first, second] = inCombat ? sides : [sides[1], sides[0]]
+
+      setLocationId(target.id)
+      setSelectedTile(target.tile)
+      setAttacker(first ?? second ?? '')
+      setDefender(second ?? first ?? '')
+    } catch (e) {
+      setError(
+        e instanceof AsyncTi4Error ? e.message : 'Could not load that game',
+      )
+      setGame(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleImport(): void {
+    if (!game || !location) return
+    try {
+      const { config, notes } = buildImportConfig(
+        game,
+        { location, attacker, defender },
+        abilityLookup,
+      )
+      onImport(config)
+      setOpen(false)
+      if (notes.length > 0) toast(notes.join('; '))
+    } catch (e) {
+      setError(e instanceof AsyncTi4Error ? e.message : 'Could not import that')
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <ButtonIcon title="Import from AsyncTI4">
+          <DownloadIcon />
+        </ButtonIcon>
+      </DialogTrigger>
+      <DialogContent className={styles.content}>
+        <DialogTitle>Import from AsyncTI4</DialogTitle>
+
+        <form
+          className={styles.loadRow}
+          onSubmit={e => {
+            e.preventDefault()
+            void handleLoad()
+          }}
+        >
+          <input
+            className={styles.textInput}
+            type="text"
+            value={input}
+            placeholder="Game id or link"
+            onChange={e => setInput(e.target.value)}
+          />
+          <button
+            className={styles.loadButton}
+            type="submit"
+            disabled={loading}
+          >
+            {loading ? 'Loading' : 'Load'}
+          </button>
+        </form>
+
+        {error && <p className={styles.error}>{error}</p>}
+
+        {game && location && (
+          <>
+            <p className={styles.meta}>
+              {game.gameCustomName || game.gameName}
+              {game.gameRound ? ` · round ${game.gameRound}` : ''}
+            </p>
+
+            <div className={clsx(styles.board, 'theme-defender')}>
+              <SystemMap
+                positions={Object.keys(game.tileUnitData)}
+                locations={locations}
+                ringCount={game.ringCount ?? 3}
+                selectedTile={selectedTile}
+                onSelectTile={selectTile}
+              />
+
+              {tileLocations.length > 0 && (
+                <div className={styles.areas}>
+                  {tileLocations.map(l => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      className={clsx(styles.area, {
+                        // Space takes the full width: it is a different fight
+                        // from the ground below it, not one planet among many.
+                        // A lone planet takes it too — nothing sits beside it.
+                        [styles.area_full]:
+                          l.mode === 'SPACE' || groundAreaCount === 1,
+                        // Nobody holds it and nobody is standing on it. Still
+                        // worth picking — an undefended planet is a fine thing
+                        // to plan a landing on — but it is not a fight yet.
+                        [styles.area_unclaimed]:
+                          l.mode === 'GROUND' && l.factions.length === 0,
+                        [styles.area_selected]: l.id === locationId,
+                      })}
+                      onClick={() => selectLocation(l.id)}
+                    >
+                      <span className={styles.areaName}>
+                        {locationAreaLabel(l)}
+                        {/* The system's own name, so a hexagon whose planets
+                            are all locked or unclaimed still says where it
+                            is — Mallice behind its locked nexus, say. */}
+                        {l.mode === 'SPACE' && l.systemName && (
+                          <span className={styles.areaSystem}>
+                            {l.systemName}
+                          </span>
+                        )}
+                        {l.isActiveCombat && (
+                          <span className={styles.areaBadge}>in combat</span>
+                        )}
+                      </span>
+                      <span className={styles.areaWho}>
+                        {l.factions.length === 0
+                          ? 'Unclaimed'
+                          : l.factions.map(factionLabel).join(' vs ')}
+                      </span>
+                      <span className={styles.areaUnits}>
+                        {l.unitSummary || 'no units'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Attacker</span>
+              <Select value={attacker} onValueChange={setAttacker}>
+                <SelectTrigger className={styles.select}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className={styles.selectContent}>
+                  {players.map(p => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Defender</span>
+              <Select value={defender} onValueChange={setDefender}>
+                <SelectTrigger className={styles.select}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className={styles.selectContent}>
+                  {players.map(p => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+
+            <div className={styles.importRow}>
+              <button
+                className={styles.importButton}
+                type="button"
+                onClick={handleImport}
+                disabled={!attacker || !defender}
+              >
+                Import battle
+              </button>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}

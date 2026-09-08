@@ -85,6 +85,7 @@ interface BattleCardProps {
   onResetUnits: (side: CombatSide) => void
   attackerActions?: ReactNode
   defenderActions?: ReactNode
+  topActions?: ReactNode
   className?: string
 }
 
@@ -122,6 +123,7 @@ export function BattleCard({
   onResetUnits,
   attackerActions,
   defenderActions,
+  topActions,
   className,
 }: BattleCardProps) {
   return (
@@ -132,6 +134,7 @@ export function BattleCard({
           value={system}
           onChange={onSystemChange}
         />
+        {topActions && <div className={styles.topActions}>{topActions}</div>}
       </div>
 
       <header className={styles.header}>

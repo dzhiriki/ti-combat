@@ -1,0 +1,662 @@
+{
+  "gameCustomName": "Sample TI4 Game",
+  "gameName": "sample-ti4",
+  "gameRound": 4,
+  "playerData": [
+    {
+      "color": "sunset",
+      "faction": "sardakk",
+      "galvanizeTokensReinf": 0,
+      "techs": [
+        "gd",
+        "sr",
+        "cv2",
+        "aida",
+        "det",
+        "ff2",
+        "exo2",
+        "lwd",
+        "bs",
+        "dd2",
+        "st",
+        "ws",
+        "sd2",
+        "cr2",
+        "vpw",
+        "pa",
+        "x89c4",
+        "asc",
+        "inf2"
+      ],
+      "userName": "Ada",
+      "leaders": [
+        {
+          "id": "sardakkagent",
+          "type": "agent",
+          "locked": false
+        },
+        {
+          "id": "sardakkcommander",
+          "type": "commander",
+          "locked": false
+        },
+        {
+          "id": "sardakkhero",
+          "type": "hero",
+          "locked": true
+        }
+      ]
+    },
+    {
+      "color": "azure",
+      "faction": "deepwrought",
+      "galvanizeTokensReinf": 0,
+      "techs": [
+        "nm",
+        "bs",
+        "sr",
+        "gd",
+        "cv2",
+        "hm",
+        "dn2",
+        "md",
+        "td",
+        "det",
+        "hydrothermal",
+        "sdn",
+        "st",
+        "asc",
+        "x89c4",
+        "aida"
+      ],
+      "userName": "Bruno",
+      "leaders": [
+        {
+          "id": "deepwroughtagent",
+          "type": "agent",
+          "locked": false
+        },
+        {
+          "id": "deepwroughtcommander",
+          "type": "commander",
+          "locked": false
+        },
+        {
+          "id": "deepwroughthero",
+          "type": "hero",
+          "locked": true
+        }
+      ]
+    },
+    {
+      "color": "gray",
+      "faction": "sol",
+      "galvanizeTokensReinf": 0,
+      "techs": [
+        "amd",
+        "nm",
+        "sr",
+        "ac2",
+        "ff2",
+        "gd",
+        "bs",
+        "sdn",
+        "x89c4",
+        "aida"
+      ],
+      "userName": "Cleo",
+      "leaders": [
+        {
+          "id": "solagent",
+          "type": "agent",
+          "locked": false
+        },
+        {
+          "id": "solcommander",
+          "type": "commander",
+          "locked": false
+        },
+        {
+          "id": "solhero",
+          "type": "hero",
+          "locked": true
+        }
+      ]
+    },
+    {
+      "color": "bloodred",
+      "faction": "cabal",
+      "galvanizeTokensReinf": 0,
+      "techs": ["sar", "vtx", "aida", "ws", "asc", "bs", "sr"],
+      "userName": "Dara",
+      "leaders": [
+        {
+          "id": "cabalagent",
+          "type": "agent",
+          "locked": false
+        },
+        {
+          "id": "cabalcommander",
+          "type": "commander",
+          "locked": false
+        },
+        {
+          "id": "cabalhero",
+          "type": "hero",
+          "locked": true
+        }
+      ],
+      "promissoryNotesInPlayArea": ["copper_an", "sunset_sftt"]
+    },
+    {
+      "color": "copper",
+      "faction": "muaat",
+      "galvanizeTokensReinf": 0,
+      "techs": ["ps", "sar", "td", "asc", "x89c4", "dd2", "aida"],
+      "userName": "Ewan",
+      "leaders": [
+        {
+          "id": "muaatagent",
+          "type": "agent",
+          "locked": false
+        },
+        {
+          "id": "muaatcommander",
+          "type": "commander",
+          "locked": true
+        },
+        {
+          "id": "muaathero",
+          "type": "hero",
+          "locked": true
+        }
+      ]
+    },
+    {
+      "color": "tropical",
+      "faction": "bastion",
+      "galvanizeTokensReinf": 4,
+      "techs": ["sdn", "ie", "helios2", "cr2", "md", "proxima", "pds2"],
+      "userName": "Fenna",
+      "leaders": [
+        {
+          "id": "bastionagent",
+          "type": "agent",
+          "locked": false
+        },
+        {
+          "id": "bastioncommander",
+          "type": "commander",
+          "locked": false
+        },
+        {
+          "id": "bastionhero",
+          "type": "hero",
+          "locked": true
+        }
+      ],
+      "promissoryNotesInPlayArea": ["sunset_an"]
+    },
+    {
+      "color": "aberration",
+      "faction": "neutral",
+      "galvanizeTokensReinf": 0,
+      "techs": ["ff2", "dd2", "cv2", "cr2", "ws"],
+      "userName": "Bot"
+    }
+  ],
+  "ringCount": 3,
+  "tilePositions": [
+    "104:39",
+    "106:26",
+    "212:41",
+    "302:30",
+    "303:114",
+    "308:68",
+    "309:77",
+    "314:79",
+    "316:92",
+    "317:107",
+    "frac4:fracture4",
+    "tl:82a"
+  ],
+  "tileUnitData": {
+    "104": {
+      "anomaly": false,
+      "planets": {},
+      "space": {
+        "bastion": [
+          {
+            "count": 2,
+            "entityId": "ca",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 1, 0]
+          },
+          {
+            "count": 1,
+            "entityId": "ff",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          },
+          {
+            "count": 1,
+            "entityId": "gf",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          }
+        ]
+      }
+    },
+    "106": {
+      "anomaly": false,
+      "planets": {
+        "lodor": {
+          "controlledBy": "bastion",
+          "entities": {
+            "bastion": [
+              {
+                "count": 5,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [5, 0, 0, 0]
+              },
+              {
+                "count": 1,
+                "entityId": "mf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [0, 0, 1, 0]
+              },
+              {
+                "count": 2,
+                "entityId": "pd",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [2, 0, 0, 0]
+              }
+            ]
+          }
+        }
+      },
+      "space": {
+        "sardakk": [
+          {
+            "count": 2,
+            "entityId": "ff",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [2, 0, 0, 0]
+          },
+          {
+            "count": 2,
+            "entityId": "dn",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [2, 0, 0, 0]
+          }
+        ]
+      }
+    },
+    "212": {
+      "anomaly": true,
+      "planets": {
+        "mirage": {
+          "controlledBy": "sardakk",
+          "entities": {
+            "sardakk": [
+              {
+                "count": 1,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              }
+            ]
+          }
+        }
+      },
+      "space": {
+        "neutral": [
+          {
+            "count": 1,
+            "entityId": "mirage",
+            "entityType": "token",
+            "sustained": null,
+            "unitStates": null
+          }
+        ],
+        "sardakk": [
+          {
+            "count": 2,
+            "entityId": "ff",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [2, 0, 0, 0]
+          },
+          {
+            "count": 1,
+            "entityId": "dd",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          }
+        ]
+      }
+    },
+    "302": {
+      "anomaly": false,
+      "planets": {
+        "mellon": {
+          "controlledBy": "sardakk",
+          "entities": {
+            "neutral": [
+              {
+                "count": 1,
+                "entityId": "paradiseworld",
+                "entityType": "attachment",
+                "sustained": null,
+                "unitStates": null
+              }
+            ],
+            "sardakk": [
+              {
+                "count": 1,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              }
+            ]
+          }
+        },
+        "zohbat": {
+          "controlledBy": "sardakk",
+          "entities": {
+            "deepwrought": [
+              {
+                "count": 1,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              }
+            ],
+            "neutral": [
+              {
+                "count": 1,
+                "entityId": "warfare",
+                "entityType": "attachment",
+                "sustained": null,
+                "unitStates": null
+              }
+            ],
+            "sardakk": [
+              {
+                "count": 2,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [2, 0, 0, 0]
+              }
+            ]
+          }
+        }
+      },
+      "space": {}
+    },
+    "303": {
+      "anomaly": true,
+      "planets": {},
+      "space": {
+        "sardakk": [
+          {
+            "count": 1,
+            "entityId": "ca",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          }
+        ]
+      }
+    },
+    "308": {
+      "anomaly": true,
+      "planets": {
+        "everra": {
+          "controlledBy": "sol",
+          "entities": {}
+        }
+      },
+      "space": {
+        "cabal": [
+          {
+            "count": 1,
+            "entityId": "dd",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          }
+        ]
+      }
+    },
+    "309": {
+      "anomaly": false,
+      "planets": {},
+      "space": {
+        "neutral": [
+          {
+            "count": 1,
+            "entityId": "ionbeta",
+            "entityType": "token",
+            "sustained": null,
+            "unitStates": null
+          }
+        ]
+      }
+    },
+    "314": {
+      "anomaly": true,
+      "planets": {},
+      "space": {
+        "neutral": [
+          {
+            "count": 1,
+            "entityId": "frontier",
+            "entityType": "token",
+            "sustained": null,
+            "unitStates": null
+          }
+        ]
+      }
+    },
+    "316": {
+      "anomaly": true,
+      "planets": {
+        "ordinian": {
+          "controlledBy": "bastion",
+          "entities": {
+            "bastion": [
+              {
+                "count": 1,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              },
+              {
+                "count": 1,
+                "entityId": "sd",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              }
+            ],
+            "neutral": [
+              {
+                "count": 1,
+                "entityId": "helios2",
+                "entityType": "attachment",
+                "sustained": null,
+                "unitStates": null
+              }
+            ]
+          }
+        },
+        "revelation": {
+          "controlledBy": "bastion",
+          "entities": {}
+        }
+      },
+      "space": {
+        "bastion": [
+          {
+            "count": 1,
+            "entityId": "ff",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          }
+        ]
+      }
+    },
+    "317": {
+      "anomaly": false,
+      "planets": {
+        "hercalor": {
+          "controlledBy": "bastion",
+          "entities": {
+            "bastion": [
+              {
+                "count": 3,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [3, 0, 0, 0]
+              },
+              {
+                "count": 1,
+                "entityId": "sd",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              },
+              {
+                "count": 1,
+                "entityId": "mf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [0, 0, 1, 0]
+              }
+            ],
+            "neutral": [
+              {
+                "count": 1,
+                "entityId": "biotic",
+                "entityType": "attachment",
+                "sustained": null,
+                "unitStates": null
+              },
+              {
+                "count": 1,
+                "entityId": "helios2",
+                "entityType": "attachment",
+                "sustained": null,
+                "unitStates": null
+              }
+            ]
+          }
+        },
+        "tiamat": {
+          "controlledBy": "bastion",
+          "entities": {}
+        }
+      },
+      "space": {
+        "bastion": [
+          {
+            "count": 1,
+            "entityId": "ca",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          }
+        ]
+      }
+    },
+    "frac4": {
+      "anomaly": false,
+      "planets": {
+        "styx": {
+          "controlledBy": "cabal",
+          "entities": {
+            "cabal": [
+              {
+                "count": 2,
+                "entityId": "mf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [2, 0, 0, 0]
+              },
+              {
+                "count": 1,
+                "entityId": "pd",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              }
+            ],
+            "deepwrought": [
+              {
+                "count": 1,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              }
+            ]
+          }
+        }
+      },
+      "space": {
+        "cabal": [
+          {
+            "count": 1,
+            "entityId": "ws",
+            "entityType": "unit",
+            "sustained": 1,
+            "unitStates": [0, 1, 0, 0]
+          },
+          {
+            "count": 2,
+            "entityId": "ca",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [2, 0, 0, 0]
+          },
+          {
+            "count": 3,
+            "entityId": "ff",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [3, 0, 0, 0]
+          }
+        ]
+      }
+    },
+    "tl": {
+      "anomaly": false,
+      "planets": {
+        "lockedmallice": {
+          "controlledBy": null,
+          "entities": {}
+        }
+      },
+      "space": {}
+    }
+  },
+  "versionSchema": 7
+}

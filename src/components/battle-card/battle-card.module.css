@@ -5,9 +5,22 @@
 }
 
 .systemToggle {
-  display: flex;
-  justify-content: center;
+  display: grid;
+  place-items: center center;
   margin-bottom: var(--space-4);
+
+  /* Keeps the system toggle centred no matter what sits beside it. */
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-areas: '. toggle actions';
+}
+
+.systemToggle > :first-child {
+  grid-area: toggle;
+}
+
+.topActions {
+  grid-area: actions;
+  justify-self: end;
 }
 
 .header {
