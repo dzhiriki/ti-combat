@@ -10,6 +10,7 @@ const UNIT_LIST = {
 }
 
 export default buildCombatState({
+  system: 'TI4',
   mode: 'SPACE',
   attacker: {
     faction: 'ARBOREC',

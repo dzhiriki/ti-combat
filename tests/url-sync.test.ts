@@ -16,6 +16,7 @@ const abilityLookup = buildAbilityLookup(getAllAbilities())
 function baseConfig(): SerializedConfig {
   return {
     v: 1,
+    g: 'TI4',
     af: 'ARBOREC',
     df: 'ARBOREC',
     m: 'S',
@@ -27,6 +28,32 @@ function baseConfig(): SerializedConfig {
 }
 
 describe('URL round-trip', () => {
+  it.each([
+    ['ARBOREC', 'NEUTRAL', 'TI4'],
+    ['AVARICE_REX', 'NEUTRAL', 'TF'],
+    ['NEUTRAL', 'AVARICE_REX', 'TF'],
+    ['NEUTRAL', 'NEUTRAL', 'TI4'],
+  ])('restores legacy %s vs %s links as %s', (af, df, system) => {
+    const raw = searchParamsToConfig(
+      `?v=1&af=${af}&df=${df}&m=S`,
+      abilityLookup,
+    )
+    expect(raw).not.toHaveProperty('g')
+    const result = validateSerializedConfig(raw, abilityLookup)
+    expect(result.config.g).toBe(system)
+    expect(result.warnings).toEqual([])
+  })
+
+  it('does not treat an explicitly empty URL system as a legacy link', () => {
+    const raw = searchParamsToConfig(
+      '?v=1&g=&af=AVARICE_REX&df=NEUTRAL&m=S',
+      abilityLookup,
+    )
+    const result = validateSerializedConfig(raw, abilityLookup)
+    expect(result.config.g).toBe('TI4')
+    expect(result.warnings).toContain('Invalid game system reset to TI4')
+  })
+
   it('round-trips UnitList<number> tuple arrays', () => {
     const galvanizedUnits = [
       ['SPACE_DOCK', 0],

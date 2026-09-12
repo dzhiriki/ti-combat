@@ -134,23 +134,23 @@ export function CombatSimulator({
     })
 
   const attackerConfig = useMemo(
-    () => getUnitConfig(attackerFaction),
-    [attackerFaction],
+    () => getUnitConfig(system, attackerFaction),
+    [system, attackerFaction],
   )
   const defenderConfig = useMemo(
-    () => getUnitConfig(defenderFaction),
-    [defenderFaction],
+    () => getUnitConfig(system, defenderFaction),
+    [system, defenderFaction],
   )
 
   const attackerAbilities = useMemo(
     () => getAvailableAbilities('attacker'),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [attackerFaction],
+    [system, attackerFaction],
   )
   const defenderAbilities = useMemo(
     () => getAvailableAbilities('defender'),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [defenderFaction],
+    [system, defenderFaction],
   )
 
   const attackerReadContext = useMemo(

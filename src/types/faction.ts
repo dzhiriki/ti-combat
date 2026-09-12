@@ -8,7 +8,7 @@ import type { UnitBaseType, UnitDefinition, UnitDefinitionInput } from './unit'
 // (Prophecy of Kings, Codices, Thunder's Edge). Twilight's Fall is a
 // separate ruleset with its own faction roster and unit set. Each system
 // has its own data module: `src/data/main` and `src/data/tf`.
-export type GameSystem = 'TI4' | 'TWILIGHTS_FALL'
+export type GameSystem = 'TI4' | 'TF'
 
 export interface FactionAbilities {
   faction?: readonly Ability[]

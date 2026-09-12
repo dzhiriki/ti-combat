@@ -170,6 +170,7 @@ describe('loadConfig', () => {
     const setup = new CombatSetup()
     const config: SerializedConfig = {
       v: 1,
+      g: 'TI4',
       af: setup.attackerFaction,
       df: setup.defenderFaction,
       m: 'S',

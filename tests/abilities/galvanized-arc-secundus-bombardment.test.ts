@@ -11,6 +11,7 @@ function summarizeOutcomes(attackerGalvanized: boolean): {
   draw: number
 } {
   const state = buildCombatState({
+    system: 'TI4',
     mode: 'GROUND',
     attacker: {
       faction: 'BARONY_OF_LETNEV',

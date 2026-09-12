@@ -4,7 +4,7 @@ import type { GameData, GameSystem } from '@/types'
 
 const DATA_BY_SYSTEM: Record<GameSystem, GameData> = {
   TI4: main,
-  TWILIGHTS_FALL: tf,
+  TF: tf,
 }
 
 /** The data module (factions, generic units, shared ability pool) for a game

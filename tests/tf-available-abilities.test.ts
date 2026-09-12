@@ -11,11 +11,7 @@ import { combatTest } from './utils/combat-test'
 
 describe("Twilight's Fall available abilities", () => {
   it('hides Galvanized Units — there is no Galvanize mechanic in TF', () => {
-    const regs = getAvailableAbilities(
-      'TWILIGHTS_FALL',
-      'attacker',
-      'AVARICE_REX',
-    )
+    const regs = getAvailableAbilities('TF', 'attacker', 'AVARICE_REX')
     expect(regs.some(r => r.ability.key === 'PRE_GALVANIZED')).toBe(false)
     // Sanity: the GENERAL slot itself and the ADVANCED phase drivers stay.
     expect(regs.some(r => r.slot === 'GENERAL')).toBe(true)
@@ -31,7 +27,7 @@ describe("Twilight's Fall available abilities", () => {
 
   it('Temporal Command Suite offers every genome, Clever Genome included', () => {
     const setup = new CombatSetup()
-    setup.setSystem('TWILIGHTS_FALL')
+    setup.setSystem('TF')
     setup.setFaction('attacker', 'AVARICE_REX')
     const tcs = setup
       .getAvailableAbilities('attacker')
@@ -53,11 +49,7 @@ describe("Twilight's Fall available abilities", () => {
   })
 
   it('lists TF abilities and genomes alphabetically', () => {
-    const regs = getAvailableAbilities(
-      'TWILIGHTS_FALL',
-      'attacker',
-      'AVARICE_REX',
-    )
+    const regs = getAvailableAbilities('TF', 'attacker', 'AVARICE_REX')
     const names = (slot: string) =>
       regs.filter(r => r.slot === slot).map(r => r.ability.name)
     const sorted = (arr: string[]) =>
@@ -67,11 +59,7 @@ describe("Twilight's Fall available abilities", () => {
   })
 
   it("lists TF unit upgrades in the UI's unit order, alphabetical within type", () => {
-    const regs = getAvailableAbilities(
-      'TWILIGHTS_FALL',
-      'attacker',
-      'AVARICE_REX',
-    )
+    const regs = getAvailableAbilities('TF', 'attacker', 'AVARICE_REX')
     const upgrades = regs.filter(r => r.slot === 'TF_UNIT_UPGRADE')
     // Non-mech cards carry their unit type in the exclusive group; mechs
     // (the stacking cards) have none.
@@ -102,11 +90,7 @@ describe("Twilight's Fall available abilities", () => {
   })
 
   it('tags every TF unit upgrade with its unit type as the panel sub-header', () => {
-    const regs = getAvailableAbilities(
-      'TWILIGHTS_FALL',
-      'attacker',
-      'AVARICE_REX',
-    )
+    const regs = getAvailableAbilities('TF', 'attacker', 'AVARICE_REX')
     const upgrades = regs.filter(r => r.slot === 'TF_UNIT_UPGRADE')
     const typeOf = (r: (typeof upgrades)[number]) =>
       r.ability.exclusiveGroup?.replace('TF_UNIT_UPGRADE_', '') ?? 'MECH'
@@ -132,7 +116,7 @@ describe("Twilight's Fall available abilities", () => {
   })
 
   it('neutral in a TF session matches the TF slot layout', () => {
-    const regs = getAvailableAbilities('TWILIGHTS_FALL', 'attacker', 'NEUTRAL')
+    const regs = getAvailableAbilities('TF', 'attacker', 'NEUTRAL')
     // No OTHER catch-all, no Galvanize, no TI4 agent pool.
     expect(regs.some(r => r.slot === 'OTHER')).toBe(false)
     expect(regs.some(r => r.ability.key === 'PRE_GALVANIZED')).toBe(false)
@@ -191,7 +175,7 @@ describe("Twilight's Fall available abilities", () => {
 
   it('Il Na Viroset mechs appear in the space assign-hits and sustain lists', () => {
     const setup = new CombatSetup()
-    setup.setSystem('TWILIGHTS_FALL')
+    setup.setSystem('TF')
     setup.setFaction('attacker', 'IL_NA_VIROSET')
 
     const config = setup.abilities.attacker
@@ -224,11 +208,7 @@ describe("Twilight's Fall available abilities", () => {
   })
 
   it('every TF ability, genome, paradigm, and unit upgrade carries its faction logo', () => {
-    const regs = getAvailableAbilities(
-      'TWILIGHTS_FALL',
-      'attacker',
-      'AVARICE_REX',
-    )
+    const regs = getAvailableAbilities('TF', 'attacker', 'AVARICE_REX')
     for (const slot of [
       'TF_ABILITY',
       'TF_GENOME',
@@ -253,7 +233,7 @@ describe("Twilight's Fall unit-upgrade exclusivity", () => {
     isEnabled: (key: string) => boolean
   } {
     const setup = new CombatSetup()
-    setup.setSystem('TWILIGHTS_FALL')
+    setup.setSystem('TF')
     return {
       setup,
       enable: key =>

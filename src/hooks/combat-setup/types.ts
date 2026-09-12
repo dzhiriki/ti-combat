@@ -3,11 +3,13 @@ import type { Precision } from '@/hooks/use-settings'
 import type {
   CombatSide,
   FactionKey,
+  GameSystem,
   UnitBaseType,
   UnitSelection,
 } from '@/types'
 
 export interface SimulationInput {
+  system: GameSystem
   attackerFaction: FactionKey
   defenderFaction: FactionKey
   attackerSelections: Record<UnitBaseType, UnitSelection>

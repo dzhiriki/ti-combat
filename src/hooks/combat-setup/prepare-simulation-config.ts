@@ -1,6 +1,5 @@
 import { createLookups } from '@/combat'
 import type { CombatSide, FactionKey, GameSystem } from '@/types'
-import { getFactionSystem } from '@/utils/get-faction-system'
 
 import type {
   Ability,
@@ -41,6 +40,7 @@ interface SideAbilitiesData {
 }
 
 export function prepareSimulationConfig(
+  system: GameSystem,
   config: Record<CombatSide, SideAbilitiesConfig>,
   attackerFaction: FactionKey,
   defenderFaction: FactionKey,
@@ -54,14 +54,6 @@ export function prepareSimulationConfig(
     ability,
     slot: 'OTHER',
   }))
-  // Both sides always share a game system. Neutral exists in every system,
-  // so derive it from whichever side is non-neutral (mirrors the shared-link
-  // restore logic in combat-setup.ts); all-neutral defaults to TI4.
-  const system: GameSystem =
-    getFactionSystem(attackerFaction) === 'TWILIGHTS_FALL' ||
-    getFactionSystem(defenderFaction) === 'TWILIGHTS_FALL'
-      ? 'TWILIGHTS_FALL'
-      : 'TI4'
   const registered: Record<CombatSide, RegisteredAbility[]> = {
     attacker: [
       ...getAvailableAbilities(system, 'attacker', attackerFaction),
@@ -117,13 +109,13 @@ export function prepareSimulationConfig(
   return {
     attacker: {
       registered: registered.attacker,
-      unitAbilityKeys: getUnitDefinitionAbilityKeys(attackerFaction),
-      factionOwnedKeys: getFactionOwnedAbilityKeys(attackerFaction),
+      unitAbilityKeys: getUnitDefinitionAbilityKeys(system, attackerFaction),
+      factionOwnedKeys: getFactionOwnedAbilityKeys(system, attackerFaction),
     },
     defender: {
       registered: registered.defender,
-      unitAbilityKeys: getUnitDefinitionAbilityKeys(defenderFaction),
-      factionOwnedKeys: getFactionOwnedAbilityKeys(defenderFaction),
+      unitAbilityKeys: getUnitDefinitionAbilityKeys(system, defenderFaction),
+      factionOwnedKeys: getFactionOwnedAbilityKeys(system, defenderFaction),
     },
   }
 }

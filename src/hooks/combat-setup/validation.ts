@@ -2,19 +2,16 @@ import { z } from 'zod/mini'
 
 import { type Ability, extractDefaults } from '@/combat'
 import { UNIT_LIMITS, UNIT_TYPES } from '@/constants/units'
-import * as main from '@/data/main'
-import * as tf from '@/data/tf'
+import type { GameSystem } from '@/types'
+import {
+  DEFAULT_FACTION_BY_SYSTEM,
+  GAME_SYSTEMS,
+} from '@/utils/get-faction-system'
+import { getGameData } from '@/utils/get-game-data'
 
 import type { SerializedConfig } from './serialization'
 
-// TI4 first so the fallback faction is TI4's default.
-const factionKeySet = new Set<string>([
-  ...Object.keys(main.factions),
-  ...Object.keys(tf.factions),
-])
-const factionKeys = [...factionKeySet]
 const unitTypeSet = new Set<string>(UNIT_TYPES)
-const defaultFaction = factionKeys[0]
 
 const baseAbilitySchema = z.object({
   isEnabled: z.optional(z.boolean()),
@@ -45,17 +42,39 @@ export function validateSerializedConfig(
   // Version
   const v = 1 as const
 
-  // Factions
-  let af = String(raw.af ?? '')
-  if (!factionKeySet.has(af)) {
-    warnings.push(`Unknown faction "${af}" reset to default`)
-    af = defaultFaction
+  // Only legacy links (without a system) infer it from factions. An explicit
+  // system is authoritative, including when both sides are Neutral.
+  let system: GameSystem = 'TI4'
+  if (raw.g === undefined) {
+    for (const key of [raw.af, raw.df]) {
+      if (typeof key !== 'string' || key === 'NEUTRAL') continue
+      const inferred = GAME_SYSTEMS.find(s =>
+        Object.hasOwn(getGameData(s).factions, key),
+      )
+      if (inferred) {
+        system = inferred
+        break
+      }
+    }
+  } else if (raw.g === 'TF' || raw.g === 'TI4') {
+    system = raw.g
+  } else {
+    warnings.push('Invalid game system reset to TI4')
   }
-  let df = String(raw.df ?? '')
-  if (!factionKeySet.has(df)) {
-    warnings.push(`Unknown faction "${df}" reset to default`)
-    df = defaultFaction
+
+  // Factions must belong to the selected system. Validate after inference so
+  // an unknown legacy attacker doesn't hide a valid TF defender.
+  const factions = getGameData(system).factions
+  const validateFaction = (rawKey: unknown): string => {
+    const key = String(rawKey ?? '')
+    if (Object.hasOwn(factions, key)) return key
+    warnings.push(
+      `Faction "${key}" is not available in ${system}, reset to default`,
+    )
+    return DEFAULT_FACTION_BY_SYSTEM[system]
   }
+  const af = validateFaction(raw.af)
+  const df = validateFaction(raw.df)
 
   // Combat mode
   let m: 'S' | 'G' = 'S'
@@ -74,7 +93,7 @@ export function validateSerializedConfig(
   const da = validateAbilities(raw.da, abilityLookup, warnings)
 
   return {
-    config: { v, af, df, m, au, du, aa, da } as SerializedConfig,
+    config: { v, g: system, af, df, m, au, du, aa, da },
     warnings,
   }
 }

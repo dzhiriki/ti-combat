@@ -31,6 +31,7 @@ const switcher: Ability<{ mode: string }> = {
 describe('function-valued invoke', () => {
   it('is re-resolved when a param changes', () => {
     const state = buildCombatState({
+      system: 'TI4',
       mode: 'SPACE',
       attacker: {
         faction: 'NEUTRAL',
@@ -61,6 +62,7 @@ describe('function-valued invoke', () => {
       invoke: () => [],
     }
     const state = buildCombatState({
+      system: 'TI4',
       mode: 'SPACE',
       attacker: {
         faction: 'NEUTRAL',

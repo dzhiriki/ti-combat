@@ -24,6 +24,74 @@ describe('validateSerializedConfig', () => {
     expect(result.config).toEqual(config)
   })
 
+  it.each([
+    ['ARBOREC', 'ARGENT_FLIGHT', 'TI4', 'ARBOREC', 'ARGENT_FLIGHT'],
+    ['AVARICE_REX', 'NEUTRAL', 'TF', 'AVARICE_REX', 'NEUTRAL'],
+    ['NEUTRAL', 'AVARICE_REX', 'TF', 'NEUTRAL', 'AVARICE_REX'],
+    ['NEUTRAL', 'NEUTRAL', 'TI4', 'NEUTRAL', 'NEUTRAL'],
+    ['UNKNOWN', 'AVARICE_REX', 'TF', 'AVARICE_REX', 'AVARICE_REX'],
+    ['AVARICE_REX', 'ARBOREC', 'TF', 'AVARICE_REX', 'AVARICE_REX'],
+    ['ARBOREC', 'AVARICE_REX', 'TI4', 'ARBOREC', 'ARBOREC'],
+  ])(
+    'migrates legacy %s vs %s to %s',
+    (af, df, system, expectedAf, expectedDf) => {
+      const legacy: Record<string, unknown> = { ...makeValidConfig(), af, df }
+      delete legacy.g
+      const result = validateSerializedConfig(legacy, abilityLookup)
+      expect(result.config.g).toBe(system)
+      expect(result.config.af).toBe(expectedAf)
+      expect(result.config.df).toBe(expectedDf)
+      expect(result.warnings.length).toBe(
+        Number(af !== expectedAf) + Number(df !== expectedDf),
+      )
+    },
+  )
+
+  it.each([
+    ['TI4', 'AVARICE_REX', 'ARBOREC'],
+    ['TF', 'ARBOREC', 'AVARICE_REX'],
+  ])(
+    'treats explicit %s as authoritative over faction %s',
+    (system, af, expectedAf) => {
+      const result = validateSerializedConfig(
+        { ...makeValidConfig(), g: system, af, df: 'NEUTRAL' },
+        abilityLookup,
+      )
+      expect(result.config.g).toBe(system)
+      expect(result.config.af).toBe(expectedAf)
+      expect(result.config.df).toBe('NEUTRAL')
+      expect(result.warnings).toEqual([
+        `Faction "${af}" is not available in ${system}, reset to default`,
+      ])
+    },
+  )
+
+  it.each(['UNKNOWN', '', null, 42])(
+    'warns for invalid explicit system %s',
+    system => {
+      const result = validateSerializedConfig(
+        { ...makeValidConfig(), g: system, af: 'AVARICE_REX' },
+        abilityLookup,
+      )
+      // Invalid explicit systems reset to TI4; only missing systems infer TF.
+      expect(result.config.g).toBe('TI4')
+      expect(result.config.af).toBe('ARBOREC')
+      expect(result.warnings).toContain('Invalid game system reset to TI4')
+    },
+  )
+
+  it.each(['UNKNOWN', 'toString', '__proto__'])(
+    'resets unknown TF faction %s to its system default',
+    af => {
+      const result = validateSerializedConfig(
+        { ...makeValidConfig(), g: 'TF', af, df: 'NEUTRAL' },
+        abilityLookup,
+      )
+      expect(result.config.af).toBe('AVARICE_REX')
+      expect(result.warnings).toHaveLength(1)
+    },
+  )
+
   it('resets unknown faction to default', () => {
     const config = { ...makeValidConfig(), af: 'NONEXISTENT_FACTION' }
     const result = validateSerializedConfig(config, abilityLookup)
@@ -72,6 +140,7 @@ describe('validateSerializedConfig', () => {
     // restore doesn't drop them with an "Unknown ability" warning.
     const config: SerializedConfig = {
       v: 1,
+      g: 'TI4',
       af: 'BARONY_OF_LETNEV',
       df: 'ARBOREC',
       m: 'S',
@@ -111,7 +180,7 @@ describe('validateSerializedConfig', () => {
   // refresh ("Unknown ability skipped").
   it("keeps Twilight's Fall shared-deck abilities across a save/load round-trip", () => {
     const setup = new CombatSetup()
-    setup.setSystem('TWILIGHTS_FALL')
+    setup.setSystem('TF')
     setup.setUnitCount('attacker', 'CRUISER', 1)
     setup.setUnitCount('defender', 'CRUISER', 1)
     setup.setAbilityParam('attacker', 'TF_HARDLIGHT', {

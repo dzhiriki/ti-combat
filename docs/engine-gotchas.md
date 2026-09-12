@@ -14,8 +14,8 @@ a check there too.
 
 - **One invoke per (ability, timing).** A second invoke with the same timing
   on one ability is silently skipped. Compose extra work into the single
-  invoke instead (see `onPrepare` in
-  `src/data/tf/abilities/unit-upgrade/create-tf-unit-upgrade.ts`, added for Hel-Titan).
+  invoke instead (see `src/data/tf/abilities/unit-upgrade/pds/hel-titan.ts`,
+  which calls its stats invoke and restores ground participation in one PREPARE).
 
 - **The engine must never import from `src/data`.** The data barrels
   (`src/data/main`, `src/data/tf`, `src/data`) evaluate every ability at
@@ -54,18 +54,28 @@ a check there too.
   never mention it. Gate such abilities with
   `isCallable: (_p, ctx) => ctx.unitSource !== undefined`.
 
+- **`modifyUnitType` shallowly assigns native stats.** Supplying
+  `UNIT_ABILITIES` replaces the whole map; it does not merge individual flags
+  with the existing map. The same applies to `ABILITIES`. Fixed upgrade cards
+  must list their complete unit-ability block (including `{}` when clearing
+  it); relative modifiers must spread the current map when preserving it.
+  `createStatsInvoke` deliberately preserves this behavior (see
+  `tests/engine/create-stats-invoke.test.ts`).
+
 - **Abilities attached to unit stats during PREPARE are too late for their
   own PREPARE invokes.** `modifyUnitType(..., { ABILITIES: [...] })` inside a
   PREPARE cannot add another PREPARE-timed ability for this combat. Do the
   work directly in the attaching ability's PREPARE instead (see the TF war
   sun upgrades stripping Planetary Shield 2RAM-style in
-  `create-tf-unit-upgrade.ts`).
+  `src/data/tf/abilities/unit-upgrade/war-sun/prototype-war-sun.ts`).
 
 - **Finite `uses` bills and gates EVERY non-system invoke — including a
   card's PREPARE.** A stat-upgrade card with a finite-uses active ability
   (TF Exotrireme) must mark its PREPARE `system: true`, or the stat
   application burns a use at PREPARE and stops applying entirely once
-  `uses` reaches 0 (see `create-tf-unit-upgrade.ts`).
+  `uses` reaches 0. `createStatsInvoke` (`src/utils/create-stats-invoke.ts`)
+  marks native stat applications as system invokes; custom PREPARE handlers
+  must retain that flag (see TF Exotrireme and Hel-Titan).
 
 - **System invokes skip dispatch-time `uses` gating.** Invokes on timings
   like `REROLL_DICE_ROLL` (whose billing is deferred to the kernel) fire
@@ -199,6 +209,16 @@ a check there too.
   untouched (see `tests/engine/space-combat-winner-participation.test.ts`).
 
 ## Reconcile and config
+
+- **The session's game system cannot be inferred from its factions.** Neutral
+  exists in both systems; TF Neutral vs Neutral still needs TF genomes and
+  must not acquire TI4 mechanics. Pass `system` through setup, simulation input,
+  and data lookups; serialize it as `g=TI4` or `g=TF`. Only URL validation infers
+  it for legacy links without the field (first recognized non-neutral faction, otherwise
+  TI4); explicit systems validate both factions against their own roster.
+  The `combatTest` shorthand also infers a default for existing tests, but
+  all-neutral TF tests must set `system: 'TF'` explicitly. See
+  `tests/game-system.test.ts` for URL and worker regression coverage.
 
 - **`resetSettingsToBase` intentionally does NOT re-apply
   `declareParamChange`.** The asymmetry with `resetBaseGroups` is
@@ -340,7 +360,9 @@ a check there too.
   when appending**, and remember `unwrapUnitListKeys` decides tuple-ness
   from the FIRST entry.
 
-- **Watch for import cycles between faction modules and shared decks.**
-  E.g. the TF unit-upgrade deck imports card invokes that import Janovet's
-  helper, which reads the deck's configs — compute config-derived constants
-  lazily, never at module-evaluation time (see `faces-of-janovet.ts`).
+- **Inherit printed upgrade stats, not runtime unit stats.** TF Janovet reads
+  the native stat blocks exposed by `createStatsInvoke` through the runtime
+  `TF_UNIT_UPGRADE` lookup (`isStatsInvoke` narrows the tagged entries). Reading
+  `getUnitStats` instead would also copy unrelated PREPARE modifiers. Keep
+  shared text helpers independent of faction/deck modules to avoid import
+  cycles (see `faces-of-janovet.ts` and `janovet-inherits.ts`).

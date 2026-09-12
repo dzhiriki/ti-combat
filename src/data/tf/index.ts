@@ -66,7 +66,7 @@ export const abilities: readonly RegisteredAbility[] = [
 ]
 
 export const factions = resolveFactions(
-  'TWILIGHTS_FALL',
+  'TF',
   // base-units' literal COMBAT: number[] doesn't structurally match
   // DiceGroup's tuple type, so the cast needs an `unknown` bridge.
   baseUnits as unknown as Readonly<Record<string, UnitDefinition>>,

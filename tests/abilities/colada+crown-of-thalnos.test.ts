@@ -21,7 +21,7 @@ describe('TF_COLADA + CROWN_OF_THALNOS', () => {
           CROWN_OF_THALNOS: { isEnabled: true, safeReroll: true },
         },
       },
-      defender: { faction: 'ARBOREC', units: { CARRIER: 1 } },
+      defender: { faction: 'AVARICE_REX', units: { CARRIER: 1 } },
     })
 
     const branches = t.advance()
@@ -47,7 +47,7 @@ describe('TF_COLADA + CROWN_OF_THALNOS', () => {
           CROWN_OF_THALNOS: { isEnabled: true, safeReroll: true },
         },
       },
-      defender: { faction: 'ARBOREC', units: { INFANTRY: 1 } },
+      defender: { faction: 'AVARICE_REX', units: { INFANTRY: 1 } },
     })
 
     const branches = t.advance()

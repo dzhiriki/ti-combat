@@ -151,7 +151,7 @@ interface DisplayedEntry {
 function collectDisplayed(): DisplayedEntry[] {
   const bySystem: Record<GameSystem, FactionKey[]> = {
     TI4: getFactionKeysBySystem('TI4'),
-    TWILIGHTS_FALL: getFactionKeysBySystem('TWILIGHTS_FALL'),
+    TF: getFactionKeysBySystem('TF'),
   }
 
   const seen = new Set<Ability>()

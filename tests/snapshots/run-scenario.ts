@@ -107,6 +107,7 @@ function resolveSide(config: ScenarioSideConfig): SideConfig {
 
 export function runScenario(config: ScenarioConfig): FormattedOutcome[] {
   const state = buildCombatState({
+    system: 'TI4',
     mode: config.mode,
     attacker: resolveSide(config.attacker),
     defender: resolveSide(config.defender),

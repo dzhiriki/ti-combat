@@ -38,6 +38,7 @@ describe('declare hooks receive the lookup context', () => {
     }
 
     buildCombatState({
+      system: 'TI4',
       mode: 'SPACE',
       attacker: {
         faction: 'NOMAD',

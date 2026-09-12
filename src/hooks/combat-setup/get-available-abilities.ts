@@ -11,7 +11,6 @@ import type {
 } from '@/types'
 import { getFaction } from '@/utils/get-faction'
 import { getFactionUnitConfig } from '@/utils/get-faction-unit-config'
-import { getGameData } from '@/utils/get-game-data'
 import { getEffectiveStats } from '@/utils/get-simulation-units'
 
 import type {
@@ -115,7 +114,7 @@ const registeredBySystem: Record<GameSystem, readonly RegisteredAbility[]> = {
     ...tag(allCommanderAbilities, 'COMMANDER'),
     ...allExternalAbilities,
   ],
-  TWILIGHTS_FALL: tf.abilities,
+  TF: tf.abilities,
 }
 
 const allUnitAbilities: Ability[] = []
@@ -229,7 +228,7 @@ function collectUnitAbilities(
   return out
 }
 
-const unitDefAbilityKeysCache = new Map<FactionKey, ReadonlySet<string>>()
+const unitDefAbilityKeysCache = new Map<string, ReadonlySet<string>>()
 
 /** Get keys of all abilities defined on faction units (regardless of unit state).
  *  Uses the merged faction unit config (faction overrides + base units), so
@@ -237,12 +236,14 @@ const unitDefAbilityKeysCache = new Map<FactionKey, ReadonlySet<string>>()
  *  from base units are included even when the faction doesn't override the
  *  corresponding unit type. */
 export function getUnitDefinitionAbilityKeys(
+  system: GameSystem,
   factionKey: FactionKey,
 ): ReadonlySet<string> {
-  const cached = unitDefAbilityKeysCache.get(factionKey)
+  const cacheKey = `${system}:${factionKey}`
+  const cached = unitDefAbilityKeysCache.get(cacheKey)
   if (cached) return cached
   const keys = new Set<string>()
-  const mergedUnits = getFactionUnitConfig(factionKey)
+  const mergedUnits = getFactionUnitConfig(system, factionKey)
   for (const unitDef of Object.values(mergedUnits)) {
     if (!unitDef?.BASE) continue
     for (const ability of [
@@ -256,19 +257,21 @@ export function getUnitDefinitionAbilityKeys(
       if (deploy) keys.add(deploy.key)
     }
   }
-  unitDefAbilityKeysCache.set(factionKey, keys)
+  unitDefAbilityKeysCache.set(cacheKey, keys)
   return keys
 }
 
-const factionOwnedKeysCache = new Map<FactionKey, ReadonlySet<string>>()
+const factionOwnedKeysCache = new Map<string, ReadonlySet<string>>()
 
 export function getFactionOwnedAbilityKeys(
+  system: GameSystem,
   factionKey: FactionKey,
 ): ReadonlySet<string> {
-  const cached = factionOwnedKeysCache.get(factionKey)
+  const cacheKey = `${system}:${factionKey}`
+  const cached = factionOwnedKeysCache.get(cacheKey)
   if (cached) return cached
-  const keys = new Set(getUnitDefinitionAbilityKeys(factionKey))
-  const faction = getFaction(factionKey)
+  const keys = new Set(getUnitDefinitionAbilityKeys(system, factionKey))
+  const faction = getFaction(system, factionKey)
   if (faction.abilities) {
     const a = faction.abilities
     for (const list of Object.values(a)) {
@@ -277,7 +280,7 @@ export function getFactionOwnedAbilityKeys(
       }
     }
   }
-  factionOwnedKeysCache.set(factionKey, keys)
+  factionOwnedKeysCache.set(cacheKey, keys)
   return keys
 }
 
@@ -288,10 +291,8 @@ export function getAvailableAbilities(
   upgradedTypes?: ReadonlySet<UnitBaseType>,
 ): RegisteredAbility[] {
   const isNeutral = factionKey === 'NEUTRAL'
-  const faction = getGameData(system).factions[factionKey] as
-    | Faction
-    | undefined
-  const ownedKeys = getFactionOwnedAbilityKeys(factionKey)
+  const faction = getFaction(system, factionKey)
+  const ownedKeys = getFactionOwnedAbilityKeys(system, factionKey)
 
   const base: RegisteredAbility[] = registeredBySystem[system].filter(reg => {
     const a = reg.ability
@@ -308,7 +309,7 @@ export function getAvailableAbilities(
   })
 
   const factionAbilities: RegisteredAbility[] = []
-  if (faction?.abilities) {
+  if (faction.abilities) {
     for (const [key, list] of Object.entries(faction.abilities) as [
       keyof typeof FACTION_KEY_TO_SLOT,
       Ability[] | undefined,
@@ -330,9 +331,7 @@ export function getAvailableAbilities(
     }
   }
 
-  const unitAbilities = faction
-    ? collectUnitAbilities(faction, side, upgradedTypes)
-    : []
+  const unitAbilities = collectUnitAbilities(faction, side, upgradedTypes)
 
   return [...base, ...factionAbilities, ...unitAbilities]
 }

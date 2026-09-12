@@ -24,6 +24,7 @@ import { combatTest } from '../utils/combat-test'
 // roll, since rerolling those would lower expected hits-on-Bastion).
 
 const baseConfig: CombatStateConfig = {
+  system: 'TI4',
   mode: 'GROUND',
   attacker: {
     faction: 'LAST_BASTION',

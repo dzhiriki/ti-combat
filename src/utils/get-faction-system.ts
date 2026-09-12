@@ -3,17 +3,17 @@ import type { FactionKey, GameSystem } from '@/types'
 
 import { getGameData } from './get-game-data'
 
-export const GAME_SYSTEMS: readonly GameSystem[] = ['TI4', 'TWILIGHTS_FALL']
+export const GAME_SYSTEMS: readonly GameSystem[] = ['TI4', 'TF']
 
 export const GAME_SYSTEM_LABELS: Record<GameSystem, string> = {
   TI4: 'Twilight Imperium',
-  TWILIGHTS_FALL: "Twilight's Fall",
+  TF: "Twilight's Fall",
 }
 
 /** The game system a faction belongs to — the data module that defines it.
  *  Neutral exists in every system and resolves to TI4. */
 export function getFactionSystem(factionKey: FactionKey): GameSystem {
-  return factionKey in main.factions ? 'TI4' : 'TWILIGHTS_FALL'
+  return factionKey in main.factions ? 'TI4' : 'TF'
 }
 
 /** Faction keys offered in a given system, in registry order. */

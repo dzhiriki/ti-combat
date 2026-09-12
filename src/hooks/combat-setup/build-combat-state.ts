@@ -2,6 +2,7 @@ import { makeVariantId } from '@/combat'
 import type { DeclaredSubtype } from '@/combat/abilities-engine/types'
 import type {
   FactionKey,
+  GameSystem,
   UnitBaseType,
   UnitIdList,
   UnitState,
@@ -34,6 +35,7 @@ export interface SideConfig {
 }
 
 export interface CombatStateConfig {
+  system: GameSystem
   mode: CombatMode
   attacker: SideConfig
   defender: SideConfig
@@ -53,6 +55,7 @@ export interface CombatStateConfig {
 // ============================================================================
 
 function buildSideState(
+  system: GameSystem,
   config: SideConfig,
   abilities: SideAbilitiesConfig,
   gen: { _nextCode?: number },
@@ -63,7 +66,7 @@ function buildSideState(
   const unitState: Record<string, UnitState> = {}
   const unitStats: Record<string, UnitStats> = {}
 
-  const factionConfig = getFactionUnitConfig(config.faction)
+  const factionConfig = getFactionUnitConfig(system, config.faction)
 
   for (const [type, count] of Object.entries(config.units)) {
     const unitType_ = type as UnitBaseType
@@ -99,7 +102,7 @@ function buildSideState(
   const declaredSubtypes = settings?.subtypes ?? []
 
   const baseUnitStats: Record<string, UnitStatsEntry> = {
-    ...buildUnitStatsMap(config.faction, upgradedSet),
+    ...buildUnitStatsMap(system, config.faction, upgradedSet),
     ...unitStats,
   }
 
@@ -153,6 +156,7 @@ export function buildCombatState(config: CombatStateConfig): CombatState {
   }
 
   const sideAbilities = prepareSimulationConfig(
+    config.system,
     abilitiesConfig,
     config.attacker.faction,
     config.defender.faction,
@@ -162,11 +166,13 @@ export function buildCombatState(config: CombatStateConfig): CombatState {
 
   const gen: { _nextCode?: number } = {}
   const attackerSide = buildSideState(
+    config.system,
     config.attacker,
     abilitiesConfig.attacker,
     gen,
   )
   const defenderSide = buildSideState(
+    config.system,
     config.defender,
     abilitiesConfig.defender,
     gen,

@@ -22,16 +22,21 @@ import {
 } from '@/hooks/combat-setup/build-combat-state'
 import type {
   CombatSide,
+  GameSystem,
   UnitBaseType,
   UnitId,
   UnitIdList,
   UnitState,
 } from '@/types'
+import { getFactionSystem } from '@/utils/get-faction-system'
 
 import { shuffleInPlace } from './shuffle'
 
 export type { SideConfig }
-export type CombatTestConfig = CombatStateConfig
+// Test shorthand only: production builders require an explicit game system.
+export type CombatTestConfig = Omit<CombatStateConfig, 'system'> & {
+  system?: GameSystem
+}
 
 // ============================================================================
 // REVERSED MODE (for forEachSide tests)
@@ -638,6 +643,13 @@ export function transitionAndLoad(
 // ============================================================================
 
 export function combatTest(config: CombatTestConfig): CombatTest {
+  const system =
+    config.system ??
+    getFactionSystem(
+      config.attacker.faction === 'NEUTRAL'
+        ? config.defender.faction
+        : config.attacker.faction,
+    )
   const reversed = _reversed
   const effectiveConfig = reversed
     ? { ...config, attacker: config.defender, defender: config.attacker }
@@ -651,6 +663,7 @@ export function combatTest(config: CombatTestConfig): CombatTest {
   return new CombatTest(
     buildCombatState({
       ...effectiveConfig,
+      system,
       prepareAbilities: ({ attacker, defender }) => {
         shuffleInPlace(attacker)
         shuffleInPlace(defender)

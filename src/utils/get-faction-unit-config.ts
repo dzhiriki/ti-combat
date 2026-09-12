@@ -1,12 +1,12 @@
 import { UNIT_TYPES } from '@/constants/units'
 import {
   type FactionKey,
+  type GameSystem,
   type UnitBaseType,
   type UnitDefinition,
 } from '@/types'
 
 import { getFaction } from './get-faction'
-import { getFactionSystem } from './get-faction-system'
 import { getGameData } from './get-game-data'
 
 /**
@@ -15,10 +15,11 @@ import { getGameData } from './get-game-data'
  * Faction-specific units override the generic roster of the faction's system.
  */
 export function getFactionUnitConfig(
+  system: GameSystem,
   factionKey: FactionKey,
 ): Record<UnitBaseType, UnitDefinition> {
-  const factionUnits = getFaction(factionKey).units
-  const roster = getGameData(getFactionSystem(factionKey)).baseUnits
+  const factionUnits = getFaction(system, factionKey).units
+  const roster = getGameData(system).baseUnits
   const result = {} as Record<UnitBaseType, UnitDefinition>
 
   for (const unitType of UNIT_TYPES) {

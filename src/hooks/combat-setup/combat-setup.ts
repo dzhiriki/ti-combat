@@ -20,10 +20,8 @@ import type {
   UnitIdList,
   UnitSelection,
 } from '@/types'
-import {
-  DEFAULT_FACTION_BY_SYSTEM,
-  getFactionSystem,
-} from '@/utils/get-faction-system'
+import { getFaction } from '@/utils/get-faction'
+import { DEFAULT_FACTION_BY_SYSTEM } from '@/utils/get-faction-system'
 import {
   buildUnitStatsMap,
   getSimulationUnits,
@@ -97,7 +95,7 @@ export class CombatSetup {
   constructor() {
     this._system = 'TI4'
     const defaultFaction = DEFAULT_FACTION_BY_SYSTEM[this._system]
-    const defaultUnitStats = buildUnitStatsMap(defaultFaction)
+    const defaultUnitStats = buildUnitStatsMap(this._system, defaultFaction)
 
     this._attackerFaction = defaultFaction
     this._defenderFaction = defaultFaction
@@ -128,12 +126,12 @@ export class CombatSetup {
       defender: flattenUnique(defenderRegistered),
     }
     this._unitAbilityKeys = {
-      attacker: getUnitDefinitionAbilityKeys(defaultFaction),
-      defender: getUnitDefinitionAbilityKeys(defaultFaction),
+      attacker: getUnitDefinitionAbilityKeys(this._system, defaultFaction),
+      defender: getUnitDefinitionAbilityKeys(this._system, defaultFaction),
     }
     this._factionOwnedKeys = {
-      attacker: getFactionOwnedAbilityKeys(defaultFaction),
-      defender: getFactionOwnedAbilityKeys(defaultFaction),
+      attacker: getFactionOwnedAbilityKeys(this._system, defaultFaction),
+      defender: getFactionOwnedAbilityKeys(this._system, defaultFaction),
     }
 
     this._stateData = {
@@ -255,6 +253,8 @@ export class CombatSetup {
   }
 
   setFaction(side: CombatSide, faction: FactionKey): void {
+    // Reject cross-system selections before changing any setup state.
+    getFaction(this._system, faction)
     if (side === 'attacker') {
       this._attackerFaction = faction
     } else {
@@ -271,8 +271,14 @@ export class CombatSetup {
     this._sideRegistered[side] = reg
     this._lookups = createLookups(this._sideRegistered)
     this._sideAbilities[side] = flattenUnique(reg)
-    this._unitAbilityKeys[side] = getUnitDefinitionAbilityKeys(faction)
-    this._factionOwnedKeys[side] = getFactionOwnedAbilityKeys(faction)
+    this._unitAbilityKeys[side] = getUnitDefinitionAbilityKeys(
+      this._system,
+      faction,
+    )
+    this._factionOwnedKeys[side] = getFactionOwnedAbilityKeys(
+      this._system,
+      faction,
+    )
 
     // Rebuild side config: keep existing params for surviving abilities,
     // initialize defaults for new ones
@@ -471,12 +477,18 @@ export class CombatSetup {
       defender: flattenUnique(defenderRegistered),
     }
     this._unitAbilityKeys = {
-      attacker: getUnitDefinitionAbilityKeys(this._attackerFaction),
-      defender: getUnitDefinitionAbilityKeys(this._defenderFaction),
+      attacker: getUnitDefinitionAbilityKeys(
+        this._system,
+        this._attackerFaction,
+      ),
+      defender: getUnitDefinitionAbilityKeys(
+        this._system,
+        this._defenderFaction,
+      ),
     }
     this._factionOwnedKeys = {
-      attacker: getFactionOwnedAbilityKeys(this._attackerFaction),
-      defender: getFactionOwnedAbilityKeys(this._defenderFaction),
+      attacker: getFactionOwnedAbilityKeys(this._system, this._attackerFaction),
+      defender: getFactionOwnedAbilityKeys(this._system, this._defenderFaction),
     }
 
     // Rebuild units for both sides
@@ -508,6 +520,7 @@ export class CombatSetup {
       Object.values(this._defenderSelections).some(s => s.count > 0)
     if (!hasUnits) return null
     return {
+      system: this._system,
       attackerFaction: this._attackerFaction,
       defenderFaction: this._defenderFaction,
       attackerSelections: this._attackerSelections,
@@ -537,6 +550,7 @@ export class CombatSetup {
 
     return {
       v: 1,
+      g: this._system,
       af: this._attackerFaction,
       df: this._defenderFaction,
       m: this._combatMode === 'SPACE' ? 'S' : 'G',
@@ -551,18 +565,13 @@ export class CombatSetup {
     const af = config.af as FactionKey
     const df = config.df as FactionKey
 
-    // Set factions
+    // URL validation normalizes legacy links before they reach this method.
+    // Reject inconsistent direct callers before mutating the current setup.
+    getFaction(config.g, af)
+    getFaction(config.g, df)
+    this._system = config.g
     this._attackerFaction = af
     this._defenderFaction = df
-    // Both sides share a system; derive it from a non-neutral faction (Neutral
-    // exists in every system) so shared links restore the correct mode without
-    // a dedicated field.
-    this._system =
-      af !== 'NEUTRAL'
-        ? getFactionSystem(af)
-        : df !== 'NEUTRAL'
-          ? getFactionSystem(df)
-          : 'TI4'
     this._combatMode = config.m === 'S' ? 'SPACE' : 'GROUND'
 
     // Set unit selections
@@ -604,12 +613,12 @@ export class CombatSetup {
       defender: flattenUnique(defenderReg),
     }
     this._unitAbilityKeys = {
-      attacker: getUnitDefinitionAbilityKeys(af),
-      defender: getUnitDefinitionAbilityKeys(df),
+      attacker: getUnitDefinitionAbilityKeys(this._system, af),
+      defender: getUnitDefinitionAbilityKeys(this._system, df),
     }
     this._factionOwnedKeys = {
-      attacker: getFactionOwnedAbilityKeys(af),
-      defender: getFactionOwnedAbilityKeys(df),
+      attacker: getFactionOwnedAbilityKeys(this._system, af),
+      defender: getFactionOwnedAbilityKeys(this._system, df),
     }
 
     // Initialize ability defaults, reconcile, then apply URL overrides
@@ -749,6 +758,7 @@ export class CombatSetup {
       _nextCode: this._stateData._nextCode,
     }
     const { units, unitType, unitState, unitStats } = getSimulationUnits(
+      this._system,
       faction,
       selections,
       gen,
@@ -763,7 +773,7 @@ export class CombatSetup {
         unitType,
         unitState,
         unitStats: {
-          ...buildUnitStatsMap(faction, upgradedSet),
+          ...buildUnitStatsMap(this._system, faction, upgradedSet),
           ...unitStats,
         },
       },

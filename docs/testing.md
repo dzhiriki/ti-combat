@@ -32,6 +32,7 @@ Creates a `CombatTest` instance from a config object. The constructor automatica
 
 ```typescript
 const t = combatTest({
+  system?: 'TI4' | 'TF', // defaults from first non-neutral faction
   mode: 'SPACE' | 'GROUND',
   attacker: {
     faction: FactionKey,          // e.g. 'ARBOREC', 'SARDAKK_NORR'
@@ -45,6 +46,11 @@ const t = combatTest({
   defender: { /* same structure */ },
 })
 ```
+
+`combatTest` infers the system only as a test-authoring convenience (all-neutral
+setups default to TI4). For Neutral vs Neutral in Twilight's Fall, pass
+`system: 'TF'`. Direct `buildCombatState` callers must always pass
+`system`; both factions must belong to that system.
 
 ### Ability params shorthand
 

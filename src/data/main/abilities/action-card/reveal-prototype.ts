@@ -55,7 +55,7 @@ export const revealPrototype: Ability<Params> = {
       isCallable: (params, ctx) => pickTarget(params, ctx) !== undefined,
       call: (ctx, params) => {
         const target = pickTarget(params, ctx)!
-        const faction = getFactionUnitConfig(ctx.api.own.getFaction())
+        const faction = getFactionUnitConfig('TI4', ctx.api.own.getFaction())
         const upgraded = faction[target].UPGRADED!
         const current = ctx.api.own.getUnitStats(target)!
 
@@ -107,7 +107,7 @@ function pickTarget(
     ctx.state.combatMode === 'GROUND'
       ? params.groundPriority
       : params.spacePriority
-  const faction = getFactionUnitConfig(ctx.api.own.getFaction())
+  const faction = getFactionUnitConfig('TI4', ctx.api.own.getFaction())
 
   for (const variantKey of ctx.utils.getFlat(priority)) {
     const type = variantKey as UnitBaseType

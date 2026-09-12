@@ -7,6 +7,7 @@ import { getAvailableAbilities } from '@/hooks/combat-setup/get-available-abilit
 describe('RuntimeAbilityList.get(slot)', () => {
   it('lists the abilities registered on a side under a slot, memoized', () => {
     const state = buildCombatState({
+      system: 'TI4',
       mode: 'SPACE',
       attacker: { faction: 'NOMAD', units: { CRUISER: 1 } },
       defender: { faction: 'NEUTRAL', units: { CRUISER: 1 } },

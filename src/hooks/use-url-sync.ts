@@ -14,6 +14,7 @@ import {
 export function configToSearchString(config: SerializedConfig): string {
   const parts: string[] = [
     `v=${config.v}`,
+    `g=${config.g}`,
     `af=${config.af}`,
     `df=${config.df}`,
     `m=${config.m}`,
@@ -116,6 +117,7 @@ export function searchParamsToConfig(
 
   return {
     v: Number(params.get('v') ?? 1),
+    ...(params.has('g') && { g: params.get('g') }),
     af: params.get('af') ?? '',
     df: params.get('df') ?? '',
     m: params.get('m') ?? 'S',

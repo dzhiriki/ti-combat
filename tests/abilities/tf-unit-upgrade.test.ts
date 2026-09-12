@@ -82,7 +82,7 @@ describe('TF unit upgrades', () => {
         units: { FIGHTER: 2, INFANTRY: 1 },
         abilities: { TF_UPGRADE_MORPHWING: true },
       },
-      defender: { faction: 'ARBOREC', units: { INFANTRY: 1 } },
+      defender: { faction: 'AVARICE_REX', units: { INFANTRY: 1 } },
     })
 
     t.advanceTo('GROUND_COMBAT')
@@ -99,7 +99,7 @@ describe('TF unit upgrades', () => {
         units: { FIGHTER: 2, INFANTRY: 2 },
         abilities: { TF_UPGRADE_MORPHWING: true },
       },
-      defender: { faction: 'ARBOREC', units: { INFANTRY: 3 } },
+      defender: { faction: 'AVARICE_REX', units: { INFANTRY: 3 } },
     })
 
     t.advanceTo('GROUND_COMBAT')
@@ -112,7 +112,7 @@ describe('TF unit upgrades', () => {
   it('Morphwing does not let the defender commit fighters', () => {
     const t = combatTest({
       mode: 'GROUND',
-      attacker: { faction: 'ARBOREC', units: { INFANTRY: 1 } },
+      attacker: { faction: 'AVARICE_REX', units: { INFANTRY: 1 } },
       defender: {
         faction: 'AVARICE_REX',
         units: { FIGHTER: 2, INFANTRY: 1 },
