@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import type { Ability } from '@/combat'
+
 import { unitCount } from '../utils/branches'
 import { combatTest } from '../utils/combat-test'
 
@@ -46,6 +48,45 @@ describe('TF_FACES_OF_JANOVET', () => {
     expect(t.dicePool().attacker).toContainDice('FLAGSHIP', [4, 1])
   })
 
+  it('inherits card stats, not unrelated runtime changes to the upgraded unit', () => {
+    const modifier: Ability = {
+      key: 'TEST_DESTROYER_MODIFIER',
+      name: 'Test destroyer modifier',
+      params: { isEnabled: false, uses: Infinity },
+      headerUI: 'isEnabled',
+      invoke: [
+        {
+          timing: 'PREPARE',
+          call: ctx => {
+            ctx.api.own.modifyUnitType('DESTROYER', {
+              UNIT_ABILITIES: { AFB: [2, 5] },
+            })
+          },
+        },
+      ],
+    }
+    const t = combatTest({
+      mode: 'SPACE',
+      attacker: {
+        faction: 'EL_NEN_JANOVET',
+        units: { FLAGSHIP: 1, DESTROYER: 1 },
+        abilities: { TF_UPGRADE_EXILE: true, TEST_DESTROYER_MODIFIER: true },
+      },
+      defender: { faction: 'AVARICE_REX', units: { CRUISER: 1 } },
+      customAbilities: [modifier],
+    })
+
+    expect(t.state.attacker.unitStats.DESTROYER).toMatchObject({
+      UNIT_ABILITIES: { AFB: [2, 5] },
+    })
+    expect(t.state.attacker.unitStats.FLAGSHIP).toMatchObject({
+      COMBAT: [5, 2],
+      MOVE: 1,
+      CAPACITY: 3,
+      UNIT_ABILITIES: { AFB: [6, 3], SUSTAIN_DAMAGE: true },
+    })
+  })
+
   it('inherits nothing from war sun upgrades or with no cards enabled', () => {
     const t = combatTest({
       mode: 'GROUND',
@@ -64,6 +105,26 @@ describe('TF_FACES_OF_JANOVET', () => {
 
     // War sun cards are not part of the inheritance — no bombardment dice.
     expect(t.dicePool().attacker).not.toContainDice('FLAGSHIP', [3, 3])
+  })
+
+  it('inherits Linkship retreat text without fielding a destroyer', () => {
+    const t = combatTest({
+      mode: 'SPACE',
+      attacker: {
+        faction: 'EL_NEN_JANOVET',
+        units: { FLAGSHIP: 1 },
+        abilities: {
+          TF_UPGRADE_LINKSHIP: true,
+          RETREAT: { isEnabled: true, rounds: 1 },
+        },
+      },
+      defender: { faction: 'AVARICE_REX', units: { CRUISER: 3 } },
+    })
+
+    t.advanceTo('SPACE_COMBAT')
+    t.advanceRound()
+
+    expect(t.defender.units.CRUISER).toHaveLength(2)
   })
 
   it("inherits Strike Wing Alpha's AFB text: naturals 9/10 destroy infantry", () => {

@@ -1,16 +1,23 @@
 import councilKeleresIcon from '@/assets/faction/council_keleres.svg?raw'
 import type { Ability } from '@/combat'
+import { sustainDamage } from '@/data/main/abilities/general/sustain-damage'
+import { createStatsInvoke } from '@/utils/create-stats-invoke'
 
-import { createTfUnitUpgrade } from '../create-tf-unit-upgrade'
-
-export const saggitaria: Ability = createTfUnitUpgrade({
+export const saggitaria: Ability = {
   key: 'TF_UPGRADE_SAGGITARIA',
   icon: councilKeleresIcon,
   name: 'Saggitaria',
-  unitType: 'CRUISER',
-  cost: 2,
-  combat: [6, 1],
-  move: 3,
-  capacity: 1,
-  sustain: true,
-})
+  params: { isEnabled: false, uses: Infinity },
+  headerUI: 'isEnabled',
+  exclusiveGroup: 'TF_UNIT_UPGRADE_CRUISER',
+  invoke: [
+    createStatsInvoke('CRUISER', {
+      COST: 2,
+      COMBAT: [6, 1],
+      MOVE: 3,
+      CAPACITY: 1,
+      UNIT_ABILITIES: { SUSTAIN_DAMAGE: true },
+      ABILITIES: [sustainDamage],
+    }),
+  ],
+}

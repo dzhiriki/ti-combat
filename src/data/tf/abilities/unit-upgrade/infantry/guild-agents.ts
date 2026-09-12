@@ -1,13 +1,19 @@
 import yssarilTribesIcon from '@/assets/faction/yssaril_tribes.svg?raw'
 import type { Ability } from '@/combat'
+import { createStatsInvoke } from '@/utils/create-stats-invoke'
 
-import { createTfUnitUpgrade } from '../create-tf-unit-upgrade'
-
-export const guildAgents: Ability = createTfUnitUpgrade({
+export const guildAgents: Ability = {
   key: 'TF_UPGRADE_GUILD_AGENTS',
   icon: yssarilTribesIcon,
   name: 'Guild Agents',
-  unitType: 'INFANTRY',
-  cost: 0.5,
-  combat: [7, 1],
-})
+  params: { isEnabled: false, uses: Infinity },
+  headerUI: 'isEnabled',
+  exclusiveGroup: 'TF_UNIT_UPGRADE_INFANTRY',
+  invoke: [
+    createStatsInvoke('INFANTRY', {
+      COST: 0.5,
+      COMBAT: [7, 1],
+      UNIT_ABILITIES: {},
+    }),
+  ],
+}

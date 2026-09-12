@@ -467,6 +467,39 @@ export const my_faction: Faction = {
 
 `faction` abilities only appear for that faction. `promissory`, `agent`, `commander`, `hero`, and `breakthrough` are collected across all factions and available to everyone.
 
+### Twilight's Fall unit upgrades
+
+Each card in `src/data/tf/abilities/unit-upgrade/` is a normal `Ability` object.
+Declare its params, UI, exclusive group, and special invokes directly. Non-mech
+cards use `exclusiveGroup: 'TF_UNIT_UPGRADE_<UNIT_TYPE>'`; mech cards omit it
+so they stack.
+
+For a fixed stat block, use `createStatsInvoke(unitType, stats)` from
+`@/utils/create-stats-invoke`. It accepts native `UnitStats` and returns only a
+`PREPARE` invoke with `system: true` (stat application never consumes active
+uses, and still runs at zero uses):
+
+```typescript
+invoke: [
+  createStatsInvoke('CARRIER', {
+    COMBAT: [9, 1],
+    CAPACITY: 8,
+    UNIT_ABILITIES: { SUSTAIN_DAMAGE: true },
+    ABILITIES: [sustainDamage],
+  }),
+]
+```
+
+The helper does not attach abilities implicitly: declare both the native unit
+ability flag and its handler when needed. Relative stat changes (Echo of
+Ascension, mech upgrades) use ordinary PREPARE handlers. If a card needs extra
+PREPARE work, call its stats invoke inside that same handler and retain
+`system: true`; do not add a second PREPARE (see Hel-Titan and the war suns).
+
+Stats invokes expose their `unitType` and `stats`, narrowed by `isStatsInvoke`
+from `@/utils/is-stats-invoke`. Janovet uses these to inherit printed upgrade
+abilities without depending on factory metadata or runtime unit modifications.
+
 ### Registry (data side)
 
 A faction module exports a `FactionDefinition`. Its `abilities` and any unit `ABILITIES` may be a function of the `DataRegistry`, resolved once by the system index (`resolveFactions` in `src/data/registry.ts`):

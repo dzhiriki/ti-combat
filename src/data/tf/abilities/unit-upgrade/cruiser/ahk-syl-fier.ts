@@ -1,15 +1,21 @@
 import ghostsOfCreussIcon from '@/assets/faction/ghosts_of_creuss.svg?raw'
 import type { Ability } from '@/combat'
+import { createStatsInvoke } from '@/utils/create-stats-invoke'
 
-import { createTfUnitUpgrade } from '../create-tf-unit-upgrade'
-
-export const ahkSylFier: Ability = createTfUnitUpgrade({
+export const ahkSylFier: Ability = {
   key: 'TF_UPGRADE_AHK_SYL_FIER',
   icon: ghostsOfCreussIcon,
   name: 'Ahk Syl Fier',
-  unitType: 'CRUISER',
-  cost: 2,
-  combat: [6, 1],
-  move: 3,
-  capacity: 1,
-})
+  params: { isEnabled: false, uses: Infinity },
+  headerUI: 'isEnabled',
+  exclusiveGroup: 'TF_UNIT_UPGRADE_CRUISER',
+  invoke: [
+    createStatsInvoke('CRUISER', {
+      COST: 2,
+      COMBAT: [6, 1],
+      MOVE: 3,
+      CAPACITY: 1,
+      UNIT_ABILITIES: {},
+    }),
+  ],
+}

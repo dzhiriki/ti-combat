@@ -1,14 +1,19 @@
 import arborecIcon from '@/assets/faction/arborec.svg?raw'
 import type { Ability } from '@/combat'
+import { createStatsInvoke } from '@/utils/create-stats-invoke'
 
-import { createTfUnitUpgrade } from '../create-tf-unit-upgrade'
-
-export const letaniWarrior: Ability = createTfUnitUpgrade({
+export const letaniWarrior: Ability = {
   key: 'TF_UPGRADE_LETANI_WARRIOR',
   icon: arborecIcon,
   name: 'Letani Warrior',
-  unitType: 'INFANTRY',
-  cost: 0.5,
-  combat: [7, 1],
-  production: 2,
-})
+  params: { isEnabled: false, uses: Infinity },
+  headerUI: 'isEnabled',
+  exclusiveGroup: 'TF_UNIT_UPGRADE_INFANTRY',
+  invoke: [
+    createStatsInvoke('INFANTRY', {
+      COST: 0.5,
+      COMBAT: [7, 1],
+      UNIT_ABILITIES: { PRODUCTION: 2 },
+    }),
+  ],
+}

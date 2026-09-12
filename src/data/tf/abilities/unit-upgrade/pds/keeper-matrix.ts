@@ -1,15 +1,21 @@
 import xxchaKingdomIcon from '@/assets/faction/xxcha_kingdom.svg?raw'
 import type { Ability } from '@/combat'
+import { planetaryShield } from '@/data/main/abilities/general/planetary-shield'
+import { createStatsInvoke } from '@/utils/create-stats-invoke'
 
-import { createTfUnitUpgrade } from '../create-tf-unit-upgrade'
-
-export const keeperMatrix: Ability = createTfUnitUpgrade({
+export const keeperMatrix: Ability = {
   key: 'TF_UPGRADE_KEEPER_MATRIX',
   icon: xxchaKingdomIcon,
   name: 'Keeper Matrix',
   description:
     'You may use this unit’s Space Cannon against ships in adjacent systems.',
-  unitType: 'PDS',
-  spaceCannon: [5, 2],
-  planetaryShield: true,
-})
+  params: { isEnabled: false, uses: Infinity },
+  headerUI: 'isEnabled',
+  exclusiveGroup: 'TF_UNIT_UPGRADE_PDS',
+  invoke: [
+    createStatsInvoke('PDS', {
+      UNIT_ABILITIES: { SPACE_CANNON: [5, 2], PLANETARY_SHIELD: true },
+      ABILITIES: [planetaryShield],
+    }),
+  ],
+}

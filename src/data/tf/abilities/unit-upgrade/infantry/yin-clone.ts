@@ -1,13 +1,19 @@
 import yinBrotherhoodIcon from '@/assets/faction/yin_brotherhood.svg?raw'
 import type { Ability } from '@/combat'
+import { createStatsInvoke } from '@/utils/create-stats-invoke'
 
-import { createTfUnitUpgrade } from '../create-tf-unit-upgrade'
-
-export const yinClone: Ability = createTfUnitUpgrade({
+export const yinClone: Ability = {
   key: 'TF_UPGRADE_YIN_CLONE',
   icon: yinBrotherhoodIcon,
   name: 'Yin Clone',
-  unitType: 'INFANTRY',
-  cost: 0.5,
-  combat: [7, 1],
-})
+  params: { isEnabled: false, uses: Infinity },
+  headerUI: 'isEnabled',
+  exclusiveGroup: 'TF_UNIT_UPGRADE_INFANTRY',
+  invoke: [
+    createStatsInvoke('INFANTRY', {
+      COST: 0.5,
+      COMBAT: [7, 1],
+      UNIT_ABILITIES: {},
+    }),
+  ],
+}

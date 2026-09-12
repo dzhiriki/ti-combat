@@ -1,37 +1,14 @@
-import type { Ability, SideApi } from '@/combat'
+import { type Ability, hasStaticInvokes } from '@/combat'
 import { sustainDamage } from '@/data/main/abilities/general/sustain-damage'
-import unitUpgrades from '@/data/tf/abilities/unit-upgrade'
-import {
-  getTfUnitUpgradeConfig,
-  type TfUnitUpgradeConfig,
-} from '@/data/tf/abilities/unit-upgrade/create-tf-unit-upgrade'
+import type { UnitBaseType } from '@/types'
+import { isStatsInvoke } from '@/utils/is-stats-invoke'
 
-// The card grants the abilities of the destroyer, cruiser, and dreadnought
-// unit-upgrade technologies specifically — not carriers, PDS, or war suns.
-// Lazy: this module sits in an import cycle with the unit-upgrade deck (its
-// card invokes call `janovetInherits`), so the deck must not be touched at
-// module-evaluation time.
-let inheritable: readonly TfUnitUpgradeConfig[] | undefined
-const getInheritable = () =>
-  (inheritable ??= [
-    ...unitUpgrades.CRUISER,
-    ...unitUpgrades.DESTROYER,
-    ...unitUpgrades.DREADNOUGHT,
-  ].flatMap(card => getTfUnitUpgradeConfig(card) ?? []))
-
-/** Is the given inheritable upgrade card enabled on this side? Exposed for the
- *  card invokes that extend their text ability to the flagship (Strike Wing
- *  Alpha's AFB trigger, Linkship's retreat destroy). */
-export function janovetInherits(api: SideApi, upgradeKey: string): boolean {
-  const janovet = api.getAbilityConfig(
-    'TF_FACES_OF_JANOVET' as keyof AbilityConfigMap,
-  ) as { isEnabled?: boolean } | undefined
-  if (janovet?.isEnabled !== true) return false
-  const card = api.getAbilityConfig(upgradeKey as keyof AbilityConfigMap) as
-    | { isEnabled?: boolean }
-    | undefined
-  return card?.isEnabled === true
-}
+// Only these upgrade types contribute unit abilities to the flagship.
+const INHERITABLE_TYPES: readonly UnitBaseType[] = [
+  'CRUISER',
+  'DESTROYER',
+  'DREADNOUGHT',
+]
 
 // El Nen Janovet flagship. "This unit gains the unit abilities and text
 // abilities of your destroyer, cruiser, and dreadnought unit upgrade
@@ -57,14 +34,23 @@ export const facesOfJanovet: Ability = {
     {
       timing: 'PREPARE',
       call: ctx => {
-        const enabled = getInheritable().filter(
-          cfg =>
-            (
-              ctx.api.own.getAbilityConfig(
-                cfg.key as keyof AbilityConfigMap,
-              ) as { isEnabled?: boolean } | undefined
-            )?.isEnabled === true,
-        )
+        // Read the cards' stat blocks, not the units' runtime stats (which
+        // may also contain changes from unrelated abilities).
+        const enabled = ctx.abilities.own
+          .get('TF_UNIT_UPGRADE')
+          .flatMap(card => {
+            const config = ctx.api.own.getAbilityConfig(
+              card.key as keyof AbilityConfigMap,
+            )
+            if (config?.isEnabled !== true || !hasStaticInvokes(card)) return []
+            return card.invoke.filter(isStatsInvoke)
+          })
+          .filter(inv => INHERITABLE_TYPES.includes(inv.unitType))
+          .sort(
+            (a, b) =>
+              INHERITABLE_TYPES.indexOf(a.unitType) -
+              INHERITABLE_TYPES.indexOf(b.unitType),
+          )
         if (enabled.length === 0) return
 
         const current = ctx.api.own.getUnitStats('FLAGSHIP')
@@ -73,15 +59,18 @@ export const facesOfJanovet: Ability = {
         const abilities = [...(current.ABILITIES ?? [])]
         let directHitImmune = current.DIRECT_HIT_IMMUNE === true
 
-        for (const cfg of enabled) {
-          if (cfg.afb) unitAbilities.AFB = cfg.afb
-          if (cfg.bombardment) unitAbilities.BOMBARDMENT = cfg.bombardment
-          if (cfg.spaceCannon) unitAbilities.SPACE_CANNON = cfg.spaceCannon
-          if (cfg.sustain && !unitAbilities.SUSTAIN_DAMAGE) {
+        for (const { stats } of enabled) {
+          const inherited = stats.UNIT_ABILITIES
+          if (inherited?.AFB) unitAbilities.AFB = inherited.AFB
+          if (inherited?.BOMBARDMENT)
+            unitAbilities.BOMBARDMENT = inherited.BOMBARDMENT
+          if (inherited?.SPACE_CANNON)
+            unitAbilities.SPACE_CANNON = inherited.SPACE_CANNON
+          if (inherited?.SUSTAIN_DAMAGE && !unitAbilities.SUSTAIN_DAMAGE) {
             unitAbilities.SUSTAIN_DAMAGE = true
             abilities.push(sustainDamage)
           }
-          if (cfg.directHitImmune) directHitImmune = true
+          if (stats.DIRECT_HIT_IMMUNE) directHitImmune = true
         }
 
         ctx.api.own.modifyUnitType('FLAGSHIP', {

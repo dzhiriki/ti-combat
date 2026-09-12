@@ -1,17 +1,23 @@
 import empyreanIcon from '@/assets/faction/empyrean.svg?raw'
 import type { Ability } from '@/combat'
+import { createStatsInvoke } from '@/utils/create-stats-invoke'
 
-import { createTfUnitUpgrade } from '../create-tf-unit-upgrade'
-
-export const triune: Ability = createTfUnitUpgrade({
+export const triune: Ability = {
   key: 'TF_UPGRADE_TRIUNE',
   icon: empyreanIcon,
   name: 'Triune',
   description:
     'This unit may move without being transported. Fighters in excess of your ships’ capacity count against your fleet pool.',
-  unitType: 'FIGHTER',
-  cost: 0.5,
-  combat: [7, 1],
-  move: 2,
-  fleetPoolCost: 1,
-})
+  params: { isEnabled: false, uses: Infinity },
+  headerUI: 'isEnabled',
+  exclusiveGroup: 'TF_UNIT_UPGRADE_FIGHTER',
+  invoke: [
+    createStatsInvoke('FIGHTER', {
+      COST: 0.5,
+      COMBAT: [7, 1],
+      MOVE: 2,
+      FLEET_POOL_COST: 1,
+      UNIT_ABILITIES: {},
+    }),
+  ],
+}
