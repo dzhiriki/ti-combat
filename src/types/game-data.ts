@@ -1,4 +1,4 @@
-import type { Ability, RegisteredAbility } from '@/combat'
+import type { RegisteredAbility } from '@/combat'
 
 import type { CombatSide } from './combat-side'
 import type { Faction, GameSystem } from './faction'
@@ -57,26 +57,11 @@ export type SlotNames<Entry> = Entry extends { items: readonly (infer Item)[] }
       : Slot
     : never
 
-/** Per-slot render info derived from a system's slot config. */
-export interface SlotDisplay {
-  category: string
-  subcategory?: string
-  /** Position in the slot config; drives render order. */
-  order: number
-  /** Whether the card shows its faction icon. */
-  icon: boolean
-}
-
 /**
- * A registered ability plus the slot entry of the config that shows it. Built
- * once per system; `getAvailableAbilities` filters these for a faction.
+ * A registered ability with ownership and deployment metadata. Eligibility
+ * and presentation are defined by the system's slot config.
  */
 export interface CollectedAbility extends RegisteredAbility {
-  strategy?: SlotStrategy
-  /** Whether the NEUTRAL faction sees this entry: the slot entry's flag and
-   *  the definition's own `neutral` folded into one. */
-  neutral: boolean
-  display: SlotDisplay
   /** Owning faction; absent for the system's shared decks. */
   factionKey?: string
   /** A unit's DEPLOY comes in base and upgraded variants; only one applies. */
@@ -87,12 +72,13 @@ export interface GameData {
   id: GameSystem
   label: string
   defaultFaction: string
+  slots: readonly SlotEntry[]
   factions: Readonly<Record<string, Faction>>
   baseUnits: Readonly<Partial<Record<UnitBaseType, UnitDefinition>>>
   /** Every ability reachable through this system, for config validation. */
   allAbilities: readonly RegisteredAbility[]
   /** All shared, faction, and unit abilities registered under a slot. */
-  getAbilities(slot: string): readonly Ability[]
+  getAbilities(slot: string): readonly RegisteredAbility[]
   getFaction(factionKey: string): Faction
   getFactionUnitConfig(factionKey: string): Record<UnitBaseType, UnitDefinition>
   getAvailableAbilities(

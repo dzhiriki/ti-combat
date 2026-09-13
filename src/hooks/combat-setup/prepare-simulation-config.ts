@@ -48,8 +48,6 @@ export function prepareSimulationConfig(
   const customRegistered: CollectedAbility[] = custom.map(ability => ({
     ...ability,
     slot: 'OTHER',
-    neutral: true,
-    display: { category: 'OTHER', order: Infinity, icon: true },
   }))
   const registered: Record<CombatSide, CollectedAbility[]> = {
     attacker: [

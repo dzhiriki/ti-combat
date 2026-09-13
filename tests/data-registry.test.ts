@@ -41,11 +41,13 @@ describe('GameData faction resolution', () => {
     },
   }
   let seenByTwo: string[] = []
+  let abilityKeysSeenByTwo: string[] = []
   const lazyTwo: FactionDefinition = {
     name: 'Lazy two',
     units: {},
     abilities: data => {
       seenByTwo = Object.keys(data.factions)
+      abilityKeysSeenByTwo = data.allAbilities.map(ability => ability.key)
       return {}
     },
   }
@@ -61,8 +63,12 @@ describe('GameData faction resolution', () => {
   const resolved = gameData.factions
 
   it('resolves lazy abilities and unit ABILITIES from GameData', () => {
-    expect(resolved.L.abilities?.technology).toEqual([techT])
-    expect(resolved.L.units.FLAGSHIP?.BASE.ABILITIES).toEqual([agentA])
+    expect(resolved.L.abilities?.technology).toMatchObject([
+      { ...techT, slot: 'TECHNOLOGY' },
+    ])
+    expect(resolved.L.units.FLAGSHIP?.BASE.ABILITIES).toMatchObject([
+      { ...agentA, slot: 'FACTION_AGENT' },
+    ])
   })
 
   it('passes the exported GameData entity to lazy definitions', () => {
@@ -71,6 +77,16 @@ describe('GameData faction resolution', () => {
 
   it('exposes only static factions while lazy definitions resolve', () => {
     expect(seenByTwo).toEqual(['S'])
+    expect(abilityKeysSeenByTwo).toEqual(['TECH_T', 'AGENT_A'])
+  })
+
+  it('returns registered entries once despite multiple presentation slots', () => {
+    const agents = gameData.getAbilities('FACTION_AGENT')
+    expect(agents).toHaveLength(1)
+    expect(agents[0]).toBe(
+      gameData.allAbilities.find(ability => ability.key === agentA.key),
+    )
+    expect(gameData.getAbilities('UNKNOWN')).toEqual([])
   })
 
   it('omits icon on a resolved lazy faction that declares none', () => {
@@ -171,63 +187,26 @@ describe('slot config', () => {
       .filter(reg => reg.key === key)
   const slotsOf = (key: string): string[] =>
     shownTo('A', key).map(reg => reg.slot)
-  const categoriesOf = (key: string): string[] =>
-    shownTo('A', key).map(
-      reg => `${reg.display.category}/${reg.display.subcategory ?? '-'}`,
-    )
-
-  it('renders an OWN group under the faction', () => {
+  it('offers an OWN group only to its faction', () => {
     expect(slotsOf('HERO_A')).toEqual(['FACTION_HERO'])
-    expect(categoriesOf('HERO_A')).toEqual(['FACTION/HERO'])
+    expect(shownTo('B', 'HERO_A')).toEqual([])
   })
 
   it('collects every faction into one slot and splits it by strategy', () => {
     // One FACTION_AGENT slot: the faction's own agent renders under FACTION,
     // everyone else's in the shared AGENT list — never both.
     expect(slotsOf('AGENT_A')).toEqual(['FACTION_AGENT'])
-    expect(categoriesOf('AGENT_A')).toEqual(['FACTION/AGENT'])
     expect(slotsOf('AGENT_B')).toEqual(['FACTION_AGENT'])
-    expect(categoriesOf('AGENT_B')).toEqual(['AGENT/-'])
   })
 
   it('shows an ALL slot to every faction, its owner included', () => {
-    expect(categoriesOf('PROMISSORY_A')).toEqual(['PROMISSORY/-'])
-    expect(categoriesOf('PROMISSORY_B')).toEqual(['PROMISSORY/-'])
+    expect(slotsOf('PROMISSORY_A')).toEqual(['FACTION_PROMISSORY'])
+    expect(slotsOf('PROMISSORY_B')).toEqual(['FACTION_PROMISSORY'])
   })
 
   it('registers a faction unit ability under the slot named after its type', () => {
     expect(slotsOf('CRUISER_A')).toEqual(['FACTION_CRUISER'])
     expect(slotsOf('FLAGSHIP_A')).toEqual(['FACTION_FLAGSHIP'])
-  })
-
-  it('gives every slot of a multi-slot entry its title and order', () => {
-    // The unit slots listed together under FACTION/UNIT.
-    expect(shownTo('A', 'CRUISER_A')[0]?.display).toEqual({
-      category: 'FACTION',
-      subcategory: 'UNIT',
-      order: 9,
-      icon: true,
-    })
-    // Flagships and mechs keep their own sub-headers.
-    expect(shownTo('A', 'FLAGSHIP_A')[0]?.display).toEqual({
-      category: 'FACTION',
-      subcategory: 'FLAGSHIP',
-      order: 2,
-      icon: true,
-    })
-    expect(shownTo('A', 'HERO_A')[0]?.display).toEqual({
-      category: 'FACTION',
-      subcategory: 'HERO',
-      order: 5,
-      icon: true,
-    })
-  })
-
-  it('drops the card icon where the config says the header already names the faction', () => {
-    // Own agent under FACTION: icon off. Someone else's agent in the shared
-    // AGENT list: icon on, it is the only thing saying whose it is.
-    expect(shownTo('A', 'AGENT_A')[0]?.display.icon).toBe(false)
-    expect(shownTo('A', 'AGENT_B')[0]?.display.icon).toBe(true)
   })
 
   it('hides `neutral: false` entries from NEUTRAL only', () => {

@@ -1,8 +1,14 @@
-import { filter, groupBy, pipe } from 'remeda'
+import { filter, pipe } from 'remeda'
 
 import type { AbilityReadContext, CombatMode } from '@/combat'
 import { extractDefaults } from '@/combat'
-import type { CollectedAbility } from '@/types'
+import type {
+  CollectedAbility,
+  SlotCategory,
+  SlotConfig,
+  SlotEntry,
+} from '@/types'
+import { matchesAbilitySlot } from '@/utils/matches-ability-slot'
 
 import styles from './abilities-panel.module.css'
 import { AbilityConfig } from './components/ability-config'
@@ -11,6 +17,8 @@ export type AbilityFilterMode = 'all' | 'same' | 'enabled'
 
 interface AbilitiesPanelProps {
   abilities: CollectedAbility[]
+  slots: readonly SlotEntry[]
+  factionKey: string
   readContext: AbilityReadContext
   combatMode: CombatMode
   params: Record<string, Record<string, unknown>>
@@ -56,21 +64,16 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
   return false
 }
 
-function matchesSearch(reg: CollectedAbility, query: string): boolean {
-  const haystack = [
-    reg.name,
-    reg.description ?? '',
-    reg.display.category,
-    reg.display.subcategory ?? '',
-  ]
+function matchesSearch(
+  reg: CollectedAbility,
+  query: string,
+  titles: string,
+): boolean {
+  const haystack = [reg.name, reg.description ?? '', titles]
     .join(' ')
     .toLowerCase()
   const tokens = query.split(/\s+/).filter(Boolean)
   return tokens.every(token => fuzzyMatch(haystack, token))
-}
-
-function firstSlotOrder(regs: CollectedAbility[] | undefined): number {
-  return Math.min(...(regs ?? []).map(reg => reg.display.order))
 }
 
 function renderAbilityConfig(
@@ -82,6 +85,7 @@ function renderAbilityConfig(
     abilityName: string,
     params: Record<string, unknown>,
   ) => void,
+  hideIcon: boolean,
 ): React.ReactElement {
   return (
     <AbilityConfig
@@ -91,13 +95,15 @@ function renderAbilityConfig(
       combatMode={combatMode}
       params={params[reg.key] ?? {}}
       onParamsChange={newParams => onParamsChange(reg.key, newParams)}
-      hideIcon={!reg.display.icon}
+      hideIcon={hideIcon}
     />
   )
 }
 
 export function AbilitiesPanel({
   abilities,
+  slots,
+  factionKey,
   readContext,
   combatMode,
   params,
@@ -109,7 +115,6 @@ export function AbilitiesPanel({
   const visible = pipe(
     abilities,
     filter(hasUI),
-    filter(reg => !normalizedQuery || matchesSearch(reg, normalizedQuery)),
     filter(reg => {
       if (filterMode === 'all') return true
       if (filterMode === 'same') return isInCurrentMode(reg, combatMode)
@@ -117,67 +122,53 @@ export function AbilitiesPanel({
     }),
   )
 
-  const byCategory = groupBy(visible, reg => reg.display.category)
-
-  const orderedCategories = Object.keys(byCategory).sort(
-    (a, b) => firstSlotOrder(byCategory[a]) - firstSlotOrder(byCategory[b]),
-  )
+  const renderGroup = (config: SlotConfig, category?: SlotCategory) => {
+    const entries = visible.filter(
+      reg =>
+        matchesAbilitySlot(reg, config, factionKey, category?.neutral) &&
+        (!normalizedQuery ||
+          matchesSearch(
+            reg,
+            normalizedQuery,
+            `${category?.title ?? ''} ${config.title}`,
+          )),
+    )
+    if (entries.length === 0) return null
+    return (
+      <div key={config.title}>
+        {category && (
+          <div className={styles.subcategoryLabel}>{config.title}</div>
+        )}
+        <div className={styles.abilitiesList}>
+          {entries.map(reg =>
+            renderAbilityConfig(
+              reg,
+              readContext,
+              combatMode,
+              params,
+              onParamsChange,
+              !(config.icon ?? category?.icon ?? true),
+            ),
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={styles.container}>
-      {orderedCategories.map(category => {
-        const entries = byCategory[category] ?? []
-
-        if (entries.some(reg => reg.display.subcategory !== undefined)) {
-          const bySubcategory = groupBy(
-            entries,
-            reg => reg.display.subcategory ?? 'ABILITY',
-          )
-          // Slot config order governs sub-headers; within one the sort is
-          // stable, so cards keep registration order.
-          const subcategories = Object.keys(bySubcategory).sort(
-            (a, b) =>
-              firstSlotOrder(bySubcategory[a]) -
-              firstSlotOrder(bySubcategory[b]),
-          )
-
-          return (
-            <div key={category}>
-              <h6 className={styles.categoryLabel}>{category}</h6>
-              {subcategories.map(subcategory => (
-                <div key={subcategory}>
-                  <div className={styles.subcategoryLabel}>{subcategory}</div>
-                  <div className={styles.abilitiesList}>
-                    {bySubcategory[subcategory]?.map(reg =>
-                      renderAbilityConfig(
-                        reg,
-                        readContext,
-                        combatMode,
-                        params,
-                        onParamsChange,
-                      ),
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        }
-
+      {slots.map(entry => {
+        const groups =
+          'items' in entry
+            ? entry.items
+                .map(item => renderGroup(item, entry))
+                .filter(group => group !== null)
+            : [renderGroup(entry)].filter(group => group !== null)
+        if (groups.length === 0) return null
         return (
-          <div key={category}>
-            <h6 className={styles.categoryLabel}>{category}</h6>
-            <div className={styles.abilitiesList}>
-              {entries.map(reg =>
-                renderAbilityConfig(
-                  reg,
-                  readContext,
-                  combatMode,
-                  params,
-                  onParamsChange,
-                ),
-              )}
-            </div>
+          <div key={entry.title}>
+            <h6 className={styles.categoryLabel}>{entry.title}</h6>
+            {groups}
           </div>
         )
       })}

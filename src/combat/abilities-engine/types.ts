@@ -533,8 +533,6 @@ export interface Ability<Params extends Record<string, unknown> = any> {
   uiConfig?: UIConfig<AbilityBaseParams & Params>
   /** Restrict ability to a specific side (attacker or defender). When set, the ability is only available to that side. */
   side?: CombatSide
-  /** Set to false to keep the ability off the NEUTRAL faction's list (Neutral has no fleet pool to enforce). */
-  neutral?: boolean
   /** Restrict ability to a specific combat mode (SPACE or GROUND). When set, the ability is skipped during combat if the mode doesn't match, and dimmed in the UI. */
   context?: CombatMode
   /** When true, both sides share identical config. Changing params on one side mirrors to the other. */

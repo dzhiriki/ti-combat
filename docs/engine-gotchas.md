@@ -39,7 +39,7 @@ a check there too.
   `src/data/tf/clone-ability.ts` does this for every TF clone.
 
 - **Registered abilities are copies of their definitions.** `RegisteredAbility`
-  is `Ability & { slot }`, and `createGameData` builds one per slot entry by
+  is `Ability & { slot }`, and `createGameData` builds registered entries by
   spreading the definition. Identity-based lookups (`Set<Ability>`, WeakMap
   caches) therefore never match a registered entry against the unit-definition
   object it came from — dedupe by `key` instead. Invoke objects are shared by
@@ -148,8 +148,10 @@ a check there too.
 
 - **A lazy faction sees only static factions.** During resolution, the
   system's `GameData.factions` excludes every definition that has a lazy part,
-  so two lazy factions cannot read each other. The same `GameData` object gets
-  the complete roster after resolution. Nekro is the only lazy faction today.
+  so two lazy factions cannot read each other. `allAbilities` is registered
+  for that static roster first; `getAbilities(slot)` filters this catalog.
+  The same `GameData` object gets the complete roster and rebuilt catalog in
+  roster order after resolution. Nekro is the only lazy faction today.
 
 - **Config abilities resolve before unit-attached abilities within a timing
   pass.** A unit ability's PREPARE cannot pre-empt an ADVANCED phase driver's
@@ -209,9 +211,9 @@ a check there too.
   The list feeds the engine, where order drives invoke resolution within a
   timing pass, so it walks the collected abilities (shared decks in
   `index.ts` order, then faction-owned ones) and asks the slot config only
-  _whether_ each is visible. Render order lives on each entry's `display`,
-  which is why the panel can group by category without the list being sorted
-  that way. Reordering the collection to match the config silently moves
+  _whether_ each is visible. The panel iterates `GameData.slots` in display
+  order and matches abilities by slot and owner; collected abilities carry
+  no presentation or eligibility fields. Reordering the collection to match the config silently moves
   ADVANCED's phase drivers out of their registration position.
 
 - **`getAvailableAbilities` feeds BOTH the panel and the engine.** Hiding a

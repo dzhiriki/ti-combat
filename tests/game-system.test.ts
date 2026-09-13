@@ -13,6 +13,7 @@ import type { GameSystem } from '@/types'
 import { getFaction } from '@/utils/get-faction'
 import { getFactionUnitConfig } from '@/utils/get-faction-unit-config'
 import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
+import { matchesAbilitySlot } from '@/utils/matches-ability-slot'
 
 describe('explicit game system', () => {
   afterEach(() => {
@@ -27,16 +28,26 @@ describe('explicit game system', () => {
       for (const faction of Object.keys(data.factions)) {
         const seen = new Set<string>()
         for (const reg of data.getAvailableAbilities('attacker', faction)) {
-          const where = `${reg.display.category}/${reg.display.subcategory ?? ''}`
-          expect(
-            typeof reg.display.order,
-            `${system}:${faction} has no render order for ${reg.slot}`,
-          ).toBe('number')
+          const matchingSlots = data.slots.flatMap(entry =>
+            'items' in entry
+              ? entry.items.filter(item =>
+                  matchesAbilitySlot(reg, item, faction, entry.neutral),
+                )
+              : matchesAbilitySlot(reg, entry, faction)
+                ? [entry]
+                : [],
+          )
+          expect(matchingSlots, `${system}:${faction}:${reg.key}`).toHaveLength(
+            1,
+          )
+          expect(reg).not.toHaveProperty('display')
+          expect(reg).not.toHaveProperty('strategy')
+          expect(reg).not.toHaveProperty('neutral')
           // The engine consumes this list as is — a repeated key would fire
           // its invokes twice.
           expect(
             seen.has(reg.key),
-            `${system}:${faction} lists ${reg.key} twice (in ${where})`,
+            `${system}:${faction} lists ${reg.key} twice (in ${reg.slot})`,
           ).toBe(false)
           seen.add(reg.key)
         }
@@ -60,24 +71,6 @@ describe('explicit game system', () => {
     expect(tf.has('TECHNOLOGY')).toBe(false)
     expect(ti4.has('FACTION_BREAKTHROUGH')).toBe(true)
     expect(tf.has('FACTION_BREAKTHROUGH')).toBe(false)
-  })
-
-  it('splits a faction card between its own section and the shared pool', () => {
-    const data = getGameData('TI4')
-    const where = (faction: string, key: string): string[] =>
-      data
-        .getAvailableAbilities('attacker', faction)
-        .filter(reg => reg.key === key)
-        .map(reg => `${reg.slot}:${reg.display.category}`)
-
-    // Sardakk's own commander sits under FACTION; for anyone else it is one
-    // of the commanders in the shared COMMANDER list — never both.
-    expect(where('SARDAKK_NORR', 'GHOM_SEKKUS')).toEqual([
-      'FACTION_COMMANDER:FACTION',
-    ])
-    expect(where('ARBOREC', 'GHOM_SEKKUS')).toEqual([
-      'FACTION_COMMANDER:COMMANDER',
-    ])
   })
 
   it.each(GAME_SYSTEMS)('round-trips Neutral vs Neutral in %s', system => {

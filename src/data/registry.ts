@@ -74,13 +74,6 @@ function resolveDefinition(
   }
 }
 
-function setFactions(
-  gameData: GameData,
-  factions: Readonly<Record<string, Faction>>,
-): void {
-  Object.assign(gameData, { factions })
-}
-
 /**
  * Resolve a system's faction definitions against its GameData entity. Static
  * factions are installed first, so lazy factions can inspect them without
@@ -89,7 +82,12 @@ function setFactions(
 export function resolveFactions<K extends string>(
   gameData: GameData,
   definitions: Readonly<Record<K, FactionDefinition>>,
+  registerAbilities: (factions: Readonly<Record<string, Faction>>) => void,
 ): Readonly<Record<K, Faction>> {
+  const setFactions = (factions: Readonly<Record<string, Faction>>): void => {
+    Object.assign(gameData, { factions })
+    registerAbilities(factions)
+  }
   const statics: Record<string, Faction> = {}
   const entries = Object.entries(definitions) as [K, FactionDefinition][]
   for (const [key, definition] of entries) {
@@ -98,7 +96,7 @@ export function resolveFactions<K extends string>(
     }
   }
 
-  setFactions(gameData, statics)
+  setFactions(statics)
 
   const resolved = {} as Record<K, Faction>
   for (const [key, definition] of entries) {
@@ -107,6 +105,6 @@ export function resolveFactions<K extends string>(
       : resolveDefinition(definition, gameData)
   }
 
-  setFactions(gameData, resolved)
+  setFactions(resolved)
   return resolved
 }

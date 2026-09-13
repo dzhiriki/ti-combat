@@ -17,7 +17,6 @@ export type {
   GameData,
   SlotCategory,
   SlotConfig,
-  SlotDisplay,
   SlotEntry,
   SlotNames,
   SlotStrategy,

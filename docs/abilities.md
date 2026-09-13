@@ -28,7 +28,6 @@ interface Ability<Params extends Record<string, unknown>> {
   description?: string // Tooltip text describing what the ability does
   warning?: string // Optional warning paragraph appended to the tooltip
   icon?: string // Raw SVG string for display next to name
-  neutral?: boolean // false: never offered to the NEUTRAL faction
   params: AbilityBaseParams & Params // Default parameter values (includes isEnabled and uses from AbilityBaseParams)
   paramsSchema?: {
     safeParse: (data: unknown) => { success: boolean; data?: unknown }
@@ -93,7 +92,7 @@ Every entry, and every category (whose flags its items inherit), also takes:
 | `neutral` | `true`  | Whether NEUTRAL sees the slot. Neutral is a generic opponent: no research, hand, or notes, so TI4 turns those off |
 | `icon`    | `true`  | Whether cards show their faction icon. Off where the header already names the faction (own agents under FACTION)  |
 
-Per-ability availability rules live on the ability itself, next to `side`: `neutral: false` keeps a card off Neutral's list in every system (Fleet Pool — Neutral has none to enforce).
+Neutral eligibility is defined only in the slot config. Fleet Pool is available to Neutral through ADVANCED and defaults to disabled.
 
 | `strategy` | Which of the slot's abilities the selected faction sees                  |
 | ---------- | ------------------------------------------------------------------------ |
@@ -106,7 +105,9 @@ There is one slot per kind of card — all agents are collected into `FACTION_AG
 
 ### How a faction's abilities are collected
 
-`createGameData` collects once, at build time, into one list of `CollectedAbility` — a copy of the ability definition extended with the slot it is registered under (that part is `RegisteredAbility`, the shape everything past the definitions works on: engine lookups, reconcile, the setup store) plus the slot entry of the config that shows it (its `strategy`, `neutral` flag, and `display`), and its owning faction if any. Shared decks pair with entries that have no strategy, faction-owned abilities with entries that do; an ability no entry could ever show is a data error and throws. `getAvailableAbilities(side, faction)` then walks that list in **registration order** — which is what drives invoke resolution, so it is deliberately not config order — and keeps the entries whose strategy admits the faction. An ability is available when at least one entry shows it.
+`createGameData` collects each ability once per source into a `CollectedAbility`: the definition plus its registered `slot`, owning faction if any, and optional deployment metadata. `RegisteredAbility` is the definition plus `slot`, the shape used by engine lookups, reconcile, and the setup store. Presentation and eligibility remain in `GameData.slots`; collected abilities carry no `strategy`, `neutral`, or `display` fields.
+
+Shared decks register under slots with no strategy, faction-owned abilities under slots with a strategy; an ability no entry could ever show is a data error and throws. `getAvailableAbilities(side, faction)` walks the collected list in **registration order** and keeps abilities matching at least one slot entry's ownership and Neutral rules. The panel iterates `GameData.slots` in display order, matching available abilities by slot and owner. Category and subcategory titles, icon visibility, and title-based search all come directly from that config.
 
 The one exception is the catch-all: an ability that no entry shows, but that another faction can reach across the table with (an `external` invoke), is appended to the `OTHER` slot with its owner's icon. Systems opt out by not declaring `OTHER` — Twilight's Fall has no such slot.
 

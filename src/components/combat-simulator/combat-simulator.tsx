@@ -22,6 +22,7 @@ import type { Precision } from '@/hooks/use-settings'
 import { useSimulation } from '@/hooks/use-simulation'
 import { useUrlSync } from '@/hooks/use-url-sync'
 import type { CombatSide, UnitBaseType } from '@/types'
+import { getGameData } from '@/utils/get-game-data'
 import { getUnitConfig } from '@/utils/get-unit-config'
 
 import { ButtonIconPlain } from '../ui/button-icon-plain'
@@ -283,6 +284,8 @@ export function CombatSimulator({
         {renderAbilitiesHeader('attacker', 'Attacker Abilities')}
         <AbilitiesPanel
           abilities={attackerAbilities}
+          slots={getGameData(system).slots}
+          factionKey={attackerFaction}
           readContext={attackerReadContext}
           combatMode={combatMode}
           params={abilities.attacker}
@@ -308,6 +311,8 @@ export function CombatSimulator({
         {renderAbilitiesHeader('defender', 'Defender Abilities')}
         <AbilitiesPanel
           abilities={defenderAbilities}
+          slots={getGameData(system).slots}
+          factionKey={defenderFaction}
           readContext={defenderReadContext}
           combatMode={combatMode}
           params={abilities.defender}

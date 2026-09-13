@@ -42,7 +42,7 @@ describe('RuntimeAbilityList.get(slot)', () => {
     // rendered category differs.
     const thundarian = registered.attacker.find(r => r.key === 'THUNDARIAN')!
     expect(thundarian.slot).toBe('FACTION_AGENT')
-    expect(thundarian.display.category).toBe('FACTION')
+    expect(thundarian.factionKey).toBe('NOMAD')
     expect(lookups.attacker.own.get('AGENT')).toEqual([])
     expect(lookups.defender.opponent).toBe(lookups.attacker.own)
   })

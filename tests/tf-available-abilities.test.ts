@@ -5,6 +5,7 @@ import { UNIT_DISPLAY_NAMES } from '@/constants/units'
 import { CombatSetup } from '@/hooks/combat-setup'
 import type { UnitBaseType } from '@/types'
 import { getGameData } from '@/utils/get-game-data'
+import { matchesAbilitySlot } from '@/utils/matches-ability-slot'
 
 import { combatTest } from './utils/combat-test'
 
@@ -95,7 +96,7 @@ describe("Twilight's Fall available abilities", () => {
     }
   })
 
-  it('tags every TF unit upgrade with its unit type as the panel sub-header', () => {
+  it('groups every TF unit upgrade under its unit type in the slot config', () => {
     const regs = getGameData('TF').getAvailableAbilities(
       'attacker',
       'AVARICE_REX',
@@ -103,13 +104,21 @@ describe("Twilight's Fall available abilities", () => {
     const upgrades = regs.filter(r => r.slot.startsWith('UNIT_UPGRADE_'))
     const typeOf = (r: (typeof upgrades)[number]) =>
       r.exclusiveGroup?.replace('UNIT_UPGRADE_', '') ?? 'MECH'
+    const category = getGameData('TF').slots.find(
+      entry => entry.title === 'UNIT UPGRADE',
+    )!
+    expect('items' in category).toBe(true)
+    if (!('items' in category)) return
     for (const r of upgrades) {
-      expect(r.display.subcategory, `${r.name} is missing a sub-header`).toBe(
+      const matches = category.items.filter(item =>
+        matchesAbilitySlot(r, item, 'AVARICE_REX', category.neutral),
+      )
+      expect(matches).toHaveLength(1)
+      expect(matches[0].title, `${r.name} is missing a sub-header`).toBe(
         UNIT_DISPLAY_NAMES[typeOf(r) as UnitBaseType],
       )
     }
-    // Every unit type in the deck gets its own group, no stray extras.
-    const groups = [...new Set(upgrades.map(r => r.display.subcategory))]
+    const groups = category.items.map(item => item.title)
     expect(groups).toEqual([
       'Flagship',
       'War Sun',

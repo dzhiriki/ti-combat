@@ -17,7 +17,6 @@ export const fleetPool: Ability<Params> = {
   key: 'FLEET_POOL',
   name: 'Enforce Fleet Pool',
   context: 'SPACE',
-  neutral: false,
   params: {
     isEnabled: false,
     uses: Infinity,
