@@ -20,7 +20,6 @@ import type {
   UnitSelection,
 } from '@/types'
 import { getFaction } from '@/utils/get-faction'
-import { DEFAULT_FACTION_BY_SYSTEM } from '@/utils/get-faction-system'
 import { DEFAULT_GAME_SYSTEM, getGameData } from '@/utils/get-game-data'
 import {
   buildUnitStatsMap,
@@ -74,7 +73,7 @@ export class CombatSetup {
 
   constructor() {
     this._system = DEFAULT_GAME_SYSTEM
-    const defaultFaction = DEFAULT_FACTION_BY_SYSTEM[this._system]
+    const defaultFaction = getGameData(this._system).defaultFaction
     const defaultUnitStats = buildUnitStatsMap(this._system, defaultFaction)
 
     this._attackerFaction = defaultFaction
@@ -214,7 +213,7 @@ export class CombatSetup {
     if (this._system === system) return
     this._system = system
 
-    const faction = DEFAULT_FACTION_BY_SYSTEM[system]
+    const faction = getGameData(system).defaultFaction
     this._attackerSelections = createDefaultUnitSelections()
     this._defenderSelections = createDefaultUnitSelections()
 

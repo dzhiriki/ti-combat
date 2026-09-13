@@ -3,10 +3,7 @@ import { z } from 'zod/mini'
 import { type Ability, extractDefaults } from '@/combat'
 import { UNIT_LIMITS, UNIT_TYPES } from '@/constants/units'
 import type { GameSystem } from '@/types'
-import {
-  DEFAULT_FACTION_BY_SYSTEM,
-  GAME_SYSTEMS,
-} from '@/utils/get-faction-system'
+import { GAME_SYSTEMS } from '@/utils/get-game-data'
 import {
   DEFAULT_GAME_SYSTEM,
   getGameData,
@@ -83,7 +80,7 @@ export function validateSerializedConfig(
     warnings.push(
       `Faction "${key}" is not available in ${system}, reset to default`,
     )
-    return DEFAULT_FACTION_BY_SYSTEM[system]
+    return getGameData(system).defaultFaction
   }
   const af = validateFaction(raw.af)
   const df = validateFaction(raw.df)
