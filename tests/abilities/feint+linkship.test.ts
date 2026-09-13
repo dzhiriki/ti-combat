@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_FEINT + TF_UPGRADE_LINKSHIP', () => {
   it('a Linkship retreating via Feint still destroys an eligible ship', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

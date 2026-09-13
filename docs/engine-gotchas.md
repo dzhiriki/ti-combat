@@ -108,9 +108,9 @@ a check there too.
   ability (`updateAbilityConfig` → `hasDynamicInvokes` in `ability-api.ts`),
   so the list can depend on the ability's own params (see
   `tests/engine/function-invoke.test.ts`). The no-unit external fallback in
-  `collectAbilityCandidates` and the OTHER-slot detection in
-  `get-available-abilities` read `ability.invoke` without a side context and
-  treat a factory as "no external invokes", and `removeUnitInvokes`'s
+  `collectAbilityCandidates` and the OTHER-slot construction in
+  `create-game-data.ts` read `ability.invoke` without a side context and treat
+  a factory as "no external invokes", and `removeUnitInvokes`'s
   per-unit-death sweep skips candidates that fail `hasStaticInvokes` rather
   than resolving them, since resolving would need per-unit params/ctx it
   doesn't have on that path — so unit-sourced candidates must keep the array
@@ -139,9 +139,10 @@ a check there too.
   branch on a value that `onParamSet` derives; key it on the raw param the
   caller wrote (Ssruu keys on `agentKey`, Clever Genome on `genomeKey`).
 
-- **A lazy faction sees only static factions.** `DataRegistry.factions`
-  excludes every definition that has a lazy part, so two lazy factions
-  cannot read each other. Nekro is the only lazy faction today.
+- **A lazy faction sees only static factions.** During resolution, the
+  system's `GameData.factions` excludes every definition that has a lazy part,
+  so two lazy factions cannot read each other. The same `GameData` object gets
+  the complete roster after resolution. Nekro is the only lazy faction today.
 
 - **Config abilities resolve before unit-attached abilities within a timing
   pass.** A unit ability's PREPARE cannot pre-empt an ADVANCED phase driver's
@@ -151,8 +152,8 @@ a check there too.
   the flagship, consumed by the capacity driver itself, not an invoke).
 
 - **TF unit-upgrade cards MUST register ahead of the base slots.**
-  `getAvailableAbilities` deliberately returns `[...tfUpgrades, ...base,
-...]`: the cards' PREPARE applies the stat block (capacity, Fighter-II-style
+  The TF `GameData` entry registers them before GENERAL/ADVANCED: the cards'
+  PREPARE applies the stat block (capacity, Fighter-II-style
   `FLEET_POOL_COST`) that the ADVANCED drivers' own PREPARE enforcement then
   reads — they are the TF analog of TI4's build-time UPGRADED stats. Re-appending them after `base` silently makes
   Capacity/Fleet Pool enforce against the un-upgraded stats (fighters
@@ -216,8 +217,8 @@ a check there too.
   and data lookups; serialize it as `g=TI4` or `g=TF`. Only URL validation infers
   it for legacy links without the field (first recognized non-neutral faction, otherwise
   TI4); explicit systems validate both factions against their own roster.
-  The `combatTest` shorthand also infers a default for existing tests, but
-  all-neutral TF tests must set `system: 'TF'` explicitly. See
+  The `combatTest` shorthand defaults to TI4; every TF test must set
+  `system: 'TF'` explicitly. See
   `tests/game-system.test.ts` for URL and worker regression coverage.
 
 - **`resetSettingsToBase` intentionally does NOT re-apply

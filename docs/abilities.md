@@ -2,7 +2,7 @@
 
 ## File Structure
 
-Data is split by game system: `src/data/main/` (Twilight Imperium 4) and `src/data/tf/` (Twilight's Fall). Each has an `index.ts` exporting the same `GameData` shape (`factions`, `baseUnits`, `abilities` — the full shared pool available in that system, generic mechanics included); code outside `src/data` reads it through `getGameData(system)` (`src/utils/get-game-data.ts`) and never imports data files directly. Shared TI4 abilities are organized in `src/data/main/abilities/` by category:
+Data is split by game system: `src/data/main/` (Twilight Imperium 4) and `src/data/tf/` (Twilight's Fall). Each `index.ts` default-exports a complete `GameData` entry point: system metadata, factions, base units, registered and lookup ability pools, slot presentation, and faction/ability lookup methods. Code outside `src/data` reads it through `getGameData(system)` (`src/utils/get-game-data.ts`) and never imports system data files directly. System-specific availability policy is declared when the entry calls `createGameData`. Shared TI4 abilities are organized in `src/data/main/abilities/` by category:
 
 ```
 src/data/main/abilities/
@@ -500,18 +500,18 @@ Stats invokes expose their `unitType` and `stats`, narrowed by `isStatsInvoke`
 from `@/utils/is-stats-invoke`. Janovet uses these to inherit printed upgrade
 abilities without depending on factory metadata or runtime unit modifications.
 
-### Registry (data side)
+### Lazy faction data
 
-A faction module exports a `FactionDefinition`. Its `abilities` and any unit `ABILITIES` may be a function of the `DataRegistry`, resolved once by the system index (`resolveFactions` in `src/data/registry.ts`):
+A faction module exports a `FactionDefinition`. Its `abilities` and any unit `ABILITIES` may be a function of the system's `GameData`, resolved once by `createGameData`:
 
 ```typescript
 export const nekro_virus: FactionDefinition = {
-  abilities: registry => ({ technology: copyTechnologies(registry.factions) }),
-  units: { FLAGSHIP: { BASE: { ABILITIES: registry => [...] } } },
+  abilities: data => ({ technology: copyTechnologies(data.factions) }),
+  units: { FLAGSHIP: { BASE: { ABILITIES: data => [...] } } },
 }
 ```
 
-`registry` exposes `system`, `baseUnits`, the static `factions` of the system, and `getAbilities(slot)`. A lazy faction never sees another lazy faction. Use this instead of importing other faction modules.
+This is the same `GameData` entity that the system exports. It exposes `id`, `baseUnits`, `factions`, and `getAbilities(slot)`. During lazy resolution, `factions` intentionally contains only static factions, so a lazy faction never sees another lazy faction. Use this instead of importing other faction modules.
 
 ### Unit Abilities
 

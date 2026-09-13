@@ -28,7 +28,7 @@ import type {
   UnitIdList,
   UnitState,
 } from '@/types'
-import { getFactionSystem } from '@/utils/get-faction-system'
+import { DEFAULT_GAME_SYSTEM } from '@/utils/get-game-data'
 
 import { shuffleInPlace } from './shuffle'
 
@@ -643,13 +643,7 @@ export function transitionAndLoad(
 // ============================================================================
 
 export function combatTest(config: CombatTestConfig): CombatTest {
-  const system =
-    config.system ??
-    getFactionSystem(
-      config.attacker.faction === 'NEUTRAL'
-        ? config.defender.faction
-        : config.attacker.faction,
-    )
+  const system = config.system ?? DEFAULT_GAME_SYSTEM
   const reversed = _reversed
   const effectiveConfig = reversed
     ? { ...config, attacker: config.defender, defender: config.attacker }

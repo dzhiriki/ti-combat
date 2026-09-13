@@ -10,9 +10,8 @@ import { UNIT_TYPES } from '@/constants/units'
 import * as main from '@/data/main'
 import * as tf from '@/data/tf'
 import { CombatSetup } from '@/hooks/combat-setup'
-import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
-import type { GameSystem } from '@/types'
-import { getFactionKeysBySystem } from '@/utils/get-faction-system'
+import { GAME_SYSTEMS } from '@/utils/get-faction-system'
+import { getGameData } from '@/utils/get-game-data'
 
 // Static invariants over every registered ability. Each check here enforces a
 // rule that previously lived only in docs/engine-gotchas.md or the ability
@@ -24,10 +23,12 @@ import { getFactionKeysBySystem } from '@/utils/get-faction-system'
  *  slots (agents, shared unit abilities) is one entry. */
 function collectAllAbilities(): Map<Ability, string> {
   const out = new Map<Ability, string>()
-  for (const a of getAllAbilities()) {
-    if (!out.has(a)) out.set(a, a.key)
+  for (const system of GAME_SYSTEMS) {
+    for (const ability of getGameData(system).allAbilities) {
+      if (!out.has(ability)) out.set(ability, ability.key)
+    }
   }
-  // getAllAbilities skips unit-attached abilities with no UI — walk the unit
+  // GameData lookup pools skip unit-attached abilities with no UI — walk the unit
   // definitions too so engine-level checks cover them.
   for (const [factionKey, faction] of [
     ...Object.entries(main.factions),
@@ -149,18 +150,11 @@ interface DisplayedEntry {
 }
 
 function collectDisplayed(): DisplayedEntry[] {
-  const bySystem: Record<GameSystem, string[]> = {
-    TI4: getFactionKeysBySystem('TI4'),
-    TF: getFactionKeysBySystem('TF'),
-  }
-
   const seen = new Set<Ability>()
   const out: DisplayedEntry[] = []
 
-  for (const [system, keys] of Object.entries(bySystem) as [
-    GameSystem,
-    string[],
-  ][]) {
+  for (const system of GAME_SYSTEMS) {
+    const keys = Object.keys(getGameData(system).factions)
     const setup = new CombatSetup()
     setup.setSystem(system)
     for (const side of ['attacker', 'defender'] as const) {

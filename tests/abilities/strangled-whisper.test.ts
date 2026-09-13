@@ -10,6 +10,7 @@ import { combatTest } from '../utils/combat-test'
 describe.forEachSide('A Strangled Whisper', () => {
   it('carries any number of fighters while the flagship is fielded', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'SICKENING_LURCH',
@@ -25,6 +26,7 @@ describe.forEachSide('A Strangled Whisper', () => {
 
   it('mechs still count against capacity — only infantry and fighters are free', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'SICKENING_LURCH',
@@ -43,6 +45,7 @@ describe.forEachSide('A Strangled Whisper', () => {
 
   it('capacity is enforced again once the flagship dies', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'SICKENING_LURCH',

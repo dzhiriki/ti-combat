@@ -1,17 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
-import {
-  buildAbilityLookup,
-  validateSerializedConfig,
-} from '@/hooks/combat-setup/validation'
+import { validateSerializedConfig } from '@/hooks/combat-setup/validation'
 import {
   configToSearchString,
   searchParamsToConfig,
 } from '@/hooks/use-url-sync'
-
-const abilityLookup = buildAbilityLookup(getAllAbilities())
 
 function baseConfig(): SerializedConfig {
   return {
@@ -34,22 +28,16 @@ describe('URL round-trip', () => {
     ['NEUTRAL', 'AVARICE_REX', 'TF'],
     ['NEUTRAL', 'NEUTRAL', 'TI4'],
   ])('restores legacy %s vs %s links as %s', (af, df, system) => {
-    const raw = searchParamsToConfig(
-      `?v=1&af=${af}&df=${df}&m=S`,
-      abilityLookup,
-    )
+    const raw = searchParamsToConfig(`?v=1&af=${af}&df=${df}&m=S`)
     expect(raw).not.toHaveProperty('g')
-    const result = validateSerializedConfig(raw, abilityLookup)
+    const result = validateSerializedConfig(raw)
     expect(result.config.g).toBe(system)
     expect(result.warnings).toEqual([])
   })
 
   it('does not treat an explicitly empty URL system as a legacy link', () => {
-    const raw = searchParamsToConfig(
-      '?v=1&g=&af=AVARICE_REX&df=NEUTRAL&m=S',
-      abilityLookup,
-    )
-    const result = validateSerializedConfig(raw, abilityLookup)
+    const raw = searchParamsToConfig('?v=1&g=&af=AVARICE_REX&df=NEUTRAL&m=S')
+    const result = validateSerializedConfig(raw)
     expect(result.config.g).toBe('TI4')
     expect(result.warnings).toContain('Invalid game system reset to TI4')
   })
@@ -65,7 +53,7 @@ describe('URL round-trip', () => {
     config.da['PRE_GALVANIZED'] = { galvanizedUnits }
 
     const search = configToSearchString(config)
-    const decoded = searchParamsToConfig(`?${search}`, abilityLookup)
+    const decoded = searchParamsToConfig(`?${search}`)
 
     expect(
       (decoded.da as Record<string, Record<string, unknown>>)['PRE_GALVANIZED']
@@ -83,7 +71,7 @@ describe('URL round-trip', () => {
     config.da['SUSTAIN_DAMAGE'] = { spacePriority }
 
     const search = configToSearchString(config)
-    const decoded = searchParamsToConfig(`?${search}`, abilityLookup)
+    const decoded = searchParamsToConfig(`?${search}`)
 
     expect(
       (decoded.da as Record<string, Record<string, unknown>>)['SUSTAIN_DAMAGE']
@@ -104,8 +92,8 @@ describe('URL round-trip', () => {
       unitPriority: [['FIGHTER'], ['DESTROYER']],
     }
     const search = configToSearchString(config)
-    const decoded = searchParamsToConfig(`?${search}`, abilityLookup)
-    const result = validateSerializedConfig(decoded, abilityLookup)
+    const decoded = searchParamsToConfig(`?${search}`)
+    const result = validateSerializedConfig(decoded)
     expect(result.warnings).toEqual([])
     expect(result.config.da['UNIT_PRIORITY']).toBeDefined()
     expect(result.config.da['SPACE_CANNON_OFFENSE']).toBeDefined()
@@ -119,8 +107,8 @@ describe('URL round-trip', () => {
     const search =
       '?v=1&af=ARBOREC&df=ARBOREC&m=S&au.FIGHTER=1.0&du.FIGHTER=1.0' +
       '&da.PRE_GALVANIZED.galvanizedUnits=FIGHTER,1,DESTROYER,0'
-    const decoded = searchParamsToConfig(search, abilityLookup)
-    const result = validateSerializedConfig(decoded, abilityLookup)
+    const decoded = searchParamsToConfig(search)
+    const result = validateSerializedConfig(decoded)
     expect(result.warnings.some(w => w.includes('Galvanized'))).toBe(true)
     expect(result.config.da['PRE_GALVANIZED']).toBeUndefined()
   })
@@ -131,7 +119,7 @@ describe('URL round-trip', () => {
     config.da['UNIT_PRIORITY'] = { spaceUnitPriority }
 
     const search = configToSearchString(config)
-    const decoded = searchParamsToConfig(`?${search}`, abilityLookup)
+    const decoded = searchParamsToConfig(`?${search}`)
 
     // Order-mode lists round-trip as flat string arrays — `unwrapUnitListKeys`
     // accepts both shapes, so the consumer treats them equivalently.

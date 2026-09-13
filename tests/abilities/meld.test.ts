@@ -8,6 +8,7 @@ describe('TF_MELD', () => {
     // Attacker cruiser combat 7, melded die = 2d10 summed, capped at 10:
     // P(hit) = 1 - (6·5)/200 = 0.85. Defender cruiser rolls naturally (0.4).
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -36,6 +37,7 @@ describe('TF_MELD', () => {
     // Cruiser 7 and dreadnought 5: the cruiser die gains more from melding
     // (0.4 → 0.85), so it is chosen; the dreadnought stays natural (0.6).
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -57,6 +59,7 @@ describe('TF_MELD', () => {
 
   it('bills one use per melded roll and stops when spent', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -87,6 +90,7 @@ describe('TF_MELD', () => {
   it('scope selects which rolls meld — unit-ability dice qualify only when chosen', () => {
     // Defender PDS space cannon 6: natural 0.5; melded 1 - (5·4)/200 = 0.9.
     const scoped = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: { faction: 'AVARICE_REX', units: { CRUISER: 2 } },
       defender: {
@@ -104,6 +108,7 @@ describe('TF_MELD', () => {
 
     // Default scope (COMBAT) leaves the Space Cannon roll natural.
     const combatOnly = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: { faction: 'AVARICE_REX', units: { CRUISER: 2 } },
       defender: {

@@ -12,6 +12,7 @@ describe('TF_COLADA + CROWN_OF_THALNOS', () => {
     //   P(1) = C(2,1)*0.8*0.2 * C(1,0)*0.1            = 0.032
     //   P(2) = C(2,1)*0.8*0.2 * 0.9  +  0.8^2         = 0.928
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'SAINT_OF_SWORDS',
@@ -38,6 +39,7 @@ describe('TF_COLADA + CROWN_OF_THALNOS', () => {
     // it stays at [6,1] — one die per unit, which Crown's safe path leaves
     // alone. Plain 0.5/0.5.
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'SAINT_OF_SWORDS',

@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF unit abilities', () => {
   it('Hel-Titan PDS participates in ground combat as a ground force', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',
@@ -23,6 +24,7 @@ describe('TF unit abilities', () => {
 
   it('Exotrireme self-destruct destroys up to 2 enemy ships', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -43,6 +45,7 @@ describe('TF unit abilities', () => {
 
   it('Exotrireme self-destruct fires once per use after the same round', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -64,6 +67,7 @@ describe('TF unit abilities', () => {
 
   it('Exotrireme self-destruct is limited by its uses', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -85,6 +89,7 @@ describe('TF unit abilities', () => {
 
   it('Exotrireme self-destruct honors a custom target priority order', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -117,6 +122,7 @@ describe('TF unit abilities', () => {
 
   it('Exotrireme stat upgrade applies even with 0 uses (self-destruct off)', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -139,6 +145,7 @@ describe('TF unit abilities', () => {
 
   it('Radiant Aur mech repairs a damaged mech at the start of a ground round', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'RADIANT_AUR',
@@ -160,6 +167,7 @@ describe('TF unit abilities', () => {
 
   it('Radiant Aur mech repair waits for the damaged-mech threshold', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'RADIANT_AUR',
@@ -190,6 +198,7 @@ describe('TF unit abilities', () => {
 
   it('Radiant Aur mech repair threshold tracks LIVING mechs as they die', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'RADIANT_AUR',
@@ -217,6 +226,7 @@ describe('TF unit abilities', () => {
 
   it('Radiant Aur mech repair is limited by its uses (1 token = 1 repair)', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'RADIANT_AUR',

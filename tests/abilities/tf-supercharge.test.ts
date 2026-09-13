@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe.forEachSide('TF_SUPERCHARGE', () => {
   it('applies +2 to exactly one unit of the preferred type', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -27,6 +28,7 @@ describe.forEachSide('TF_SUPERCHARGE', () => {
 
   it('falls through to the next priority when the preferred type is gone', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -54,6 +56,7 @@ describe.forEachSide('TF_SUPERCHARGE', () => {
 
   it('applies in ground combat too', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',

@@ -2,11 +2,13 @@ import type { Ability, RegisteredAbility } from '@/combat'
 import { UNIT_DISPLAY_NAMES } from '@/constants/units'
 import advanced from '@/data/main/abilities/advanced'
 import environment from '@/data/main/abilities/environment'
-import general from '@/data/main/abilities/general'
+import general, {
+  SHARED_UNIT_ABILITY_KEYS,
+} from '@/data/main/abilities/general'
 import relic from '@/data/main/abilities/relic'
 import type { UnitBaseType, UnitDefinition } from '@/types'
 
-import { resolveFactions } from '../registry'
+import { createGameData } from '../create-game-data'
 import ability from './abilities/ability'
 import actionCard from './abilities/action-card'
 import genome from './abilities/genome'
@@ -15,15 +17,16 @@ import unitUpgrade from './abilities/unit-upgrade'
 import {
   type AbilitySlot,
   FACTION_KEY_TO_SLOT,
+  SLOT_DISPLAY,
+  SLOT_ORDER,
   unitSlot,
 } from './ability-slots'
 import baseUnits from './base-units'
 import factionDefinitions from './faction'
 
-// Twilight's Fall: the faction roster, the generic unit roster, and every
-// shared (non-faction) ability available in a TF session. Same shape as
-// `src/data/main` (see `GameData`); code outside `src/data` must import only
-// these index modules.
+// Twilight's Fall. This module default-exports its complete GameData entry
+// point; code outside `src/data` selects it through `getGameData` rather than
+// importing system internals.
 
 export type { AbilitySlot } from './ability-slots'
 export {
@@ -66,7 +69,7 @@ const unitUpgrades: RegisteredAbility<AbilitySlot>[] = Object.entries(
 // unit-upgrade cards are the TF analog of TI4's build-time UPGRADED stats:
 // their PREPARE applies the stat block that the ADVANCED drivers (Capacity,
 // Fleet Pool) read during their own PREPARE enforcement, so they go first.
-export const abilities: readonly RegisteredAbility<AbilitySlot>[] = [
+const sharedAbilities: readonly RegisteredAbility<AbilitySlot>[] = [
   ...unitUpgrades,
   ...tag(tfGeneral, 'GENERAL'),
   ...tag(advanced, 'ADVANCED'),
@@ -78,14 +81,32 @@ export const abilities: readonly RegisteredAbility<AbilitySlot>[] = [
   ...tag(actionCard, 'TF_ACTION_CARD'),
 ]
 
-export const factions = resolveFactions(
-  'TF',
+const gameData = createGameData({
+  id: 'TF',
+  label: "Twilight's Fall",
+  factionDefinitions,
   // base-units' literal COMBAT: number[] doesn't structurally match
   // DiceGroup's tuple type, so the cast needs an `unknown` bridge.
-  baseUnits as unknown as Readonly<Record<string, UnitDefinition>>,
-  abilities,
-  factionDefinitions,
-  { FACTION_KEY_TO_SLOT, unitSlot },
-)
+  baseUnits: baseUnits as unknown as Readonly<Record<string, UnitDefinition>>,
+  sharedAbilities,
+  FACTION_KEY_TO_SLOT,
+  unitSlot,
+  SLOT_DISPLAY,
+  SLOT_ORDER,
+  sharedUnitAbilityKeys: SHARED_UNIT_ABILITY_KEYS,
+  neutral: {
+    hiddenSlots: [
+      'RELIC',
+      'TF_ABILITY',
+      'TF_PARADIGM',
+      'TF_ACTION_CARD',
+      'TF_UNIT_UPGRADE',
+    ],
+  },
+})
 
+export const factions = gameData.factions
 export type FactionKey = keyof typeof factions
+export const abilities = gameData.abilities
+export const allAbilities = gameData.allAbilities
+export default gameData

@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe.forEachSide('TF_TEMPORAL_COMMAND_SUITE', () => {
   it('re-readies the chosen genome, granting it an extra use', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -32,6 +33,7 @@ describe.forEachSide('TF_TEMPORAL_COMMAND_SUITE', () => {
 
   it('the same genome can be re-readied several times', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -57,6 +59,7 @@ describe.forEachSide('TF_TEMPORAL_COMMAND_SUITE', () => {
 
   it('each genome receives its own token count', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -85,6 +88,7 @@ describe.forEachSide('TF_TEMPORAL_COMMAND_SUITE', () => {
 
   it('a re-readied genome still fires at most once per window', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -114,6 +118,7 @@ describe.forEachSide('TF_TEMPORAL_COMMAND_SUITE', () => {
 
   it('genomes with a zero count receive nothing', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -135,6 +140,7 @@ describe.forEachSide('TF_TEMPORAL_COMMAND_SUITE', () => {
 
   it('without the suite the genome exhausts after one use', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

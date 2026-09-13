@@ -5,6 +5,7 @@ import { combatTest, unitsByBaseType } from '../utils/combat-test'
 describe('TF genomes', () => {
   it('Mirror Genome blocks opponent Space Cannon Offense', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -20,6 +21,7 @@ describe('TF genomes', () => {
 
   it('Splitting Genome places 2 fighters when your cruiser is destroyed', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -38,6 +40,7 @@ describe('TF genomes', () => {
 
   it('Temporal Genome (Thundarian reuse) restarts a bad roll for a TF faction', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -65,6 +68,7 @@ describe('TF genomes', () => {
 
   it('Valiant Genome rolls 1 die against the opponent when your unit dies', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -93,6 +97,7 @@ describe('TF genomes', () => {
 
   it('Valiant Genome is not exhausted for an unchecked own loss', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -117,6 +122,7 @@ describe('TF genomes', () => {
 
   it('Valiant Genome holds back when the opponent would give up an unchecked unit', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

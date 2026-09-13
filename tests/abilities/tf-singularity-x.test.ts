@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_SINGULARITY_X', () => {
   it('copies an opponent ability mid-combat, after an opponent unit is destroyed', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -32,6 +33,7 @@ describe('TF_SINGULARITY_X', () => {
 
   it('does not fire when no ability is selected to copy', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

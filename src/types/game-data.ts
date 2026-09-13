@@ -1,13 +1,11 @@
-import type { RegisteredAbility } from '@/combat'
+import type { Ability, RegisteredAbility } from '@/combat'
 
-import type { Faction } from './faction'
-import type { UnitBaseType } from './unit'
+import type { CombatSide } from './combat-side'
+import type { Faction, GameSystem } from './faction'
+import type { UnitBaseType, UnitDefinition } from './unit'
 
-// The shape every game system's data module (`src/data/main`, `src/data/tf`)
-// exports: its faction roster, its generic unit roster, and the shared
-// (non-faction) ability pool already tagged with panel slots. Consumers pick
-// the module for the selected system via `getGameData` and never reach into
-// the data folders directly.
+// The complete public entry point exported by every game system. Consumers
+// select one through `getGameData` and do not import system internals.
 export interface SlotDisplay {
   category: string
   subcategory?: string
@@ -19,9 +17,26 @@ export interface AbilitySlotData {
 }
 
 export interface GameData extends AbilitySlotData {
+  id: GameSystem
+  label: string
+  defaultFaction: string
   factions: Readonly<Record<string, Faction>>
-  baseUnits: Readonly<Record<string, unknown>>
+  baseUnits: Readonly<Record<string, UnitDefinition>>
+  /** Full system pool before faction- and side-specific entries are added. */
   abilities: readonly RegisteredAbility[]
+  /** Every ability reachable through this system, for config validation. */
+  allAbilities: readonly Ability[]
   SLOT_DISPLAY: Readonly<Record<string, SlotDisplay>>
   SLOT_ORDER: readonly string[]
+  /** All shared, faction, and unit abilities registered under a slot. */
+  getAbilities(slot: string): readonly Ability[]
+  getFaction(factionKey: string): Faction
+  getFactionUnitConfig(factionKey: string): Record<UnitBaseType, UnitDefinition>
+  getAvailableAbilities(
+    side: CombatSide,
+    factionKey: string,
+    upgradedTypes?: ReadonlySet<UnitBaseType>,
+  ): RegisteredAbility[]
+  getUnitDefinitionAbilityKeys(factionKey: string): ReadonlySet<string>
+  getFactionOwnedAbilityKeys(factionKey: string): ReadonlySet<string>
 }

@@ -7,6 +7,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_CLOAK', () => {
   it('Cloak blocks opponent Space Cannon Offense in Twilight’s Fall', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

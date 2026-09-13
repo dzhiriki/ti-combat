@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_UPGRADE_JUSTICIAR_RAIL', () => {
   it('routes its Space Cannon hits onto non-fighter ships first', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

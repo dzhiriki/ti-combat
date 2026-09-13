@@ -11,6 +11,7 @@ describe('TF_FACES_OF_JANOVET', () => {
   it('gains AFB from an enabled destroyer upgrade (Exile)', () => {
     // Flagship inherits AFB [6,3] → 3 dice at 6+ against 2 fighters.
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'EL_NEN_JANOVET',
@@ -31,6 +32,7 @@ describe('TF_FACES_OF_JANOVET', () => {
 
   it('gains Bombardment and Spark immunity from a dreadnought upgrade', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'EL_NEN_JANOVET',
@@ -66,6 +68,7 @@ describe('TF_FACES_OF_JANOVET', () => {
       ],
     }
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'EL_NEN_JANOVET',
@@ -89,6 +92,7 @@ describe('TF_FACES_OF_JANOVET', () => {
 
   it('inherits nothing from war sun upgrades or with no cards enabled', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'EL_NEN_JANOVET',
@@ -109,6 +113,7 @@ describe('TF_FACES_OF_JANOVET', () => {
 
   it('inherits Linkship retreat text without fielding a destroyer', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'EL_NEN_JANOVET',
@@ -130,6 +135,7 @@ describe('TF_FACES_OF_JANOVET', () => {
   it("inherits Strike Wing Alpha's AFB text: naturals 9/10 destroy infantry", () => {
     // Flagship AFB [6,3] via SWA → same distribution as the destroyer test.
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'EL_NEN_JANOVET',

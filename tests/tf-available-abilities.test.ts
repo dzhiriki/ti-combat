@@ -140,6 +140,7 @@ describe("Twilight's Fall available abilities", () => {
 
   it('Artemiris Ascendant defaults to placing the flagship and 2 cruisers', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -159,6 +160,7 @@ describe("Twilight's Fall available abilities", () => {
 
   it('neutral vs a TF faction can use a TF genome in combat', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'NEUTRAL',

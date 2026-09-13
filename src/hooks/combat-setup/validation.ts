@@ -7,7 +7,11 @@ import {
   DEFAULT_FACTION_BY_SYSTEM,
   GAME_SYSTEMS,
 } from '@/utils/get-faction-system'
-import { getGameData } from '@/utils/get-game-data'
+import {
+  DEFAULT_GAME_SYSTEM,
+  getGameData,
+  isGameSystem,
+} from '@/utils/get-game-data'
 
 import type { SerializedConfig } from './serialization'
 
@@ -23,7 +27,9 @@ export interface ValidationResult {
   warnings: string[]
 }
 
-export function buildAbilityLookup(abilities: Ability[]): Map<string, Ability> {
+export function buildAbilityLookup(
+  abilities: readonly Ability[],
+): Map<string, Ability> {
   const map = new Map<string, Ability>()
   for (const ability of abilities) {
     if (!map.has(ability.key)) {
@@ -33,9 +39,27 @@ export function buildAbilityLookup(abilities: Ability[]): Map<string, Ability> {
   return map
 }
 
+/** Resolve an explicit or legacy serialized system before ability decoding. */
+export function resolveSerializedGameSystem(raw: {
+  g?: unknown
+  af?: unknown
+  df?: unknown
+}): GameSystem {
+  if (isGameSystem(raw.g)) return raw.g
+  if (raw.g !== undefined) return DEFAULT_GAME_SYSTEM
+
+  for (const key of [raw.af, raw.df]) {
+    if (typeof key !== 'string' || key === 'NEUTRAL') continue
+    const inferred = GAME_SYSTEMS.find(system =>
+      Object.hasOwn(getGameData(system).factions, key),
+    )
+    if (inferred) return inferred
+  }
+  return DEFAULT_GAME_SYSTEM
+}
+
 export function validateSerializedConfig(
   raw: SerializedConfig | Record<string, unknown>,
-  abilityLookup: Map<string, Ability>,
 ): ValidationResult {
   const warnings: string[] = []
 
@@ -44,23 +68,11 @@ export function validateSerializedConfig(
 
   // Only legacy links (without a system) infer it from factions. An explicit
   // system is authoritative, including when both sides are Neutral.
-  let system: GameSystem = 'TI4'
-  if (raw.g === undefined) {
-    for (const key of [raw.af, raw.df]) {
-      if (typeof key !== 'string' || key === 'NEUTRAL') continue
-      const inferred = GAME_SYSTEMS.find(s =>
-        Object.hasOwn(getGameData(s).factions, key),
-      )
-      if (inferred) {
-        system = inferred
-        break
-      }
-    }
-  } else if (raw.g === 'TF' || raw.g === 'TI4') {
-    system = raw.g
-  } else {
-    warnings.push('Invalid game system reset to TI4')
+  const system = resolveSerializedGameSystem(raw)
+  if (raw.g !== undefined && !isGameSystem(raw.g)) {
+    warnings.push(`Invalid game system reset to ${DEFAULT_GAME_SYSTEM}`)
   }
+  const abilityLookup = buildAbilityLookup(getGameData(system).allAbilities)
 
   // Factions must belong to the selected system. Validate after inference so
   // an unknown legacy attacker doesn't hide a valid TF defender.

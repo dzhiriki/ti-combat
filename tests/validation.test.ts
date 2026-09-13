@@ -1,14 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { CombatSetup } from '@/hooks/combat-setup'
-import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
-import {
-  buildAbilityLookup,
-  validateSerializedConfig,
-} from '@/hooks/combat-setup/validation'
-
-const abilityLookup = buildAbilityLookup(getAllAbilities())
+import { validateSerializedConfig } from '@/hooks/combat-setup/validation'
 
 function makeValidConfig(): SerializedConfig {
   const setup = new CombatSetup()
@@ -19,7 +13,7 @@ function makeValidConfig(): SerializedConfig {
 describe('validateSerializedConfig', () => {
   it('accepts a valid config with no warnings', () => {
     const config = makeValidConfig()
-    const result = validateSerializedConfig(config, abilityLookup)
+    const result = validateSerializedConfig(config)
     expect(result.warnings).toEqual([])
     expect(result.config).toEqual(config)
   })
@@ -37,7 +31,7 @@ describe('validateSerializedConfig', () => {
     (af, df, system, expectedAf, expectedDf) => {
       const legacy: Record<string, unknown> = { ...makeValidConfig(), af, df }
       delete legacy.g
-      const result = validateSerializedConfig(legacy, abilityLookup)
+      const result = validateSerializedConfig(legacy)
       expect(result.config.g).toBe(system)
       expect(result.config.af).toBe(expectedAf)
       expect(result.config.df).toBe(expectedDf)
@@ -53,10 +47,12 @@ describe('validateSerializedConfig', () => {
   ])(
     'treats explicit %s as authoritative over faction %s',
     (system, af, expectedAf) => {
-      const result = validateSerializedConfig(
-        { ...makeValidConfig(), g: system, af, df: 'NEUTRAL' },
-        abilityLookup,
-      )
+      const result = validateSerializedConfig({
+        ...makeValidConfig(),
+        g: system,
+        af,
+        df: 'NEUTRAL',
+      })
       expect(result.config.g).toBe(system)
       expect(result.config.af).toBe(expectedAf)
       expect(result.config.df).toBe('NEUTRAL')
@@ -69,10 +65,11 @@ describe('validateSerializedConfig', () => {
   it.each(['UNKNOWN', '', null, 42])(
     'warns for invalid explicit system %s',
     system => {
-      const result = validateSerializedConfig(
-        { ...makeValidConfig(), g: system, af: 'AVARICE_REX' },
-        abilityLookup,
-      )
+      const result = validateSerializedConfig({
+        ...makeValidConfig(),
+        g: system,
+        af: 'AVARICE_REX',
+      })
       // Invalid explicit systems reset to TI4; only missing systems infer TF.
       expect(result.config.g).toBe('TI4')
       expect(result.config.af).toBe('ARBOREC')
@@ -83,10 +80,12 @@ describe('validateSerializedConfig', () => {
   it.each(['UNKNOWN', 'toString', '__proto__'])(
     'resets unknown TF faction %s to its system default',
     af => {
-      const result = validateSerializedConfig(
-        { ...makeValidConfig(), g: 'TF', af, df: 'NEUTRAL' },
-        abilityLookup,
-      )
+      const result = validateSerializedConfig({
+        ...makeValidConfig(),
+        g: 'TF',
+        af,
+        df: 'NEUTRAL',
+      })
       expect(result.config.af).toBe('AVARICE_REX')
       expect(result.warnings).toHaveLength(1)
     },
@@ -94,7 +93,7 @@ describe('validateSerializedConfig', () => {
 
   it('resets unknown faction to default', () => {
     const config = { ...makeValidConfig(), af: 'NONEXISTENT_FACTION' }
-    const result = validateSerializedConfig(config, abilityLookup)
+    const result = validateSerializedConfig(config)
     expect(result.warnings.length).toBeGreaterThan(0)
     expect(result.warnings[0]).toContain('NONEXISTENT_FACTION')
     expect(result.config.af).not.toBe('NONEXISTENT_FACTION')
@@ -102,7 +101,7 @@ describe('validateSerializedConfig', () => {
 
   it('resets invalid combat mode to default', () => {
     const config = { ...makeValidConfig(), m: 'X' as 'S' | 'G' }
-    const result = validateSerializedConfig(config, abilityLookup)
+    const result = validateSerializedConfig(config)
     expect(result.warnings.length).toBeGreaterThan(0)
     expect(result.config.m).toBe('S')
   })
@@ -110,7 +109,7 @@ describe('validateSerializedConfig', () => {
   it('ignores unknown unit types with warning', () => {
     const config = makeValidConfig()
     config.au['FAKE_UNIT'] = [3, 0]
-    const result = validateSerializedConfig(config, abilityLookup)
+    const result = validateSerializedConfig(config)
     expect(result.warnings.length).toBeGreaterThan(0)
     expect(result.config.au['FAKE_UNIT']).toBeUndefined()
   })
@@ -118,7 +117,7 @@ describe('validateSerializedConfig', () => {
   it('clamps unit count to limits', () => {
     const config = makeValidConfig()
     config.au['FLAGSHIP'] = [5, 0]
-    const result = validateSerializedConfig(config, abilityLookup)
+    const result = validateSerializedConfig(config)
     expect(result.config.au['FLAGSHIP']![0]).toBe(1)
   })
 
@@ -128,7 +127,7 @@ describe('validateSerializedConfig', () => {
       isEnabled: 'not_a_bool' as unknown as boolean,
       uses: 2,
     }
-    const result = validateSerializedConfig(config, abilityLookup)
+    const result = validateSerializedConfig(config)
     expect(result.warnings.length).toBeGreaterThan(0)
     expect(result.config.aa['DIRECT_HIT']).toBeUndefined()
   })
@@ -152,7 +151,7 @@ describe('validateSerializedConfig', () => {
       },
       da: {},
     }
-    const result = validateSerializedConfig(config, abilityLookup)
+    const result = validateSerializedConfig(config)
     expect(result.warnings).toEqual([])
     expect(result.config.aa['NON_EUCLIDEAN_SHIELDING']).toBeDefined()
     expect(result.config.aa['GRAVLEASH_MANEUVERS']).toBeDefined()
@@ -161,16 +160,24 @@ describe('validateSerializedConfig', () => {
   it('skips unknown ability keys with warning', () => {
     const config = makeValidConfig()
     config.aa['NONEXISTENT_ABILITY'] = { isEnabled: true, uses: 1 }
-    const result = validateSerializedConfig(config, abilityLookup)
+    const result = validateSerializedConfig(config)
     expect(result.warnings.length).toBeGreaterThan(0)
     expect(result.config.aa['NONEXISTENT_ABILITY']).toBeUndefined()
+  })
+
+  it('rejects abilities from a different game system', () => {
+    const config = makeValidConfig()
+    config.aa['TF_HARDLIGHT'] = { isEnabled: true, uses: 1 }
+    const result = validateSerializedConfig(config)
+    expect(result.warnings).toContain('Unknown ability "TF_HARDLIGHT" skipped')
+    expect(result.config.aa['TF_HARDLIGHT']).toBeUndefined()
   })
 
   it('keeps valid abilities alongside invalid ones', () => {
     const config = makeValidConfig()
     config.aa['DIRECT_HIT'] = { isEnabled: true, uses: 2 }
     config.aa['FAKE_ABILITY'] = { isEnabled: true, uses: 1 }
-    const result = validateSerializedConfig(config, abilityLookup)
+    const result = validateSerializedConfig(config)
     expect(result.config.aa['DIRECT_HIT']).toBeDefined()
     expect(result.config.aa['FAKE_ABILITY']).toBeUndefined()
   })
@@ -198,7 +205,7 @@ describe('validateSerializedConfig', () => {
     })
 
     const config = setup.toSerializedConfig()
-    const result = validateSerializedConfig(config, abilityLookup)
+    const result = validateSerializedConfig(config)
     expect(result.warnings).toEqual([])
     expect(result.config.aa['TF_HARDLIGHT']).toBeDefined()
     expect(result.config.aa['TF_DIVINITY']).toBeDefined()
@@ -219,7 +226,7 @@ describe('validateSerializedConfig', () => {
       isEnabled: true,
       galvanizedUnits: ['FIGHTER', '1', 'DESTROYER', '0'],
     }
-    const result = validateSerializedConfig(config, abilityLookup)
+    const result = validateSerializedConfig(config)
     expect(result.warnings.some(w => w.includes('Galvanized'))).toBe(true)
     expect(result.config.da['PRE_GALVANIZED']).toBeUndefined()
   })

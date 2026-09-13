@@ -80,7 +80,6 @@ export function CombatSimulator({
     simulationInput,
     serializedConfig,
     loadConfig,
-    allAbilities,
     setSystem,
     setFaction,
     setUnitCount,
@@ -93,7 +92,7 @@ export function CombatSimulator({
   } = useCombatSetup()
 
   const { toast } = useToast()
-  useUrlSync(serializedConfig, loadConfig, allAbilities, toast)
+  useUrlSync(serializedConfig, loadConfig, toast)
 
   const [attackerSheetOpen, setAttackerSheetOpen] = useState(false)
   const [defenderSheetOpen, setDefenderSheetOpen] = useState(false)

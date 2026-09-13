@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_DIVINITY', () => {
   it('saves a unit from destruction during space combat', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -24,6 +25,7 @@ describe('TF_DIVINITY', () => {
 
   it('is not spent when the unit it would save is unchecked', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -53,6 +55,7 @@ describe('TF_DIVINITY', () => {
 
   it('spends the save when the last-hit unit is a checked type', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -81,6 +84,7 @@ describe('TF_DIVINITY', () => {
 
   it('also saves a unit during ground combat', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',

@@ -1,5 +1,6 @@
 import type { Ability } from '@/combat'
 
+import type { GameData } from './game-data'
 import type { UnitBaseType, UnitDefinition, UnitDefinitionInput } from './unit'
 
 // Game systems the calculator supports. TI4 is the base + expansions
@@ -18,19 +19,10 @@ export interface Faction {
   abilities?: FactionAbilities
 }
 
-/** Registration-time view of a game system, handed to lazy faction
- *  definitions. Lazy factions are not visible in `factions`. */
-export interface DataRegistry {
-  readonly system: GameSystem
-  readonly baseUnits: Readonly<Record<string, UnitDefinition>>
-  readonly factions: Readonly<Record<string, Faction>>
-  /** Every ability registered under `slot`: shared decks from the system's
-   *  `abilities` list, faction-owned lists via FACTION_KEY_TO_SLOT, and
-   *  unit-attached abilities via `unitSlot`. Computed once per slot. */
-  getAbilities(slot: string): readonly Ability[]
-}
-
-export type Lazy<T> = T | ((registry: DataRegistry) => T)
+/** Lazy definitions receive the same GameData entity exported by the system.
+ *  While factions are resolving, its `factions` lookup intentionally exposes
+ *  only static factions. */
+export type Lazy<T> = T | ((gameData: GameData) => T)
 
 /** Authoring shape of a faction module. Resolved to `Faction` by the system
  *  index; nothing outside `src/data` sees it. */

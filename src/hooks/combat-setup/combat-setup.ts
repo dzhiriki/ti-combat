@@ -21,16 +21,12 @@ import type {
 } from '@/types'
 import { getFaction } from '@/utils/get-faction'
 import { DEFAULT_FACTION_BY_SYSTEM } from '@/utils/get-faction-system'
+import { DEFAULT_GAME_SYSTEM, getGameData } from '@/utils/get-game-data'
 import {
   buildUnitStatsMap,
   getSimulationUnits,
 } from '@/utils/get-simulation-units'
 
-import {
-  getAvailableAbilities,
-  getFactionOwnedAbilityKeys,
-  getUnitDefinitionAbilityKeys,
-} from './get-available-abilities'
 import {
   initializeAbilityDefaults,
   reconcileAbilitiesConfig,
@@ -92,7 +88,7 @@ export class CombatSetup {
   private _syncSnapshots: SyncSnapshots = new Map()
 
   constructor() {
-    this._system = 'TI4'
+    this._system = DEFAULT_GAME_SYSTEM
     const defaultFaction = DEFAULT_FACTION_BY_SYSTEM[this._system]
     const defaultUnitStats = buildUnitStatsMap(this._system, defaultFaction)
 
@@ -103,14 +99,13 @@ export class CombatSetup {
     this._combatMode = 'SPACE'
     this._abilities = { attacker: {}, defender: {} }
 
-    const attackerRegistered = getAvailableAbilities(
-      this._system,
+    const gameData = getGameData(this._system)
+    const attackerRegistered = gameData.getAvailableAbilities(
       'attacker',
       defaultFaction,
       this.getUpgradedTypes('attacker'),
     )
-    const defenderRegistered = getAvailableAbilities(
-      this._system,
+    const defenderRegistered = gameData.getAvailableAbilities(
       'defender',
       defaultFaction,
       this.getUpgradedTypes('defender'),
@@ -125,12 +120,12 @@ export class CombatSetup {
       defender: flattenUnique(defenderRegistered),
     }
     this._unitAbilityKeys = {
-      attacker: getUnitDefinitionAbilityKeys(this._system, defaultFaction),
-      defender: getUnitDefinitionAbilityKeys(this._system, defaultFaction),
+      attacker: gameData.getUnitDefinitionAbilityKeys(defaultFaction),
+      defender: gameData.getUnitDefinitionAbilityKeys(defaultFaction),
     }
     this._factionOwnedKeys = {
-      attacker: getFactionOwnedAbilityKeys(this._system, defaultFaction),
-      defender: getFactionOwnedAbilityKeys(this._system, defaultFaction),
+      attacker: gameData.getFactionOwnedAbilityKeys(defaultFaction),
+      defender: gameData.getFactionOwnedAbilityKeys(defaultFaction),
     }
 
     this._stateData = {
@@ -261,8 +256,8 @@ export class CombatSetup {
     }
 
     // Reload abilities for the changed side
-    const reg = getAvailableAbilities(
-      this._system,
+    const gameData = getGameData(this._system)
+    const reg = gameData.getAvailableAbilities(
       side,
       faction,
       this.getUpgradedTypes(side),
@@ -270,14 +265,8 @@ export class CombatSetup {
     this._sideRegistered[side] = reg
     this._lookups = createLookups(this._sideRegistered)
     this._sideAbilities[side] = flattenUnique(reg)
-    this._unitAbilityKeys[side] = getUnitDefinitionAbilityKeys(
-      this._system,
-      faction,
-    )
-    this._factionOwnedKeys[side] = getFactionOwnedAbilityKeys(
-      this._system,
-      faction,
-    )
+    this._unitAbilityKeys[side] = gameData.getUnitDefinitionAbilityKeys(faction)
+    this._factionOwnedKeys[side] = gameData.getFactionOwnedAbilityKeys(faction)
 
     // Rebuild side config: keep existing params for surviving abilities,
     // initialize defaults for new ones
@@ -385,8 +374,7 @@ export class CombatSetup {
     this.rebuildUnits(side, faction, newSelections)
 
     // Upgrades may have changed — recalculate available abilities
-    const regReset = getAvailableAbilities(
-      this._system,
+    const regReset = getGameData(this._system).getAvailableAbilities(
       side,
       faction,
       this.getUpgradedTypes(side),
@@ -454,14 +442,13 @@ export class CombatSetup {
     // Recompute available abilities for the swapped sides — `side`-restricted
     // abilities (e.g. attacker-only commanders) need re-filtering against the
     // new side. Swapping the cached lists alone leaks old entries through.
-    const attackerRegistered = getAvailableAbilities(
-      this._system,
+    const gameData = getGameData(this._system)
+    const attackerRegistered = gameData.getAvailableAbilities(
       'attacker',
       this._attackerFaction,
       this.getUpgradedTypes('attacker'),
     )
-    const defenderRegistered = getAvailableAbilities(
-      this._system,
+    const defenderRegistered = gameData.getAvailableAbilities(
       'defender',
       this._defenderFaction,
       this.getUpgradedTypes('defender'),
@@ -476,18 +463,12 @@ export class CombatSetup {
       defender: flattenUnique(defenderRegistered),
     }
     this._unitAbilityKeys = {
-      attacker: getUnitDefinitionAbilityKeys(
-        this._system,
-        this._attackerFaction,
-      ),
-      defender: getUnitDefinitionAbilityKeys(
-        this._system,
-        this._defenderFaction,
-      ),
+      attacker: gameData.getUnitDefinitionAbilityKeys(this._attackerFaction),
+      defender: gameData.getUnitDefinitionAbilityKeys(this._defenderFaction),
     }
     this._factionOwnedKeys = {
-      attacker: getFactionOwnedAbilityKeys(this._system, this._attackerFaction),
-      defender: getFactionOwnedAbilityKeys(this._system, this._defenderFaction),
+      attacker: gameData.getFactionOwnedAbilityKeys(this._attackerFaction),
+      defender: gameData.getFactionOwnedAbilityKeys(this._defenderFaction),
     }
 
     // Rebuild units for both sides
@@ -590,14 +571,13 @@ export class CombatSetup {
     }
 
     // Rebuild abilities for new factions
-    const attackerReg = getAvailableAbilities(
-      this._system,
+    const gameData = getGameData(this._system)
+    const attackerReg = gameData.getAvailableAbilities(
       'attacker',
       af,
       this.getUpgradedTypes('attacker'),
     )
-    const defenderReg = getAvailableAbilities(
-      this._system,
+    const defenderReg = gameData.getAvailableAbilities(
       'defender',
       df,
       this.getUpgradedTypes('defender'),
@@ -612,12 +592,12 @@ export class CombatSetup {
       defender: flattenUnique(defenderReg),
     }
     this._unitAbilityKeys = {
-      attacker: getUnitDefinitionAbilityKeys(this._system, af),
-      defender: getUnitDefinitionAbilityKeys(this._system, df),
+      attacker: gameData.getUnitDefinitionAbilityKeys(af),
+      defender: gameData.getUnitDefinitionAbilityKeys(df),
     }
     this._factionOwnedKeys = {
-      attacker: getFactionOwnedAbilityKeys(this._system, af),
-      defender: getFactionOwnedAbilityKeys(this._system, df),
+      attacker: gameData.getFactionOwnedAbilityKeys(af),
+      defender: gameData.getFactionOwnedAbilityKeys(df),
     }
 
     // Initialize ability defaults, reconcile, then apply URL overrides
@@ -722,8 +702,7 @@ export class CombatSetup {
     this.rebuildUnits(side, faction, newSelections)
 
     if (upgradeChanged) {
-      const regUpd = getAvailableAbilities(
-        this._system,
+      const regUpd = getGameData(this._system).getAvailableAbilities(
         side,
         faction,
         this.getUpgradedTypes(side),

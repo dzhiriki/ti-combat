@@ -3,28 +3,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CombatOutcome } from '@/combat'
 import { CombatSetup, type SimulationInput } from '@/hooks/combat-setup'
 import { buildCombatState } from '@/hooks/combat-setup/build-combat-state'
-import {
-  getAllAbilities,
-  getAvailableAbilities,
-} from '@/hooks/combat-setup/get-available-abilities'
 import { prepareSimulationConfig } from '@/hooks/combat-setup/prepare-simulation-config'
-import {
-  buildAbilityLookup,
-  validateSerializedConfig,
-} from '@/hooks/combat-setup/validation'
+import { validateSerializedConfig } from '@/hooks/combat-setup/validation'
 import {
   configToSearchString,
   searchParamsToConfig,
 } from '@/hooks/use-url-sync'
 import { getFaction } from '@/utils/get-faction'
-import {
-  GAME_SYSTEMS,
-  getFactionKeysBySystem,
-} from '@/utils/get-faction-system'
+import { GAME_SYSTEMS } from '@/utils/get-faction-system'
 import { getFactionUnitConfig } from '@/utils/get-faction-unit-config'
 import { getGameData } from '@/utils/get-game-data'
-
-const abilityLookup = buildAbilityLookup(getAllAbilities())
 
 describe('explicit game system', () => {
   afterEach(() => {
@@ -40,8 +28,8 @@ describe('explicit game system', () => {
       expect(new Set(data.SLOT_ORDER).size).toBe(data.SLOT_ORDER.length)
       expect(new Set(data.SLOT_ORDER)).toEqual(new Set(displaySlots))
 
-      for (const faction of getFactionKeysBySystem(system)) {
-        for (const reg of getAvailableAbilities(system, 'attacker', faction)) {
+      for (const faction of Object.keys(data.factions)) {
+        for (const reg of data.getAvailableAbilities('attacker', faction)) {
           expect(
             Object.hasOwn(data.SLOT_DISPLAY, reg.slot),
             `${system}:${faction} uses undeclared slot ${reg.slot}`,
@@ -81,10 +69,7 @@ describe('explicit game system', () => {
     const searchParams = new URLSearchParams(search)
     expect(searchParams.get('g')).toBe(system)
     expect(searchParams.has('system')).toBe(false)
-    const result = validateSerializedConfig(
-      searchParamsToConfig(search, abilityLookup),
-      abilityLookup,
-    )
+    const result = validateSerializedConfig(searchParamsToConfig(search))
     expect(result.warnings).toEqual([])
     expect(result.config).toEqual(serialized)
 
@@ -123,10 +108,10 @@ describe('explicit game system', () => {
   it('validates factions against the selected system in data lookups', () => {
     // Populate TI4 caches first: a cache keyed only by faction must not let
     // a later cross-system request bypass validation.
-    getAvailableAbilities('TI4', 'attacker', 'ARBOREC')
-    expect(() => getAvailableAbilities('TF', 'attacker', 'ARBOREC')).toThrow(
-      'Faction "ARBOREC" is not available in TF',
-    )
+    getGameData('TI4').getAvailableAbilities('attacker', 'ARBOREC')
+    expect(() =>
+      getGameData('TF').getAvailableAbilities('attacker', 'ARBOREC'),
+    ).toThrow('Faction "ARBOREC" is not available in TF')
     expect(() => getFaction('TI4', 'AVARICE_REX')).toThrow()
     expect(() => getFactionUnitConfig('TI4', 'AVARICE_REX')).toThrow()
   })

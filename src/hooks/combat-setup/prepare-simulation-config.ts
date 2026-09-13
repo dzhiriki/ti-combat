@@ -1,5 +1,6 @@
 import { createLookups } from '@/combat'
 import type { CombatSide, GameSystem } from '@/types'
+import { getGameData } from '@/utils/get-game-data'
 
 import type {
   Ability,
@@ -9,11 +10,6 @@ import type {
   CombatMode,
   SideAbilitiesConfig,
 } from '../../combat/combat-state/types'
-import {
-  getAvailableAbilities,
-  getFactionOwnedAbilityKeys,
-  getUnitDefinitionAbilityKeys,
-} from './get-available-abilities'
 import {
   clampLimitParams,
   initializeAbilityDefaults,
@@ -47,6 +43,7 @@ export function prepareSimulationConfig(
   combatMode: CombatMode,
   customAbilities?: Ability[],
 ): Record<CombatSide, SideAbilitiesData> {
+  const gameData = getGameData(system)
   const custom = customAbilities ?? []
   // Custom abilities aren't tied to a slot — surface them as 'OTHER'
   // so they still flow through the registered pipeline.
@@ -56,11 +53,11 @@ export function prepareSimulationConfig(
   }))
   const registered: Record<CombatSide, RegisteredAbility[]> = {
     attacker: [
-      ...getAvailableAbilities(system, 'attacker', attackerFaction),
+      ...gameData.getAvailableAbilities('attacker', attackerFaction),
       ...customRegistered,
     ],
     defender: [
-      ...getAvailableAbilities(system, 'defender', defenderFaction),
+      ...gameData.getAvailableAbilities('defender', defenderFaction),
       ...customRegistered,
     ],
   }
@@ -109,13 +106,13 @@ export function prepareSimulationConfig(
   return {
     attacker: {
       registered: registered.attacker,
-      unitAbilityKeys: getUnitDefinitionAbilityKeys(system, attackerFaction),
-      factionOwnedKeys: getFactionOwnedAbilityKeys(system, attackerFaction),
+      unitAbilityKeys: gameData.getUnitDefinitionAbilityKeys(attackerFaction),
+      factionOwnedKeys: gameData.getFactionOwnedAbilityKeys(attackerFaction),
     },
     defender: {
       registered: registered.defender,
-      unitAbilityKeys: getUnitDefinitionAbilityKeys(system, defenderFaction),
-      factionOwnedKeys: getFactionOwnedAbilityKeys(system, defenderFaction),
+      unitAbilityKeys: gameData.getUnitDefinitionAbilityKeys(defenderFaction),
+      factionOwnedKeys: gameData.getFactionOwnedAbilityKeys(defenderFaction),
     },
   }
 }

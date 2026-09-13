@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe.forEachSide('TF_CLEVER_GENOME + TF_TEMPORAL_COMMAND_SUITE', () => {
   it('Clever Genome doubles the copied text in one window, and TCS re-readies it', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

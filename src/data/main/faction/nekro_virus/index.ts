@@ -13,9 +13,9 @@ import type {
 import { SHARED_UNIT_ABILITY_KEYS } from '@/data/main/abilities/general'
 import { sustainDamage } from '@/data/main/abilities/general/sustain-damage'
 import type {
-  DataRegistry,
   Faction,
   FactionDefinition,
+  GameData,
   UnitBaseType,
   UnitDefinition,
 } from '@/types'
@@ -139,7 +139,7 @@ function createFactionUnitAbility(
 }
 
 // ---------------------------------------------------------------------------
-// Collect and memoize the copies made from the registry's faction roster
+// Collect and memoize copies made from the game data's faction roster
 // ---------------------------------------------------------------------------
 
 interface NekroCopies {
@@ -149,13 +149,13 @@ interface NekroCopies {
   singularity: Ability
 }
 
-const copiesByRegistry = new WeakMap<DataRegistry, NekroCopies>()
+const copiesByGameData = new WeakMap<GameData, NekroCopies>()
 
-function collect(registry: DataRegistry): NekroCopies {
-  const cached = copiesByRegistry.get(registry)
+function collect(gameData: GameData): NekroCopies {
+  const cached = copiesByGameData.get(gameData)
   if (cached) return cached
 
-  const others = registry.factions
+  const others = gameData.factions
 
   const flagship = Object.values(others).flatMap(faction =>
     (faction.units.FLAGSHIP?.BASE?.ABILITIES ?? [])
@@ -223,11 +223,11 @@ function collect(registry: DataRegistry): NekroCopies {
     ;(genericUpgradeConflicts[ut] ??= []).push(a.key)
   }
   const genericUnitUpgrades = createGenericUnitUpgrades(
-    registry.baseUnits,
+    gameData.baseUnits,
     genericUpgradeConflicts,
   )
 
-  const taggedGenericTechs = registry
+  const taggedGenericTechs = gameData
     .getAbilities('TECHNOLOGY')
     .map(a => ({ ability: a, subcategory: 'TECHNOLOGY' as const }))
   const taggedUnitUpgrades = genericUnitUpgrades.map(a => ({
@@ -260,7 +260,7 @@ function collect(registry: DataRegistry): NekroCopies {
   )
 
   const copies = { flagship, technology, unit, singularity }
-  copiesByRegistry.set(registry, copies)
+  copiesByGameData.set(gameData, copies)
   return copies
 }
 
@@ -271,8 +271,8 @@ function collect(registry: DataRegistry): NekroCopies {
 export const nekro_virus: FactionDefinition = {
   name: 'Nekro Virus',
   icon: nekroVirusIcon,
-  abilities: registry => {
-    const { singularity, technology, unit } = collect(registry)
+  abilities: gameData => {
+    const { singularity, technology, unit } = collect(gameData)
     return { faction: [singularity], technology, unit }
   },
   units: {
@@ -289,10 +289,10 @@ export const nekro_virus: FactionDefinition = {
         UNIT_ABILITIES: {
           SUSTAIN_DAMAGE: true,
         },
-        ABILITIES: registry => [
+        ABILITIES: gameData => [
           theAlastor,
           sustainDamage,
-          ...collect(registry).flagship,
+          ...collect(gameData).flagship,
         ],
       },
     },

@@ -7,6 +7,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF war sun vs Planetary Shield', () => {
   it('base war sun bombardment is blocked by Planetary Shield', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',
@@ -29,6 +30,7 @@ describe('TF war sun vs Planetary Shield', () => {
   // marking shields lost even with no war sun on the field.
   it('dreadnought bombardment is blocked by Planetary Shield', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',
@@ -47,6 +49,7 @@ describe('TF war sun vs Planetary Shield', () => {
 
   it('Prototype War Sun upgrade disables Planetary Shield', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',

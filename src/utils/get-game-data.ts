@@ -1,14 +1,16 @@
-import * as main from '@/data/main'
-import * as tf from '@/data/tf'
+import { GAME_DATA } from '@/data'
 import type { GameData, GameSystem } from '@/types'
 
-const DATA_BY_SYSTEM: Record<GameSystem, GameData> = {
-  TI4: main,
-  TF: tf,
+export const GAME_SYSTEMS: readonly GameSystem[] = Object.keys(
+  GAME_DATA,
+) as GameSystem[]
+export const DEFAULT_GAME_SYSTEM = GAME_SYSTEMS[0]
+
+/** The public data entry point for a game system. */
+export function getGameData(system: GameSystem): GameData {
+  return GAME_DATA[system]
 }
 
-/** The data module (factions, generic units, shared ability pool) for a game
- *  system. Everything outside `src/data` reads game data through this. */
-export function getGameData(system: GameSystem): GameData {
-  return DATA_BY_SYSTEM[system]
+export function isGameSystem(value: unknown): value is GameSystem {
+  return typeof value === 'string' && Object.hasOwn(GAME_DATA, value)
 }

@@ -1,12 +1,22 @@
 import type { Ability } from '@/combat'
-import type { baseUnits } from '@/data/main'
 
 import type { DiceGroup } from './die'
 import type { Lazy } from './faction'
 
 export type UnitVariantId = string & { readonly __brand: 'UnitVariantId' }
 
-export type UnitBaseType = keyof typeof baseUnits | 'FLAGSHIP' | 'MECH'
+export type UnitBaseType =
+  | 'FLAGSHIP'
+  | 'WAR_SUN'
+  | 'DREADNOUGHT'
+  | 'CARRIER'
+  | 'CRUISER'
+  | 'DESTROYER'
+  | 'FIGHTER'
+  | 'MECH'
+  | 'INFANTRY'
+  | 'PDS'
+  | 'SPACE_DOCK'
 type UnitVariant = `${UnitBaseType}:${UnitVariantId}`
 export type UnitType = UnitBaseType | UnitVariant
 
@@ -48,7 +58,7 @@ export interface UnitDefinition {
 }
 
 /** Authoring shape of a unit's stats: `ABILITIES` may be computed from the
- *  data registry. Resolved to `UnitStats` by the system index. */
+ *  system's GameData. Resolved to `UnitStats` by the system entry point. */
 export type UnitStatsInput = Omit<UnitStats, 'ABILITIES'> & {
   ABILITIES?: Lazy<readonly Ability[]>
 }

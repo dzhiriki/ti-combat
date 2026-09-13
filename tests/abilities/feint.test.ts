@@ -19,6 +19,7 @@ function dicePoolEntries(t: ReturnType<typeof combatTest>): number {
 describe.forEachSide('TF_FEINT', () => {
   it('retreats at the announcement — the combat round is never fought', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -43,6 +44,7 @@ describe.forEachSide('TF_FEINT', () => {
 
   it('waits for the announced round — earlier rounds are fought normally', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -70,6 +72,7 @@ describe.forEachSide('TF_FEINT', () => {
 
   it('without a retreat announced it does nothing', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

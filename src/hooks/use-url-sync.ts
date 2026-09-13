@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 
-import type { Ability } from '@/combat'
-import { extractDefaults } from '@/combat'
+import { type Ability, extractDefaults } from '@/combat'
+import { getGameData } from '@/utils/get-game-data'
 
 import type { SerializedConfig } from './combat-setup/serialization'
 import {
   buildAbilityLookup,
+  resolveSerializedGameSystem,
   validateSerializedConfig,
 } from './combat-setup/validation'
 
@@ -79,11 +80,14 @@ function encodeScalar(v: unknown): string {
 
 // ── Decode: query string → raw config object ────────────────────────
 
-export function searchParamsToConfig(
-  search: string,
-  abilityLookup: Map<string, Ability>,
-): Record<string, unknown> {
+export function searchParamsToConfig(search: string): Record<string, unknown> {
   const params = new URLSearchParams(search)
+  const system = resolveSerializedGameSystem({
+    ...(params.has('g') && { g: params.get('g') }),
+    af: params.get('af'),
+    df: params.get('df'),
+  })
+  const abilityLookup = buildAbilityLookup(getGameData(system).allAbilities)
   const au: Record<string, [number, 0 | 1]> = {}
   const du: Record<string, [number, 0 | 1]> = {}
   const aa: Record<string, Record<string, unknown>> = {}
@@ -185,16 +189,10 @@ function decodeScalar(s: string): unknown {
 export function useUrlSync(
   serializedConfig: SerializedConfig,
   loadConfig: (config: SerializedConfig) => void,
-  allAbilities: Ability[],
   toast: (message: string) => void,
 ): void {
   const loadedRef = useRef(false)
   const initialConfigRef = useRef(serializedConfig)
-  const abilityLookup = useMemo(
-    () => buildAbilityLookup(allAbilities),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  )
 
   // Read URL on mount (one-time)
   useEffect(() => {
@@ -205,8 +203,8 @@ export function useUrlSync(
     }
 
     try {
-      const raw = searchParamsToConfig(search, abilityLookup)
-      const { config, warnings } = validateSerializedConfig(raw, abilityLookup)
+      const raw = searchParamsToConfig(search)
+      const { config, warnings } = validateSerializedConfig(raw)
       loadConfig(config)
       if (warnings.length > 0) {
         toast(warnings.join('; '))

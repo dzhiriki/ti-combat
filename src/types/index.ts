@@ -3,11 +3,9 @@ export interface UnitSelection {
   upgraded: boolean
 }
 
-export type CombatSide = 'attacker' | 'defender'
-
+export type { CombatSide } from './combat-side'
 export type { DiceGroup } from './die'
 export type {
-  DataRegistry,
   Faction,
   FactionAbilities,
   FactionDefinition,
