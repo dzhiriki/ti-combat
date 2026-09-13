@@ -33,7 +33,6 @@ export type {
   OwnOpponentContext,
   ParamChange,
   ParamFilter,
-  RegisteredAbility,
   RuntimeAbilityList,
   SettingsParams,
   SyncSortSpec,

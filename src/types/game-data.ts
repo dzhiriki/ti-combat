@@ -1,4 +1,4 @@
-import type { Ability, RegisteredAbility } from '@/combat'
+import type { Ability } from '@/combat'
 
 import type { CombatSide } from './combat-side'
 import type { Faction, GameSystem } from './faction'
@@ -71,7 +71,9 @@ export interface SlotDisplay {
  * An ability paired with one slot entry of the config that shows it. Built
  * once per system; `getAvailableAbilities` filters these for a faction.
  */
-export interface CollectedAbility extends RegisteredAbility {
+export interface CollectedAbility {
+  ability: Ability
+  slot: string
   strategy?: SlotStrategy
   /** Whether the NEUTRAL faction sees this entry. */
   neutral: boolean

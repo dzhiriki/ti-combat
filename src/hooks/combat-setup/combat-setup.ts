@@ -40,19 +40,6 @@ import {
 } from './serialization'
 import type { SimulationInput } from './types'
 
-// The flat `_sideAbilities` list feeds engine reconciliation and must hold
-// each ability once.
-function flattenUnique(regs: readonly CollectedAbility[]): Ability[] {
-  const seen = new Set<string>()
-  const out: Ability[] = []
-  for (const r of regs) {
-    if (seen.has(r.ability.key)) continue
-    seen.add(r.ability.key)
-    out.push(r.ability)
-  }
-  return out
-}
-
 function createDefaultUnitSelections(): Record<UnitBaseType, UnitSelection> {
   return UNIT_TYPES.reduce(
     (acc, unitType) => {
@@ -114,8 +101,8 @@ export class CombatSetup {
     }
     this._lookups = createLookups(this._sideRegistered)
     this._sideAbilities = {
-      attacker: flattenUnique(attackerRegistered),
-      defender: flattenUnique(defenderRegistered),
+      attacker: attackerRegistered.map(r => r.ability),
+      defender: defenderRegistered.map(r => r.ability),
     }
     this._unitAbilityKeys = {
       attacker: gameData.getUnitDefinitionAbilityKeys(defaultFaction),
@@ -262,7 +249,7 @@ export class CombatSetup {
     )
     this._sideRegistered[side] = reg
     this._lookups = createLookups(this._sideRegistered)
-    this._sideAbilities[side] = flattenUnique(reg)
+    this._sideAbilities[side] = reg.map(r => r.ability)
     this._unitAbilityKeys[side] = gameData.getUnitDefinitionAbilityKeys(faction)
     this._factionOwnedKeys[side] = gameData.getFactionOwnedAbilityKeys(faction)
 
@@ -379,7 +366,7 @@ export class CombatSetup {
     )
     this._sideRegistered[side] = regReset
     this._lookups = createLookups(this._sideRegistered)
-    this._sideAbilities[side] = flattenUnique(regReset)
+    this._sideAbilities[side] = regReset.map(r => r.ability)
     reconcileAbilitiesConfig(
       this._abilities,
       this._sideAbilities,
@@ -457,8 +444,8 @@ export class CombatSetup {
     }
     this._lookups = createLookups(this._sideRegistered)
     this._sideAbilities = {
-      attacker: flattenUnique(attackerRegistered),
-      defender: flattenUnique(defenderRegistered),
+      attacker: attackerRegistered.map(r => r.ability),
+      defender: defenderRegistered.map(r => r.ability),
     }
     this._unitAbilityKeys = {
       attacker: gameData.getUnitDefinitionAbilityKeys(this._attackerFaction),
@@ -586,8 +573,8 @@ export class CombatSetup {
     }
     this._lookups = createLookups(this._sideRegistered)
     this._sideAbilities = {
-      attacker: flattenUnique(attackerReg),
-      defender: flattenUnique(defenderReg),
+      attacker: attackerReg.map(r => r.ability),
+      defender: defenderReg.map(r => r.ability),
     }
     this._unitAbilityKeys = {
       attacker: gameData.getUnitDefinitionAbilityKeys(af),
@@ -707,7 +694,7 @@ export class CombatSetup {
       )
       this._sideRegistered[side] = regUpd
       this._lookups = createLookups(this._sideRegistered)
-      this._sideAbilities[side] = flattenUnique(regUpd)
+      this._sideAbilities[side] = regUpd.map(r => r.ability)
     }
     reconcileAbilitiesConfig(
       this._abilities,

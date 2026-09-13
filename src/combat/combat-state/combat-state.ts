@@ -1,5 +1,6 @@
 import { GROUND_FORCES, STRUCTURES } from '@/constants/units'
 import type {
+  CollectedAbility,
   CombatSide,
   DiceGroup,
   UnitAbility,
@@ -17,7 +18,6 @@ import {
   cloneTracker,
   type DicePool,
   type InvokeCollections,
-  type RegisteredAbility,
 } from '../abilities-engine'
 import { AbilityContext } from '../abilities-engine/api/ability-api'
 import { extractDefaults } from '../abilities-engine/declare-param'
@@ -235,7 +235,7 @@ export class CombatState {
     attacker: SideStateData,
     defender: SideStateData,
     combatMode: CombatMode,
-    abilities?: Record<import('@/types').CombatSide, RegisteredAbility[]>,
+    abilities?: Record<import('@/types').CombatSide, CollectedAbility[]>,
     unitAbilityKeys?: Record<import('@/types').CombatSide, ReadonlySet<string>>,
     factionOwnedKeys?: Record<
       import('@/types').CombatSide,
@@ -307,7 +307,7 @@ export class CombatState {
 
   public static fromDataStandalone(
     data: CombatStateData,
-    abilities?: Record<import('@/types').CombatSide, RegisteredAbility[]>,
+    abilities?: Record<import('@/types').CombatSide, CollectedAbility[]>,
     unitAbilityKeys?: Record<import('@/types').CombatSide, ReadonlySet<string>>,
     factionOwnedKeys?: Record<
       import('@/types').CombatSide,
@@ -343,7 +343,7 @@ export class CombatState {
    *  defaults. Only fills absent keys — never overwrites existing config. */
   private static _ensureAbilityDefaults(
     data: CombatStateData,
-    abilities: Record<import('@/types').CombatSide, RegisteredAbility[]>,
+    abilities: Record<import('@/types').CombatSide, CollectedAbility[]>,
   ): void {
     for (const side of ['attacker', 'defender'] as const) {
       const cfg = data[side].abilities

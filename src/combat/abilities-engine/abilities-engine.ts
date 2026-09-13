@@ -1,4 +1,5 @@
 import type {
+  CollectedAbility,
   CombatSide,
   UnitBaseType,
   UnitId,
@@ -32,7 +33,6 @@ import type {
   Ability,
   AbilityInvoke,
   AbilityTiming,
-  RegisteredAbility,
   RuntimeAbilityList,
 } from './types'
 
@@ -85,18 +85,16 @@ const PRE_SORTED_BUCKETS: AbilityTiming[] = [
 
 // ── Ability execution engine (module-private helpers) ────────────────────
 
-function dedupeRegistered(regs: readonly RegisteredAbility[]): {
+/** Split a side's registered list into the ability list and the key→slot
+ *  map the runtime lookups are built from. Each ability appears once. */
+function indexRegistered(regs: readonly CollectedAbility[]): {
   abilities: Ability[]
   slots: Map<string, string>
 } {
-  const abilities: Ability[] = []
-  const slots = new Map<string, string>()
-  for (const r of regs) {
-    if (slots.has(r.ability.key)) continue
-    slots.set(r.ability.key, r.slot)
-    abilities.push(r.ability)
+  return {
+    abilities: regs.map(r => r.ability),
+    slots: new Map(regs.map(r => [r.ability.key, r.slot])),
   }
-  return { abilities, slots }
 }
 
 /** Source of an ability - either from config, a deploy ability, or a unit */
@@ -553,18 +551,6 @@ export class AbilitiesEngine {
     return this._abilities[side]
   }
 
-  /** Re-emit the per-side abilities as `RegisteredAbility[]`, preserving the
-   *  slot tags captured at engine construction. Used by the test harness when
-   *  building a follow-up CombatState that must accept the same registered
-   *  shape the simulation pipeline produces. */
-  getRegisteredAbilities(side: CombatSide): RegisteredAbility[] {
-    const slots = this._abilitySlots[side]
-    return this._abilities[side].map(ability => ({
-      ability,
-      slot: slots.get(ability.key) ?? 'OTHER',
-    }))
-  }
-
   get unitAbilityKeys(): Record<CombatSide, ReadonlySet<string>> {
     return this._unitAbilityKeys
   }
@@ -638,13 +624,8 @@ export class AbilitiesEngine {
   /**
    * Create from pre-reconciled config data (simulation initialization path).
    *
-   * The `registered` input may contain duplicate ability keys when the same
-   * ability is intentionally surfaced under multiple slots (e.g., the active
-   * faction's agents appear once under AGENT and once under FACTION_AGENT for
-   * panel rendering). The engine deduplicates here so internal lookups,
-   * reconciliation, and runtime accessors see a single entry per key. The
-   * first occurrence wins — order in `registered` determines which slot the
-   * runtime ability list reports.
+   * `registered` lists each ability once per side, in registration order —
+   * the data layer guarantees it (see `getAvailableAbilities`).
    *
    * Expects the caller to have already run reconciliation
    * (via prepareSimulationConfig). This factory just loads abilities
@@ -652,19 +633,19 @@ export class AbilitiesEngine {
    */
   static fromConfig(
     combatState: CombatState,
-    registered: Record<CombatSide, RegisteredAbility[]>,
+    registered: Record<CombatSide, CollectedAbility[]>,
     unitAbilityKeys: Record<CombatSide, ReadonlySet<string>>,
     factionOwnedKeys: Record<CombatSide, ReadonlySet<string>>,
   ): AbilitiesEngine {
-    const attackerDedup = dedupeRegistered(registered.attacker)
-    const defenderDedup = dedupeRegistered(registered.defender)
+    const attackerIndex = indexRegistered(registered.attacker)
+    const defenderIndex = indexRegistered(registered.defender)
     const abilities: Record<CombatSide, Ability[]> = {
-      attacker: attackerDedup.abilities,
-      defender: defenderDedup.abilities,
+      attacker: attackerIndex.abilities,
+      defender: defenderIndex.abilities,
     }
     const abilitySlots: Record<CombatSide, Map<string, string>> = {
-      attacker: attackerDedup.slots,
-      defender: defenderDedup.slots,
+      attacker: attackerIndex.slots,
+      defender: defenderIndex.slots,
     }
     const instance = Object.create(AbilitiesEngine.prototype) as AbilitiesEngine
     instance._combatState = combatState
@@ -701,19 +682,19 @@ export class AbilitiesEngine {
    */
   static wrap(
     combatState: CombatState,
-    registered: Record<CombatSide, RegisteredAbility[]>,
+    registered: Record<CombatSide, CollectedAbility[]>,
     unitAbilityKeys: Record<CombatSide, ReadonlySet<string>>,
     factionOwnedKeys: Record<CombatSide, ReadonlySet<string>>,
   ): AbilitiesEngine {
-    const attackerDedup = dedupeRegistered(registered.attacker)
-    const defenderDedup = dedupeRegistered(registered.defender)
+    const attackerIndex = indexRegistered(registered.attacker)
+    const defenderIndex = indexRegistered(registered.defender)
     const abilities: Record<CombatSide, Ability[]> = {
-      attacker: attackerDedup.abilities,
-      defender: defenderDedup.abilities,
+      attacker: attackerIndex.abilities,
+      defender: defenderIndex.abilities,
     }
     const abilitySlots: Record<CombatSide, Map<string, string>> = {
-      attacker: attackerDedup.slots,
-      defender: defenderDedup.slots,
+      attacker: attackerIndex.slots,
+      defender: defenderIndex.slots,
     }
     const instance = Object.create(AbilitiesEngine.prototype) as AbilitiesEngine
     instance._combatState = combatState

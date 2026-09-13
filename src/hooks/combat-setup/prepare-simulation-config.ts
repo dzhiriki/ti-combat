@@ -1,11 +1,8 @@
 import { createLookups } from '@/combat'
-import type { CombatSide, GameSystem } from '@/types'
+import type { CollectedAbility, CombatSide, GameSystem } from '@/types'
 import { getGameData } from '@/utils/get-game-data'
 
-import type {
-  Ability,
-  RegisteredAbility,
-} from '../../combat/abilities-engine/types'
+import type { Ability } from '../../combat/abilities-engine/types'
 import type {
   CombatMode,
   SideAbilitiesConfig,
@@ -30,7 +27,7 @@ import {
  * factories (avoiding a redundant second call to getAvailableAbilities).
  */
 interface SideAbilitiesData {
-  registered: RegisteredAbility[]
+  registered: CollectedAbility[]
   unitAbilityKeys: ReadonlySet<string>
   factionOwnedKeys: ReadonlySet<string>
 }
@@ -45,13 +42,16 @@ export function prepareSimulationConfig(
 ): Record<CombatSide, SideAbilitiesData> {
   const gameData = getGameData(system)
   const custom = customAbilities ?? []
-  // Custom abilities aren't tied to a slot — surface them as 'OTHER'
-  // so they still flow through the registered pipeline.
-  const customRegistered: RegisteredAbility[] = custom.map(ability => ({
+  // Custom abilities (tests, ad-hoc probes) aren't collected from any slot
+  // config and never reach the panel; file them under OTHER so they flow
+  // through the same registered pipeline.
+  const customRegistered: CollectedAbility[] = custom.map(ability => ({
     ability,
     slot: 'OTHER',
+    neutral: true,
+    display: { category: 'OTHER', order: Infinity, icon: true },
   }))
-  const registered: Record<CombatSide, RegisteredAbility[]> = {
+  const registered: Record<CombatSide, CollectedAbility[]> = {
     attacker: [
       ...gameData.getAvailableAbilities('attacker', attackerFaction),
       ...customRegistered,
@@ -61,22 +61,9 @@ export function prepareSimulationConfig(
       ...customRegistered,
     ],
   }
-  // `registered` may contain the same ability under multiple slots (own
-  // faction's agents/commanders appear in both AGENT and FACTION_AGENT for
-  // panel rendering). Reconciliation operates on a unique flat list.
-  const flattenUnique = (regs: readonly RegisteredAbility[]): Ability[] => {
-    const seen = new Set<string>()
-    const out: Ability[] = []
-    for (const r of regs) {
-      if (seen.has(r.ability.key)) continue
-      seen.add(r.ability.key)
-      out.push(r.ability)
-    }
-    return out
-  }
   const abilities: Record<CombatSide, Ability[]> = {
-    attacker: flattenUnique(registered.attacker),
-    defender: flattenUnique(registered.defender),
+    attacker: registered.attacker.map(r => r.ability),
+    defender: registered.defender.map(r => r.ability),
   }
   const lookups = createLookups(registered)
 

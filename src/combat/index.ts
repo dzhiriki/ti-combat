@@ -21,7 +21,6 @@ export {
   type OwnOpponentContext,
   type ParamChange,
   type ParamFilter,
-  type RegisteredAbility,
   resolveInvokes,
   type RuntimeAbilityList,
   type SettingsParams,

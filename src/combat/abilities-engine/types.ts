@@ -611,8 +611,3 @@ export interface Ability<Params extends Record<string, unknown> = any> {
         ctx: AbilityLookupContext,
       ) => AbilityInvoke<AbilityBaseParams & Params>[])
 }
-
-export interface RegisteredAbility<Slot extends string = string> {
-  readonly ability: Ability
-  readonly slot: Slot
-}

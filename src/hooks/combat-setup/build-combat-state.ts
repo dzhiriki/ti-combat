@@ -44,8 +44,8 @@ export interface CombatStateConfig {
    *  harnesses use it to shuffle iteration order; production leaves it
    *  unset. */
   prepareAbilities?: (abilities: {
-    attacker: import('../../combat/abilities-engine/types').RegisteredAbility[]
-    defender: import('../../combat/abilities-engine/types').RegisteredAbility[]
+    attacker: import('@/types').CollectedAbility[]
+    defender: import('@/types').CollectedAbility[]
   }) => void
 }
 

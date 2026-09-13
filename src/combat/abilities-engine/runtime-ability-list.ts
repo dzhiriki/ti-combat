@@ -1,11 +1,6 @@
-import type { CombatSide } from '@/types'
+import type { CollectedAbility, CombatSide } from '@/types'
 
-import type {
-  Ability,
-  OwnOpponentContext,
-  RegisteredAbility,
-  RuntimeAbilityList,
-} from './types'
+import type { Ability, OwnOpponentContext, RuntimeAbilityList } from './types'
 
 /** Build a per-side lookup over a deduped ability list. `get(slot)` filters
  *  lazily and caches per slot, so repeated UI/engine reads share one array. */
@@ -27,25 +22,19 @@ export function createRuntimeAbilityList(
   }
 }
 
-/** Dedupe a registered list by key, keeping the first slot per key — the
- *  same rule as the engine's `dedupeRegistered`. */
 export function createRuntimeAbilityListFromRegistered(
-  registered: readonly RegisteredAbility[],
+  registered: readonly CollectedAbility[],
 ): RuntimeAbilityList {
-  const abilities: Ability[] = []
-  const slots = new Map<string, string>()
-  for (const r of registered) {
-    if (slots.has(r.ability.key)) continue
-    slots.set(r.ability.key, r.slot)
-    abilities.push(r.ability)
-  }
-  return createRuntimeAbilityList(abilities, slots)
+  return createRuntimeAbilityList(
+    registered.map(r => r.ability),
+    new Map(registered.map(r => [r.ability.key, r.slot])),
+  )
 }
 
 /** Own/opponent lookups for both sides, built from the registered lists
  *  alone — usable before an engine exists (reconcile, worker setup). */
 export function createLookups(
-  registered: Record<CombatSide, readonly RegisteredAbility[]>,
+  registered: Record<CombatSide, readonly CollectedAbility[]>,
 ): Record<CombatSide, OwnOpponentContext<RuntimeAbilityList>> {
   const attacker = createRuntimeAbilityListFromRegistered(registered.attacker)
   const defender = createRuntimeAbilityListFromRegistered(registered.defender)
