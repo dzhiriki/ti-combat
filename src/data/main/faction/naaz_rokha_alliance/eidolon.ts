@@ -17,9 +17,13 @@ export const eidolon: Ability = {
   invoke: [
     {
       timing: 'START_OF_COMBAT',
+      isCallable: (_params, ctx) =>
+        ctx.api.own.getUnitSurface(ctx.getUnit()) ===
+        ctx.api.own.getSpaceSurfaceId(),
       call: ctx => {
         ctx.api.own.updateAbilityConfig('SETTINGS', {
-          ships: (current: UnitBaseType[]) => [...current, 'MECH'],
+          ships: (current: UnitBaseType[]) =>
+            current.includes('MECH') ? current : [...current, 'MECH'],
         })
         const stats = ctx.api.own.getUnitStats('MECH')!
         // Modify all mechs to Z-Grav form: combat [8, 2], loses Sustain Damage

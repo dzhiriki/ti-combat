@@ -35,6 +35,7 @@ export const assaultCannon: Ability<Params> = {
         const { nonFighterShips } = ctx.api.own.getAbilityConfig('SETTINGS')
         const nonFighterCount = ctx.api.own.countUnits(nonFighterShips, {
           includeVariants: true,
+          participatingOnly: true,
         })
         if (nonFighterCount < 3) return false
 

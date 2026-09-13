@@ -37,5 +37,16 @@ export const morphwing: Ability = {
         })
       },
     },
+    {
+      timing: 'END_OF_COMBAT',
+      context: 'GROUND_COMBAT',
+      isCallable: (_params, ctx) => ctx.side === 'attacker',
+      call: ctx => {
+        const fighters = ctx.api.own.getUnits('FIGHTER', {
+          includeVariants: true,
+        })
+        ctx.api.own.moveUnits(fighters, ctx.api.own.getSpaceSurfaceId())
+      },
+    },
   ],
 }

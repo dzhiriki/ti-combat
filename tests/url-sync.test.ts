@@ -128,4 +128,37 @@ describe('URL round-trip', () => {
         ?.spaceUnitPriority,
     ).toEqual(['FIGHTER', 'DESTROYER', 'CRUISER'])
   })
+
+  it('round-trips surface editor state and placements', () => {
+    const config: SerializedConfig = {
+      ...baseConfig(),
+      v: 2,
+      e: 'F',
+      p: ['planet-1', 'planet-2'],
+      sp: 'planet-2',
+      asu: {
+        space: { CRUISER: [1, 0] },
+        'planet-1': {},
+        'planet-2': { INFANTRY: [2, 1] },
+      },
+      dsu: {
+        space: {},
+        'planet-1': { PDS: [1, 0] },
+        'planet-2': {},
+      },
+    }
+
+    const decoded = searchParamsToConfig(`?${configToSearchString(config)}`)
+    const result = validateSerializedConfig(decoded)
+
+    expect(result.warnings).toEqual([])
+    expect(result.config).toMatchObject({
+      v: 2,
+      e: 'F',
+      p: ['planet-1', 'planet-2'],
+      sp: 'planet-2',
+      asu: config.asu,
+      dsu: config.dsu,
+    })
+  })
 })

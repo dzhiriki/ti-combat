@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import { CombatSetup } from '@/hooks/combat-setup'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
+import { validateSerializedConfig } from '@/hooks/combat-setup/validation'
+import { searchParamsToConfig } from '@/hooks/use-url-sync'
 
 describe('toSerializedConfig', () => {
-  it('returns version 1', () => {
+  it('returns version 2', () => {
     const setup = new CombatSetup()
     const config = setup.toSerializedConfig()
-    expect(config.v).toBe(1)
+    expect(config.v).toBe(2)
   })
 
   it('serializes default factions', () => {
@@ -183,5 +185,19 @@ describe('loadConfig', () => {
 
     // General abilities should still be initialized
     expect(setup.abilities.attacker['UNIT_PRIORITY']).toBeDefined()
+  })
+
+  it('migrates legacy Starlancer ground counts into planet placement', () => {
+    const raw = searchParamsToConfig(
+      '?v=1&g=TF&af=IL_NA_VIROSET&df=AVARICE_REX&m=S' +
+        '&au.MECH=2.0&du.CRUISER=1.0' +
+        '&aa.TF_STARLANCER_XI.mechsOnGround=1',
+    )
+    const setup = new CombatSetup()
+    setup.loadConfig(validateSerializedConfig(raw).config)
+    setup.setEditorMode('FULL')
+
+    expect(setup.surfaceSelections.attacker.space.MECH.count).toBe(1)
+    expect(setup.surfaceSelections.attacker['planet-1'].MECH.count).toBe(1)
   })
 })

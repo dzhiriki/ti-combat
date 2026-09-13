@@ -1,15 +1,30 @@
 import { isDeepEqual } from 'remeda'
 
-import type { GameSystem, UnitBaseType, UnitSelection } from '@/types'
+import { UNIT_TYPES } from '@/constants/units'
+import type {
+  GameSystem,
+  SurfaceUnitSelections,
+  UnitBaseType,
+  UnitSelection,
+} from '@/types'
+
+export type SerializedUnits = Record<string, [number, 0 | 1]>
+export type SerializedSurfaceUnits = Record<string, SerializedUnits>
 
 export interface SerializedConfig {
-  v: 1
+  v: 1 | 2
   g: GameSystem
   af: string
   df: string
   m: 'S' | 'G'
-  au: Record<string, [number, 0 | 1]>
-  du: Record<string, [number, 0 | 1]>
+  au: SerializedUnits
+  du: SerializedUnits
+  /** v2 surface editor state. Omitted by legacy links. */
+  e?: 'S' | 'F'
+  p?: string[]
+  sp?: string
+  asu?: SerializedSurfaceUnits
+  dsu?: SerializedSurfaceUnits
   aa: Record<string, Record<string, unknown>>
   da: Record<string, Record<string, unknown>>
 }
@@ -22,6 +37,38 @@ export function serializeUnits(
     if (sel.count > 0) {
       result[type] = [sel.count, sel.upgraded ? 1 : 0]
     }
+  }
+  return result
+}
+
+export function serializeSurfaceUnits(
+  placements: SurfaceUnitSelections,
+): SerializedSurfaceUnits {
+  return Object.fromEntries(
+    Object.entries(placements).map(([surfaceId, selections]) => [
+      surfaceId,
+      serializeUnits(selections),
+    ]),
+  )
+}
+
+export function deserializeSurfaceUnits(
+  serialized: SerializedSurfaceUnits | undefined,
+  surfaceIds: readonly string[],
+): SurfaceUnitSelections {
+  const result: SurfaceUnitSelections = {}
+  for (const surfaceId of surfaceIds) {
+    const selections = Object.fromEntries(
+      UNIT_TYPES.map(type => [type, { count: 0, upgraded: false }]),
+    ) as Record<UnitBaseType, UnitSelection>
+    for (const [type, tuple] of Object.entries(serialized?.[surfaceId] ?? {})) {
+      if (!(type in selections)) continue
+      selections[type as UnitBaseType] = {
+        count: tuple[0],
+        upgraded: tuple[1] === 1,
+      }
+    }
+    result[surfaceId] = selections
   }
   return result
 }

@@ -76,7 +76,10 @@ export const phoenixStandard: Ability<Params> = {
             : params.spaceUnitPriority
         const target = findTarget(ctx.api.own, priority)
         if (target === undefined) return
-        const ids = ctx.api.own.getUnits(target, { includeVariants: true })
+        const ids = ctx.api.own.getUnits(target, {
+          includeVariants: true,
+          participatingOnly: true,
+        })
         for (const id of ids) {
           if (galvanizeUnit(ctx, id, true)) break
         }
@@ -89,7 +92,13 @@ function findTarget(api: SideApi, priority: UnitList): UnitType | undefined {
   for (const [t] of priority) {
     const type = t as UnitType
     if (parseVariantId(type).subtypes.includes(GALVANIZED)) continue
-    if (api.hasUnitType(type, { includeVariants: true })) return type
+    if (
+      api.hasUnitType(type, {
+        includeVariants: true,
+        participatingOnly: true,
+      })
+    )
+      return type
   }
   return undefined
 }

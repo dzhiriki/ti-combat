@@ -27,23 +27,23 @@ export function canonicalizeUnitState(
 ): void {
   s._needsCanonicalize = undefined
   const pools = collectVariantPools(s, types)
-  for (const type in pools) {
-    const ids = pools[type as UnitType]
-    if (ids) canonicalizePool(s, ids)
-  }
+  for (const ids of pools.values()) canonicalizePool(s, ids)
 }
 
 function collectVariantPools(
   s: SideStateData,
   types?: ReadonlySet<UnitType>,
-): Partial<Record<UnitType, UnitId[]>> {
-  const pools: Partial<Record<UnitType, UnitId[]>> = {}
+): Map<string, UnitId[]> {
+  const pools = new Map<string, UnitId[]>()
   const collect = (pool: string) => {
     for (const id of pool) {
       const type = s.unitType[id]
       if (!type) continue
       if (types && !types.has(type)) continue
-      ;(pools[type] ??= []).push(id as UnitId)
+      const key = `${s.unitSurface[id] ?? ''}\0${type}`
+      const pool = pools.get(key)
+      if (pool) pool.push(id as UnitId)
+      else pools.set(key, [id as UnitId])
     }
   }
   collect(s.participatingUnits)

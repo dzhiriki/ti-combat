@@ -2,6 +2,7 @@ import { clsx } from 'clsx'
 import { useState } from 'react'
 
 import type { CombatOutcome } from '@/combat'
+import type { SurfaceDefinition } from '@/types'
 
 import { DetailedOutcomes } from '../detailed-outcomes'
 
@@ -23,6 +24,8 @@ interface CombatResultBarProps {
   outcomes: CombatOutcome[] | null
   unitPriority: UnitPriority
   participatingTypes: UnitPriority
+  showSurfaces?: boolean
+  surfaces?: readonly SurfaceDefinition[]
   isComputing?: boolean
 }
 
@@ -31,6 +34,8 @@ export function CombatResultBar({
   outcomes,
   unitPriority,
   participatingTypes,
+  showSurfaces,
+  surfaces,
   isComputing,
 }: CombatResultBarProps) {
   const [showDetailed, setShowDetailed] = useState(false)
@@ -68,6 +73,8 @@ export function CombatResultBar({
           outcomes={outcomes}
           unitPriority={unitPriority}
           participatingTypes={participatingTypes}
+          showSurfaces={showSurfaces}
+          surfaces={surfaces}
         />
       )}
     </div>

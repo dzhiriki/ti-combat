@@ -73,6 +73,8 @@ const EMPTY_SIDE_FOR_STATIC: SideStateData = {
   faction: 'sol' as never,
   participatingUnits: '' as UnitIdList,
   nonParticipatingUnits: '' as UnitIdList,
+  surfaceUnits: {},
+  unitSurface: {},
   unitType: {},
   unitState: {},
   unitStats: {} as never,

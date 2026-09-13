@@ -1,3 +1,4 @@
+import type { SurfaceType } from '../types/surface'
 import type { UnitAbility, UnitBaseType } from '../types/unit'
 
 export const NON_FIGHTER_SHIPS: UnitBaseType[] = [
@@ -38,6 +39,23 @@ export const UNIT_TYPES: UnitBaseType[] = [
   ...GROUND_FORCES,
   ...STRUCTURES,
 ]
+
+export const DEFAULT_UNIT_SURFACES: Record<
+  UnitBaseType,
+  readonly SurfaceType[]
+> = {
+  FLAGSHIP: ['SPACE'],
+  WAR_SUN: ['SPACE'],
+  DREADNOUGHT: ['SPACE'],
+  CARRIER: ['SPACE'],
+  CRUISER: ['SPACE'],
+  DESTROYER: ['SPACE'],
+  FIGHTER: ['SPACE'],
+  MECH: ['SPACE', 'PLANET'],
+  INFANTRY: ['SPACE', 'PLANET'],
+  PDS: ['PLANET'],
+  SPACE_DOCK: ['PLANET'],
+}
 
 export const UNIT_PRICE: Record<UnitBaseType, number> = {
   WAR_SUN: 12,

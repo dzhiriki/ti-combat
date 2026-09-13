@@ -15,6 +15,9 @@ export const mollTerminus: Ability = {
   invoke: [
     {
       timing: 'COMMIT_UNITS',
+      isCallable: (_params, ctx) =>
+        ctx.api.own.getUnitSurface(ctx.getUnit()) ===
+        ctx.api.own.getActiveSurfaceId(),
       call: ctx => {
         ctx.api.opponent.setUnitAbilityCannotBeUsed(
           'SUSTAIN_DAMAGE',

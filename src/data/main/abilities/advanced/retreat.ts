@@ -1,6 +1,7 @@
 import type { Ability, AbilityCallContext, CombatStateData } from '@/combat'
 import type {
   CombatSide,
+  SurfaceId,
   UnitId,
   UnitIdList,
   UnitState,
@@ -31,6 +32,7 @@ declare global {
 export interface SavedRetreatData {
   savedUnits: Record<string, UnitId[]>
   savedUnitState: Record<string, UnitState>
+  savedUnitSurfaces: Record<UnitId, SurfaceId>
 }
 
 /** Remove units from combat and save them into RETREAT's config for
@@ -41,11 +43,13 @@ export function retreatUnits(ctx: AbilityCallContext, unitIds: UnitId[]): void {
   const existing = (retreatConfig?._saved as SavedRetreatData | undefined) ?? {
     savedUnits: {},
     savedUnitState: {},
+    savedUnitSurfaces: {},
   }
 
   // Build merged saved data (new objects to avoid shared-reference mutation)
   const mergedUnits = { ...existing.savedUnits }
   const mergedState = { ...existing.savedUnitState }
+  const mergedSurfaces = { ...existing.savedUnitSurfaces }
 
   for (const unitId of unitIds) {
     const variantKey = ctx.api.own.getUnitVariantKey(unitId)
@@ -55,6 +59,8 @@ export function retreatUnits(ctx: AbilityCallContext, unitIds: UnitId[]): void {
 
     const us = side.unitState[unitId]
     if (us) mergedState[unitId] = { ...us }
+    const surfaceId = side.unitSurface[unitId]
+    if (surfaceId) mergedSurfaces[unitId] = surfaceId
   }
 
   // Trigger WHEN_RETREAT for each unit before removal
@@ -66,7 +72,11 @@ export function retreatUnits(ctx: AbilityCallContext, unitIds: UnitId[]): void {
 
   // Store in RETREAT's config (not the calling ability's config)
   ctx.api.own.updateAbilityConfig('RETREAT', {
-    _saved: { savedUnits: mergedUnits, savedUnitState: mergedState },
+    _saved: {
+      savedUnits: mergedUnits,
+      savedUnitState: mergedState,
+      savedUnitSurfaces: mergedSurfaces,
+    },
   })
 }
 
@@ -96,6 +106,20 @@ export function restoreRetreatedUnits(
   sideState.participatingUnits = (sideState.participatingUnits +
     restoredIds) as UnitIdList
   sideState.unitType = { ...sideState.unitType, ...restoredTypes }
+
+  const unitSurface = { ...sideState.unitSurface }
+  const surfaceUnits = { ...sideState.surfaceUnits }
+  for (const id of restoredIds) {
+    const unitId = id as UnitId
+    const surfaceId = saved.savedUnitSurfaces?.[unitId]
+    if (!surfaceId) continue
+    unitSurface[unitId] = surfaceId
+    surfaceUnits[surfaceId] = ((surfaceUnits[surfaceId] ?? '') +
+      unitId) as UnitIdList
+  }
+  sideState.unitSurface = unitSurface
+  sideState.surfaceUnits = surfaceUnits
+  sideState._locationHash = undefined
 
   sideState.unitState = { ...sideState.unitState }
   for (const [id, us] of Object.entries(saved.savedUnitState)) {
@@ -135,7 +159,12 @@ export const retreat: Ability<Params> = {
       call: ctx => {
         const allIds: UnitId[] = []
         for (const type of ctx.api.own.getActiveBaseTypes()) {
-          allIds.push(...ctx.api.own.getUnits(type, { includeVariants: true }))
+          allIds.push(
+            ...ctx.api.own.getUnits(type, {
+              includeVariants: true,
+              participatingOnly: true,
+            }),
+          )
         }
 
         ctx.transitionTo('COMPLETE', 'LOST')

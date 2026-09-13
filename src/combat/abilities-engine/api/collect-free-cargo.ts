@@ -11,10 +11,17 @@ import type { SideApi } from './ability-api'
  *  pool. */
 export function collectFreeCargo(api: SideApi): ReadonlySet<UnitBaseType> {
   const free = new Set<UnitBaseType>()
+  const spaceId = api.getSpaceSurfaceId()
   for (const baseType of UNIT_TYPES) {
     const cargo = api.getUnitStats(baseType)?.FREE_CARGO
     if (!cargo?.length) continue
-    if (api.countUnits(baseType, { includeVariants: true }) === 0) continue
+    if (
+      api.countUnits(baseType, {
+        includeVariants: true,
+        surfaceId: spaceId,
+      }) === 0
+    )
+      continue
     for (const t of cargo) free.add(t)
   }
   return free

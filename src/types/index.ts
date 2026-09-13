@@ -1,8 +1,3 @@
-export interface UnitSelection {
-  count: number
-  upgraded: boolean
-}
-
 export type { CombatSide } from './combat-side'
 export type { DiceGroup } from './die'
 export type {
@@ -27,6 +22,18 @@ export {
   UnitListNumberSchema,
   UnitListSchema,
 } from './schemas'
+export type {
+  SurfaceDefinition,
+  SurfaceId,
+  SurfaceType,
+  SurfaceUnitSelections,
+  UnitSelection,
+} from './surface'
+export {
+  createDefaultSurfaces,
+  DEFAULT_PLANET_ID,
+  SPACE_SURFACE_ID,
+} from './surface'
 export type {
   Unit,
   UnitAbility,

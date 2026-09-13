@@ -55,7 +55,10 @@ export const vosHollow: Ability<Params> = {
           if (
             ownDestroyedShips.has(type) &&
             opponentShipsSet.has(type) &&
-            ctx.api.opponent.hasUnitType(type, { includeVariants: false })
+            ctx.api.opponent.hasUnitType(type, {
+              includeVariants: false,
+              surfaceId: ctx.api.opponent.getSpaceSurfaceId(),
+            })
           )
             return true
         }
@@ -76,7 +79,10 @@ export const vosHollow: Ability<Params> = {
           if (
             ownDestroyedShips.has(type) &&
             opponentShipsSet.has(type) &&
-            ctx.api.opponent.hasUnitType(type, { includeVariants: false })
+            ctx.api.opponent.hasUnitType(type, {
+              includeVariants: false,
+              surfaceId: ctx.api.opponent.getSpaceSurfaceId(),
+            })
           ) {
             ctx.api.opponent.destroyUnits(type)
             return

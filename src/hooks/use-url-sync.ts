@@ -20,6 +20,11 @@ export function configToSearchString(config: SerializedConfig): string {
     `df=${config.df}`,
     `m=${config.m}`,
   ]
+  if (config.v >= 2) {
+    parts.push(`e=${config.e ?? 'S'}`)
+    parts.push(`sp=${config.sp ?? 'planet-1'}`)
+    parts.push(`p=${(config.p ?? ['planet-1']).join(',')}`)
+  }
 
   for (const [type, [count, upgraded]] of Object.entries(config.au)) {
     parts.push(`au.${type}=${count}.${upgraded}`)
@@ -27,11 +32,26 @@ export function configToSearchString(config: SerializedConfig): string {
   for (const [type, [count, upgraded]] of Object.entries(config.du)) {
     parts.push(`du.${type}=${count}.${upgraded}`)
   }
+  writeSurfaceUnits(parts, 'asu', config.asu)
+  writeSurfaceUnits(parts, 'dsu', config.dsu)
 
   writeAbilityParams(parts, 'aa', config.aa)
   writeAbilityParams(parts, 'da', config.da)
 
   return parts.join('&')
+}
+
+function writeSurfaceUnits(
+  parts: string[],
+  prefix: string,
+  surfaces: SerializedConfig['asu'],
+): void {
+  if (!surfaces) return
+  for (const [surfaceId, units] of Object.entries(surfaces)) {
+    for (const [type, [count, upgraded]] of Object.entries(units)) {
+      parts.push(`${prefix}.${surfaceId}.${type}=${count}.${upgraded}`)
+    }
+  }
 }
 
 function writeAbilityParams(
@@ -92,6 +112,8 @@ export function searchParamsToConfig(search: string): Record<string, unknown> {
   const du: Record<string, [number, 0 | 1]> = {}
   const aa: Record<string, Record<string, unknown>> = {}
   const da: Record<string, Record<string, unknown>> = {}
+  const asu: NonNullable<SerializedConfig['asu']> = {}
+  const dsu: NonNullable<SerializedConfig['dsu']> = {}
 
   for (const [key, value] of params) {
     if (key.startsWith('au.')) {
@@ -116,6 +138,18 @@ export function searchParamsToConfig(search: string): Record<string, unknown> {
         abilityLookup.get(abilityKey),
         paramKey,
       )
+    } else if (key.startsWith('asu.') || key.startsWith('dsu.')) {
+      const target = key.startsWith('asu.') ? asu : dsu
+      const rest = key.slice(4)
+      const dotIdx = rest.indexOf('.')
+      if (dotIdx === -1) continue
+      const surfaceId = rest.slice(0, dotIdx)
+      const type = rest.slice(dotIdx + 1)
+      const [count, upgraded] = value.split('.')
+      ;(target[surfaceId] ??= {})[type] = [
+        Number(count),
+        Number(upgraded) as 0 | 1,
+      ]
     }
   }
 
@@ -127,6 +161,13 @@ export function searchParamsToConfig(search: string): Record<string, unknown> {
     m: params.get('m') ?? 'S',
     au,
     du,
+    ...(Number(params.get('v') ?? 1) >= 2 && {
+      e: params.get('e') ?? 'S',
+      sp: params.get('sp') ?? 'planet-1',
+      p: (params.get('p') ?? 'planet-1').split(',').filter(Boolean),
+      asu,
+      dsu,
+    }),
     aa,
     da,
   }
@@ -140,6 +181,9 @@ function decodeValue(
   // Base params — always known types regardless of ability lookup
   if (paramKey === 'isEnabled') return raw === 'true'
   if (paramKey === 'uses') return raw === 'Inf' ? Infinity : Number(raw)
+  if (ability?.key === 'TF_STARLANCER_XI' && paramKey === 'mechsOnGround') {
+    return Number(raw)
+  }
 
   if (!ability) return raw
 

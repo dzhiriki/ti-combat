@@ -21,6 +21,7 @@ export const salaiSaiCorian: Ability = {
           if (type === 'FIGHTER') continue
           nonFighterCount += ctx.api.opponent.countUnits(type, {
             includeVariants: true,
+            participatingOnly: true,
           })
         }
 

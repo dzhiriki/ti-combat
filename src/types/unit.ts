@@ -2,6 +2,7 @@ import type { Ability } from '@/combat'
 
 import type { DiceGroup } from './die'
 import type { Lazy } from './faction'
+import type { SurfaceType } from './surface'
 
 export type UnitVariantId = string & { readonly __brand: 'UnitVariantId' }
 
@@ -47,6 +48,10 @@ export interface UnitStats {
    *  living units, so the exemption ends when the carrier dies. */
   FREE_CARGO?: readonly UnitBaseType[]
   FLEET_POOL_COST?: number
+  /** Surfaces on which this unit may physically exist. When omitted the
+   *  default follows its base category: ships in space, ground forces on
+   *  either surface, and structures on planets. */
+  ALLOWED_SURFACES?: readonly SurfaceType[]
   DIRECT_HIT_IMMUNE?: boolean
   UNIT_ABILITIES?: UnitAbilities
   ABILITIES?: readonly Ability[]

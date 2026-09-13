@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { ToggleGroup } from '@/components/ui/toggle-group'
+import type { UnitEditorMode } from '@/hooks/combat-setup/combat-setup'
 import type { Settings, Theme } from '@/hooks/use-settings'
 
 import { Divider } from './ui/divider'
@@ -32,6 +33,11 @@ type PrecisionKind = 'full' | 'limited'
 const precisionOptions = [
   { value: 'full' as const, label: 'Full' },
   { value: 'limited' as const, label: 'Limited' },
+]
+
+const editorOptions = [
+  { value: 'SIMPLIFIED' as const, label: 'Simple' },
+  { value: 'FULL' as const, label: 'Full' },
 ]
 
 interface SettingsPanelProps {
@@ -111,6 +117,16 @@ export function SettingsPanel({
               disabled={precisionKind !== 'limited'}
             />
           </div>
+        </section>
+        <section className={styles.section}>
+          <span className={styles.label}>View</span>
+          <ToggleGroup<UnitEditorMode>
+            options={editorOptions}
+            value={settings.editorMode}
+            onChange={editorMode =>
+              onSettingsChange({ ...settings, editorMode })
+            }
+          />
         </section>
         <Divider />
         <section>

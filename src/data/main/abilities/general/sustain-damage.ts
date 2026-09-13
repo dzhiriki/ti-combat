@@ -77,6 +77,7 @@ export const sustainDamage: Ability<Params> = {
       isCallable: (params, ctx) => {
         const unitId = ctx.getUnit()
         if (ctx.api.own.getPendingHits() <= 0) return false
+        if (!ctx.api.own.isParticipating(unitId)) return false
 
         if (ctx.api.own.getUnitState(unitId)?.isDamaged) {
           return false

@@ -52,6 +52,7 @@ export const strikeWingAlphaII: Ability<Params> = {
               if (toDestroy.length >= count) break
               const ids = branchCtx.api.opponent.getUnits(variant, {
                 includeVariants: false,
+                surfaceId: branchCtx.api.opponent.getSpaceSurfaceId(),
               })
               for (const id of ids) {
                 if (toDestroy.length >= count) break

@@ -61,6 +61,7 @@ export const overwingZeta: Ability<Params> = {
             if (typeof stats?.FLEET_POOL_COST !== 'number') continue
             const count = ctx.api.own.countUnits(baseType, {
               includeVariants: true,
+              surfaceId: ctx.api.own.getSpaceSurfaceId(),
             })
             currentCost += count * stats.FLEET_POOL_COST
           }

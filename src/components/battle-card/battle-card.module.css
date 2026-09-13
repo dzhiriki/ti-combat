@@ -60,6 +60,65 @@
   margin-top: var(--space-4);
 }
 
+.planetTabs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.planetTabItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.planetTab {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.planetTab:hover {
+  color: var(--color-text-main);
+}
+
+.planetTabSelected {
+  color: hsl(var(--color-light-100));
+}
+
+.planetSeparator {
+  color: var(--color-border-main);
+}
+
+.surfaceSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.surfaceSection + .surfaceSection {
+  margin-top: var(--space-4);
+}
+
+.surfaceTitle {
+  margin: 0;
+  color: var(--color-text-main);
+  text-align: center;
+  font-family: var(--font-heading);
+  font-size: var(--text-sm);
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .unitGroup {
   display: flex;
   flex-direction: column;

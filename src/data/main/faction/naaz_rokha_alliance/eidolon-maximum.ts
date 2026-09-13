@@ -23,6 +23,8 @@ export const eidolonMaximum: Ability = {
           // Add MECH to ships for space combat participation
           ships: (current: UnitBaseType[]) =>
             current.includes('MECH') ? current : [...current, 'MECH'],
+          spaceCombatParticipating: (current: UnitBaseType[]) =>
+            current.includes('MECH') ? current : [...current, 'MECH'],
           // Remove MECH from groundForces so derived valid targets
           // (bombardment, SCD) exclude it — unit ability hit immunity
           groundForces: (current: UnitBaseType[]) =>
@@ -71,6 +73,7 @@ export const eidolonMaximum: Ability = {
         for (const id of ctx.api.own.getUnits('MECH', {
           includeVariants: true,
         })) {
+          if (!ctx.api.own.isParticipating(id)) continue
           if (ctx.api.own.getUnitState(id)?.isDamaged) {
             ctx.api.own.modifyUnitState(id, { isDamaged: false })
           }

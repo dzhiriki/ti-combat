@@ -5,6 +5,10 @@ import styles from './unit-row-dual.module.css'
 interface UnitRowDualProps {
   name: string
   limit: number
+  attackerLimit?: number
+  defenderLimit?: number
+  attackerDisabled?: boolean
+  defenderDisabled?: boolean
   attackerHasUpgrade: boolean
   defenderHasUpgrade: boolean
   attacker: { count: number; upgraded: boolean }
@@ -18,6 +22,10 @@ interface UnitRowDualProps {
 export function UnitRowDual({
   name,
   limit,
+  attackerLimit,
+  defenderLimit,
+  attackerDisabled,
+  defenderDisabled,
   attackerHasUpgrade,
   defenderHasUpgrade,
   attacker,
@@ -33,7 +41,8 @@ export function UnitRowDual({
         count={attacker.count}
         upgraded={attacker.upgraded}
         hasUpgrade={attackerHasUpgrade}
-        limit={limit}
+        limit={attackerLimit ?? limit}
+        disabled={attackerDisabled}
         onCountChange={onAttackerCountChange}
         onUpgradeToggle={onAttackerUpgradeToggle}
         className="theme-attacker"
@@ -45,7 +54,8 @@ export function UnitRowDual({
         count={defender.count}
         upgraded={defender.upgraded}
         hasUpgrade={defenderHasUpgrade}
-        limit={limit}
+        limit={defenderLimit ?? limit}
+        disabled={defenderDisabled}
         flipped
         onCountChange={onDefenderCountChange}
         onUpgradeToggle={onDefenderUpgradeToggle}

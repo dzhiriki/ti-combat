@@ -58,11 +58,13 @@ export const evelynDelouis: Ability<Params> = {
       isCallable: (params, ctx) => {
         return ctx.api.own.hasUnitType(params.unitType, {
           includeVariants: false,
+          participatingOnly: true,
         })
       },
       call: (ctx, params) => {
         const [unitId] = ctx.api.own.getUnits(params.unitType, {
           includeVariants: false,
+          participatingOnly: true,
         })
         ctx.api.own.addSubtype(unitId, EVELYN)
       },
@@ -74,13 +76,17 @@ export const evelynDelouis: Ability<Params> = {
       isCallable: (params, ctx) => {
         const variantId = makeVariantId(params.unitType, [EVELYN])
         return (
-          ctx.api.own.getUnits(variantId, { includeVariants: true }).length > 0
+          ctx.api.own.getUnits(variantId, {
+            includeVariants: true,
+            participatingOnly: true,
+          }).length > 0
         )
       },
       call: (ctx, params) => {
         const variantId = makeVariantId(params.unitType, [EVELYN])
         const [unitId] = ctx.api.own.getUnits(variantId, {
           includeVariants: true,
+          participatingOnly: true,
         })
         ctx.api.own.removeSubtype(unitId, EVELYN)
       },

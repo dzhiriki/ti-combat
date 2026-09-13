@@ -61,7 +61,7 @@ export function validateSerializedConfig(
   const warnings: string[] = []
 
   // Version
-  const v = 1 as const
+  const v = raw.v === 2 ? (2 as const) : (1 as const)
 
   // Only legacy links (without a system) infer it from factions. An explicit
   // system is authoritative, including when both sides are Neutral.
@@ -97,14 +97,78 @@ export function validateSerializedConfig(
   const au = validateUnits(raw.au, warnings)
   const du = validateUnits(raw.du, warnings)
 
+  const planetIds =
+    v === 2 && Array.isArray(raw.p)
+      ? [...new Set(raw.p.filter(isPlanetId))]
+      : ['planet-1']
+  if (planetIds.length === 0) planetIds.push('planet-1')
+  const sp =
+    v === 2 && typeof raw.sp === 'string' && planetIds.includes(raw.sp)
+      ? raw.sp
+      : planetIds[0]
+  const e = v === 2 && raw.e === 'F' ? ('F' as const) : ('S' as const)
+  const validSurfaceIds = new Set(['space', ...planetIds])
+  const asu =
+    v === 2
+      ? validateSurfaceUnits(raw.asu, validSurfaceIds, warnings)
+      : undefined
+  const dsu =
+    v === 2
+      ? validateSurfaceUnits(raw.dsu, validSurfaceIds, warnings)
+      : undefined
+
   // Abilities
   const aa = validateAbilities(raw.aa, abilityLookup, warnings)
   const da = validateAbilities(raw.da, abilityLookup, warnings)
 
   return {
-    config: { v, g: system, af, df, m, au, du, aa, da },
+    config: {
+      v,
+      g: system,
+      af,
+      df,
+      m,
+      au,
+      du,
+      ...(v === 2 && { e, p: planetIds, sp, asu, dsu }),
+      aa,
+      da,
+    },
     warnings,
   }
+}
+
+function isPlanetId(value: unknown): value is string {
+  return typeof value === 'string' && /^planet-[1-9]\d*$/.test(value)
+}
+
+function validateSurfaceUnits(
+  raw: unknown,
+  validSurfaceIds: ReadonlySet<string>,
+  warnings: string[],
+): NonNullable<SerializedConfig['asu']> {
+  const result: NonNullable<SerializedConfig['asu']> = {}
+  if (typeof raw !== 'object' || raw === null) return result
+  for (const surfaceId of validSurfaceIds) result[surfaceId] = {}
+  const remaining = { ...UNIT_LIMITS }
+  for (const [surfaceId, units] of Object.entries(
+    raw as Record<string, unknown>,
+  )) {
+    if (!validSurfaceIds.has(surfaceId)) {
+      warnings.push(`Unknown surface "${surfaceId}" ignored`)
+      continue
+    }
+    const validated = validateUnits(units, warnings)
+    const kept: typeof validated = {}
+    for (const [type, [count, upgraded]] of Object.entries(validated)) {
+      const unitType = type as keyof typeof UNIT_LIMITS
+      const allowed = Math.min(count, remaining[unitType])
+      remaining[unitType] -= allowed
+      if (allowed > 0) kept[type] = [allowed, upgraded]
+    }
+    result[surfaceId] = kept
+  }
+  return result
 }
 
 function validateUnits(
