@@ -3,14 +3,16 @@ import {
   UNIT_SHORT_NAMES,
   UNIT_TYPES,
 } from '@/constants/units'
-import type { GameSystem, UnitBaseType } from '@/types'
+import type { GameSystem, SurfaceType, UnitBaseType } from '@/types'
 
 import { getFactionUnitConfig } from './get-faction-unit-config'
+import { allowedSurfaceTypes } from './surface-placements'
 
 export interface UnitConfig {
   name: string
   shortName: string
   hasUpgrade: boolean
+  allowedSurfaces: readonly SurfaceType[]
 }
 
 export function getUnitConfig(
@@ -35,6 +37,12 @@ export function getUnitConfig(
       name: UNIT_DISPLAY_NAMES[unitType],
       shortName: UNIT_SHORT_NAMES[unitType],
       hasUpgrade,
+      allowedSurfaces: allowedSurfaceTypes(
+        unitType,
+        unitDef.UPGRADED?.ALLOWED_SURFACES
+          ? { ...unitDef.BASE, ...unitDef.UPGRADED }
+          : unitDef.BASE,
+      ),
     }
   }
 

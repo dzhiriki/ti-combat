@@ -60,6 +60,7 @@ export const strikeWingAlpha: Ability = {
           effect: (count, branchCtx) => {
             const infantry = branchCtx.api.opponent.getUnits('INFANTRY', {
               includeVariants: true,
+              surfaceId: branchCtx.api.opponent.getSpaceSurfaceId(),
             })
             const toDestroy = infantry.slice(0, count)
             if (toDestroy.length > 0)

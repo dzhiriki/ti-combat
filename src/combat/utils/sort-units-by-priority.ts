@@ -27,6 +27,7 @@ export function sortUnitsByPriority(
   side: SideStateData,
   priorityList: readonly UnitType[],
   participatingTypes?: ReadonlySet<UnitBaseType>,
+  participatingUnit?: (id: UnitId) => boolean,
 ): void {
   const rank = new Map<UnitType, number>()
   for (let i = 0; i < priorityList.length; i++) {
@@ -45,6 +46,7 @@ export function sortUnitsByPriority(
   }
 
   const participates = (id: UnitId): boolean => {
+    if (participatingUnit) return participatingUnit(id)
     if (participatingTypes) {
       const base = parseVariantId(side.unitType[id]).type as UnitBaseType
       return participatingTypes.has(base)
@@ -79,4 +81,6 @@ export function sortUnitsByPriority(
 
   side.participatingUnits = participating.join('') as UnitIdList
   side.nonParticipatingUnits = nonParticipating.join('') as UnitIdList
+  if (side._locationHash && !side._locationHash.startsWith('='))
+    side._locationHash = undefined
 }

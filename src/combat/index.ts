@@ -45,6 +45,7 @@ export {
   getOpponentSide,
 } from './combat-side-state/combat-side-state'
 export {
+  cloneStateForBranch,
   type CombatMode,
   CombatState,
   type CombatStateData,
@@ -65,6 +66,6 @@ export {
   type UnitAbilityMeta,
 } from './combat-state'
 export { type LogEntry, Logger } from './logger'
-export type { CombatOutcome, SurvivorSide } from './types'
+export type { CombatOutcome, SurfaceSurvivors, SurvivorSide } from './types'
 export { nextUnitIds } from './utils/unit-id'
 export { makeVariantId, parseVariantId } from './utils/unit-variant'

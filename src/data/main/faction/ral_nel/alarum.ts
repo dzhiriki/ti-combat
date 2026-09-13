@@ -56,6 +56,7 @@ export const alarum: Ability<Params> = {
       isCallable: (params, ctx) => {
         if (!params.availableUnits.some(([, n]) => n > 0)) return false
         const callerId = ctx.getUnit()
+        if (!ctx.api.own.isParticipating(callerId)) return false
         const state = (ctx.api.own.getRunState('ALARUM')?.firedRoundIds ??
           []) as UnitId[]
         return !state.includes(callerId)

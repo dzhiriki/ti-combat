@@ -93,6 +93,9 @@ export type SettingsParams = {
   units: UnitBaseType[]
   spaceCombatParticipating: UnitBaseType[]
   groundCombatParticipating: UnitBaseType[]
+  /** Types whose participation may originate outside the active surface. */
+  spaceCombatParticipatingFromAnySurface: UnitBaseType[]
+  groundCombatParticipatingFromAnySurface: UnitBaseType[]
   validTargetsSpaceCannonOffense: UnitBaseType[]
   validTargetsBombardment: UnitBaseType[]
   validTargetsSpaceCannonDefense: UnitBaseType[]

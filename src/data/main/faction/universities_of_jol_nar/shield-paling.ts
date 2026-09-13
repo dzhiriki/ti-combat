@@ -16,6 +16,9 @@ export const shieldPaling: Ability = {
   invoke: [
     {
       timing: 'PREPARE',
+      isCallable: (_params, ctx) =>
+        ctx.api.own.getUnitSurface(ctx.getUnit()) ===
+        ctx.api.own.getActiveSurfaceId(),
       call: ctx => {
         ctx.api.own.updateAbilityConfig('FRAGILE', {
           excludeUnits: (current: UnitBaseType[] = []) => [
@@ -28,7 +31,9 @@ export const shieldPaling: Ability = {
     {
       timing: 'AFTER_DESTROY',
       isCallable: (_params, ctx) =>
-        !ctx.api.own.hasUnitType('MECH', { includeVariants: true }),
+        !ctx.api.own.hasUnitType('MECH', {
+          includeVariants: true,
+        }),
       call: ctx => {
         ctx.api.own.updateAbilityConfig('FRAGILE', {
           excludeUnits: (current: UnitBaseType[] = []) =>

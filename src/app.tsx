@@ -53,6 +53,10 @@ function App() {
         <CombatSimulator
           className={clsx(styles.animateFadeUp, styles.animateDelay100)}
           precision={settings.precision}
+          preferredEditorMode={settings.editorMode}
+          onEditorModePreferenceChange={editorMode =>
+            setSettings({ ...settings, editorMode })
+          }
         />
       </div>
     </ToastProvider>

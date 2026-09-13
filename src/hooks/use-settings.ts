@@ -1,15 +1,22 @@
 import { useEffect, useState } from 'react'
 
+import type { UnitEditorMode } from './combat-setup/combat-setup'
+
 export type Theme = 'system' | 'dark' | 'light'
 
 export type Precision = { kind: 'limited' | 'full'; digits: number }
 
-export type Settings = { theme: Theme; precision: Precision }
+export type Settings = {
+  theme: Theme
+  precision: Precision
+  editorMode: UnitEditorMode
+}
 
 const STORAGE_KEY = 'settings'
 const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
   precision: { kind: 'limited', digits: 2 },
+  editorMode: 'SIMPLIFIED',
 }
 
 function loadSettings(): Settings {

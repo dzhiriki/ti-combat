@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import type { UnitIdList } from '@/types'
+import {
+  createDefaultSurfaces,
+  SPACE_SURFACE_ID,
+  type UnitIdList,
+} from '@/types'
 
 import {
   buildCombatDiceRollGroup,
@@ -22,6 +26,8 @@ function makeSide(): SideStateData {
     faction: 'FEDERATION_OF_SOL',
     participatingUnits: '' as UnitIdList,
     nonParticipatingUnits: '' as UnitIdList,
+    surfaceUnits: { space: '' as UnitIdList },
+    unitSurface: {},
     unitType: {},
     unitState: {},
     unitStats: {} as SideStateData['unitStats'],
@@ -35,6 +41,8 @@ function makeCombatState(): CombatState {
     attacker: makeSide(),
     defender: makeSide(),
     combatMode: 'SPACE',
+    surfaces: createDefaultSurfaces(),
+    activeSurfaceId: SPACE_SURFACE_ID,
   }
   return CombatState.fromDataStandalone(data)
 }

@@ -2,13 +2,13 @@ import { prepareSimulationConfig } from '@/hooks/combat-setup'
 import type { SimulationInput } from '@/hooks/combat-setup/types'
 import type {
   GameSystem,
-  UnitBaseType,
+  SurfaceDefinition,
+  SurfaceUnitSelections,
   UnitIdList,
-  UnitSelection,
 } from '@/types'
 import {
   buildUnitStatsMap,
-  getSimulationUnits,
+  getSimulationUnitsOnSurfaces,
 } from '@/utils/get-simulation-units'
 
 import type { DeclaredSubtype } from './abilities-engine/types'
@@ -24,20 +24,19 @@ import { makeVariantId } from './utils/unit-variant'
 function buildSideState(
   system: GameSystem,
   faction: string,
-  selections: Record<UnitBaseType, UnitSelection>,
+  placements: SurfaceUnitSelections,
+  surfaces: readonly SurfaceDefinition[],
   abilities: SideAbilitiesConfig,
   gen: { _nextCode?: number },
 ): SideStateData {
-  const upgradedSet = new Set<UnitBaseType>()
-  for (const [k, v] of Object.entries(selections)) {
-    if (v.upgraded) upgradedSet.add(k as UnitBaseType)
+  const upgradedSet = new Set<import('@/types').UnitBaseType>()
+  for (const selections of Object.values(placements)) {
+    for (const [k, v] of Object.entries(selections)) {
+      if (v.upgraded) upgradedSet.add(k as import('@/types').UnitBaseType)
+    }
   }
-  const { units, unitType, unitState, unitStats } = getSimulationUnits(
-    system,
-    faction,
-    selections,
-    gen,
-  )
+  const { units, unitType, unitState, unitStats, surfaceUnits, unitSurface } =
+    getSimulationUnitsOnSurfaces(system, faction, placements, surfaces, gen)
 
   const baseUnitStats: Record<string, UnitStatsEntry> = {
     ...buildUnitStatsMap(system, faction, upgradedSet),
@@ -64,6 +63,8 @@ function buildSideState(
     faction,
     participatingUnits: units,
     nonParticipatingUnits: '' as UnitIdList,
+    surfaceUnits,
+    unitSurface,
     unitType,
     unitState,
     unitStats: baseUnitStats,
@@ -77,8 +78,10 @@ self.onmessage = (e: MessageEvent<SimulationInput>) => {
     system,
     attackerFaction,
     defenderFaction,
-    attackerSelections,
-    defenderSelections,
+    surfaces,
+    activeSurfaceId,
+    attackerPlacements,
+    defenderPlacements,
     combatMode,
     abilities,
     precision,
@@ -99,18 +102,22 @@ self.onmessage = (e: MessageEvent<SimulationInput>) => {
     buildSideState(
       system,
       attackerFaction,
-      attackerSelections,
+      attackerPlacements,
+      surfaces,
       abilities.attacker,
       gen,
     ),
     buildSideState(
       system,
       defenderFaction,
-      defenderSelections,
+      defenderPlacements,
+      surfaces,
       abilities.defender,
       gen,
     ),
     combatMode,
+    surfaces,
+    activeSurfaceId,
     {
       attacker: sideAbilities.attacker.registered,
       defender: sideAbilities.defender.registered,

@@ -8,6 +8,7 @@ import type {
   UnitStats,
   UnitType,
 } from '@/types'
+import type { SurfaceDefinition, SurfaceId } from '@/types'
 
 import type {
   AbilitiesOverride,
@@ -148,6 +149,11 @@ export type SideAbilitiesConfig = Record<string, Record<string, unknown>>
 /** State data for one side of combat */
 export interface SideStateData {
   faction: string
+  /** Authoritative physical membership. Every living unit appears in exactly
+   *  one surface list. `unitSurface` retains the last location of destroyed
+   *  ids so destroy reactions can still inspect where their source was. */
+  surfaceUnits: Record<string, UnitIdList>
+  unitSurface: Record<string, SurfaceId>
   /** Participating UnitIds packed into a `UnitIdList` (one UTF-16 char
    *  per UnitId), pre-sorted by combat-mode priority. Highest priority
    *  first, lowest last. `slice(0, -N)` keeps the N highest-priority
@@ -197,6 +203,22 @@ export interface SideStateData {
    *  with another SideStateData; mutations must clone first via
    *  `ensureHitPoolOwned`. */
   _hitPoolShared?: boolean
+  /** Cached physical-location signature used by state hashing. */
+  _locationHash?: string
+  /** Calculation target used to omit redundant location data when every
+   *  living unit is already on the active surface. */
+  _activeSurfaceId?: SurfaceId
+  /** Shared intern table for immutable single-occupied-surface membership
+   *  objects. It avoids allocating the same map in millions of equivalent
+   *  probability branches and has no effect on state identity. */
+  _surfaceUnitsCache?: Array<
+    | {
+        surfaceId: SurfaceId
+        pool: UnitIdList
+        value: Record<string, UnitIdList>
+      }
+    | undefined
+  >
   /** Derived O(1) lookup cache for `unitAbilityRestrictions`, rebuilt
    *  lazily on first read after any mutation that could affect
    *  restriction outcomes (entries added/removed, unit composition
@@ -278,6 +300,8 @@ export interface DiceRollContext {
     defender: import('../dice-math/types').SideDiceCollection
   }
   allowedUnitTypes?: ReadonlySet<UnitBaseType>
+  /** Restrict dice-producing units to these physical surfaces. */
+  sourceSurfaceIds?: ReadonlySet<SurfaceId>
   isUnitAbility: boolean
   /** Per-side dice collection in the kernel-native format. Populated by
    *  `_collectDice`; mutated in place by BEFORE-timing API calls. */
@@ -320,6 +344,9 @@ export interface CombatStateData {
   attacker: SideStateData
   defender: SideStateData
   combatMode: CombatMode
+  surfaces: SurfaceDefinition[]
+  /** Space for SPACE mode, or the planet whose invasion is being resolved. */
+  activeSurfaceId: SurfaceId
   /** The side that won, or 'draw'. Set whenever a side is wiped (via
    *  `_removeOne` or `_postAssignHits`) or via an ability's `transitionTo`.
    *  Guaranteed to be defined whenever `isFinished` is true — combat

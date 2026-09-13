@@ -6,7 +6,10 @@ import {
 } from '../combat-state/phase-utils'
 import type { CombatMode, MetaPhase } from '../combat-state/types'
 import type { CombatOutcome } from '../types'
-import { extractSurvivors } from './utils/extract-survivors'
+import {
+  extractSurvivors,
+  extractSurvivorsBySurface,
+} from './utils/extract-survivors'
 import type { OutcomeRecord } from './utils/types'
 
 interface ExpansionResult {
@@ -341,6 +344,8 @@ function outcomeRecordToArray(record: OutcomeRecord): CombatOutcome[] {
     results.push({
       attacker,
       defender,
+      attackerSurfaces: extractSurvivorsBySurface(o.attackerData),
+      defenderSurfaces: extractSurvivorsBySurface(o.defenderData),
       winner: o.winnerSide,
       probability: o.probability,
     })

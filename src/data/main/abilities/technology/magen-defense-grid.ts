@@ -33,7 +33,11 @@ export const magenDefenseGrid: Ability<Params> = {
       timing: 'START_OF_COMBAT',
       isCallable: (_, ctx) => {
         const { structures } = ctx.api.own.getAbilityConfig('SETTINGS')
-        return ctx.api.own.countUnits(structures, { includeVariants: true }) > 0
+        return (
+          ctx.api.own.countUnits(structures, {
+            includeVariants: true,
+          }) > 0
+        )
       },
       call: (ctx, params) => {
         const target = ctx.api.opponent.findUnitByPriority(

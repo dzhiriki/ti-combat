@@ -29,6 +29,7 @@ export const il_sai_lakoe: Faction = {
           'When this unit is produced, place it on any planet you control.',
         COST: 2,
         COMBAT: [6, 1],
+        ALLOWED_SURFACES: ['PLANET'],
         CAPACITY_COST: 1,
         UNIT_ABILITIES: {
           SUSTAIN_DAMAGE: true,

@@ -13,6 +13,7 @@ export const heavensEye: Ability = {
   invoke: [
     {
       timing: 'END_OF_COMBAT_ROUND',
+      isCallable: (_params, ctx) => ctx.api.own.isParticipating(ctx.getUnit()),
       call: ctx => {
         ctx.api.own.modifyUnitState(ctx.getUnit(), { isDamaged: false })
       },

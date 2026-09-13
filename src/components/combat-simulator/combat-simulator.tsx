@@ -7,6 +7,7 @@ import {
 import { clsx } from 'clsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import type { CombatOutcome, SurvivorSide } from '@/combat'
 import {
   AbilitiesPanel,
   type AbilityFilterMode,
@@ -17,6 +18,7 @@ import { ButtonIcon } from '@/components/ui/button-icon'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ToggleGroup } from '@/components/ui/toggle-group'
+import type { UnitEditorMode } from '@/hooks/combat-setup/combat-setup'
 import { useCombatSetup } from '@/hooks/use-combat-setup'
 import type { Precision } from '@/hooks/use-settings'
 import { useSimulation } from '@/hooks/use-simulation'
@@ -61,11 +63,15 @@ function loadFilterMode(side: CombatSide): AbilityFilterMode {
 interface CombatSimulatorProps {
   className?: string
   precision: Precision
+  preferredEditorMode: UnitEditorMode
+  onEditorModePreferenceChange: (mode: UnitEditorMode) => void
 }
 
 export function CombatSimulator({
   className,
   precision,
+  preferredEditorMode,
+  onEditorModePreferenceChange,
 }: CombatSimulatorProps) {
   const {
     system,
@@ -73,6 +79,10 @@ export function CombatSimulator({
     defenderFaction,
     attackerSelections,
     defenderSelections,
+    editorMode,
+    surfaces,
+    selectedPlanetId,
+    surfaceSelections,
     combatMode,
     abilities,
     stateData,
@@ -88,13 +98,27 @@ export function CombatSimulator({
     setUpgraded,
     setAbilityParam,
     setCombatMode,
+    setEditorMode,
+    selectPlanet,
+    addPlanet,
+    setSurfaceUnitCount,
     resetUnits,
     resetAbilities,
     swap,
-  } = useCombatSetup()
+  } = useCombatSetup(preferredEditorMode)
 
   const { toast } = useToast()
-  useUrlSync(serializedConfig, loadConfig, toast)
+  const loadUrlConfig = (config: Parameters<typeof loadConfig>[0]) => {
+    const loadedEditorMode = loadConfig(config)
+    onEditorModePreferenceChange(loadedEditorMode)
+  }
+  useUrlSync(serializedConfig, loadUrlConfig, toast)
+
+  useEffect(() => {
+    if (editorMode !== preferredEditorMode) {
+      setEditorMode(preferredEditorMode)
+    }
+  }, [editorMode, preferredEditorMode, setEditorMode])
 
   const [attackerSheetOpen, setAttackerSheetOpen] = useState(false)
   const [defenderSheetOpen, setDefenderSheetOpen] = useState(false)
@@ -171,6 +195,35 @@ export function CombatSimulator({
   )
 
   const { outcomes, isComputing } = useSimulation(inputWithPrecision)
+
+  const displayOutcomes = useMemo(() => {
+    if (!outcomes || editorMode === 'FULL') return outcomes
+    const spaceId = surfaces.find(surface => surface.type === 'SPACE')?.id
+    const visible = [spaceId, selectedPlanetId].filter(
+      (id): id is NonNullable<typeof id> => id !== undefined,
+    )
+    const aggregate = (
+      bySurface: CombatOutcome['attackerSurfaces'],
+      fallback: SurvivorSide,
+    ): SurvivorSide => {
+      if (!bySurface) return fallback
+      const result: SurvivorSide = {}
+      for (const surfaceId of visible) {
+        for (const [type, units] of Object.entries(
+          bySurface[surfaceId] ?? {},
+        )) {
+          if (!units) continue
+          result[type] = [...(result[type] ?? []), ...units]
+        }
+      }
+      return result
+    }
+    return outcomes.map(outcome => ({
+      ...outcome,
+      attacker: aggregate(outcome.attackerSurfaces, outcome.attacker),
+      defender: aggregate(outcome.defenderSurfaces, outcome.defender),
+    }))
+  }, [editorMode, outcomes, selectedPlanetId, surfaces])
 
   const unitPriority = useMemo(() => {
     const key =
@@ -349,18 +402,25 @@ export function CombatSimulator({
           defenderFaction={defenderFaction}
           attackerSelections={attackerSelections}
           defenderSelections={defenderSelections}
+          editorMode={editorMode}
+          surfaces={surfaces}
+          selectedPlanetId={selectedPlanetId}
+          surfaceSelections={surfaceSelections}
           attackerConfig={attackerConfig}
           defenderConfig={defenderConfig}
           combatResult={combatResult}
-          outcomes={outcomes}
+          outcomes={displayOutcomes}
           unitPriority={unitPriority}
           participatingTypes={participatingTypes}
           isComputing={isComputing}
           combatMode={combatMode}
           onCombatModeChange={setCombatMode}
+          onPlanetChange={selectPlanet}
+          onAddPlanet={addPlanet}
           onFactionChange={setFaction}
           onSwap={swap}
           onUnitCountChange={setUnitCount}
+          onSurfaceUnitCountChange={setSurfaceUnitCount}
           onUpgradeToggle={handleUpgradeToggle}
           onResetUnits={resetUnits}
           attackerActions={

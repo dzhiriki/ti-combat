@@ -6,9 +6,7 @@ import type { UnitBaseType, UnitList } from '@/types'
 
 type Params = {
   anomalies: number
-  mechsOnGround: number
   strategy: 'WIN_IN_SPACE' | 'PRESERVE_SUSTAIN' | 'PRESERVE_NO_SUSTAIN'
-  _initialMechs: number
 }
 
 declare global {
@@ -29,23 +27,11 @@ function mechsParticipating(ctx: AbilityReadContext): boolean {
   return participating.includes('MECH')
 }
 
-/** How many of the LIVING mechs are still in the space area. `mechsOnGround`
- *  says how many stay on the planet; the rest are in space. The mechs are
- *  fungible units, so which pool a casualty came from is the player's call —
- *  that attribution IS the strategy: WIN_IN_SPACE gives up ground mechs
- *  first (space presence lasts as long as possible), the preserve options
- *  give up space mechs first (the ground pool is kept intact for later). */
-function spaceMechsRemaining(ctx: AbilityReadContext, params: Params): number {
-  const alive = ctx.api.own.countUnits('MECH', { includeVariants: true })
-  const initial = params._initialMechs > 0 ? params._initialMechs : alive
-  const ground = Math.min(params.mechsOnGround, initial)
-  const space = initial - ground
-  const dead = Math.max(0, initial - alive)
-  if (params.strategy === 'WIN_IN_SPACE') {
-    const groundDead = Math.min(dead, ground)
-    return Math.max(0, space - (dead - groundDead))
-  }
-  return Math.max(0, space - dead)
+function spaceMechsRemaining(ctx: AbilityReadContext): number {
+  return ctx.api.own.countUnits('MECH', {
+    includeVariants: true,
+    surfaceId: ctx.api.own.getSpaceSurfaceId(),
+  })
 }
 
 // Il Na Viroset mech. "This unit participates in space combat as if it were a
@@ -56,9 +42,7 @@ function spaceMechsRemaining(ctx: AbilityReadContext, params: Params): number {
 // combat for them to be part of.
 //
 // The combat continues while the side holds the space area: ships OR mechs
-// that are physically in it. `mechsOnGround` says how many mechs stay on the
-// planet (the rest are in space; the default of 0 commits everything to the
-// space fight, matching the default strategy). Only once nothing but ground
+// that are physically in it. Only once nothing but ground
 // mechs remain does the fighting stop, with those mechs alive on the ground.
 // The `strategy` select decides how mech casualties are attributed and
 // whether the mechs spend their Sustain Damage:
@@ -80,16 +64,13 @@ export const starlancerXI: Ability<Params> = {
   context: 'SPACE',
   paramsSchema: z.object({
     anomalies: z.number(),
-    mechsOnGround: z.number(),
     strategy: z.string(),
   }),
   params: {
     isEnabled: true,
     uses: Infinity,
     anomalies: 0,
-    mechsOnGround: 0,
     strategy: 'WIN_IN_SPACE',
-    _initialMechs: 0,
   },
   // The mech's printed text — always on while mechs are fielded.
   readOnly: true,
@@ -107,7 +88,7 @@ export const starlancerXI: Ability<Params> = {
   declareParamChange: () => [
     { key: 'spaceCombatParticipating', value: 'MECH' },
   ],
-  uiConfig: ctx => [
+  uiConfig: [
     {
       key: 'strategy',
       label: 'Strategy',
@@ -117,13 +98,6 @@ export const starlancerXI: Ability<Params> = {
         { label: 'Save ground (sustain)', value: 'PRESERVE_SUSTAIN' },
         { label: 'Save ground (no sustain)', value: 'PRESERVE_NO_SUSTAIN' },
       ],
-    },
-    {
-      key: 'mechsOnGround',
-      label: 'Mechs on ground',
-      type: 'number',
-      min: 0,
-      max: ctx.api.own.countUnits('MECH', { includeVariants: true }),
     },
     {
       key: 'anomalies',
@@ -144,13 +118,8 @@ export const starlancerXI: Ability<Params> = {
         ctx.api.own.updateAbilityConfig('SETTINGS', {
           spaceCombatParticipating: (current: UnitBaseType[]) =>
             current.includes('MECH') ? current : [...current, 'MECH'],
-        })
-        // Snapshot the fielded mech count so casualty attribution can tell
-        // the space pool from the ground pool later.
-        ctx.api.own.updateAbilityConfig({
-          _initialMechs: ctx.api.own.countUnits('MECH', {
-            includeVariants: true,
-          }),
+          spaceCombatParticipatingFromAnySurface: (current: UnitBaseType[]) =>
+            current.includes('MECH') ? current : [...current, 'MECH'],
         })
         if (params.strategy === 'PRESERVE_NO_SUSTAIN') {
           ctx.api.own.updateAbilityConfig('SUSTAIN_DAMAGE', {
@@ -170,13 +139,15 @@ export const starlancerXI: Ability<Params> = {
       // are not in the space area and cannot keep the fight going), the wipe
       // check ends the combat, and they survive on the ground.
       timing: 'AFTER_DESTROY',
-      isCallable: (params, ctx) =>
+      isCallable: (_params, ctx) =>
         mechsParticipating(ctx) &&
         !ownShipsFielded(ctx) &&
-        spaceMechsRemaining(ctx, params) === 0,
+        spaceMechsRemaining(ctx) === 0,
       call: ctx => {
         ctx.api.own.updateAbilityConfig('SETTINGS', {
           spaceCombatParticipating: (current: UnitBaseType[]) =>
+            current.filter(t => t !== 'MECH'),
+          spaceCombatParticipatingFromAnySurface: (current: UnitBaseType[]) =>
             current.filter(t => t !== 'MECH'),
         })
       },

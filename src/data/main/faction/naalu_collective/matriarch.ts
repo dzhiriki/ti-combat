@@ -23,5 +23,14 @@ export const matriarch: Ability = {
         })
       },
     },
+    {
+      timing: 'END_OF_COMBAT',
+      call: ctx => {
+        const fighters = ctx.api.own.getUnits('FIGHTER', {
+          includeVariants: true,
+        })
+        ctx.api.own.moveUnits(fighters, ctx.api.own.getSpaceSurfaceId())
+      },
+    },
   ],
 }

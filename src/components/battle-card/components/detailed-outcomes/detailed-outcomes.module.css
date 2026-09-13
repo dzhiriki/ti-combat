@@ -106,3 +106,15 @@
 .noSurvivors {
   color: var(--color-text-muted);
 }
+
+.surfaceGroup + .surfaceGroup {
+  margin-top: var(--space-1);
+}
+
+.surfaceLabel {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

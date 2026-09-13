@@ -29,6 +29,10 @@ export const theAlastor: Ability = {
             ...current,
             ...groundForces.filter(u => !current.includes(u)),
           ],
+          spaceCombatParticipatingFromAnySurface: (current: UnitBaseType[]) => [
+            ...current,
+            ...groundForces.filter(u => !current.includes(u)),
+          ],
         })
       },
     },

@@ -26,6 +26,8 @@ export const settings: Ability<SettingsParams> = {
     units: [...SHIPS, ...GROUND_FORCES, ...STRUCTURES],
     spaceCombatParticipating: [],
     groundCombatParticipating: [],
+    spaceCombatParticipatingFromAnySurface: [],
+    groundCombatParticipatingFromAnySurface: [],
     validTargetsSpaceCannonOffense: SHIPS,
     validTargetsBombardment: [],
     validTargetsSpaceCannonDefense: [],

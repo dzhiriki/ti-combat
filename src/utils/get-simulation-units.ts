@@ -1,7 +1,10 @@
 import { nextUnitIds } from '@/combat'
-import { UNIT_TYPES } from '@/constants/units'
+import { DEFAULT_UNIT_SURFACES, UNIT_TYPES } from '@/constants/units'
 import type {
   GameSystem,
+  SurfaceDefinition,
+  SurfaceId,
+  SurfaceUnitSelections,
   UnitBaseType,
   UnitIdList,
   UnitSelection,
@@ -26,36 +29,77 @@ export function getSimulationUnits(
   unitType: Record<string, UnitType>
   unitState: Record<string, UnitState>
   unitStats: Record<string, UnitStats>
+  surfaceUnits: Record<string, UnitIdList>
+  unitSurface: Record<string, SurfaceId>
+} {
+  return getSimulationUnitsOnSurfaces(
+    system,
+    faction,
+    { space: selections },
+    [{ id: 'space' as SurfaceId, type: 'SPACE', name: 'Space' }],
+    gen,
+  )
+}
+
+/** Builds unit instances from the engine's explicit surface representation. */
+export function getSimulationUnitsOnSurfaces(
+  system: GameSystem,
+  faction: string,
+  placements: SurfaceUnitSelections,
+  surfaces: readonly SurfaceDefinition[],
+  gen: { _nextCode?: number },
+): {
+  units: UnitIdList
+  unitType: Record<string, UnitType>
+  unitState: Record<string, UnitState>
+  unitStats: Record<string, UnitStats>
+  surfaceUnits: Record<string, UnitIdList>
+  unitSurface: Record<string, SurfaceId>
 } {
   const factionConfig = getFactionUnitConfig(system, faction)
   let units = ''
   const unitType: Record<string, UnitType> = {}
   const unitState: Record<string, UnitState> = {}
   const unitStats: Record<string, UnitStats> = {}
+  const surfaceUnits: Record<string, UnitIdList> = {}
+  const unitSurface: Record<string, SurfaceId> = {}
 
-  for (const baseType of UNIT_TYPES) {
-    const sel = selections[baseType]
-    if (sel.count === 0) continue
+  for (const [surfaceKey, selections] of Object.entries(placements)) {
+    const surface = surfaces.find(candidate => candidate.id === surfaceKey)
+    if (!surface) throw new Error(`Unknown surface: ${surfaceKey}`)
+    let surfaceList = ''
+    for (const baseType of UNIT_TYPES) {
+      const sel = selections[baseType]
+      if (!sel || sel.count === 0) continue
 
-    const unitDef = factionConfig[baseType]
-    const baseStats = unitDef.BASE
-    const upgradedStats = unitDef.UPGRADED
+      const unitDef = factionConfig[baseType]
+      const baseStats = unitDef.BASE
+      const upgradedStats = unitDef.UPGRADED
 
-    if (!baseStats && !upgradedStats) continue
+      if (!baseStats && !upgradedStats) continue
 
-    const effectiveStats = getEffectiveStats(
-      baseStats,
-      upgradedStats,
-      sel.upgraded,
-    )
-    if (!effectiveStats) continue
+      const effectiveStats = getEffectiveStats(
+        baseStats,
+        upgradedStats,
+        sel.upgraded,
+      )
+      if (!effectiveStats) continue
+      const allowed =
+        effectiveStats.ALLOWED_SURFACES ?? DEFAULT_UNIT_SURFACES[baseType]
+      if (!allowed.includes(surface.type)) {
+        throw new Error(`${baseType} cannot be placed on ${surface.type}`)
+      }
 
-    const ids = nextUnitIds(sel.count, gen)
-    for (const id of ids) {
-      units += id
-      unitType[id] = baseType as UnitType
+      const ids = nextUnitIds(sel.count, gen)
+      for (const id of ids) {
+        units += id
+        surfaceList += id
+        unitType[id] = baseType as UnitType
+        unitSurface[id] = surfaceKey as SurfaceId
+      }
+      unitStats[baseType] = effectiveStats
     }
-    unitStats[baseType] = effectiveStats
+    surfaceUnits[surfaceKey] = surfaceList as UnitIdList
   }
 
   // Returns a packed UnitIdList — the caller places it into
@@ -68,6 +112,8 @@ export function getSimulationUnits(
     unitType,
     unitState,
     unitStats,
+    surfaceUnits,
+    unitSurface,
   }
 }
 

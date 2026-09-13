@@ -37,6 +37,7 @@ export const raidFormation: Ability<Params> = {
         const pendingHits = ctx.api.opponent.getPendingHits()
         const fighterCount = ctx.api.opponent.countUnits('FIGHTER', {
           includeVariants: true,
+          participatingOnly: true,
         })
 
         return pendingHits > fighterCount
@@ -45,6 +46,7 @@ export const raidFormation: Ability<Params> = {
         const pendingHits = ctx.api.opponent.getPendingHits()
         const fighterCount = ctx.api.opponent.countUnits('FIGHTER', {
           includeVariants: true,
+          participatingOnly: true,
         })
         const excess = pendingHits - fighterCount
 

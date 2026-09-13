@@ -39,8 +39,10 @@ export const greyfireMutagen: Ability<Params> = {
         if (ctx.api.opponent.getFaction() === 'YIN_BROTHERHOOD') return false
         const { groundForces } = ctx.api.opponent.getAbilityConfig('SETTINGS')
         if (
-          ctx.api.opponent.countUnits(groundForces, { includeVariants: true }) <
-          2
+          ctx.api.opponent.countUnits(groundForces, {
+            includeVariants: true,
+            participatingOnly: true,
+          }) < 2
         )
           return false
         return (

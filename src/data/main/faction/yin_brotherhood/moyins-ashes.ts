@@ -20,8 +20,12 @@ export const moyinsAshes: Ability = {
         )
       },
       call: (ctx, _params, placedId) => {
+        const surface = ctx.api.own.getUnitSurface(placedId)
         ctx.api.own.removeUnits(placedId)
-        ctx.api.own.placeUnits({ MECH: 1 })
+        ctx.api.own.placeUnits(
+          { MECH: 1 },
+          surface ?? ctx.api.own.getActiveSurfaceId(),
+        )
       },
     },
   ],

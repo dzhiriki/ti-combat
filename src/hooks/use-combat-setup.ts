@@ -3,10 +3,14 @@ import { useCallback, useMemo, useReducer, useState } from 'react'
 import type { CombatMode } from '@/combat'
 import { CombatSetup } from '@/hooks/combat-setup'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
-import type { CombatSide, GameSystem, UnitBaseType } from '@/types'
+import type { CombatSide, GameSystem, SurfaceId, UnitBaseType } from '@/types'
 
-export function useCombatSetup() {
-  const [setup] = useState(() => new CombatSetup())
+import type { UnitEditorMode } from './combat-setup/combat-setup'
+
+export function useCombatSetup(
+  initialEditorMode: UnitEditorMode = 'SIMPLIFIED',
+) {
+  const [setup] = useState(() => new CombatSetup(initialEditorMode))
   const [, forceRender] = useReducer((x: number) => x + 1, 0)
 
   const setSystem = useCallback(
@@ -57,6 +61,48 @@ export function useCombatSetup() {
     [setup],
   )
 
+  const setEditorMode = useCallback(
+    (mode: UnitEditorMode) => {
+      setup.setEditorMode(mode)
+      forceRender()
+    },
+    [setup],
+  )
+
+  const selectPlanet = useCallback(
+    (surfaceId: SurfaceId) => {
+      setup.selectPlanet(surfaceId)
+      forceRender()
+    },
+    [setup],
+  )
+
+  const addPlanet = useCallback(() => {
+    setup.addPlanet()
+    forceRender()
+  }, [setup])
+
+  const removePlanet = useCallback(
+    (surfaceId: SurfaceId) => {
+      setup.removePlanet(surfaceId)
+      forceRender()
+    },
+    [setup],
+  )
+
+  const setSurfaceUnitCount = useCallback(
+    (
+      side: CombatSide,
+      surfaceId: SurfaceId,
+      unitType: UnitBaseType,
+      count: number,
+    ) => {
+      setup.setSurfaceUnitCount(side, surfaceId, unitType, count)
+      forceRender()
+    },
+    [setup],
+  )
+
   const resetUnits = useCallback(
     (side: CombatSide) => {
       setup.resetUnits(side)
@@ -82,6 +128,7 @@ export function useCombatSetup() {
     (config: SerializedConfig) => {
       setup.loadConfig(config)
       forceRender()
+      return setup.editorMode
     },
     [setup],
   )
@@ -109,6 +156,10 @@ export function useCombatSetup() {
     attackerSelections: setup.attackerSelections,
     defenderSelections: setup.defenderSelections,
     combatMode: setup.combatMode,
+    editorMode: setup.editorMode,
+    surfaces: setup.surfaces,
+    selectedPlanetId: setup.selectedPlanetId,
+    surfaceSelections: setup.surfaceSelections,
     abilities: setup.abilities,
     stateData,
     getReadContext: setup.getReadContext.bind(setup),
@@ -122,6 +173,11 @@ export function useCombatSetup() {
     setUpgraded,
     setAbilityParam,
     setCombatMode,
+    setEditorMode,
+    selectPlanet,
+    addPlanet,
+    removePlanet,
+    setSurfaceUnitCount,
     resetUnits,
     resetAbilities,
     swap,

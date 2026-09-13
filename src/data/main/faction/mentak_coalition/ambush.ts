@@ -41,6 +41,7 @@ export const ambush: Ability<Params> = {
         return (
           ctx.api.own.countUnits(ATTACKER_TYPES, {
             includeVariants: true,
+            participatingOnly: true,
           }) > 0
         )
       },
@@ -54,6 +55,7 @@ export const ambush: Ability<Params> = {
         for (const variantKey of ctx.utils.getFlat(params.attackerPriority)) {
           for (const uid of ctx.api.own.getUnits(variantKey, {
             includeVariants: false,
+            participatingOnly: true,
           })) {
             if (selected.length >= MAX_SHIPS) break
             selected.push(uid)

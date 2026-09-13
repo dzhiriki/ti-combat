@@ -19,6 +19,10 @@ export const quantumManipulator: Ability = {
       isCallable: (_params, ctx) => {
         if (ctx.api.own.getPendingHits() <= 0) return false
         const unitId = ctx.getUnit()
+        if (
+          ctx.api.own.getUnitSurface(unitId) !== ctx.api.own.getSpaceSurfaceId()
+        )
+          return false
         if (ctx.api.own.getUnitState(unitId)?.isDamaged) return false
         const unitType = ctx.api.own.getUnitBaseType(unitId)!
         if (

@@ -2,9 +2,12 @@ import { GROUND_FORCES, STRUCTURES } from '@/constants/units'
 import type {
   CombatSide,
   DiceGroup,
+  SurfaceDefinition,
+  SurfaceId,
   UnitAbility,
   UnitBaseType,
   UnitId,
+  UnitIdList,
   UnitType,
 } from '@/types'
 
@@ -36,6 +39,7 @@ import { marginalizeBaseHits } from '../dice-math/utils/marginalize-base-hits'
 import { type LogEntry, Logger } from '../logger'
 import { canonicalizeUnitState } from '../utils/canonicalize-unit-state'
 import { sortUnitsByPriority } from '../utils/sort-units-by-priority'
+import { parseVariantId } from '../utils/unit-variant'
 import type {
   CombatMode,
   CombatStateData,
@@ -77,6 +81,53 @@ function unwrapUnitListKeys(raw: unknown): UnitType[] {
     result.push(entry[0] as UnitType)
   }
   return result
+}
+
+/** Starlancer's strategy chooses which physical mech pool absorbs casualties
+ * first. Preserve the configured unit-type priority and only reorder MECH ids
+ * inside their existing slots: ids nearer the tail are destroyed first. */
+function sortStarlancerMechsBySurface(
+  data: CombatStateData,
+  side: CombatSide,
+): void {
+  if (data.combatMode !== 'SPACE') return
+
+  const sideData = data[side]
+  const base = sideData.abilities['TF_STARLANCER_XI']
+  const live = sideData.liveAbilities['TF_STARLANCER_XI']
+  const params = live === undefined ? base : { ...base, ...live }
+  if (params?.isEnabled === false) return
+
+  const strategy = params?.strategy as string | undefined
+  const preserveGround =
+    strategy === 'PRESERVE_SUSTAIN' || strategy === 'PRESERVE_NO_SUSTAIN'
+  const spaceId = data.surfaces!.find(surface => surface.type === 'SPACE')?.id
+  if (!spaceId) return
+
+  const pool = [...sideData.participatingUnits] as UnitId[]
+  const positions: number[] = []
+  const mechs: UnitId[] = []
+  for (let index = 0; index < pool.length; index++) {
+    const id = pool[index]
+    if (parseVariantId(sideData.unitType[id]).type !== 'MECH') continue
+    positions.push(index)
+    mechs.push(id)
+  }
+  if (mechs.length < 2) return
+
+  mechs.sort((a, b) => {
+    const aInSpace = sideData.unitSurface[a] === spaceId
+    const bInSpace = sideData.unitSurface[b] === spaceId
+    if (aInSpace === bInSpace) return a > b ? -1 : a < b ? 1 : 0
+    const aProtected = preserveGround ? !aInSpace : aInSpace
+    return aProtected ? -1 : 1
+  })
+  for (let index = 0; index < positions.length; index++) {
+    pool[positions[index]] = mechs[index]
+  }
+  sideData.participatingUnits = pool.join('') as UnitIdList
+  if (sideData._locationHash && !sideData._locationHash.startsWith('='))
+    sideData._locationHash = undefined
 }
 
 function sortUnitsAtSetup(data: CombatStateData): void {
@@ -123,6 +174,8 @@ function sortUnitsAtSetup(data: CombatStateData): void {
       | {
           spaceCombatParticipating?: UnitBaseType[]
           groundCombatParticipating?: UnitBaseType[]
+          spaceCombatParticipatingFromAnySurface?: UnitBaseType[]
+          groundCombatParticipatingFromAnySurface?: UnitBaseType[]
         }
       | undefined
     const partList =
@@ -130,8 +183,22 @@ function sortUnitsAtSetup(data: CombatStateData): void {
         ? settings?.groundCombatParticipating
         : settings?.spaceCombatParticipating
     const participatingTypes = partList ? new Set(partList) : undefined
+    const anySurfaceList =
+      mode === 'GROUND'
+        ? settings?.groundCombatParticipatingFromAnySurface
+        : settings?.spaceCombatParticipatingFromAnySurface
+    const anySurfaceTypes = new Set(anySurfaceList ?? [])
+    const activeSurfaceId = data.activeSurfaceId!
 
-    sortUnitsByPriority(data[side], list, participatingTypes)
+    sortUnitsByPriority(data[side], list, participatingTypes, id => {
+      const type = parseVariantId(data[side].unitType[id]).type as UnitBaseType
+      return (
+        (participatingTypes?.has(type) ?? false) &&
+        (data[side].unitSurface[id] === activeSurfaceId ||
+          anySurfaceTypes.has(type))
+      )
+    })
+    sortStarlancerMechsBySurface(data, side)
   }
 }
 
@@ -139,6 +206,7 @@ interface UnitAbilityPhaseConfig {
   firing: CombatSide[]
   hitSource: HitSource
   allowedUnitTypes?: ReadonlySet<UnitBaseType>
+  sourceSurfaceIds?: ReadonlySet<SurfaceId>
 }
 
 /** AFB-context AFTER_UNIT_ABILITY_ROLL abilities (e.g. RAID_FORMATION) need
@@ -238,6 +306,8 @@ export class CombatState {
     attacker: SideStateData,
     defender: SideStateData,
     combatMode: CombatMode,
+    surfaces: SurfaceDefinition[],
+    activeSurfaceId: SurfaceId,
     abilities?: Record<import('@/types').CombatSide, RegisteredAbility[]>,
     unitAbilityKeys?: Record<import('@/types').CombatSide, ReadonlySet<string>>,
     factionOwnedKeys?: Record<
@@ -249,10 +319,15 @@ export class CombatState {
   ): CombatState {
     const instance = Object.create(CombatState.prototype) as CombatState
 
+    attacker._activeSurfaceId = activeSurfaceId
+    defender._activeSurfaceId = activeSurfaceId
+
     const baseData: CombatStateData = {
       attacker,
       defender,
       combatMode,
+      surfaces,
+      activeSurfaceId,
       _nextCode: nextCode,
     }
 
@@ -378,11 +453,19 @@ export class CombatState {
   /** Queue a wipe check after a direct unit-removal effect. */
   queueCompletionCheck(phase: MetaPhase[]): void {
     if (this.data.winnerSide !== undefined) return
-    this.pendingSteps.push({
+    const check: PhaseStep = {
       kind: 'method',
       fn: CombatState.prototype._postUnitMutation,
       phase,
-    })
+    }
+    const group = this.pendingSteps.at(-1)
+    if (group?.kind === 'group') {
+      // Groups execute from the tail. Run the check after all remaining
+      // destroy reactions, including any nested cascades they create.
+      group.steps.unshift(check)
+    } else {
+      this.pendingSteps.push(check)
+    }
   }
 
   isFinished(): boolean {
@@ -610,7 +693,14 @@ export class CombatState {
       }
 
       case 'COMMIT_UNITS':
-        return [{ kind: 'timing', timing: 'COMMIT_UNITS', phase }]
+        return [
+          { kind: 'timing', timing: 'COMMIT_UNITS', phase },
+          {
+            kind: 'method',
+            fn: CombatState.prototype._commitUnits,
+            phase,
+          },
+        ]
     }
   }
 
@@ -640,6 +730,35 @@ export class CombatState {
   // STEP METHODS (referenced by PhaseStep entries in getPhaseScript)
   // ===========================================================================
 
+  /** Land every eligible attacking unit currently in space on the selected
+   *  planet. COMMIT_UNITS abilities run first so Matriarch/Morphwing-style
+   *  rules can extend the eligible type list before movement. */
+  private _commitUnits(): void {
+    const data = this.data
+    if (data.combatMode !== 'GROUND') return
+    const space = data.surfaces!.find(surface => surface.type === 'SPACE')
+    const target = data.surfaces!.find(
+      surface =>
+        surface.id === data.activeSurfaceId && surface.type === 'PLANET',
+    )
+    if (!space || !target) return
+
+    const attacker = data.attacker
+    const settings = CombatSideState.getLiveParams(attacker, 'SETTINGS')
+    const eligible = new Set(
+      (settings?.groundCombatParticipating as UnitBaseType[] | undefined) ??
+        GROUND_FORCES,
+    )
+    const moving: UnitId[] = []
+    for (const id of attacker.surfaceUnits[space.id] ?? '') {
+      const type = parseVariantId(attacker.unitType[id]).type as UnitBaseType
+      if (eligible.has(type)) moving.push(id as UnitId)
+    }
+    CombatSideState.moveUnits(attacker, moving, target.id)
+    this.resyncParticipating('attacker')
+    this.resyncParticipating('defender')
+  }
+
   /** Swap the two sides' pending hit pools. Queued inside a self-targeting
    *  unit-ability dice-roll group (Proxima self-bomb): the roll produces hits
    *  against the natural opponent so AFTER_UNIT_ABILITY_ROLL abilities (e.g.
@@ -662,55 +781,55 @@ export class CombatState {
    *  (SPACE_COMBAT / GROUND_COMBAT / AFB) have further steps queued;
    *  non-combat metas drain to empty and the engine picks up the transition. */
   private _postAssignHits(phase: MetaPhase[]): void {
-    const meta = innerMeta(phase)
-    // Unit-ability phases (BOMBARDMENT / SCD / AFB / SCO) must let later
-    // phases run even when the phase wiped a side's participants — e.g. PDS
-    // still fires in SCD after bombardment clears ground forces. Only the
-    // combat-round metas can shortcut on missing participants.
-    const isCombatRound = meta === 'SPACE_COMBAT' || meta === 'GROUND_COMBAT'
+    // Ground pre-combat steps never own completion: an invasion still commits
+    // units and resolves defensive fire after a bombardment wipe. Space
+    // cannon offense may finish a space battle before its first round.
+    // Nested ability steps inherit their combat parent in the phase stack,
+    // so Harrow/AFB wipes during a combat round complete immediately.
+    const isCombatRound = phase.some(
+      meta => meta === 'SPACE_COMBAT' || meta === 'GROUND_COMBAT',
+    )
     const d = this.data
-    const attackerOut = isCombatRound
-      ? !CombatSideState.hasParticipatingUnits(d.attacker)
-      : !CombatSideState.hasAnyUnits(d.attacker)
-    const defenderOut = isCombatRound
-      ? !CombatSideState.hasParticipatingUnits(d.defender)
-      : !CombatSideState.hasAnyUnits(d.defender)
+    if (!isCombatRound && d.combatMode === 'GROUND') return
+    let attackerOut = !CombatSideState.hasParticipatingUnits(d.attacker)
+    let defenderOut = !CombatSideState.hasParticipatingUnits(d.defender)
+
+    // Z-Grav Eidolon joins only at START_OF_COMBAT. If an opposing fleet is
+    // already present, let the battle reach that timing; the mech remains
+    // outside earlier target pools and cannot start a battle by itself.
+    if (!isCombatRound && d.combatMode === 'SPACE') {
+      if (!attackerOut && defenderOut && this._hasPendingEidolon('defender')) {
+        defenderOut = false
+      } else if (
+        attackerOut &&
+        !defenderOut &&
+        this._hasPendingEidolon('attacker')
+      ) {
+        attackerOut = false
+      }
+    }
 
     let winner: CombatSide | 'draw' | undefined
     if (attackerOut && defenderOut) winner = 'draw'
     else if (attackerOut) winner = 'defender'
     else if (defenderOut) winner = 'attacker'
 
-    // Winning space combat requires space-combat participants. A side whose
-    // only remaining units merely share the area (ferried ground forces,
-    // structures) doesn't take the win when the opponent is absent or wiped
-    // in a unit-ability phase — the combat ends with no winner instead.
-    // Participation is SETTINGS-driven, so ship-mechs (Eidolon Maximum,
-    // Starlancer XI while ships are fielded) still win. Combat-round wipes
-    // are unaffected: the surviving side has participants by construction.
-    // Mirrors `syncWinnerSide`, which already re-derives winners from
-    // participating units only.
-    if (
-      d.combatMode === 'SPACE' &&
-      (winner === 'attacker' || winner === 'defender') &&
-      !CombatSideState.hasParticipatingUnits(d[winner])
-    ) {
-      winner = 'draw'
-    }
-
     if (winner !== undefined) this._triggerCompletion(phase, winner)
   }
 
+  private _hasPendingEidolon(side: CombatSide): boolean {
+    const sideData = this.data[side]
+    const params = CombatSideState.getLiveParams(sideData, 'EIDOLON')
+    if (!params || params.isEnabled === false) return false
+    return (
+      CombatSideState.getUnits(sideData, 'MECH', {
+        includeVariants: true,
+        surfaceId: this.data.activeSurfaceId,
+      }).length > 0
+    )
+  }
+
   private _postUnitMutation(phase: MetaPhase[]): void {
-    const destroyGroup = this.pendingSteps.at(-1)
-    if (destroyGroup?.kind === 'group' && Array.isArray(destroyGroup.data)) {
-      destroyGroup.steps.unshift({
-        kind: 'method',
-        fn: CombatState.prototype._postUnitMutation,
-        phase,
-      })
-      return
-    }
     this._postAssignHits(phase)
   }
 
@@ -745,6 +864,15 @@ export class CombatState {
         : (settings.spaceCombatParticipating as UnitBaseType[] | undefined)
     if (!partList) return
     const participatingTypes = new Set<UnitBaseType>(partList)
+    const anySurfaceList =
+      data.combatMode === 'GROUND'
+        ? (settings.groundCombatParticipatingFromAnySurface as
+            | UnitBaseType[]
+            | undefined)
+        : (settings.spaceCombatParticipatingFromAnySurface as
+            | UnitBaseType[]
+            | undefined)
+    const anySurfaceTypes = new Set(anySurfaceList ?? [])
 
     const liveUP = liveSide['UNIT_PRIORITY']
     const baseUP = baseSide['UNIT_PRIORITY']
@@ -763,7 +891,15 @@ export class CombatState {
       ? (unwrapUnitListKeys(rawOrderList) as UnitType[])
       : (partList as unknown as UnitType[])
 
-    sortUnitsByPriority(data[side], orderList, participatingTypes)
+    sortUnitsByPriority(data[side], orderList, participatingTypes, id => {
+      const type = parseVariantId(data[side].unitType[id]).type as UnitBaseType
+      return (
+        participatingTypes.has(type) &&
+        (data[side].unitSurface[id] === data.activeSurfaceId ||
+          anySurfaceTypes.has(type))
+      )
+    })
+    sortStarlancerMechsBySurface(data, side)
   }
 
   /** Replace any in-flight pending steps with the completion sequence and
@@ -1284,6 +1420,7 @@ export class CombatState {
           firing: ['defender'],
           hitSource: 'SPACE_CANNON',
           allowedUnitTypes: new Set([...GROUND_FORCES, ...STRUCTURES]),
+          sourceSurfaceIds: new Set([this.data.activeSurfaceId!]),
         }
       default:
         throw new Error(`Unexpected meta for unit-ability dice roll: ${meta}`)
@@ -1329,6 +1466,7 @@ export class CombatState {
         firing,
         hitSource: baseConfig.hitSource,
         allowedUnitTypes: baseConfig.allowedUnitTypes,
+        sourceSurfaceIds: baseConfig.sourceSurfaceIds,
         customDice,
         selfTarget,
         abilitiesOverride: config.abilitiesOverride,
@@ -1513,6 +1651,7 @@ export function buildUnitAbilityDiceRollGroup(args: {
   firing: CombatSide[]
   hitSource: HitSource
   allowedUnitTypes?: ReadonlySet<UnitBaseType>
+  sourceSurfaceIds?: ReadonlySet<SurfaceId>
   selfTarget?: boolean
   customDice?: { attacker: SideDiceCollection; defender: SideDiceCollection }
   abilitiesOverride?: Readonly<AbilitiesOverride>
@@ -1522,6 +1661,7 @@ export function buildUnitAbilityDiceRollGroup(args: {
     firing,
     hitSource,
     allowedUnitTypes,
+    sourceSurfaceIds,
     selfTarget,
     customDice,
     abilitiesOverride,
@@ -1534,6 +1674,7 @@ export function buildUnitAbilityDiceRollGroup(args: {
       selfTarget,
       customDice,
       allowedUnitTypes,
+      sourceSurfaceIds,
       isUnitAbility: true,
       abilitiesOverride,
     },
@@ -1589,6 +1730,7 @@ function collectSideDice(
     side,
     ctx.hitSource,
     ctx.allowedUnitTypes,
+    ctx.sourceSurfaceIds,
   )
 }
 
@@ -1633,8 +1775,10 @@ function collectionToLogShape(collection: SideDiceCollection): DicePool {
 export function cloneStateForBranch(base: CombatStateData): CombatStateData {
   base.attacker._hitPoolShared = true
   base.attacker._unitStateShared = true
+  base.attacker._surfaceUnitsCache ??= []
   base.defender._hitPoolShared = true
   base.defender._unitStateShared = true
+  base.defender._surfaceUnitsCache ??= []
   return {
     ...base,
     attacker: { ...base.attacker },

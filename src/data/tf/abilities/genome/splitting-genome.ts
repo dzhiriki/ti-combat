@@ -27,7 +27,7 @@ export const splittingGenome: Ability = {
           return base === 'DESTROYER' || base === 'CRUISER'
         }),
       call: ctx => {
-        ctx.api.own.placeUnits({ FIGHTER: 2 })
+        ctx.api.own.placeUnits({ FIGHTER: 2 }, ctx.api.own.getSpaceSurfaceId())
       },
     },
   ],

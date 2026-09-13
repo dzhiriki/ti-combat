@@ -2,6 +2,8 @@ import type { UnitCategory } from '@/constants/units'
 import type {
   CombatSide,
   DiceGroup,
+  SurfaceDefinition,
+  SurfaceId,
   UnitAbility,
   UnitBaseType,
   UnitId,
@@ -106,6 +108,8 @@ const SETTINGS_PARTICIPATION_KEYS = new Set([
   'groundForces',
   'spaceCombatParticipating',
   'groundCombatParticipating',
+  'spaceCombatParticipatingFromAnySurface',
+  'groundCombatParticipatingFromAnySurface',
 ])
 const UNIT_PRIORITY_PARTICIPATION_KEYS = new Set([
   'spaceUnitPriority',
@@ -161,8 +165,42 @@ export class SideApi {
     return this.state.combatMode
   }
 
+  getActiveSurfaceId(): SurfaceId {
+    return this.state.activeSurfaceId!
+  }
+
+  getSurfaces(type?: SurfaceDefinition['type']): readonly SurfaceDefinition[] {
+    return type
+      ? this.state.surfaces.filter(surface => surface.type === type)
+      : this.state.surfaces
+  }
+
+  getSpaceSurfaceId(): SurfaceId {
+    const surface = this.state.surfaces!.find(s => s.type === 'SPACE')
+    if (!surface) throw new Error('Combat state has no space surface')
+    return surface.id
+  }
+
+  getUnitSurface(unitId: UnitId): SurfaceId | undefined {
+    return CombatSideState.getUnitSurface(this._sideData, unitId)
+  }
+
+  isParticipating(unitId: UnitId): boolean {
+    return this._sideData.participatingUnits.includes(unitId)
+  }
+
+  private _onSurface(options: GetUnitsOptions): GetUnitsOptions {
+    return options.surfaceId === undefined
+      ? { ...options, surfaceId: this.state.activeSurfaceId }
+      : options
+  }
+
   getUnits(unitType: UnitType, options: GetUnitsOptions) {
-    return CombatSideState.getUnits(this._sideData, unitType, options)
+    return CombatSideState.getUnits(
+      this._sideData,
+      unitType,
+      this._onSurface(options),
+    )
   }
 
   hasUnit(unitId: UnitId) {
@@ -170,14 +208,22 @@ export class SideApi {
   }
 
   hasUnitType(unitType: UnitType, options: GetUnitsOptions) {
-    return CombatSideState.hasUnitType(this._sideData, unitType, options)
+    return CombatSideState.hasUnitType(
+      this._sideData,
+      unitType,
+      this._onSurface(options),
+    )
   }
 
   countUnits(
     filter: UnitType | UnitType[] | undefined,
     options: GetUnitsOptions,
   ) {
-    return CombatSideState.countUnits(this._sideData, filter, options)
+    return CombatSideState.countUnits(
+      this._sideData,
+      filter,
+      this._onSurface(options),
+    )
   }
 
   getPendingHits(filter?: { base?: true; bonus?: true }) {
@@ -188,8 +234,11 @@ export class SideApi {
     return CombatSideState.getHitPoolValidTargets(this._sideData)
   }
 
-  getActiveBaseTypes() {
-    return CombatSideState.getActiveBaseTypes(this._sideData)
+  getActiveBaseTypes(surfaceId?: SurfaceId) {
+    return CombatSideState.getActiveBaseTypes(
+      this._sideData,
+      surfaceId ?? this.state.activeSurfaceId,
+    )
   }
 
   getParticipatingUnitTypes(options?: { combatMode?: CombatMode }) {
@@ -283,7 +332,7 @@ export class SideApi {
       this._sideData,
       priority,
       participating,
-      options,
+      this._onSurface(options),
     )
   }
 
@@ -423,11 +472,14 @@ export class SideApi {
 
   placeUnits(
     unitsToAdd: Partial<Record<UnitType, number>>,
+    surfaceId?: SurfaceId,
   ): Record<UnitType, UnitId[]> {
+    const destination = surfaceId ?? this.state.activeSurfaceId
     const placed = CombatSideState.placeUnits(
       this._sideData,
       this.state.combatMode,
       unitsToAdd,
+      destination,
       this.state,
     )
 
@@ -443,6 +495,19 @@ export class SideApi {
     }
     enforceFleetPool(this)
     return placed as Record<UnitType, UnitId[]>
+  }
+
+  moveUnits(unitIds: UnitId | UnitId[], surfaceId?: SurfaceId): void {
+    const destination = surfaceId ?? this.state.activeSurfaceId
+    if (!this.state.surfaces.some(surface => surface.id === destination)) {
+      throw new Error(`Unknown surface: ${destination}`)
+    }
+    CombatSideState.moveUnits(
+      this._sideData,
+      Array.isArray(unitIds) ? unitIds : [unitIds],
+      destination,
+    )
+    this._abilitiesParams?.combatState.resyncParticipating(this._side)
   }
 
   modifyUnitType(key: UnitType, updates: Partial<UnitStats>): void {
@@ -712,7 +777,16 @@ export class SideApi {
       abilitiesParams &&
       affectsParticipating(targetKey, Object.keys(updates))
     ) {
+      const hadParticipating = CombatSideState.hasParticipatingUnits(sideData)
       abilitiesParams.combatState.resyncParticipating(side)
+      const hasParticipating = CombatSideState.hasParticipatingUnits(sideData)
+      if (state.winnerSide !== undefined) {
+        abilitiesParams.combatState.syncWinnerSide()
+      } else if (hadParticipating && !hasParticipating) {
+        abilitiesParams.combatState.queueCompletionCheck(
+          this._ctx.phaseStack ?? [],
+        )
+      }
     }
 
     // SETTINGS drives `isCategoryMember`, which feeds the resolved-

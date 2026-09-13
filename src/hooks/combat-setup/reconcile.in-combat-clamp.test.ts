@@ -12,6 +12,10 @@ function makeSide(units: Record<string, UnitType>): SideStateData {
     faction: 'sol' as never,
     participatingUnits: Object.keys(units).join('') as UnitIdList,
     nonParticipatingUnits: '' as UnitIdList,
+    surfaceUnits: { space: Object.keys(units).join('') as UnitIdList },
+    unitSurface: Object.fromEntries(
+      Object.keys(units).map(id => [id, 'space']),
+    ) as SideStateData['unitSurface'],
     unitType: units as Record<string, UnitType>,
     unitState: {},
     unitStats: {} as never,
