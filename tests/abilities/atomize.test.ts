@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_ATOMIZE', () => {
   it('destroys all ships in the system when your flagship is destroyed', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -26,6 +27,7 @@ describe('TF_ATOMIZE', () => {
 
   it('does not fire while the flagship survives', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

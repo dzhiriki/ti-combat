@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_DIVINITY + TF_SPARK', () => {
   it('saves the sustaining ship from Spark in space combat', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -30,6 +31,7 @@ describe('TF_DIVINITY + TF_SPARK', () => {
 
   it('does not save the ship once the card is spent', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -53,6 +55,7 @@ describe('TF_DIVINITY + TF_SPARK', () => {
 
   it('does not counter Spark for an unchecked unit type', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -81,6 +84,7 @@ describe('TF_DIVINITY + TF_SPARK', () => {
 
   it('saves the sustaining mech from Spark in ground combat', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',

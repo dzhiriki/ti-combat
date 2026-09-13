@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe.forEachSide('TF_PLANESPLITTER', () => {
   it('applies +2 to own combat rolls', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -25,6 +26,7 @@ describe.forEachSide('TF_PLANESPLITTER', () => {
 
   it('does not touch unit-ability rolls', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

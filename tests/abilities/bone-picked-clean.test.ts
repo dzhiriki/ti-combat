@@ -14,6 +14,7 @@ describe('TF_BONE_PICKED_CLEAN', () => {
     //   natural 1 hit (0.48): 1 die rerolled → 2 hits 0.288 / 1 hit 0.192
     //   natural 0 hits (0.16): 2 rerolled → 2: 0.0576 / 1: 0.0768 / 0: 0.0256
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'SICKENING_LURCH',
@@ -44,6 +45,7 @@ describe('TF_BONE_PICKED_CLEAN', () => {
     // h ∈ {2: .36, 1: .48, 0: .16}. Only ONE qualifying mech (the one with
     // more misses) rerolls; the budget can't cover both.
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'SICKENING_LURCH',
@@ -76,6 +78,7 @@ describe('TF_BONE_PICKED_CLEAN', () => {
     // an independent reroll-once trial: per die 0.6 + 0.4·0.6 = 0.84,
     // binomial(4, 0.84) over total hits. Uses spent = mechs that missed.
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'SICKENING_LURCH',
@@ -101,6 +104,7 @@ describe('TF_BONE_PICKED_CLEAN', () => {
     // round, and the rerolled dice are final. If the fresh misses rerolled
     // again, the miss branches ([1,·]/[0,·]) would shrink below these values.
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'SICKENING_LURCH',
@@ -130,6 +134,7 @@ describe('TF_BONE_PICKED_CLEAN', () => {
     // 1 mech [5,2], uses 1, threshold '2' — only a double miss (0.16)
     // triggers the reroll.
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'SICKENING_LURCH',
@@ -166,6 +171,7 @@ describe('TF_BONE_PICKED_CLEAN', () => {
     // Mech [5,2] with reroll → per-die 0.84 → hits m: 2 0.7056 / 1 0.2688 /
     // 0 0.0256. Infantry [8,1] NOT rerolled → 1 hit 0.3 / 0 hits 0.7.
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'SICKENING_LURCH',
@@ -187,6 +193,7 @@ describe('TF_BONE_PICKED_CLEAN', () => {
 
   it('does not reroll with zero uses', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'SICKENING_LURCH',

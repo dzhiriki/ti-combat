@@ -6,6 +6,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_ENIGMA + NEBULA', () => {
   it('the flagship ignores the nebula +1 while other defenders keep it', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: { faction: 'AVARICE_REX', units: { CRUISER: 1 } },
       defender: {
@@ -26,6 +27,7 @@ describe('TF_ENIGMA + NEBULA', () => {
 
   it('does nothing when the Il Na Viroset side is the attacker', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: { faction: 'IL_NA_VIROSET', units: { FLAGSHIP: 1 } },
       defender: {

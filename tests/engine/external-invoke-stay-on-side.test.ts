@@ -47,6 +47,7 @@ describe('engine: external invoke does not consume alternation slot', () => {
     const E = make('E', false)
 
     buildCombatState({
+      system: 'TI4',
       mode: 'SPACE',
       attacker: {
         faction: 'NEUTRAL',

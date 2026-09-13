@@ -1,9 +1,7 @@
 import type { UnitCategory } from '@/constants/units'
-import { enforceFleetPool } from '@/data/abilities/advanced/fleet-pool'
 import type {
   CombatSide,
   DiceGroup,
-  FactionKey,
   UnitAbility,
   UnitBaseType,
   UnitId,
@@ -61,12 +59,14 @@ import type {
   AbilitiesOverride,
   Ability,
   AbilityBaseParams,
+  AbilityLookupContext,
   AbilityTiming,
   OwnOpponentContext,
   ParamFilter,
   RuntimeAbilityList,
 } from '../types'
 import { type AbilityUtils, abilityUtils } from './ability-utils'
+import { enforceFleetPool } from './enforce-fleet-pool'
 
 // ============================================================================
 // BRANCH TYPES
@@ -690,6 +690,11 @@ export class SideApi {
         } else {
           abilitiesParams.addAbilityInvokes(side, targetKey, state)
         }
+      } else if (
+        newIsEnabled !== false &&
+        abilitiesParams.hasDynamicInvokes(side, targetKey)
+      ) {
+        abilitiesParams.addAbilityInvokes(side, targetKey, state)
       }
 
       abilitiesParams.invokeOnParamSet(
@@ -991,7 +996,7 @@ export class SideApi {
 export class AbilityContext {
   logger?: Logger
   unitSource?: UnitId
-  ownerFaction?: FactionKey
+  ownerFaction?: string
   ability?: Ability
   /** True while dispatching an invoke flagged `declaration: true`. Used by
    *  `pushModifier` to tag emitted modifiers so the dice-math kernel can
@@ -1491,6 +1496,26 @@ export class AbilityContext {
       deferCompletionCheck: overrides?.deferCompletionCheck,
       abilitiesOverride: overrides?.abilitiesOverride,
     })
+  }
+}
+
+/** Run `fn` with `ctx.this` pointing at `ability`. Engine contexts carry a
+ *  mutable `ability` slot; callers outside the dispatch loop (UI, tests,
+ *  hook dispatch) use this instead of poking the field. */
+export function withRunningAbility<T>(
+  ctx: AbilityLookupContext,
+  ability: Ability,
+  fn: () => T,
+): T {
+  // Engine contexts (AbilityContext) and the UI's AbilityReadContext both
+  // back `this` with a mutable `ability` field.
+  const slot = ctx as AbilityLookupContext & { ability?: Ability }
+  const prev = slot.ability
+  slot.ability = ability
+  try {
+    return fn()
+  } finally {
+    slot.ability = prev
   }
 }
 

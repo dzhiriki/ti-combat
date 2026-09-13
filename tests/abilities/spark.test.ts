@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_SPARK', () => {
   it('destroys a ship that used Sustain Damage in space combat', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -23,6 +24,7 @@ describe('TF_SPARK', () => {
 
   it('destroys a mech that used Sustain Damage in ground combat', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',
@@ -42,6 +44,7 @@ describe('TF_SPARK', () => {
 
   it('is not spent on unchecked target types', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -64,6 +67,7 @@ describe('TF_SPARK', () => {
 
   it('cannot destroy a Spark-immune dreadnought upgrade', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

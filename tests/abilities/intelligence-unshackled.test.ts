@@ -7,6 +7,7 @@ describe('TF_INTELLIGENCE_UNSHACKLED', () => {
     // Attacker cruiser (combat 7) dies → Intelligence Unshackled rolls 1 die
     // against the single defender cruiser at threshold 7.
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -36,6 +37,7 @@ describe('TF_INTELLIGENCE_UNSHACKLED', () => {
 
   it('does not split when your unit is not destroyed', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

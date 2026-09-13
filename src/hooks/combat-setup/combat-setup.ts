@@ -1,41 +1,34 @@
 import {
   AbilitiesEngine,
-  type Ability,
   type AbilityReadContext,
   type CombatMode,
   CombatState,
   type CombatStateData,
+  createLookups,
   extractDefaults,
   getOpponentSide,
-  type RegisteredAbility,
   type SideAbilitiesConfig,
 } from '@/combat'
 import { UNIT_LIMITS, UNIT_TYPES } from '@/constants/units'
 import type {
+  CollectedAbility,
   CombatSide,
-  FactionKey,
   GameSystem,
   UnitBaseType,
   UnitIdList,
   UnitSelection,
 } from '@/types'
-import {
-  DEFAULT_FACTION_BY_SYSTEM,
-  getFactionSystem,
-} from '@/utils/get-faction-system'
+import { getFaction } from '@/utils/get-faction'
+import { DEFAULT_GAME_SYSTEM, getGameData } from '@/utils/get-game-data'
 import {
   buildUnitStatsMap,
   getSimulationUnits,
 } from '@/utils/get-simulation-units'
 
 import {
-  getAvailableAbilities,
-  getFactionOwnedAbilityKeys,
-  getUnitDefinitionAbilityKeys,
-} from './get-available-abilities'
-import {
   initializeAbilityDefaults,
   reconcileAbilitiesConfig,
+  type SideLookups,
   type SyncSnapshots,
 } from './reconcile'
 import {
@@ -44,21 +37,6 @@ import {
   serializeUnits,
 } from './serialization'
 import type { SimulationInput } from './types'
-
-// `RegisteredAbility[]` may contain the same ability under multiple slots
-// (e.g., own faction's agents appear under both AGENT and FACTION_AGENT for
-// panel rendering). The flat `_sideAbilities` list feeds engine reconciliation
-// and must hold each ability once.
-function flattenUnique(regs: readonly RegisteredAbility[]): Ability[] {
-  const seen = new Set<string>()
-  const out: Ability[] = []
-  for (const r of regs) {
-    if (seen.has(r.ability.key)) continue
-    seen.add(r.ability.key)
-    out.push(r.ability)
-  }
-  return out
-}
 
 function createDefaultUnitSelections(): Record<UnitBaseType, UnitSelection> {
   return UNIT_TYPES.reduce(
@@ -77,14 +55,14 @@ function createDefaultUnitSelections(): Record<UnitBaseType, UnitSelection> {
  */
 export class CombatSetup {
   private _system: GameSystem
-  private _attackerFaction: FactionKey
-  private _defenderFaction: FactionKey
+  private _attackerFaction: string
+  private _defenderFaction: string
   private _attackerSelections: Record<UnitBaseType, UnitSelection>
   private _defenderSelections: Record<UnitBaseType, UnitSelection>
   private _combatMode: CombatMode
   private _abilities: Record<CombatSide, SideAbilitiesConfig>
-  private _sideAbilities: Record<CombatSide, Ability[]>
-  private _sideRegistered!: Record<CombatSide, RegisteredAbility[]>
+  private _sideRegistered!: Record<CombatSide, CollectedAbility[]>
+  private _lookups!: SideLookups
   private _unitAbilityKeys: Record<CombatSide, ReadonlySet<string>>
   private _factionOwnedKeys: Record<CombatSide, ReadonlySet<string>>
   private _stateData: CombatStateData
@@ -92,9 +70,9 @@ export class CombatSetup {
   private _syncSnapshots: SyncSnapshots = new Map()
 
   constructor() {
-    this._system = 'TI4'
-    const defaultFaction = DEFAULT_FACTION_BY_SYSTEM[this._system]
-    const defaultUnitStats = buildUnitStatsMap(defaultFaction)
+    this._system = DEFAULT_GAME_SYSTEM
+    const defaultFaction = getGameData(this._system).defaultFaction
+    const defaultUnitStats = buildUnitStatsMap(this._system, defaultFaction)
 
     this._attackerFaction = defaultFaction
     this._defenderFaction = defaultFaction
@@ -103,33 +81,29 @@ export class CombatSetup {
     this._combatMode = 'SPACE'
     this._abilities = { attacker: {}, defender: {} }
 
-    const attackerRegistered = getAvailableAbilities(
+    const gameData = getGameData(this._system)
+    const attackerRegistered = gameData.getAvailableAbilities(
       'attacker',
       defaultFaction,
       this.getUpgradedTypes('attacker'),
-      this._system,
     )
-    const defenderRegistered = getAvailableAbilities(
+    const defenderRegistered = gameData.getAvailableAbilities(
       'defender',
       defaultFaction,
       this.getUpgradedTypes('defender'),
-      this._system,
     )
     this._sideRegistered = {
       attacker: attackerRegistered,
       defender: defenderRegistered,
     }
-    this._sideAbilities = {
-      attacker: flattenUnique(attackerRegistered),
-      defender: flattenUnique(defenderRegistered),
-    }
+    this._lookups = createLookups(this._sideRegistered)
     this._unitAbilityKeys = {
-      attacker: getUnitDefinitionAbilityKeys(defaultFaction),
-      defender: getUnitDefinitionAbilityKeys(defaultFaction),
+      attacker: gameData.getUnitDefinitionAbilityKeys(defaultFaction),
+      defender: gameData.getUnitDefinitionAbilityKeys(defaultFaction),
     }
     this._factionOwnedKeys = {
-      attacker: getFactionOwnedAbilityKeys(defaultFaction),
-      defender: getFactionOwnedAbilityKeys(defaultFaction),
+      attacker: gameData.getFactionOwnedAbilityKeys(defaultFaction),
+      defender: gameData.getFactionOwnedAbilityKeys(defaultFaction),
     }
 
     this._stateData = {
@@ -156,13 +130,14 @@ export class CombatSetup {
       combatMode: 'SPACE',
     }
 
-    initializeAbilityDefaults(this._abilities, this._sideAbilities)
+    initializeAbilityDefaults(this._abilities, this._sideRegistered)
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
 
     const wrapState = CombatState.fromDataStandalone(
@@ -185,11 +160,11 @@ export class CombatSetup {
     return this._system
   }
 
-  get attackerFaction(): FactionKey {
+  get attackerFaction(): string {
     return this._attackerFaction
   }
 
-  get defenderFaction(): FactionKey {
+  get defenderFaction(): string {
     return this._defenderFaction
   }
 
@@ -213,7 +188,7 @@ export class CombatSetup {
     return this._stateData
   }
 
-  getAvailableAbilities(side: CombatSide): RegisteredAbility[] {
+  getAvailableAbilities(side: CombatSide): CollectedAbility[] {
     return this._sideRegistered[side]
   }
 
@@ -232,7 +207,7 @@ export class CombatSetup {
     if (this._system === system) return
     this._system = system
 
-    const faction = DEFAULT_FACTION_BY_SYSTEM[system]
+    const faction = getGameData(system).defaultFaction
     this._attackerSelections = createDefaultUnitSelections()
     this._defenderSelections = createDefaultUnitSelections()
 
@@ -249,7 +224,9 @@ export class CombatSetup {
     this.setFaction('defender', faction)
   }
 
-  setFaction(side: CombatSide, faction: FactionKey): void {
+  setFaction(side: CombatSide, faction: string): void {
+    // Reject cross-system selections before changing any setup state.
+    getFaction(this._system, faction)
     if (side === 'attacker') {
       this._attackerFaction = faction
     } else {
@@ -257,23 +234,23 @@ export class CombatSetup {
     }
 
     // Reload abilities for the changed side
-    const reg = getAvailableAbilities(
+    const gameData = getGameData(this._system)
+    const reg = gameData.getAvailableAbilities(
       side,
       faction,
       this.getUpgradedTypes(side),
-      this._system,
     )
     this._sideRegistered[side] = reg
-    this._sideAbilities[side] = flattenUnique(reg)
-    this._unitAbilityKeys[side] = getUnitDefinitionAbilityKeys(faction)
-    this._factionOwnedKeys[side] = getFactionOwnedAbilityKeys(faction)
+    this._lookups = createLookups(this._sideRegistered)
+    this._unitAbilityKeys[side] = gameData.getUnitDefinitionAbilityKeys(faction)
+    this._factionOwnedKeys[side] = gameData.getFactionOwnedAbilityKeys(faction)
 
     // Rebuild side config: keep existing params for surviving abilities,
     // initialize defaults for new ones
     const oldSideConfig = this._abilities[side]
     const newSideConfig: Record<string, Record<string, unknown>> = {}
 
-    for (const ability of this._sideAbilities[side]) {
+    for (const ability of this._sideRegistered[side]) {
       const defaults = extractDefaults(ability)
       if (oldSideConfig[ability.key]) {
         newSideConfig[ability.key] = { ...oldSideConfig[ability.key] }
@@ -295,10 +272,11 @@ export class CombatSetup {
     // Reconcile
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     this.rebuildEngine()
   }
@@ -332,10 +310,11 @@ export class CombatSetup {
     this.setParam(side, abilityKey, params)
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     // Force new stateData reference so React memoization triggers
     this._stateData = { ...this._stateData }
@@ -350,10 +329,11 @@ export class CombatSetup {
     }
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     this.rebuildEngine()
   }
@@ -371,20 +351,20 @@ export class CombatSetup {
     this.rebuildUnits(side, faction, newSelections)
 
     // Upgrades may have changed — recalculate available abilities
-    const regReset = getAvailableAbilities(
+    const regReset = getGameData(this._system).getAvailableAbilities(
       side,
       faction,
       this.getUpgradedTypes(side),
-      this._system,
     )
     this._sideRegistered[side] = regReset
-    this._sideAbilities[side] = flattenUnique(regReset)
+    this._lookups = createLookups(this._sideRegistered)
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     this.rebuildEngine()
   }
@@ -395,13 +375,14 @@ export class CombatSetup {
       ...this._stateData,
       [side]: { ...this._stateData[side], abilities: this._abilities[side] },
     }
-    initializeAbilityDefaults(this._abilities, this._sideAbilities)
+    initializeAbilityDefaults(this._abilities, this._sideRegistered)
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     // Force new stateData reference so React memoization triggers
     this._stateData = { ...this._stateData }
@@ -437,33 +418,29 @@ export class CombatSetup {
     // Recompute available abilities for the swapped sides — `side`-restricted
     // abilities (e.g. attacker-only commanders) need re-filtering against the
     // new side. Swapping the cached lists alone leaks old entries through.
-    const attackerRegistered = getAvailableAbilities(
+    const gameData = getGameData(this._system)
+    const attackerRegistered = gameData.getAvailableAbilities(
       'attacker',
       this._attackerFaction,
       this.getUpgradedTypes('attacker'),
-      this._system,
     )
-    const defenderRegistered = getAvailableAbilities(
+    const defenderRegistered = gameData.getAvailableAbilities(
       'defender',
       this._defenderFaction,
       this.getUpgradedTypes('defender'),
-      this._system,
     )
     this._sideRegistered = {
       attacker: attackerRegistered,
       defender: defenderRegistered,
     }
-    this._sideAbilities = {
-      attacker: flattenUnique(attackerRegistered),
-      defender: flattenUnique(defenderRegistered),
-    }
+    this._lookups = createLookups(this._sideRegistered)
     this._unitAbilityKeys = {
-      attacker: getUnitDefinitionAbilityKeys(this._attackerFaction),
-      defender: getUnitDefinitionAbilityKeys(this._defenderFaction),
+      attacker: gameData.getUnitDefinitionAbilityKeys(this._attackerFaction),
+      defender: gameData.getUnitDefinitionAbilityKeys(this._defenderFaction),
     }
     this._factionOwnedKeys = {
-      attacker: getFactionOwnedAbilityKeys(this._attackerFaction),
-      defender: getFactionOwnedAbilityKeys(this._defenderFaction),
+      attacker: gameData.getFactionOwnedAbilityKeys(this._attackerFaction),
+      defender: gameData.getFactionOwnedAbilityKeys(this._defenderFaction),
     }
 
     // Rebuild units for both sides
@@ -480,10 +457,11 @@ export class CombatSetup {
 
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     this.rebuildEngine()
   }
@@ -494,6 +472,7 @@ export class CombatSetup {
       Object.values(this._defenderSelections).some(s => s.count > 0)
     if (!hasUnits) return null
     return {
+      system: this._system,
       attackerFaction: this._attackerFaction,
       defenderFaction: this._defenderFaction,
       attackerSelections: this._attackerSelections,
@@ -511,17 +490,19 @@ export class CombatSetup {
       attacker: {},
       defender: {},
     }
-    initializeAbilityDefaults(freshAbilities, this._sideAbilities)
+    initializeAbilityDefaults(freshAbilities, this._sideRegistered)
     reconcileAbilitiesConfig(
       freshAbilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       undefined,
       this._stateData,
+      this._lookups,
     )
 
     return {
       v: 1,
+      g: this._system,
       af: this._attackerFaction,
       df: this._defenderFaction,
       m: this._combatMode === 'SPACE' ? 'S' : 'G',
@@ -533,21 +514,16 @@ export class CombatSetup {
   }
 
   loadConfig(config: SerializedConfig): void {
-    const af = config.af as FactionKey
-    const df = config.df as FactionKey
+    const af = config.af
+    const df = config.df
 
-    // Set factions
+    // URL validation normalizes legacy links before they reach this method.
+    // Reject inconsistent direct callers before mutating the current setup.
+    getFaction(config.g, af)
+    getFaction(config.g, df)
+    this._system = config.g
     this._attackerFaction = af
     this._defenderFaction = df
-    // Both sides share a system; derive it from a non-neutral faction (Neutral
-    // exists in every system) so shared links restore the correct mode without
-    // a dedicated field.
-    this._system =
-      af !== 'NEUTRAL'
-        ? getFactionSystem(af)
-        : df !== 'NEUTRAL'
-          ? getFactionSystem(df)
-          : 'TI4'
     this._combatMode = config.m === 'S' ? 'SPACE' : 'GROUND'
 
     // Set unit selections
@@ -567,44 +543,41 @@ export class CombatSetup {
     }
 
     // Rebuild abilities for new factions
-    const attackerReg = getAvailableAbilities(
+    const gameData = getGameData(this._system)
+    const attackerReg = gameData.getAvailableAbilities(
       'attacker',
       af,
       this.getUpgradedTypes('attacker'),
-      this._system,
     )
-    const defenderReg = getAvailableAbilities(
+    const defenderReg = gameData.getAvailableAbilities(
       'defender',
       df,
       this.getUpgradedTypes('defender'),
-      this._system,
     )
     this._sideRegistered = {
       attacker: attackerReg,
       defender: defenderReg,
     }
-    this._sideAbilities = {
-      attacker: flattenUnique(attackerReg),
-      defender: flattenUnique(defenderReg),
-    }
+    this._lookups = createLookups(this._sideRegistered)
     this._unitAbilityKeys = {
-      attacker: getUnitDefinitionAbilityKeys(af),
-      defender: getUnitDefinitionAbilityKeys(df),
+      attacker: gameData.getUnitDefinitionAbilityKeys(af),
+      defender: gameData.getUnitDefinitionAbilityKeys(df),
     }
     this._factionOwnedKeys = {
-      attacker: getFactionOwnedAbilityKeys(af),
-      defender: getFactionOwnedAbilityKeys(df),
+      attacker: gameData.getFactionOwnedAbilityKeys(af),
+      defender: gameData.getFactionOwnedAbilityKeys(df),
     }
 
     // Initialize ability defaults, reconcile, then apply URL overrides
     this._abilities = { attacker: {}, defender: {} }
-    initializeAbilityDefaults(this._abilities, this._sideAbilities)
+    initializeAbilityDefaults(this._abilities, this._sideRegistered)
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
 
     // Apply URL ability params on top of reconciled defaults
@@ -646,10 +619,11 @@ export class CombatSetup {
     // Final reconcile and engine rebuild
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     this.rebuildEngine()
   }
@@ -696,28 +670,28 @@ export class CombatSetup {
     this.rebuildUnits(side, faction, newSelections)
 
     if (upgradeChanged) {
-      const regUpd = getAvailableAbilities(
+      const regUpd = getGameData(this._system).getAvailableAbilities(
         side,
         faction,
         this.getUpgradedTypes(side),
-        this._system,
       )
       this._sideRegistered[side] = regUpd
-      this._sideAbilities[side] = flattenUnique(regUpd)
+      this._lookups = createLookups(this._sideRegistered)
     }
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
+      this._lookups,
     )
     this.rebuildEngine()
   }
 
   private rebuildUnits(
     side: CombatSide,
-    faction: FactionKey,
+    faction: string,
     selections: Record<UnitBaseType, UnitSelection>,
   ): void {
     const upgradedSet = new Set(
@@ -729,6 +703,7 @@ export class CombatSetup {
       _nextCode: this._stateData._nextCode,
     }
     const { units, unitType, unitState, unitStats } = getSimulationUnits(
+      this._system,
       faction,
       selections,
       gen,
@@ -743,7 +718,7 @@ export class CombatSetup {
         unitType,
         unitState,
         unitStats: {
-          ...buildUnitStatsMap(faction, upgradedSet),
+          ...buildUnitStatsMap(this._system, faction, upgradedSet),
           ...unitStats,
         },
       },
@@ -756,16 +731,18 @@ export class CombatSetup {
     abilityKey: string,
     params: Record<string, unknown>,
   ): void {
-    const ability = this._sideAbilities[side].find(a => a.key === abilityKey)
+    const ability = this._sideRegistered[side].find(a => a.key === abilityKey)
 
     let finalParams = params
     if (ability?.onParamSet) {
       const oldParams = this._abilities[side][abilityKey]
       if (oldParams) {
+        const ctx = { abilities: this._lookups[side], this: ability }
         for (const key of Object.keys(params)) {
           if (params[key] !== oldParams[key]) {
             finalParams =
-              ability.onParamSet(finalParams, key, params[key]) ?? finalParams
+              ability.onParamSet(finalParams, key, params[key], ctx) ??
+              finalParams
           }
         }
       }
@@ -778,7 +755,7 @@ export class CombatSetup {
 
     // Mutual exclusion: disable other abilities in the same exclusive group
     if (ability?.exclusiveGroup && finalParams.isEnabled) {
-      for (const other of this._sideAbilities[side]) {
+      for (const other of this._sideRegistered[side]) {
         if (other.key === abilityKey) continue
         if (other.exclusiveGroup !== ability.exclusiveGroup) continue
         const otherParams = newSideConfig[other.key]

@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_CONVERGE', () => {
   it('forces Space Cannon Offense hits onto non-fighter ships', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -27,6 +28,7 @@ describe('TF_CONVERGE', () => {
 
   it('forces Space Cannon Defense hits onto mechs in ground combat', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',
@@ -53,6 +55,7 @@ describe('TF_CONVERGE', () => {
 
   it('Space Cannon Defense falls back to other ground forces without mechs', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',

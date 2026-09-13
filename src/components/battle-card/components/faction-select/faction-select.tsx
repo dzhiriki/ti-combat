@@ -8,35 +8,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import factions from '@/data/faction'
-import type { Faction, FactionKey, GameSystem } from '@/types'
-import { GAME_SYSTEMS, getFactionSystem } from '@/utils/get-faction-system'
+import type { Faction, GameSystem } from '@/types'
+import { GAME_SYSTEMS } from '@/utils/get-game-data'
+import { getGameData } from '@/utils/get-game-data'
 import { namespaceSvgIds } from '@/utils/namespace-svg-ids'
 
 import styles from './faction-select.module.css'
 
-const ALL_FACTION_ENTRIES = (
-  Object.entries(factions) as Array<[string, Faction]>
-).sort((a, b) => {
-  if (a[0] === 'NEUTRAL') return 1
-  if (b[0] === 'NEUTRAL') return -1
-  return a[1].name.localeCompare(b[1].name)
-})
-
 // Precompute the dropdown entries for each system so the list can be filtered
 // to the active mode without re-sorting on every render. Neutral has base-game
-// stats and is offered in every system, so it lands in all buckets.
-const FACTION_ENTRIES_BY_SYSTEM = ALL_FACTION_ENTRIES.reduce(
-  (acc, entry) => {
-    const systems =
-      entry[0] === 'NEUTRAL'
-        ? GAME_SYSTEMS
-        : [getFactionSystem(entry[0] as FactionKey)]
-    for (const system of systems) (acc[system] ??= []).push(entry)
-    return acc
-  },
-  {} as Record<GameSystem, Array<[string, Faction]>>,
-)
+// stats and is offered in every system, so it lands last in every bucket.
+const FACTION_ENTRIES_BY_SYSTEM = Object.fromEntries(
+  GAME_SYSTEMS.map(system => [
+    system,
+    Object.entries(getGameData(system).factions).sort((a, b) => {
+      if (a[0] === 'NEUTRAL') return 1
+      if (b[0] === 'NEUTRAL') return -1
+      return a[1].name.localeCompare(b[1].name)
+    }),
+  ]),
+) as Record<GameSystem, Array<[string, Faction]>>
 
 function FactionIcon({ icon }: { icon: string }) {
   // Namespace internal SVG ids per instance — the faction SVGs all define
@@ -49,9 +40,9 @@ function FactionIcon({ icon }: { icon: string }) {
 }
 
 interface FactionSelectProps {
-  value: FactionKey
+  value: string
   system: GameSystem
-  onValueChange: (value: FactionKey) => void
+  onValueChange: (value: string) => void
   className?: string
   align?: 'start' | 'center' | 'end'
 }

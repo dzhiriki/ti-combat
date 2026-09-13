@@ -3,10 +3,25 @@ export interface UnitSelection {
   upgraded: boolean
 }
 
-export type CombatSide = 'attacker' | 'defender'
-
+export type { CombatSide } from './combat-side'
 export type { DiceGroup } from './die'
-export type { Faction, FactionKey, GameSystem } from './faction'
+export type {
+  Faction,
+  FactionAbilities,
+  FactionDefinition,
+  GameSystem,
+  Lazy,
+  LazyContext,
+} from './faction'
+export type {
+  CollectedAbility,
+  GameData,
+  SlotCategory,
+  SlotConfig,
+  SlotEntry,
+  SlotNames,
+  SlotStrategy,
+} from './game-data'
 export {
   UnitListBooleanSchema,
   UnitListNumberSchema,
@@ -17,11 +32,13 @@ export type {
   UnitAbility,
   UnitBaseType,
   UnitDefinition,
+  UnitDefinitionInput,
   UnitId,
   UnitIdList,
   UnitList,
   UnitState,
   UnitStats,
+  UnitStatsInput,
   UnitType,
   UnitVariantId,
 } from './unit'

@@ -53,7 +53,7 @@ export default defineConfig([
   },
   {
     files: ['src/**/*'],
-    ignores: ['src/data/faction/**', 'src/tests/**'],
+    ignores: ['src/data/*/faction/**', 'src/tests/**'],
     plugins: {
       'check-file': checkFile,
     },

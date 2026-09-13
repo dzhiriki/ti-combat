@@ -1,19 +1,12 @@
-import type { CombatSide, FactionKey, GameSystem } from '@/types'
-import { getFactionSystem } from '@/utils/get-faction-system'
+import { createLookups } from '@/combat'
+import type { CollectedAbility, CombatSide, GameSystem } from '@/types'
+import { getGameData } from '@/utils/get-game-data'
 
-import type {
-  Ability,
-  RegisteredAbility,
-} from '../../combat/abilities-engine/types'
+import type { Ability } from '../../combat/abilities-engine/types'
 import type {
   CombatMode,
   SideAbilitiesConfig,
 } from '../../combat/combat-state/types'
-import {
-  getAvailableAbilities,
-  getFactionOwnedAbilityKeys,
-  getUnitDefinitionAbilityKeys,
-} from './get-available-abilities'
 import {
   clampLimitParams,
   initializeAbilityDefaults,
@@ -34,87 +27,73 @@ import {
  * factories (avoiding a redundant second call to getAvailableAbilities).
  */
 interface SideAbilitiesData {
-  registered: RegisteredAbility[]
+  registered: CollectedAbility[]
   unitAbilityKeys: ReadonlySet<string>
   factionOwnedKeys: ReadonlySet<string>
 }
 
 export function prepareSimulationConfig(
+  system: GameSystem,
   config: Record<CombatSide, SideAbilitiesConfig>,
-  attackerFaction: FactionKey,
-  defenderFaction: FactionKey,
+  attackerFaction: string,
+  defenderFaction: string,
   combatMode: CombatMode,
   customAbilities?: Ability[],
 ): Record<CombatSide, SideAbilitiesData> {
+  const gameData = getGameData(system)
   const custom = customAbilities ?? []
-  // Custom abilities aren't tied to a slot — surface them as 'OTHER'
-  // so they still flow through the registered pipeline.
-  const customRegistered: RegisteredAbility[] = custom.map(ability => ({
-    ability,
+  // Custom abilities (tests, ad-hoc probes) aren't collected from any slot
+  // config and never reach the panel; file them under OTHER so they flow
+  // through the same registered pipeline.
+  const customRegistered: CollectedAbility[] = custom.map(ability => ({
+    ...ability,
     slot: 'OTHER',
   }))
-  // Both sides always share a game system. Neutral exists in every system,
-  // so derive it from whichever side is non-neutral (mirrors the shared-link
-  // restore logic in combat-setup.ts); all-neutral defaults to TI4.
-  const system: GameSystem =
-    getFactionSystem(attackerFaction) === 'TWILIGHTS_FALL' ||
-    getFactionSystem(defenderFaction) === 'TWILIGHTS_FALL'
-      ? 'TWILIGHTS_FALL'
-      : 'TI4'
-  const registered: Record<CombatSide, RegisteredAbility[]> = {
+  const registered: Record<CombatSide, CollectedAbility[]> = {
     attacker: [
-      ...getAvailableAbilities('attacker', attackerFaction, undefined, system),
+      ...gameData.getAvailableAbilities('attacker', attackerFaction),
       ...customRegistered,
     ],
     defender: [
-      ...getAvailableAbilities('defender', defenderFaction, undefined, system),
+      ...gameData.getAvailableAbilities('defender', defenderFaction),
       ...customRegistered,
     ],
   }
-  // `registered` may contain the same ability under multiple slots (own
-  // faction's agents/commanders appear in both AGENT and FACTION_AGENT for
-  // panel rendering). Reconciliation operates on a unique flat list.
-  const flattenUnique = (regs: readonly RegisteredAbility[]): Ability[] => {
-    const seen = new Set<string>()
-    const out: Ability[] = []
-    for (const r of regs) {
-      if (seen.has(r.ability.key)) continue
-      seen.add(r.ability.key)
-      out.push(r.ability)
-    }
-    return out
-  }
-  const abilities: Record<CombatSide, Ability[]> = {
-    attacker: flattenUnique(registered.attacker),
-    defender: flattenUnique(registered.defender),
-  }
+  const lookups = createLookups(registered)
 
-  const savedParams = snapshotConsumerParams(config, abilities)
+  const savedParams = snapshotConsumerParams(config, registered)
   // Materialize every registered ability's static defaults into the config so
   // `sideData.abilities` carries a base entry for all of them (uses, isEnabled,
   // and simple defaults). Runs AFTER the snapshot so it only fills gaps —
   // snapshot/restore must not capture these defaults and overwrite reconciled
   // sync values. Mirrors the UI store's setup (combat-setup.ts).
-  initializeAbilityDefaults(config, abilities)
-  reconcileAbilitiesConfig(config, abilities, combatMode)
-  restoreConsumerParams(config, abilities, savedParams)
+  initializeAbilityDefaults(config, registered)
+  reconcileAbilitiesConfig(
+    config,
+    registered,
+    combatMode,
+    undefined,
+    undefined,
+    lookups,
+  )
+  restoreConsumerParams(config, registered, savedParams)
   // After restore, sync-source params with declared limits may carry
   // user-supplied values that exceed the cap. Clamp them in place without
   // re-expanding the valid list so that order-mode params (single-element
   // tuples) and user-trimmed lists are not affected.
-  clampLimitParams(config, abilities)
-  resetSettingsToBase(config, abilities)
+  clampLimitParams(config, registered)
+  resetSettingsToBase(config, registered, lookups)
 
   return {
     attacker: {
       registered: registered.attacker,
-      unitAbilityKeys: getUnitDefinitionAbilityKeys(attackerFaction),
-      factionOwnedKeys: getFactionOwnedAbilityKeys(attackerFaction),
+      unitAbilityKeys: gameData.getUnitDefinitionAbilityKeys(attackerFaction),
+      factionOwnedKeys: gameData.getFactionOwnedAbilityKeys(attackerFaction),
     },
     defender: {
       registered: registered.defender,
-      unitAbilityKeys: getUnitDefinitionAbilityKeys(defenderFaction),
-      factionOwnedKeys: getFactionOwnedAbilityKeys(defenderFaction),
+      unitAbilityKeys: gameData.getUnitDefinitionAbilityKeys(defenderFaction),
+      factionOwnedKeys: gameData.getFactionOwnedAbilityKeys(defenderFaction),
     },
   }
 }

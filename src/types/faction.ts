@@ -1,34 +1,38 @@
-import type { Ability } from '@/combat'
-import factions from '@/data/faction'
+import type { Ability, RegisteredAbility } from '@/combat'
 
-import type { UnitBaseType, UnitDefinition } from './unit'
+import type { UnitBaseType, UnitDefinition, UnitDefinitionInput } from './unit'
 
 // Game systems the calculator supports. TI4 is the base + expansions
 // (Prophecy of Kings, Codices, Thunder's Edge). Twilight's Fall is a
-// separate ruleset with its own faction roster and unit set.
-export type GameSystem = 'TI4' | 'TWILIGHTS_FALL'
+// separate ruleset with its own faction roster and unit set. Each system
+// has its own data module: `src/data/main` and `src/data/tf`.
+export type GameSystem = 'TI4' | 'TF'
 
-interface FactionAbilities {
-  faction?: readonly Ability[]
-  technology?: readonly Ability[]
-  unit?: readonly Ability[]
-  promissory?: readonly Ability[]
-  agent?: readonly Ability[]
-  commander?: readonly Ability[]
-  hero?: readonly Ability[]
-  breakthrough?: readonly Ability[]
-}
+export type FactionAbilities = Record<string, Ability[]>
 
 // Faction data structure
 export interface Faction {
   name: string
   icon?: string
-  // The game system this faction belongs to. Defaults to 'TI4' when omitted,
-  // so existing factions don't need to declare it.
-  system?: GameSystem
   units: Partial<Record<UnitBaseType, UnitDefinition>>
   abilities?: FactionAbilities
 }
 
-// All faction keys
-export type FactionKey = keyof typeof factions
+/** Dependency lookups shared by all lazy fields in one system construction. */
+export interface LazyContext {
+  getFactionKeys(): readonly string[]
+  getFaction(key: string): Faction
+  getAbilities(slot: string): readonly RegisteredAbility[]
+}
+
+/** Lookup calls recursively initialize the requested faction or slot. */
+export type Lazy<T> = T | ((context: LazyContext) => T)
+
+/** Authoring shape of a faction module. Resolved to `Faction` by the system
+ *  index; nothing outside `src/data` sees it. */
+export interface FactionDefinition {
+  name: string
+  icon?: string
+  units: Partial<Record<UnitBaseType, UnitDefinitionInput>>
+  abilities?: Lazy<FactionAbilities>
+}

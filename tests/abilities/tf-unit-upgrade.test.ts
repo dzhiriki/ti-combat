@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF unit upgrades', () => {
   it('applies a non-mech upgrade to the unit stats (Hybrid Crystal Fighter)', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -23,6 +24,7 @@ describe('TF unit upgrades', () => {
 
   it('Morphwing fighters in excess of capacity count against the fleet pool', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -50,6 +52,7 @@ describe('TF unit upgrades', () => {
 
   it('Morphwing fighters within ship capacity cost no fleet pool', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -76,13 +79,14 @@ describe('TF unit upgrades', () => {
 
   it('Morphwing fighters may commit to ground combat', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',
         units: { FIGHTER: 2, INFANTRY: 1 },
         abilities: { TF_UPGRADE_MORPHWING: true },
       },
-      defender: { faction: 'ARBOREC', units: { INFANTRY: 1 } },
+      defender: { faction: 'AVARICE_REX', units: { INFANTRY: 1 } },
     })
 
     t.advanceTo('GROUND_COMBAT')
@@ -93,13 +97,14 @@ describe('TF unit upgrades', () => {
 
   it('Morphwing fighters are hit targets once committed, after infantry', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',
         units: { FIGHTER: 2, INFANTRY: 2 },
         abilities: { TF_UPGRADE_MORPHWING: true },
       },
-      defender: { faction: 'ARBOREC', units: { INFANTRY: 3 } },
+      defender: { faction: 'AVARICE_REX', units: { INFANTRY: 3 } },
     })
 
     t.advanceTo('GROUND_COMBAT')
@@ -111,8 +116,9 @@ describe('TF unit upgrades', () => {
 
   it('Morphwing does not let the defender commit fighters', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
-      attacker: { faction: 'ARBOREC', units: { INFANTRY: 1 } },
+      attacker: { faction: 'AVARICE_REX', units: { INFANTRY: 1 } },
       defender: {
         faction: 'AVARICE_REX',
         units: { FIGHTER: 2, INFANTRY: 1 },
@@ -128,6 +134,7 @@ describe('TF unit upgrades', () => {
 
   it('Hybrid Crystal Fighters fill capacity first, excess at half a fleet pool', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -154,6 +161,7 @@ describe('TF unit upgrades', () => {
 
   it('Hybrid Crystal Fighters riding free on A Strangled Whisper cost no fleet pool', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'SICKENING_LURCH',
@@ -182,6 +190,7 @@ describe('TF unit upgrades', () => {
 
   it('Echo of Ascension adjusts the flagship relative to its faction stats', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -200,6 +209,7 @@ describe('TF unit upgrades', () => {
 
   it('grants Sustain Damage via the Advanced Carrier upgrade', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -219,6 +229,7 @@ describe('TF unit upgrades', () => {
 
   it('stacks mech upgrades (Eidolon Landwaster +1 die, then Eidolon Terminus -1 combat)', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',

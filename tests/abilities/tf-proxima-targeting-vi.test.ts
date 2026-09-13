@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_PROXIMA_TARGETING_VI', () => {
   it('cancels 1 hit from a Bombardment roll', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',
@@ -27,6 +28,7 @@ describe('TF_PROXIMA_TARGETING_VI', () => {
 
   it('resolves Bombardment 7(x3) against both sides at the start of a ground round', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',

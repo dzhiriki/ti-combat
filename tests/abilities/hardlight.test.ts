@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_HARDLIGHT', () => {
   it('cancels up to 2 hits during space combat', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -24,6 +25,7 @@ describe('TF_HARDLIGHT', () => {
 
   it('also cancels hits during ground combat (broader window than Shields Holding)', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',

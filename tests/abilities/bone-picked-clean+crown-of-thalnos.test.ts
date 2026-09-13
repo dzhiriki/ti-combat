@@ -17,6 +17,7 @@ describe('TF_BONE_PICKED_CLEAN + CROWN_OF_THALNOS', () => {
     //   P(1) = .144·.4 + .16·.48       = .1344
     //   P(0) = .16·.16                 = .0256
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'SICKENING_LURCH',

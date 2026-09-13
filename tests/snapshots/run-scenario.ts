@@ -5,7 +5,7 @@ import {
   buildCombatState,
   type SideConfig,
 } from '@/hooks/combat-setup/build-combat-state'
-import type { FactionKey, UnitBaseType } from '@/types'
+import type { UnitBaseType } from '@/types'
 
 const SHORT_TO_BASE: Record<string, UnitBaseType> = Object.fromEntries(
   (Object.entries(UNIT_SHORT_NAMES) as [UnitBaseType, string][]).map(
@@ -87,7 +87,7 @@ interface FormattedOutcome {
  *  `SideConfig`. */
 export interface ScenarioSideConfig {
   units: string
-  faction?: FactionKey
+  faction?: string
   abilities?: SideConfig['abilities']
 }
 
@@ -107,6 +107,7 @@ function resolveSide(config: ScenarioSideConfig): SideConfig {
 
 export function runScenario(config: ScenarioConfig): FormattedOutcome[] {
   const state = buildCombatState({
+    system: 'TI4',
     mode: config.mode,
     attacker: resolveSide(config.attacker),
     defender: resolveSide(config.defender),

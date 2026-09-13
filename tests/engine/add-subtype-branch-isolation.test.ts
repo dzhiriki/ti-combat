@@ -9,6 +9,7 @@ describe('addSubtype branch isolation', () => {
     // own destruction inflated the expected surviving cruiser count to ~18.5
     // because addSubtype mutated arrays shared across probability branches.
     const combatState = buildCombatState({
+      system: 'TI4',
       mode: 'SPACE',
       attacker: {
         faction: 'ARBOREC',

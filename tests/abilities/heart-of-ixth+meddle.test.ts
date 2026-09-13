@@ -14,6 +14,7 @@ describe('HEART_OF_IXTH + TF_MEDDLE', () => {
   // nor stop re-enumerating face 5, showing 68%.
   it('defaults (anyPreferOwn): PDS hits an incoming infantry 70% of the time', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: { faction: 'AVARICE_REX', units: { INFANTRY: 1 } },
       defender: {
@@ -36,6 +37,7 @@ describe('HEART_OF_IXTH + TF_MEDDLE', () => {
 
   it("target='own' on both: same 70% via the one-sided batch path", () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: { faction: 'AVARICE_REX', units: { INFANTRY: 1 } },
       defender: {
@@ -63,6 +65,7 @@ describe('HEART_OF_IXTH + TF_MEDDLE', () => {
   // re-sampled the boost face after the cancel, inflating the PDS to 52%.
   it('on opposing sides: PDS vs incoming infantry is exactly 50/50', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',
@@ -102,6 +105,7 @@ describe('HEART_OF_IXTH + TF_MEDDLE', () => {
   // as a cancellable natural 6, tilting the PDS to 48%.
   it("PDS with target='own' vs infantry holding Meddle: still 50/50", () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',
@@ -136,6 +140,7 @@ describe('HEART_OF_IXTH + TF_MEDDLE', () => {
   // infantry side's Meddle is one-sided ("Only opponent", -1 on PDS dice).
   it("PDS 'any' vs infantry Meddle target='opponent': still 50/50", () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',
@@ -172,6 +177,7 @@ describe('HEART_OF_IXTH + TF_MEDDLE', () => {
   // flipped is never re-targeted by the other (disjoint natural-face pools).
   it('on opposing sides: both-roll flips stay in disjoint natural-face pools', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: {
         faction: 'AVARICE_REX',
@@ -221,6 +227,7 @@ describe('HEART_OF_IXTH + TF_MEDDLE', () => {
   // tier first; uses bill to Heart before Meddle (sorted by ability key).
   it("target='anyPreferOwn' on both: joint budget stacks across both sides", () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'GROUND',
       attacker: { faction: 'AVARICE_REX', units: { INFANTRY: 1 } },
       defender: {

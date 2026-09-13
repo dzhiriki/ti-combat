@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe.forEachSide('TF_COLADA', () => {
   it('grants an extra die at the strongest capacity unit’s combat value', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'SAINT_OF_SWORDS',
@@ -27,6 +28,7 @@ describe.forEachSide('TF_COLADA', () => {
 
   it('does nothing when no fielded unit has a capacity value', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'SAINT_OF_SWORDS',
@@ -46,6 +48,7 @@ describe.forEachSide('TF_COLADA', () => {
 
   it('re-picks the target when the best carrier dies', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'SAINT_OF_SWORDS',
@@ -74,6 +77,7 @@ describe.forEachSide('TF_COLADA', () => {
 
   it('each transported Colada mech grants a die', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'SAINT_OF_SWORDS',

@@ -102,6 +102,7 @@ describe('PLASMA_SCORING + PROXIMA_TARGETING_VI', () => {
     // advantage from firing Proxima first (their self-bomb is resolved
     // before any Galvanized units die) but neither side runs away.
     const r = summarize({
+      system: 'TI4',
       mode: 'GROUND',
       attacker: {
         faction: 'LAST_BASTION',

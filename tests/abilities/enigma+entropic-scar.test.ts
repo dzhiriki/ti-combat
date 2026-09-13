@@ -8,6 +8,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_ENIGMA + ENTROPIC_SCAR', () => {
   it('the flagship still sustains inside the scar', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',
@@ -27,6 +28,7 @@ describe('TF_ENIGMA + ENTROPIC_SCAR', () => {
 
   it('does not extend the immunity to the rest of the side', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',
@@ -47,6 +49,7 @@ describe('TF_ENIGMA + ENTROPIC_SCAR', () => {
 
   it('still blocks non-flagship unit abilities on the same side', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',
@@ -64,6 +67,7 @@ describe('TF_ENIGMA + ENTROPIC_SCAR', () => {
 
   it('another faction flagship is still stripped by the scar', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

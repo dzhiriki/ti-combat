@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_UPGRADE_LINKSHIP', () => {
   it('destroys an opponent ship without Sustain Damage when it retreats', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
