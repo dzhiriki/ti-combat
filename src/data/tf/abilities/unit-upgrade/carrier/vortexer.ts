@@ -8,7 +8,7 @@ export const vortexer: Ability = {
   name: 'Vortexer',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_CARRIER',
+  exclusiveGroup: 'UNIT_UPGRADE_CARRIER',
   invoke: [
     createStatsInvoke('CARRIER', {
       COST: 3,

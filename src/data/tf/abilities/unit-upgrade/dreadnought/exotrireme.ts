@@ -43,7 +43,7 @@ export const exotrireme: Ability<Params> = {
     }),
   },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_DREADNOUGHT',
+  exclusiveGroup: 'UNIT_UPGRADE_DREADNOUGHT',
   uiConfig: ctx => [
     {
       key: 'uses',

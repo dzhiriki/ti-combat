@@ -20,7 +20,7 @@ export const theDragonFreed: Ability = {
     'When this unit uses Bombardment, it uses it against every planet in its system and adjacent systems, ignoring Planetary Shield.',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_WAR_SUN',
+  exclusiveGroup: 'UNIT_UPGRADE_WAR_SUN',
   invoke: [
     {
       timing: 'PREPARE',

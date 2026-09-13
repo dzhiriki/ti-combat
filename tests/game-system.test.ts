@@ -56,7 +56,7 @@ describe('explicit game system', () => {
     const ti4 = slotsOf('TI4')
     const tf = slotsOf('TF')
 
-    expect(ti4.has('TF_ABILITY')).toBe(false)
+    expect(ti4.has('ABILITY')).toBe(false)
     expect(tf.has('TECHNOLOGY')).toBe(false)
     expect(ti4.has('FACTION_BREAKTHROUGH')).toBe(true)
     expect(tf.has('FACTION_BREAKTHROUGH')).toBe(false)

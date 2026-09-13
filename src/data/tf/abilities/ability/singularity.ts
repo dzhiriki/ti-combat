@@ -17,7 +17,7 @@ type SingularityParams = {
  *  Abilities only, never each other). */
 function copyables(ctx: AbilityLookupContext): readonly Ability[] {
   return ctx.abilities.own
-    .get('TF_ABILITY')
+    .get('ABILITY')
     .filter(a => !a.key.startsWith('TF_SINGULARITY_'))
 }
 

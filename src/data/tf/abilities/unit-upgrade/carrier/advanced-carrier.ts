@@ -9,7 +9,7 @@ export const advancedCarrier: Ability = {
   name: 'Advanced Carrier',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_CARRIER',
+  exclusiveGroup: 'UNIT_UPGRADE_CARRIER',
   invoke: [
     createStatsInvoke('CARRIER', {
       COST: 3,

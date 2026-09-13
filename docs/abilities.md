@@ -533,7 +533,7 @@ Each group renders in the `FACTION_<KEY>` slot its system declares `OWN`. `promi
 
 Each card in `src/data/tf/abilities/unit-upgrade/` is a normal `Ability` object.
 Declare its params, UI, exclusive group, and special invokes directly. Non-mech
-cards use `exclusiveGroup: 'TF_UNIT_UPGRADE_<UNIT_TYPE>'` (the same name as the slot each unit type's cards are registered under); mech cards omit it
+cards use `exclusiveGroup: 'UNIT_UPGRADE_<UNIT_TYPE>'` (the same name as the slot each unit type's cards are registered under); mech cards omit it
 so they stack.
 
 For a fixed stat block, use `createStatsInvoke(unitType, stats)` from

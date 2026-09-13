@@ -18,7 +18,7 @@ export const strikeWingAlpha: Ability = {
     "When this unit uses Anti-Fighter Barrage, each result of 9 or 10 also destroys 1 of your opponent's infantry in the space area of the active system.",
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_DESTROYER',
+  exclusiveGroup: 'UNIT_UPGRADE_DESTROYER',
   invoke: [
     createStatsInvoke('DESTROYER', {
       COST: 1,

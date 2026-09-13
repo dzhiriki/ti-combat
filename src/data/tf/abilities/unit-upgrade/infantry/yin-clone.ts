@@ -8,7 +8,7 @@ export const yinClone: Ability = {
   name: 'Yin Clone',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_INFANTRY',
+  exclusiveGroup: 'UNIT_UPGRADE_INFANTRY',
   invoke: [
     createStatsInvoke('INFANTRY', {
       COST: 0.5,

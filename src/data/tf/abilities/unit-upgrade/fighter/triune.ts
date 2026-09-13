@@ -10,7 +10,7 @@ export const triune: Ability = {
     'This unit may move without being transported. Fighters in excess of your ships’ capacity count against your fleet pool.',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_FIGHTER',
+  exclusiveGroup: 'UNIT_UPGRADE_FIGHTER',
   invoke: [
     createStatsInvoke('FIGHTER', {
       COST: 0.5,

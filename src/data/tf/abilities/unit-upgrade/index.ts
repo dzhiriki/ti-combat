@@ -30,14 +30,14 @@ import warSun from './war-sun'
 // alphabetically. Each bucket is its own slot, so the deck spreads straight
 // into the system's ability registration.
 export default {
-  TF_UNIT_UPGRADE_FLAGSHIP: flagship,
-  TF_UNIT_UPGRADE_WAR_SUN: warSun,
-  TF_UNIT_UPGRADE_DREADNOUGHT: dreadnought,
-  TF_UNIT_UPGRADE_CARRIER: carrier,
-  TF_UNIT_UPGRADE_CRUISER: cruiser,
-  TF_UNIT_UPGRADE_DESTROYER: destroyer,
-  TF_UNIT_UPGRADE_FIGHTER: fighter,
-  TF_UNIT_UPGRADE_MECH: mech,
-  TF_UNIT_UPGRADE_INFANTRY: infantry,
-  TF_UNIT_UPGRADE_PDS: pds,
-} satisfies Record<`TF_UNIT_UPGRADE_${string}`, readonly Ability[]>
+  UNIT_UPGRADE_FLAGSHIP: flagship,
+  UNIT_UPGRADE_WAR_SUN: warSun,
+  UNIT_UPGRADE_DREADNOUGHT: dreadnought,
+  UNIT_UPGRADE_CARRIER: carrier,
+  UNIT_UPGRADE_CRUISER: cruiser,
+  UNIT_UPGRADE_DESTROYER: destroyer,
+  UNIT_UPGRADE_FIGHTER: fighter,
+  UNIT_UPGRADE_MECH: mech,
+  UNIT_UPGRADE_INFANTRY: infantry,
+  UNIT_UPGRADE_PDS: pds,
+} satisfies Record<`UNIT_UPGRADE_${string}`, readonly Ability[]>

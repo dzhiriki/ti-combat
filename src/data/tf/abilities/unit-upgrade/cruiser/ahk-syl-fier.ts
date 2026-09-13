@@ -8,7 +8,7 @@ export const ahkSylFier: Ability = {
   name: 'Ahk Syl Fier',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_CRUISER',
+  exclusiveGroup: 'UNIT_UPGRADE_CRUISER',
   invoke: [
     createStatsInvoke('CRUISER', {
       COST: 2,

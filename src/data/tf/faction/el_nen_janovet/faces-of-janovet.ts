@@ -39,7 +39,7 @@ export const facesOfJanovet: Ability = {
         // Each unit type's upgrade cards live in their own slot; read only
         // the three the flagship inherits from, in inheritance order.
         const enabled = INHERITABLE_TYPES.flatMap(unitType =>
-          ctx.abilities.own.get(`TF_UNIT_UPGRADE_${unitType}`),
+          ctx.abilities.own.get(`UNIT_UPGRADE_${unitType}`),
         )
           .flatMap(card => {
             const config = ctx.api.own.getAbilityConfig(

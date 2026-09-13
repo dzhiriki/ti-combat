@@ -24,7 +24,7 @@ export const helTitan: Ability = {
     'This unit is treated as both a structure and a ground force. You may use its Space Cannon against ships in adjacent systems.',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_PDS',
+  exclusiveGroup: 'UNIT_UPGRADE_PDS',
   declareParamChange: () => [{ key: 'groundForces', value: 'PDS' }],
   invoke: [
     {

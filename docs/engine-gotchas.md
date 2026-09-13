@@ -381,7 +381,7 @@ a check there too.
 
 - **Inherit printed upgrade stats, not runtime unit stats.** TF Janovet reads
   the native stat blocks exposed by `createStatsInvoke` through the runtime
-  `TF_UNIT_UPGRADE_<TYPE>` lookups — one slot per unit type (`isStatsInvoke`
+  `UNIT_UPGRADE_<TYPE>` lookups — one slot per unit type (`isStatsInvoke`
   narrows the tagged entries). Reading
   `getUnitStats` instead would also copy unrelated PREPARE modifiers. Keep
   shared text helpers independent of faction/deck modules to avoid import

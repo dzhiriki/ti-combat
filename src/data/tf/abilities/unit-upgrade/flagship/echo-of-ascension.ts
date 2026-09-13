@@ -11,7 +11,7 @@ export const echoOfAscension: Ability = {
     'Adjust the printed values of your flagship: its MOVE value is increased by 1, its COMBAT value is reduced by 1, it rolls 1 additional die during combat, and its CAPACITY value is increased by 2.',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_FLAGSHIP',
+  exclusiveGroup: 'UNIT_UPGRADE_FLAGSHIP',
   invoke: [
     {
       timing: 'PREPARE',

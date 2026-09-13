@@ -38,7 +38,7 @@ export const tfTemporalCommandSuite: Ability<Params> = {
       type: 'unit-list',
       mode: 'number',
       items: ctx.abilities.own
-        .get('TF_GENOME')
+        .get('GENOME')
         .map(g => ({ label: g.name, value: g.key })),
     },
   ],
@@ -54,10 +54,10 @@ export const tfTemporalCommandSuite: Ability<Params> = {
         params.genomes.some(
           ([key, count]) =>
             count > 0 &&
-            ctx.abilities.own.get('TF_GENOME').some(g => g.key === key),
+            ctx.abilities.own.get('GENOME').some(g => g.key === key),
         ),
       call: (ctx, params) => {
-        const genomes = ctx.abilities.own.get('TF_GENOME')
+        const genomes = ctx.abilities.own.get('GENOME')
         for (const [key, count] of params.genomes) {
           if (count <= 0) continue
           if (!genomes.some(g => g.key === key)) continue

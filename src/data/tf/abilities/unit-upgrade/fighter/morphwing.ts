@@ -14,7 +14,7 @@ export const morphwing: Ability = {
     'This unit may move without being transported. Fighters in excess of your ships’ capacity count against your fleet pool. During an invasion in this system, you may commit these units to planets as if they were ground forces. When combat ends, return those units to the space area.',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_FIGHTER',
+  exclusiveGroup: 'UNIT_UPGRADE_FIGHTER',
   declareParamChange: () => [{ key: 'groundForces', value: 'FIGHTER' }],
   invoke: [
     createStatsInvoke('FIGHTER', {

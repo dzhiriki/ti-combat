@@ -10,7 +10,7 @@ export const superDreadnought: Ability = {
   description: "This unit cannot be destroyed by 'Spark' action cards.",
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_DREADNOUGHT',
+  exclusiveGroup: 'UNIT_UPGRADE_DREADNOUGHT',
   invoke: [
     createStatsInvoke('DREADNOUGHT', {
       COST: 4,

@@ -17,7 +17,7 @@ export const justiciarRail: Ability = {
     'You may use this unit’s Space Cannon against ships in adjacent systems. Hits it produces must be assigned to non-fighter ships, if able.',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_PDS',
+  exclusiveGroup: 'UNIT_UPGRADE_PDS',
   invoke: [
     createStatsInvoke('PDS', {
       UNIT_ABILITIES: { SPACE_CANNON: [5, 1], PLANETARY_SHIELD: true },

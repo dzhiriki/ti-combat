@@ -11,7 +11,7 @@ export const keeperMatrix: Ability = {
     'You may use this unit’s Space Cannon against ships in adjacent systems.',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_PDS',
+  exclusiveGroup: 'UNIT_UPGRADE_PDS',
   invoke: [
     createStatsInvoke('PDS', {
       UNIT_ABILITIES: { SPACE_CANNON: [5, 2], PLANETARY_SHIELD: true },

@@ -52,7 +52,7 @@ export const linkship: Ability = {
     'When this unit retreats, you may destroy 1 ship in the active system that is damaged or does not have Sustain Damage.',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_DESTROYER',
+  exclusiveGroup: 'UNIT_UPGRADE_DESTROYER',
   invoke: [
     createStatsInvoke('DESTROYER', {
       COST: 1,

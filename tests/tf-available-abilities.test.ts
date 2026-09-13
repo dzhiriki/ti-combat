@@ -59,8 +59,8 @@ describe("Twilight's Fall available abilities", () => {
       regs.filter(r => r.slot === slot).map(r => r.name)
     const sorted = (arr: string[]) =>
       [...arr].sort((a, b) => a.localeCompare(b))
-    expect(names('TF_ABILITY')).toEqual(sorted(names('TF_ABILITY')))
-    expect(names('TF_GENOME')).toEqual(sorted(names('TF_GENOME')))
+    expect(names('ABILITY')).toEqual(sorted(names('ABILITY')))
+    expect(names('GENOME')).toEqual(sorted(names('GENOME')))
   })
 
   it("lists TF unit upgrades in the UI's unit order, alphabetical within type", () => {
@@ -68,11 +68,11 @@ describe("Twilight's Fall available abilities", () => {
       'attacker',
       'AVARICE_REX',
     )
-    const upgrades = regs.filter(r => r.slot.startsWith('TF_UNIT_UPGRADE_'))
+    const upgrades = regs.filter(r => r.slot.startsWith('UNIT_UPGRADE_'))
     // Non-mech cards carry their unit type in the exclusive group; mechs
     // (the stacking cards) have none.
     const typeOf = (r: (typeof upgrades)[number]) =>
-      r.exclusiveGroup?.replace('TF_UNIT_UPGRADE_', '') ?? 'MECH'
+      r.exclusiveGroup?.replace('UNIT_UPGRADE_', '') ?? 'MECH'
     const uiOrder = [
       'FLAGSHIP',
       'WAR_SUN',
@@ -100,9 +100,9 @@ describe("Twilight's Fall available abilities", () => {
       'attacker',
       'AVARICE_REX',
     )
-    const upgrades = regs.filter(r => r.slot.startsWith('TF_UNIT_UPGRADE_'))
+    const upgrades = regs.filter(r => r.slot.startsWith('UNIT_UPGRADE_'))
     const typeOf = (r: (typeof upgrades)[number]) =>
-      r.exclusiveGroup?.replace('TF_UNIT_UPGRADE_', '') ?? 'MECH'
+      r.exclusiveGroup?.replace('UNIT_UPGRADE_', '') ?? 'MECH'
     for (const r of upgrades) {
       expect(r.display.subcategory, `${r.name} is missing a sub-header`).toBe(
         UNIT_DISPLAY_NAMES[typeOf(r) as UnitBaseType],
@@ -131,9 +131,9 @@ describe("Twilight's Fall available abilities", () => {
     expect(regs.some(r => r.key === 'PRE_GALVANIZED')).toBe(false)
     expect(regs.some(r => r.slot === 'FACTION_AGENT')).toBe(false)
     // Agents are replaced by the TF genome deck — and only the genome deck.
-    expect(regs.some(r => r.slot === 'TF_GENOME')).toBe(true)
-    expect(regs.some(r => r.slot === 'TF_ABILITY')).toBe(false)
-    expect(regs.some(r => r.slot.startsWith('TF_UNIT_UPGRADE_'))).toBe(false)
+    expect(regs.some(r => r.slot === 'GENOME')).toBe(true)
+    expect(regs.some(r => r.slot === 'ABILITY')).toBe(false)
+    expect(regs.some(r => r.slot.startsWith('UNIT_UPGRADE_'))).toBe(false)
     // GENERAL and the ADVANCED phase drivers stay.
     expect(regs.some(r => r.slot === 'GENERAL')).toBe(true)
     expect(regs.some(r => r.slot === 'ADVANCED')).toBe(true)
@@ -144,7 +144,7 @@ describe("Twilight's Fall available abilities", () => {
     expect(regs.some(r => r.slot === 'FACTION_AGENT')).toBe(true)
     expect(regs.some(r => r.slot === 'OTHER')).toBe(true)
     expect(regs.some(r => r.key === 'PRE_GALVANIZED')).toBe(true)
-    expect(regs.some(r => r.slot === 'TF_GENOME')).toBe(false)
+    expect(regs.some(r => r.slot === 'GENOME')).toBe(false)
   })
 
   it('Artemiris Ascendant defaults to placing the flagship and 2 cruisers', () => {
@@ -223,12 +223,7 @@ describe("Twilight's Fall available abilities", () => {
       'attacker',
       'AVARICE_REX',
     )
-    for (const slot of [
-      'TF_ABILITY',
-      'TF_GENOME',
-      'TF_PARADIGM',
-      'TF_UNIT_UPGRADE_',
-    ]) {
+    for (const slot of ['ABILITY', 'GENOME', 'PARADIGM', 'UNIT_UPGRADE_']) {
       const entries = regs.filter(r => r.slot.startsWith(slot))
       expect(entries.length).toBeGreaterThan(0)
       for (const r of entries) {

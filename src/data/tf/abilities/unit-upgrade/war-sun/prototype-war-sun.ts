@@ -19,7 +19,7 @@ export const prototypeWarSun: Ability = {
   description: "Other players' units in this system lose Planetary Shield.",
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_WAR_SUN',
+  exclusiveGroup: 'UNIT_UPGRADE_WAR_SUN',
   invoke: [
     {
       timing: 'PREPARE',

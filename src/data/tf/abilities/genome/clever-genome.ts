@@ -19,7 +19,7 @@ const NONE = 'none'
 
 /** Every other genome registered on this side (the TF Genomes deck). */
 function getGenomes(ctx: AbilityLookupContext): readonly Ability[] {
-  return ctx.abilities.own.get('TF_GENOME').filter(g => g.key !== ctx.this.key)
+  return ctx.abilities.own.get('GENOME').filter(g => g.key !== ctx.this.key)
 }
 
 function findGenome(

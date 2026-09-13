@@ -8,7 +8,7 @@ export const exile: Ability = {
   name: 'Exile',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  exclusiveGroup: 'TF_UNIT_UPGRADE_DESTROYER',
+  exclusiveGroup: 'UNIT_UPGRADE_DESTROYER',
   invoke: [
     createStatsInvoke('DESTROYER', {
       COST: 1,
