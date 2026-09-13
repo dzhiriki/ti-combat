@@ -33,6 +33,7 @@ describe('MAGEN_DEFENSE_GRID + VALKYRIE_PARTICLE_WEAVE', () => {
 
   it('MDG wins with 100% probability when it destroys the last unit before VPW can fire', () => {
     const state = buildCombatState({
+      system: 'TI4',
       mode: 'GROUND',
       attacker: {
         faction: 'SARDAKK_NORR',
