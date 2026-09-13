@@ -36,8 +36,11 @@ export const facesOfJanovet: Ability = {
       call: ctx => {
         // Read the cards' stat blocks, not the units' runtime stats (which
         // may also contain changes from unrelated abilities).
-        const enabled = ctx.abilities.own
-          .get('TF_UNIT_UPGRADE')
+        // Each unit type's upgrade cards live in their own slot; read only
+        // the three the flagship inherits from, in inheritance order.
+        const enabled = INHERITABLE_TYPES.flatMap(unitType =>
+          ctx.abilities.own.get(`TF_UNIT_UPGRADE_${unitType}`),
+        )
           .flatMap(card => {
             const config = ctx.api.own.getAbilityConfig(
               card.key as keyof AbilityConfigMap,

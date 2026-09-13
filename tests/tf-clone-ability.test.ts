@@ -1,24 +1,21 @@
 import { describe, expect, it } from 'vitest'
 
 import { hasStaticInvokes, isDeclaredParam } from '@/combat'
-import * as main from '@/data/main'
 import { viscountUnlenn } from '@/data/main/faction/barony_of_letnev/viscount-unlenn'
-import * as tf from '@/data/tf'
 import { aristocraticGenome } from '@/data/tf/abilities/genome/aristocratic-genome'
+import { getGameData } from '@/utils/get-game-data'
 
 describe('Twilight’s Fall cloned abilities', () => {
-  const tfKeys = new Set(tf.abilities.map(r => r.ability.key))
-  const ti4Keys = new Set([
-    ...main.abilities.map(r => r.ability.key),
-    ...Object.values(main.factions).flatMap(f =>
-      Object.values(f.abilities ?? {}).flatMap(list =>
-        (list as { key: string }[]).map(a => a.key),
-      ),
-    ),
-  ])
+  // TF's decks are shared, so any faction's available list carries every card.
+  const tfRegistered = getGameData('TF').getAvailableAbilities(
+    'attacker',
+    'AVARICE_REX',
+  )
+  const tfKeys = new Set(getGameData('TF').allAbilities.map(a => a.key))
+  const ti4Keys = new Set(getGameData('TI4').allAbilities.map(a => a.key))
 
   it('every TF deck card has a TF_-prefixed key of its own', () => {
-    for (const r of tf.abilities) {
+    for (const r of tfRegistered) {
       if (!r.slot.startsWith('TF_')) continue
       expect(r.ability.key, r.ability.name).toMatch(/^TF_/)
       expect(ti4Keys.has(r.ability.key), r.ability.key).toBe(false)

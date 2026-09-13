@@ -11,7 +11,7 @@ export const l1z1x_mindnet: Faction = {
   name: 'L1Z1X Mindnet',
   icon: l1z1xMindnetIcon,
   abilities: {
-    faction: [harrow],
+    ability: [harrow],
     commander: [twoRam],
   },
   units: {

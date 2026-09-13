@@ -11,7 +11,7 @@ export const universities_of_jol_nar: Faction = {
   name: 'Universities of Jol-Nar',
   icon: universitiesOfJolNarIcon,
   abilities: {
-    faction: [fragile],
+    ability: [fragile],
     commander: [agnlanOln],
   },
   units: {

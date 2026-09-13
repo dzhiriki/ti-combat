@@ -13,7 +13,7 @@ describe('declare hooks receive the lookup context', () => {
       headerUI: 'isEnabled',
       declareSubtype: (_params, ctx) => {
         seen.push(
-          `subtype:${ctx.this.key}:${ctx.abilities.own.get('AGENT').length > 0}`,
+          `subtype:${ctx.this.key}:${ctx.abilities.own.get('FACTION_AGENT').length > 0}`,
         )
         return []
       },

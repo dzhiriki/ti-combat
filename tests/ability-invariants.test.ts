@@ -7,11 +7,8 @@ import {
   withRunningAbility,
 } from '@/combat'
 import { UNIT_TYPES } from '@/constants/units'
-import * as main from '@/data/main'
-import * as tf from '@/data/tf'
 import { CombatSetup } from '@/hooks/combat-setup'
-import { GAME_SYSTEMS } from '@/utils/get-faction-system'
-import { getGameData } from '@/utils/get-game-data'
+import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
 
 // Static invariants over every registered ability. Each check here enforces a
 // rule that previously lived only in docs/engine-gotchas.md or the ability
@@ -31,8 +28,8 @@ function collectAllAbilities(): Map<Ability, string> {
   // GameData lookup pools skip unit-attached abilities with no UI — walk the unit
   // definitions too so engine-level checks cover them.
   for (const [factionKey, faction] of [
-    ...Object.entries(main.factions),
-    ...Object.entries(tf.factions),
+    ...Object.entries(getGameData('TI4').factions),
+    ...Object.entries(getGameData('TF').factions),
   ]) {
     for (const unitDef of Object.values(faction.units)) {
       if (!unitDef) continue
@@ -109,8 +106,8 @@ describe('engine invariants', () => {
     // evaluate a factory without a side context (engine-gotchas.md).
     const violations: string[] = []
     for (const faction of [
-      ...Object.values(main.factions),
-      ...Object.values(tf.factions),
+      ...Object.values(getGameData('TI4').factions),
+      ...Object.values(getGameData('TF').factions),
     ]) {
       for (const unitDef of Object.values(faction.units)) {
         if (!unitDef) continue

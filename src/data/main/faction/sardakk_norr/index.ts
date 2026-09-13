@@ -68,7 +68,7 @@ export const sardakk_norr: Faction = {
     },
   },
   abilities: {
-    faction: [unrelenting],
+    ability: [unrelenting],
     technology: [valkyrieParticleWeave],
     promissory: [tekklarLegion],
     commander: [ghomSekkus],

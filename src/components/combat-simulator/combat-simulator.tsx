@@ -282,7 +282,6 @@ export function CombatSimulator({
       <div className={styles.scrollArea}>
         {renderAbilitiesHeader('attacker', 'Attacker Abilities')}
         <AbilitiesPanel
-          system={system}
           abilities={attackerAbilities}
           readContext={attackerReadContext}
           combatMode={combatMode}
@@ -308,7 +307,6 @@ export function CombatSimulator({
       <div className={styles.scrollArea}>
         {renderAbilitiesHeader('defender', 'Defender Abilities')}
         <AbilitiesPanel
-          system={system}
           abilities={defenderAbilities}
           readContext={defenderReadContext}
           combatMode={combatMode}

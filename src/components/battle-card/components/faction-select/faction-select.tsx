@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { Faction, GameSystem } from '@/types'
-import { GAME_SYSTEMS } from '@/utils/get-faction-system'
+import { GAME_SYSTEMS } from '@/utils/get-game-data'
 import { getGameData } from '@/utils/get-game-data'
 import { namespaceSvgIds } from '@/utils/namespace-svg-ids'
 

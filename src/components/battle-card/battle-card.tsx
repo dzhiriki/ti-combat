@@ -20,7 +20,7 @@ import type {
   UnitBaseType,
   UnitSelection,
 } from '@/types'
-import { GAME_SYSTEM_LABELS, GAME_SYSTEMS } from '@/utils/get-faction-system'
+import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
 import type { UnitConfig } from '@/utils/get-unit-config'
 
 import { Divider } from '../ui/divider'
@@ -54,7 +54,7 @@ const COMBAT_MODE_OPTIONS = [
 
 const SYSTEM_OPTIONS = GAME_SYSTEMS.map(system => ({
   value: system,
-  label: GAME_SYSTEM_LABELS[system],
+  label: getGameData(system).label,
 }))
 
 interface BattleCardProps {

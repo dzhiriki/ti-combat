@@ -8,11 +8,11 @@ import {
   createLookups,
   extractDefaults,
   getOpponentSide,
-  type RegisteredAbility,
   type SideAbilitiesConfig,
 } from '@/combat'
 import { UNIT_LIMITS, UNIT_TYPES } from '@/constants/units'
 import type {
+  CollectedAbility,
   CombatSide,
   GameSystem,
   UnitBaseType,
@@ -40,11 +40,9 @@ import {
 } from './serialization'
 import type { SimulationInput } from './types'
 
-// `RegisteredAbility[]` may contain the same ability under multiple slots
-// (e.g., own faction's agents appear under both AGENT and FACTION_AGENT for
-// panel rendering). The flat `_sideAbilities` list feeds engine reconciliation
-// and must hold each ability once.
-function flattenUnique(regs: readonly RegisteredAbility[]): Ability[] {
+// The flat `_sideAbilities` list feeds engine reconciliation and must hold
+// each ability once.
+function flattenUnique(regs: readonly CollectedAbility[]): Ability[] {
   const seen = new Set<string>()
   const out: Ability[] = []
   for (const r of regs) {
@@ -79,7 +77,7 @@ export class CombatSetup {
   private _combatMode: CombatMode
   private _abilities: Record<CombatSide, SideAbilitiesConfig>
   private _sideAbilities: Record<CombatSide, Ability[]>
-  private _sideRegistered!: Record<CombatSide, RegisteredAbility[]>
+  private _sideRegistered!: Record<CombatSide, CollectedAbility[]>
   private _lookups!: SideLookups
   private _unitAbilityKeys: Record<CombatSide, ReadonlySet<string>>
   private _factionOwnedKeys: Record<CombatSide, ReadonlySet<string>>
@@ -210,7 +208,7 @@ export class CombatSetup {
     return this._stateData
   }
 
-  getAvailableAbilities(side: CombatSide): RegisteredAbility[] {
+  getAvailableAbilities(side: CombatSide): CollectedAbility[] {
     return this._sideRegistered[side]
   }
 

@@ -1,12 +1,10 @@
-import type { Ability, RegisteredAbility } from '@/combat'
-import { UNIT_DISPLAY_NAMES } from '@/constants/units'
+import type { Ability } from '@/combat'
 import advanced from '@/data/main/abilities/advanced'
 import environment from '@/data/main/abilities/environment'
-import general, {
-  SHARED_UNIT_ABILITY_KEYS,
-} from '@/data/main/abilities/general'
+import general from '@/data/main/abilities/general'
 import relic from '@/data/main/abilities/relic'
-import type { UnitBaseType, UnitDefinition } from '@/types'
+
+import type { UnitDefinition } from '@/types'
 
 import { createGameData } from '../create-game-data'
 import ability from './abilities/ability'
@@ -14,35 +12,13 @@ import actionCard from './abilities/action-card'
 import genome from './abilities/genome'
 import paradigm from './abilities/paradigm'
 import unitUpgrade from './abilities/unit-upgrade'
-import {
-  type AbilitySlot,
-  FACTION_KEY_TO_SLOT,
-  SLOT_DISPLAY,
-  SLOT_ORDER,
-  unitSlot,
-} from './ability-slots'
+import { type AbilitySlot, SLOTS } from './ability-slots'
 import baseUnits from './base-units'
-import factionDefinitions from './faction'
+import factions from './faction'
 
 // Twilight's Fall. This module default-exports its complete GameData entry
 // point; code outside `src/data` selects it through `getGameData` rather than
 // importing system internals.
-
-export type { AbilitySlot } from './ability-slots'
-export {
-  FACTION_KEY_TO_SLOT,
-  SLOT_DISPLAY,
-  SLOT_ORDER,
-  unitSlot,
-} from './ability-slots'
-export { default as baseUnits } from './base-units'
-
-function tag(
-  abilities: readonly Ability[],
-  slot: AbilitySlot,
-): RegisteredAbility<AbilitySlot>[] {
-  return abilities.map(ability => ({ ability, slot }))
-}
 
 // Twilight's Fall has none of TI4's faction-locked decks — no agendas, TI4
 // technologies, action cards, promissory notes, agents, or commanders. Only
@@ -51,62 +27,30 @@ function tag(
 // relics. TF's own draw decks are layered on top.
 const tfGeneral = general.filter(a => a.key !== 'PRE_GALVANIZED')
 
-// The unit-upgrade deck spans every unit type, so each card carries its unit
-// type as the panel sub-header (the deck is grouped by unit type in display
-// order — see `abilities/unit-upgrade`).
-const unitUpgrades: RegisteredAbility<AbilitySlot>[] = Object.entries(
-  unitUpgrade,
-).flatMap(([unitType, cards]) =>
-  cards.map(card => ({
-    slot: 'TF_UNIT_UPGRADE' as const,
-    subcategory: UNIT_DISPLAY_NAMES[unitType as UnitBaseType],
-    ability: card,
-  })),
-)
-
-// Registration order drives invoke resolution order within a timing pass
-// (panel display is grouped by slot instead, so it is unaffected). TF
-// unit-upgrade cards are the TF analog of TI4's build-time UPGRADED stats:
-// their PREPARE applies the stat block that the ADVANCED drivers (Capacity,
-// Fleet Pool) read during their own PREPARE enforcement, so they go first.
-const sharedAbilities: readonly RegisteredAbility<AbilitySlot>[] = [
-  ...unitUpgrades,
-  ...tag(tfGeneral, 'GENERAL'),
-  ...tag(advanced, 'ADVANCED'),
-  ...tag(environment, 'ENVIRONMENT'),
-  ...tag(relic, 'RELIC'),
-  ...tag(ability, 'TF_ABILITY'),
-  ...tag(genome, 'TF_GENOME'),
-  ...tag(paradigm, 'TF_PARADIGM'),
-  ...tag(actionCard, 'TF_ACTION_CARD'),
-]
-
 const gameData = createGameData({
   id: 'TF',
   label: "Twilight's Fall",
-  factionDefinitions,
+  factions,
   // base-units' literal COMBAT: number[] doesn't structurally match
   // DiceGroup's tuple type, so the cast needs an `unknown` bridge.
-  baseUnits: baseUnits as unknown as Readonly<Record<string, UnitDefinition>>,
-  sharedAbilities,
-  FACTION_KEY_TO_SLOT,
-  unitSlot,
-  SLOT_DISPLAY,
-  SLOT_ORDER,
-  sharedUnitAbilityKeys: SHARED_UNIT_ABILITY_KEYS,
-  neutral: {
-    hiddenSlots: [
-      'RELIC',
-      'TF_ABILITY',
-      'TF_PARADIGM',
-      'TF_ACTION_CARD',
-      'TF_UNIT_UPGRADE',
-    ],
-  },
+  units: baseUnits as unknown as Readonly<Record<string, UnitDefinition>>,
+  // Registration order drives invoke resolution order within a timing pass
+  // (panel display is grouped by slot instead, so it is unaffected). TF
+  // unit-upgrade cards are the TF analog of TI4's build-time UPGRADED stats:
+  // their PREPARE applies the stat block that the ADVANCED drivers (Capacity,
+  // Fleet Pool) read during their own PREPARE enforcement, so they go first.
+  abilities: {
+    ...unitUpgrade,
+    GENERAL: tfGeneral,
+    ADVANCED: advanced,
+    ENVIRONMENT: environment,
+    RELIC: relic,
+    TF_ABILITY: ability,
+    TF_GENOME: genome,
+    TF_PARADIGM: paradigm,
+    TF_ACTION_CARD: actionCard,
+  } satisfies Partial<Record<AbilitySlot, readonly Ability[]>>,
+  slots: SLOTS,
 })
 
-export const factions = gameData.factions
-export type FactionKey = keyof typeof factions
-export const abilities = gameData.abilities
-export const allAbilities = gameData.allAbilities
 export default gameData

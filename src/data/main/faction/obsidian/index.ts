@@ -10,7 +10,7 @@ export const obsidian: Faction = {
   name: 'Obsidian',
   icon: obsidianIcon,
   abilities: {
-    faction: [assail],
+    ability: [assail],
     agent: [vosHollow],
     commander: [arozHollow],
   },

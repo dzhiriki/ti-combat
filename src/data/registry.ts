@@ -74,19 +74,6 @@ function resolveDefinition(
   }
 }
 
-function assertFactionAbilityGroups(
-  gameData: GameData,
-  factionKey: string,
-  faction: Faction,
-): void {
-  for (const key of Object.keys(faction.abilities ?? {})) {
-    if (Object.hasOwn(gameData.FACTION_KEY_TO_SLOT, key)) continue
-    throw new Error(
-      `Faction ability group "${key}" on "${factionKey}" is not supported by ${gameData.id}`,
-    )
-  }
-}
-
 function setFactions(
   gameData: GameData,
   factions: Readonly<Record<string, Faction>>,
@@ -107,9 +94,7 @@ export function resolveFactions<K extends string>(
   const entries = Object.entries(definitions) as [K, FactionDefinition][]
   for (const [key, definition] of entries) {
     if (!isLazyDefinition(definition)) {
-      const faction = definition as Faction
-      assertFactionAbilityGroups(gameData, key, faction)
-      statics[key] = faction
+      statics[key] = definition as Faction
     }
   }
 
@@ -117,11 +102,9 @@ export function resolveFactions<K extends string>(
 
   const resolved = {} as Record<K, Faction>
   for (const [key, definition] of entries) {
-    const faction = Object.hasOwn(statics, key)
+    resolved[key] = Object.hasOwn(statics, key)
       ? statics[key]
       : resolveDefinition(definition, gameData)
-    assertFactionAbilityGroups(gameData, key, faction)
-    resolved[key] = faction
   }
 
   setFactions(gameData, resolved)

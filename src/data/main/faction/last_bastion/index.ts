@@ -14,7 +14,7 @@ export const last_bastion: Faction = {
   name: 'Last Bastion',
   icon: lastBastionIcon,
   abilities: {
-    faction: [phoenixStandard],
+    ability: [phoenixStandard],
     technology: [proximaTargetingVi],
     promissory: [raiseTheStandard],
     agent: [dameBriar],

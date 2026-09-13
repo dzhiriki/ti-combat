@@ -22,7 +22,7 @@ export const temporalCommandSuite: Ability<Params> = {
   },
   headerUI: 'isEnabled',
   uiConfig: ctx => {
-    const ownAgents = ctx.abilities.own.get('AGENT')
+    const ownAgents = ctx.abilities.own.get('FACTION_AGENT')
     return [
       {
         key: 'agentKey',
@@ -56,5 +56,5 @@ export const temporalCommandSuite: Ability<Params> = {
 }
 
 function findAgent(ctx: AbilityReadContext, key: string): Ability | undefined {
-  return ctx.abilities.own.get('AGENT').find(a => a.key === key)
+  return ctx.abilities.own.get('FACTION_AGENT').find(a => a.key === key)
 }

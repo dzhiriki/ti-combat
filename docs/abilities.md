@@ -28,6 +28,7 @@ interface Ability<Params extends Record<string, unknown>> {
   description?: string // Tooltip text describing what the ability does
   warning?: string // Optional warning paragraph appended to the tooltip
   icon?: string // Raw SVG string for display next to name
+  neutral?: boolean // false: never offered to the NEUTRAL faction
   params: AbilityBaseParams & Params // Default parameter values (includes isEnabled and uses from AbilityBaseParams)
   paramsSchema?: {
     safeParse: (data: unknown) => { success: boolean; data?: unknown }
@@ -48,7 +49,68 @@ interface Ability<Params extends Record<string, unknown>> {
 }
 ```
 
-There is **no `category`/`subcategory` field**. An ability's category is derived from the registration slot it occupies (which `index.ts` array or faction slot it is added to), surfaced via that game system's `SLOT_DISPLAY` — abilities never declare it. Each system owns its `AbilitySlot`, `FactionKey`, `FACTION_KEY_TO_SLOT`, `unitSlot`, `SLOT_DISPLAY`, and `SLOT_ORDER` declarations in `src/data/<system>`; the engine treats faction and slot names as opaque strings. The shared `FactionAbilities` runtime shape is `Record<string, Ability[]>`; every key must exist in the selected system's mapping or data resolution/collection throws (for example, Twilight's Fall has no breakthrough slot).
+There is **no `category`/`subcategory` field**. An ability's category is derived from the registration slot it occupies (which `index.ts` array or faction ability group it is added to) — abilities never declare it. Each system owns its `SLOTS` config in `src/data/<system>/ability-slots.ts`; the engine treats faction and slot names as opaque strings. See [Slot config](#slot-config) below.
+
+Everything a faction owns maps onto `FACTION_<NAME>`: an ability group key (the shared `FactionAbilities` runtime shape is `Record<string, Ability[]>`, so `ability` → `FACTION_ABILITY`) and a unit type alike (a dreadnought's `ABILITIES` → `FACTION_DREADNOUGHT`). The system must declare a slot of that name or data resolution throws (for example, Twilight's Fall has no `FACTION_BREAKTHROUGH` slot). Because the two share one namespace, a group named after a unit type renders in that unit's slot; Nekro Virus uses this to file its copied unit abilities next to its own units.
+
+### Slot config
+
+`SLOTS` is a single ordered list that fixes render order, titles, category grouping, and how each slot is filled. `AbilitySlot` is derived from it, so a slot can't be registered against unless it is declared:
+
+```typescript
+export const SLOTS = [
+  { title: 'GENERAL', slot: 'GENERAL' }, // shared deck from index.ts
+  {
+    title: 'FACTION', // category header, items render as sub-headers
+    items: [
+      { title: 'HERO', slot: 'FACTION_HERO', strategy: 'OWN' },
+      { title: 'AGENT', slot: 'FACTION_AGENT', strategy: 'OWN' },
+      // Several slots under one sub-header, sharing its title and order
+      {
+        title: 'UNIT',
+        slot: ['FACTION_CRUISER', 'FACTION_PDS'],
+        strategy: 'OWN',
+      },
+    ],
+  },
+  // The same slot again, from the other side of the table
+  { title: 'AGENT', slot: 'FACTION_AGENT', strategy: 'OTHER' },
+  // Hidden from the NEUTRAL faction
+  {
+    title: 'PROMISSORY',
+    slot: 'FACTION_PROMISSORY',
+    strategy: 'ALL',
+    neutral: false,
+  },
+  { title: 'OTHER', slot: 'OTHER' },
+] as const satisfies readonly SlotEntry[]
+```
+
+Every entry, and every category (whose flags its items inherit), also takes:
+
+| flag      | Default | Meaning                                                                                                           |
+| --------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
+| `neutral` | `true`  | Whether NEUTRAL sees the slot. Neutral is a generic opponent: no research, hand, or notes, so TI4 turns those off |
+| `icon`    | `true`  | Whether cards show their faction icon. Off where the header already names the faction (own agents under FACTION)  |
+
+Per-ability availability rules live on the ability itself, next to `side`: `neutral: false` keeps a card off Neutral's list in every system (Fleet Pool — Neutral has none to enforce).
+
+| `strategy` | Which of the slot's abilities the selected faction sees                  |
+| ---------- | ------------------------------------------------------------------------ |
+| _none_     | A shared deck: whatever the system's `abilities` record registered there |
+| `OWN`      | The ones it owns                                                         |
+| `OTHER`    | The ones every **other** faction owns                                    |
+| `ALL`      | Every faction's, its own included                                        |
+
+There is one slot per kind of card — all agents are collected into `FACTION_AGENT` — and a slot may appear twice under different strategies. That is how an agent renders under FACTION for the faction holding it and in the shared AGENT list for everyone else, without being registered twice.
+
+### How a faction's abilities are collected
+
+`createGameData` collects once, at build time, into one list of `CollectedAbility` — an ability paired with a slot entry of the config that shows it (so it carries that entry's `strategy`, `neutral` flag, and `display`), plus its owning faction if any. Shared decks pair with entries that have no strategy, faction-owned abilities with entries that do; an ability no entry could ever show is a data error and throws. `getAvailableAbilities(side, faction)` then walks that list in **registration order** — which is what drives invoke resolution, so it is deliberately not config order — and keeps the entries whose strategy admits the faction. An ability is available when at least one entry shows it.
+
+The one exception is the catch-all: an ability that no entry shows, but that another faction can reach across the table with (an `external` invoke), is appended to the `OTHER` slot with its owner's icon. Systems opt out by not declaring `OTHER` — Twilight's Fall has no such slot.
+
+A group with no `OWN` slot is only shown through its `ALL` pool — that is how a faction's own promissory notes stay out of its FACTION section.
 
 **`params`** — includes `AbilityBaseParams` (`isEnabled: boolean`, `uses: number`) merged with custom `Params`. Example: `params: { isEnabled: false, uses: Infinity, strategy: 'BEST' }`.
 
@@ -450,7 +512,7 @@ import { myAbility } from './my-ability'
 export const my_faction: Faction = {
   name: 'My Faction',
   abilities: {
-    faction: [myAbility], // Only available to this faction
+    ability: [myAbility], // Only available to this faction
     technology: [factionTech], // Faction-specific technology
     unit: [unitAbility], // Unit-attached abilities
     promissory: [promNote], // Available to all factions
@@ -465,13 +527,13 @@ export const my_faction: Faction = {
 }
 ```
 
-`faction` abilities only appear for that faction. `promissory`, `agent`, `commander`, `hero`, and `breakthrough` are collected across all factions and available to everyone.
+Each group renders in the `FACTION_<KEY>` slot its system declares `OWN`. `promissory`, `agent`, and `commander` are additionally collected across all factions into the shared `ALL` pools available to everyone; `promissory` has no `OWN` slot, so it appears only in that shared pool, never under its owner.
 
 ### Twilight's Fall unit upgrades
 
 Each card in `src/data/tf/abilities/unit-upgrade/` is a normal `Ability` object.
 Declare its params, UI, exclusive group, and special invokes directly. Non-mech
-cards use `exclusiveGroup: 'TF_UNIT_UPGRADE_<UNIT_TYPE>'`; mech cards omit it
+cards use `exclusiveGroup: 'TF_UNIT_UPGRADE_<UNIT_TYPE>'` (the same name as the slot each unit type's cards are registered under); mech cards omit it
 so they stack.
 
 For a fixed stat block, use `createStatsInvoke(unitType, stats)` from

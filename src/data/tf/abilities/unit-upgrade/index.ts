@@ -1,5 +1,4 @@
 import type { Ability } from '@/combat'
-import type { UnitBaseType } from '@/types'
 
 import carrier from './carrier'
 import cruiser from './cruiser'
@@ -28,17 +27,17 @@ import warSun from './war-sun'
 // Key order IS display order: buckets follow the UI's unit ordering
 // (UNIT_TYPES — Flagship, War Sun, Dreadnought, Carrier, Cruiser, Destroyer,
 // Fighter, Mech, Infantry, PDS), and each folder lists its cards
-// alphabetically. The registration site turns each bucket into the panel's
-// sub-header.
+// alphabetically. Each bucket is its own slot, so the deck spreads straight
+// into the system's ability registration.
 export default {
-  FLAGSHIP: flagship,
-  WAR_SUN: warSun,
-  DREADNOUGHT: dreadnought,
-  CARRIER: carrier,
-  CRUISER: cruiser,
-  DESTROYER: destroyer,
-  FIGHTER: fighter,
-  MECH: mech,
-  INFANTRY: infantry,
-  PDS: pds,
-} satisfies Partial<Record<UnitBaseType, readonly Ability[]>>
+  TF_UNIT_UPGRADE_FLAGSHIP: flagship,
+  TF_UNIT_UPGRADE_WAR_SUN: warSun,
+  TF_UNIT_UPGRADE_DREADNOUGHT: dreadnought,
+  TF_UNIT_UPGRADE_CARRIER: carrier,
+  TF_UNIT_UPGRADE_CRUISER: cruiser,
+  TF_UNIT_UPGRADE_DESTROYER: destroyer,
+  TF_UNIT_UPGRADE_FIGHTER: fighter,
+  TF_UNIT_UPGRADE_MECH: mech,
+  TF_UNIT_UPGRADE_INFANTRY: infantry,
+  TF_UNIT_UPGRADE_PDS: pds,
+} satisfies Record<`TF_UNIT_UPGRADE_${string}`, readonly Ability[]>

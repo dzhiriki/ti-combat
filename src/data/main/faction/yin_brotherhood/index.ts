@@ -14,7 +14,7 @@ export const yin_brotherhood: Faction = {
   name: 'Yin Brotherhood',
   icon: yinBrotherhoodIcon,
   abilities: {
-    faction: [devotion, indoctrination],
+    ability: [devotion, indoctrination],
     technology: [impulseCore],
     agent: [brotherMilor],
     promissory: [greyfireMutagen],

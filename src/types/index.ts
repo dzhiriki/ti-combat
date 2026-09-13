@@ -12,7 +12,16 @@ export type {
   GameSystem,
   Lazy,
 } from './faction'
-export type { AbilitySlotData, GameData, SlotDisplay } from './game-data'
+export type {
+  CollectedAbility,
+  GameData,
+  SlotCategory,
+  SlotConfig,
+  SlotDisplay,
+  SlotEntry,
+  SlotNames,
+  SlotStrategy,
+} from './game-data'
 export {
   UnitListBooleanSchema,
   UnitListNumberSchema,

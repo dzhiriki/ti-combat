@@ -12,7 +12,7 @@ export const argent_flight: Faction = {
   name: 'Argent Flight',
   icon: argentFlightIcon,
   abilities: {
-    faction: [raidFormation],
+    ability: [raidFormation],
     promissory: [strikeWingAmbuscade],
     commander: [trrakanAunZulok],
   },

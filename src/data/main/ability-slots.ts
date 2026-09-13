@@ -1,87 +1,77 @@
-import type { SlotDisplay, UnitBaseType } from '@/types'
+import type { SlotEntry, SlotNames } from '@/types'
 
-export type AbilitySlot =
-  | 'GENERAL'
-  | 'ADVANCED'
-  | 'TECHNOLOGY'
-  | 'ACTION_CARD'
-  | 'RELIC'
-  | 'AGENDA'
-  | 'ENVIRONMENT'
-  | 'FACTION_ABILITY'
-  | 'FACTION_TECHNOLOGY'
-  | 'FACTION_AGENT'
-  | 'FACTION_COMMANDER'
-  | 'FACTION_HERO'
-  | 'FACTION_BREAKTHROUGH'
-  | 'PROMISSORY'
-  | 'AGENT'
-  | 'COMMANDER'
-  | 'FACTION_FLAGSHIP'
-  | 'FACTION_MECH'
-  | 'FACTION_UNIT'
-  | 'OTHER'
+/**
+ * The system's ability layout in render order: every slot's title, how it is
+ * sourced, and which slots share a category header. A faction ability group
+ * lands in the slot named after it (`hero` → `FACTION_HERO`), and a faction
+ * unit's abilities in the slot named after its type (`FACTION_DREADNOUGHT`).
+ * The same slot can appear twice under different strategies — the selected
+ * faction's commander belongs under FACTION, everyone else's under COMMANDER —
+ * and one entry may list several slots to render them under one sub-header.
+ */
+export const SLOTS = [
+  { title: 'GENERAL', slot: 'GENERAL' },
+  {
+    title: 'FACTION',
+    items: [
+      { title: 'ABILITY', slot: 'FACTION_ABILITY', strategy: 'OWN' },
+      { title: 'FLAGSHIP', slot: 'FACTION_FLAGSHIP', strategy: 'OWN' },
+      // The FACTION header already names the faction; drop the card icons.
+      {
+        title: 'AGENT',
+        slot: 'FACTION_AGENT',
+        strategy: 'OWN',
+        icon: false,
+      },
+      {
+        title: 'COMMANDER',
+        slot: 'FACTION_COMMANDER',
+        strategy: 'OWN',
+        icon: false,
+      },
+      { title: 'HERO', slot: 'FACTION_HERO', strategy: 'OWN' },
+      { title: 'MECH', slot: 'FACTION_MECH', strategy: 'OWN' },
+      { title: 'BREAKTHROUGH', slot: 'FACTION_BREAKTHROUGH', strategy: 'OWN' },
+      { title: 'TECHNOLOGY', slot: 'FACTION_TECHNOLOGY', strategy: 'OWN' },
+      {
+        title: 'UNIT',
+        slot: [
+          'FACTION_WAR_SUN',
+          'FACTION_DREADNOUGHT',
+          'FACTION_CARRIER',
+          'FACTION_CRUISER',
+          'FACTION_DESTROYER',
+          'FACTION_FIGHTER',
+          'FACTION_INFANTRY',
+          'FACTION_PDS',
+          'FACTION_SPACE_DOCK',
+        ],
+        strategy: 'OWN',
+      },
+    ],
+  },
+  // Neutral is a generic opponent: no research, hand, notes, or leaders
+  // beyond the agents anyone might have handed it.
+  { title: 'TECHNOLOGY', slot: 'TECHNOLOGY', neutral: false },
+  { title: 'ACTION CARD', slot: 'ACTION_CARD', neutral: false },
+  {
+    title: 'PROMISSORY',
+    slot: 'FACTION_PROMISSORY',
+    strategy: 'ALL',
+    neutral: false,
+  },
+  { title: 'AGENT', slot: 'FACTION_AGENT', strategy: 'OTHER' },
+  {
+    title: 'COMMANDER',
+    slot: 'FACTION_COMMANDER',
+    strategy: 'OTHER',
+    neutral: false,
+  },
+  { title: 'RELIC', slot: 'RELIC', neutral: false },
+  { title: 'AGENDA', slot: 'AGENDA', neutral: false },
+  { title: 'ENVIRONMENT', slot: 'ENVIRONMENT' },
+  { title: 'OTHER', slot: 'OTHER', strategy: 'OTHER' },
+  { title: 'ADVANCED', slot: 'ADVANCED' },
+] as const satisfies readonly SlotEntry[]
 
-export const FACTION_KEY_TO_SLOT = {
-  faction: 'FACTION_ABILITY',
-  technology: 'FACTION_TECHNOLOGY',
-  unit: 'FACTION_UNIT',
-  promissory: 'PROMISSORY',
-  agent: 'AGENT',
-  commander: 'COMMANDER',
-  hero: 'FACTION_HERO',
-  breakthrough: 'FACTION_BREAKTHROUGH',
-} as const satisfies Record<string, AbilitySlot>
-
-export function unitSlot(baseType: UnitBaseType): AbilitySlot {
-  if (baseType === 'FLAGSHIP') return 'FACTION_FLAGSHIP'
-  if (baseType === 'MECH') return 'FACTION_MECH'
-  return 'FACTION_UNIT'
-}
-
-export const SLOT_DISPLAY = {
-  GENERAL: { category: 'GENERAL' },
-  ADVANCED: { category: 'ADVANCED' },
-  TECHNOLOGY: { category: 'TECHNOLOGY' },
-  ACTION_CARD: { category: 'ACTION CARD' },
-  RELIC: { category: 'RELIC' },
-  AGENDA: { category: 'AGENDA' },
-  ENVIRONMENT: { category: 'ENVIRONMENT' },
-  PROMISSORY: { category: 'PROMISSORY' },
-  AGENT: { category: 'AGENT' },
-  COMMANDER: { category: 'COMMANDER' },
-  FACTION_ABILITY: { category: 'FACTION', subcategory: 'ABILITY' },
-  FACTION_TECHNOLOGY: { category: 'FACTION', subcategory: 'TECHNOLOGY' },
-  FACTION_AGENT: { category: 'FACTION', subcategory: 'AGENT' },
-  FACTION_COMMANDER: { category: 'FACTION', subcategory: 'COMMANDER' },
-  FACTION_HERO: { category: 'FACTION', subcategory: 'HERO' },
-  FACTION_BREAKTHROUGH: { category: 'FACTION', subcategory: 'BREAKTHROUGH' },
-  FACTION_FLAGSHIP: { category: 'FACTION', subcategory: 'FLAGSHIP' },
-  FACTION_MECH: { category: 'FACTION', subcategory: 'MECH' },
-  FACTION_UNIT: { category: 'FACTION', subcategory: 'UNIT' },
-  OTHER: { category: 'OTHER' },
-} satisfies Record<AbilitySlot, SlotDisplay>
-
-/** Render order for top-level groups and FACTION subgroups. */
-export const SLOT_ORDER = [
-  'GENERAL',
-  'FACTION_ABILITY',
-  'FACTION_FLAGSHIP',
-  'FACTION_AGENT',
-  'FACTION_COMMANDER',
-  'FACTION_HERO',
-  'FACTION_MECH',
-  'FACTION_BREAKTHROUGH',
-  'FACTION_TECHNOLOGY',
-  'FACTION_UNIT',
-  'TECHNOLOGY',
-  'ACTION_CARD',
-  'PROMISSORY',
-  'AGENT',
-  'COMMANDER',
-  'RELIC',
-  'AGENDA',
-  'ENVIRONMENT',
-  'OTHER',
-  'ADVANCED',
-] as const satisfies readonly AbilitySlot[]
+export type AbilitySlot = SlotNames<(typeof SLOTS)[number]>

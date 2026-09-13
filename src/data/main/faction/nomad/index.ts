@@ -11,7 +11,7 @@ export const nomad: Faction = {
   name: 'Nomad',
   icon: nomadIcon,
   abilities: {
-    faction: [],
+    ability: [],
     technology: [temporalCommandSuite],
     promissory: [cavalry],
     agent: [thundarian],

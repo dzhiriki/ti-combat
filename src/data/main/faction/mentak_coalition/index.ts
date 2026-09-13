@@ -12,7 +12,7 @@ export const mentak_coalition: Faction = {
   name: 'Mentak Coalition',
   icon: mentakCoalitionIcon,
   abilities: {
-    faction: [ambush],
+    ability: [ambush],
     technology: [salvageOperations],
     hero: [sleeperCell],
   },

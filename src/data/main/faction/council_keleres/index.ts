@@ -9,7 +9,7 @@ export const council_keleres: Faction = {
   name: 'Council Keleres',
   icon: councilKeleresIcon,
   abilities: {
-    faction: [custodiaVigilia],
+    ability: [custodiaVigilia],
     hero: [overwingZeta],
   },
   units: {

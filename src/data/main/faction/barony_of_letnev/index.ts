@@ -15,7 +15,7 @@ export const barony_of_letnev: Faction = {
   name: 'Barony of Letnev',
   icon: baronyOfLetnevIcon,
   abilities: {
-    faction: [munitionsReserves],
+    ability: [munitionsReserves],
     technology: [l4Disruptors, nonEuclideanShielding],
     agent: [viscountUnlenn],
     promissory: [warFunding],

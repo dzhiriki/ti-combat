@@ -22,7 +22,9 @@ const NONE = 'none'
 /** Every other agent registered on this side (the TI4 AGENT pool), in
  *  registration order. */
 function getAgents(ctx: AbilityLookupContext): readonly Ability[] {
-  return ctx.abilities.own.get('AGENT').filter(a => a.key !== ctx.this.key)
+  return ctx.abilities.own
+    .get('FACTION_AGENT')
+    .filter(a => a.key !== ctx.this.key)
 }
 
 function findAgent(

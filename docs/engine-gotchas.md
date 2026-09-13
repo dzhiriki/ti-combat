@@ -152,13 +152,15 @@ a check there too.
   the flagship, consumed by the capacity driver itself, not an invoke).
 
 - **TF unit-upgrade cards MUST register ahead of the base slots.**
-  The TF `GameData` entry registers them before GENERAL/ADVANCED: the cards'
+  The TF `GameData` entry lists their slots before GENERAL/ADVANCED in its
+  `abilities` record (key order is registration order): the cards'
   PREPARE applies the stat block (capacity, Fighter-II-style
   `FLEET_POOL_COST`) that the ADVANCED drivers' own PREPARE enforcement then
   reads — they are the TF analog of TI4's build-time UPGRADED stats. Re-appending them after `base` silently makes
   Capacity/Fleet Pool enforce against the un-upgraded stats (fighters
   removed despite a fleet-pool fallback). Panel display is unaffected —
-  slots are grouped via SLOT_DISPLAY, not list order.
+  slots are grouped and ordered via the system's `SLOTS` config, not list
+  order.
 
 - **Never multiply a possibly-infinite stat by a unit count without checking
   the count first.** `Infinity * 0 = NaN` poisons every comparison
@@ -195,6 +197,15 @@ a check there too.
   `tests/engine/disabled-unit-ability-blocks-custom-dice.test.ts`). Only
   matters when a side fields both an immune unit and a config ability
   adding custom dice for a restricted unit ability.
+
+- **`getAvailableAbilities` returns registration order, not config order.**
+  The list feeds the engine, where order drives invoke resolution within a
+  timing pass, so it walks the collected abilities (shared decks in
+  `index.ts` order, then faction-owned ones) and asks the slot config only
+  _whether_ each is visible. Render order lives on each entry's `display`,
+  which is why the panel can group by category without the list being sorted
+  that way. Reordering the collection to match the config silently moves
+  ADVANCED's phase drivers out of their registration position.
 
 - **`getAvailableAbilities` feeds BOTH the panel and the engine.** Hiding a
   slot removes engine behavior, not just UI. The `ADVANCED` slot holds the
@@ -363,7 +374,8 @@ a check there too.
 
 - **Inherit printed upgrade stats, not runtime unit stats.** TF Janovet reads
   the native stat blocks exposed by `createStatsInvoke` through the runtime
-  `TF_UNIT_UPGRADE` lookup (`isStatsInvoke` narrows the tagged entries). Reading
+  `TF_UNIT_UPGRADE_<TYPE>` lookups — one slot per unit type (`isStatsInvoke`
+  narrows the tagged entries). Reading
   `getUnitStats` instead would also copy unrelated PREPARE modifiers. Keep
   shared text helpers independent of faction/deck modules to avoid import
   cycles (see `faces-of-janovet.ts` and `janovet-inherits.ts`).

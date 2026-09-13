@@ -9,10 +9,10 @@ import {
   configToSearchString,
   searchParamsToConfig,
 } from '@/hooks/use-url-sync'
+import type { GameSystem } from '@/types'
 import { getFaction } from '@/utils/get-faction'
-import { GAME_SYSTEMS } from '@/utils/get-faction-system'
 import { getFactionUnitConfig } from '@/utils/get-faction-unit-config'
-import { getGameData } from '@/utils/get-game-data'
+import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
 
 describe('explicit game system', () => {
   afterEach(() => {
@@ -20,33 +20,64 @@ describe('explicit game system', () => {
   })
 
   it.each(GAME_SYSTEMS)(
-    'owns a complete ability slot layout for %s',
+    'lists every available ability exactly once in %s',
     system => {
       const data = getGameData(system)
-      const displaySlots = Object.keys(data.SLOT_DISPLAY)
-
-      expect(new Set(data.SLOT_ORDER).size).toBe(data.SLOT_ORDER.length)
-      expect(new Set(data.SLOT_ORDER)).toEqual(new Set(displaySlots))
 
       for (const faction of Object.keys(data.factions)) {
+        const seen = new Set<string>()
         for (const reg of data.getAvailableAbilities('attacker', faction)) {
+          const where = `${reg.display.category}/${reg.display.subcategory ?? ''}`
           expect(
-            Object.hasOwn(data.SLOT_DISPLAY, reg.slot),
-            `${system}:${faction} uses undeclared slot ${reg.slot}`,
-          ).toBe(true)
+            typeof reg.display.order,
+            `${system}:${faction} has no render order for ${reg.slot}`,
+          ).toBe('number')
+          // The engine consumes this list as is — a repeated key would fire
+          // its invokes twice.
+          expect(
+            seen.has(reg.ability.key),
+            `${system}:${faction} lists ${reg.ability.key} twice (in ${where})`,
+          ).toBe(false)
+          seen.add(reg.ability.key)
         }
       }
     },
   )
 
   it('keeps system-specific slots out of the other system', () => {
-    const ti4 = getGameData('TI4')
-    const tf = getGameData('TF')
+    const slotsOf = (system: GameSystem): Set<string> => {
+      const data = getGameData(system)
+      return new Set(
+        Object.keys(data.factions).flatMap(faction =>
+          data.getAvailableAbilities('attacker', faction).map(reg => reg.slot),
+        ),
+      )
+    }
+    const ti4 = slotsOf('TI4')
+    const tf = slotsOf('TF')
 
-    expect(ti4.SLOT_ORDER).not.toContain('TF_ABILITY')
-    expect(tf.SLOT_ORDER).not.toContain('TECHNOLOGY')
-    expect(ti4.FACTION_KEY_TO_SLOT.breakthrough).toBe('FACTION_BREAKTHROUGH')
-    expect(tf.FACTION_KEY_TO_SLOT.breakthrough).toBeUndefined()
+    expect(ti4.has('TF_ABILITY')).toBe(false)
+    expect(tf.has('TECHNOLOGY')).toBe(false)
+    expect(ti4.has('FACTION_BREAKTHROUGH')).toBe(true)
+    expect(tf.has('FACTION_BREAKTHROUGH')).toBe(false)
+  })
+
+  it('splits a faction card between its own section and the shared pool', () => {
+    const data = getGameData('TI4')
+    const where = (faction: string, key: string): string[] =>
+      data
+        .getAvailableAbilities('attacker', faction)
+        .filter(reg => reg.ability.key === key)
+        .map(reg => `${reg.slot}:${reg.display.category}`)
+
+    // Sardakk's own commander sits under FACTION; for anyone else it is one
+    // of the commanders in the shared COMMANDER list — never both.
+    expect(where('SARDAKK_NORR', 'GHOM_SEKKUS')).toEqual([
+      'FACTION_COMMANDER:FACTION',
+    ])
+    expect(where('ARBOREC', 'GHOM_SEKKUS')).toEqual([
+      'FACTION_COMMANDER:COMMANDER',
+    ])
   })
 
   it.each(GAME_SYSTEMS)('round-trips Neutral vs Neutral in %s', system => {

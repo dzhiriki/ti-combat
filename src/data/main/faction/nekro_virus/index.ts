@@ -10,7 +10,6 @@ import type {
   ParamChange,
   SettingsParams,
 } from '@/combat/abilities-engine/types'
-import { SHARED_UNIT_ABILITY_KEYS } from '@/data/main/abilities/general'
 import { sustainDamage } from '@/data/main/abilities/general/sustain-damage'
 import type {
   Faction,
@@ -156,10 +155,15 @@ function collect(gameData: GameData): NekroCopies {
   if (cached) return cached
 
   const others = gameData.factions
+  // Flagship text that only restates a GENERAL toggle (Sustain Damage) is
+  // already configurable there — don't copy it.
+  const generalKeys = new Set(
+    gameData.getAbilities('GENERAL').map(ability => ability.key),
+  )
 
   const flagship = Object.values(others).flatMap(faction =>
     (faction.units.FLAGSHIP?.BASE?.ABILITIES ?? [])
-      .filter(a => !SHARED_UNIT_ABILITY_KEYS.has(a.key))
+      .filter(a => !generalKeys.has(a.key))
       .map(ability => ({
         ...ability,
         key: `NEKRO_FLAGSHIP_${ability.key}`,
@@ -273,7 +277,14 @@ export const nekro_virus: FactionDefinition = {
   icon: nekroVirusIcon,
   abilities: gameData => {
     const { singularity, technology, unit } = collect(gameData)
-    return { faction: [singularity], technology, unit }
+    // A copied unit ability joins the slot of the unit type it upgrades, so
+    // it renders next to Nekro's own units: `exclusiveGroup` is that type.
+    const unitGroups: Record<string, Ability[]> = {}
+    for (const ability of unit) {
+      const group = String(ability.exclusiveGroup).toLowerCase()
+      ;(unitGroups[group] ??= []).push(ability)
+    }
+    return { ability: [singularity], technology, ...unitGroups }
   },
   units: {
     FLAGSHIP: {

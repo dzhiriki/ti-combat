@@ -1,59 +1,84 @@
-import {
-  type Ability,
-  hasStaticInvokes,
-  type RegisteredAbility,
-} from '@/combat'
+import { type Ability, hasStaticInvokes } from '@/combat'
 import { UNIT_TYPES } from '@/constants/units'
 import type {
-  AbilitySlotData,
+  CollectedAbility,
   CombatSide,
   Faction,
   FactionDefinition,
   GameData,
   GameSystem,
-  SlotDisplay,
+  SlotEntry,
   UnitBaseType,
   UnitDefinition,
-  UnitStats,
 } from '@/types'
+import { factionSlot } from '@/utils/faction-slot'
 
 import { resolveFactions } from './registry'
 
-interface CrossFactionPool {
-  factionGroup: string
-  slot: string
-}
-
-interface ExternalAbilityPool {
-  slot: string
-}
-
-interface NeutralAvailability {
-  hiddenSlots?: readonly string[]
-  hiddenAbilityKeys?: readonly string[]
-}
-
-export interface CreateGameDataOptions<
-  FactionKey extends string = string,
-> extends AbilitySlotData {
+export interface CreateGameDataOptions {
   id: GameSystem
   label: string
-  defaultFaction?: FactionKey
-  factionDefinitions: Readonly<Record<FactionKey, FactionDefinition>>
-  baseUnits: Readonly<Record<string, UnitDefinition>>
-  sharedAbilities: readonly RegisteredAbility[]
-  SLOT_DISPLAY: Readonly<Record<string, SlotDisplay>>
-  SLOT_ORDER: readonly string[]
-  sharedUnitAbilityKeys?: ReadonlySet<string>
-  crossFactionPools?: readonly CrossFactionPool[]
-  externalAbilityPool?: ExternalAbilityPool
-  omitOwnFactionGroups?: readonly string[]
-  ownFactionSlotOverrides?: Readonly<Record<string, string>>
-  neutral?: NeutralAvailability
+  /** The roster; the first faction is the system's default selection. */
+  factions: Readonly<Record<string, FactionDefinition>>
+  /** Generic unit stats a faction inherits where it defines nothing. */
+  units: Readonly<Partial<Record<UnitBaseType, UnitDefinition>>>
+  /**
+   * The shared decks, keyed by slot. Key order is registration order, which
+   * drives invoke resolution within a timing pass.
+   */
+  abilities: Readonly<Record<string, readonly Ability[]>>
+  slots: readonly SlotEntry[]
 }
 
-type SystemGameData<FactionKey extends string> = GameData & {
-  factions: Readonly<Record<FactionKey, Faction>>
+/**
+ * Abilities a faction owns but the slot config never shows land here, so an
+ * opponent's cross-table effects stay configurable. Systems opt in by
+ * declaring the slot.
+ */
+const EXTERNAL_SLOT = 'OTHER'
+
+/** One slot of the config, flattened out of its category. */
+type ResolvedSlot = Omit<CollectedAbility, 'ability' | 'factionKey' | 'deploy'>
+
+/** Flattens a slot config into the entries abilities are matched against. */
+function resolveSlots(slots: readonly SlotEntry[]): ResolvedSlot[] {
+  const resolved: ResolvedSlot[] = []
+  const seen = new Set<string>()
+
+  let order = 0
+  for (const entry of slots) {
+    const isCategory = 'items' in entry
+    for (const item of isCategory ? entry.items : [entry]) {
+      // An entry may feed one sub-header from several slots (the unit slots
+      // under FACTION/UNIT), which then share its title and render order.
+      for (const slot of typeof item.slot === 'string'
+        ? [item.slot]
+        : item.slot) {
+        // A slot may appear under two strategies — own commanders render
+        // under FACTION, everyone else's under COMMANDER — but not twice
+        // under the same one.
+        const key = `${slot}:${item.strategy ?? ''}`
+        if (seen.has(key)) {
+          throw new Error(`Duplicate slot "${slot}" in slot config`)
+        }
+        seen.add(key)
+        resolved.push({
+          slot,
+          ...(item.strategy && { strategy: item.strategy }),
+          neutral: item.neutral ?? entry.neutral ?? true,
+          display: {
+            category: entry.title,
+            ...(isCategory && { subcategory: item.title }),
+            order,
+            icon: item.icon ?? entry.icon ?? true,
+          },
+        })
+      }
+      order++
+    }
+  }
+
+  return resolved
 }
 
 function hasExternalInvoke(ability: Ability): boolean {
@@ -63,19 +88,20 @@ function hasExternalInvoke(ability: Ability): boolean {
   )
 }
 
-function getEffectiveStats(
-  base: UnitStats,
-  upgraded: Partial<UnitStats> | undefined,
-  isUpgraded: boolean,
-): UnitStats {
-  if (!isUpgraded || !upgraded) return { ...base }
-  return {
-    ...base,
-    ...upgraded,
-    UNIT_ABILITIES: {
-      ...base.UNIT_ABILITIES,
-      ...upgraded.UNIT_ABILITIES,
-    },
+function hasUI(ability: Ability): boolean {
+  return Boolean(ability.headerUI || ability.uiConfig)
+}
+
+/** Does this slot entry show `entry` to the faction being configured? */
+function shows(entry: CollectedAbility, factionKey: string): boolean {
+  switch (entry.strategy) {
+    case 'OWN':
+      return entry.factionKey === factionKey
+    case 'OTHER':
+      return entry.factionKey !== factionKey
+    // ALL, or a shared deck.
+    default:
+      return true
   }
 }
 
@@ -83,22 +109,89 @@ function getEffectiveStats(
  * Builds the complete public entry point for one game system. The same
  * GameData object is used while resolving lazy factions and at runtime.
  */
-export function createGameData<FactionKey extends string>(
-  options: CreateGameDataOptions<FactionKey>,
-): SystemGameData<FactionKey> {
-  let registeredAbilities: readonly RegisteredAbility[] =
-    options.sharedAbilities
+export function createGameData(options: CreateGameDataOptions): GameData {
+  const slots = resolveSlots(options.slots)
+  const external = slots.find(entry => entry.slot === EXTERNAL_SLOT)
+  const collected: CollectedAbility[] = []
+
+  /**
+   * Pair an ability with every config entry showing its slot. Shared decks
+   * belong to entries without a strategy, faction-owned abilities to entries
+   * with one — an ability nobody would ever show is a data error.
+   */
+  const collect = (
+    ability: Ability,
+    slot: string,
+    owner: Pick<CollectedAbility, 'factionKey' | 'deploy'> = {},
+  ): void => {
+    const owned = owner.factionKey !== undefined
+    const homes = slots.filter(
+      entry => entry.slot === slot && (entry.strategy !== undefined) === owned,
+    )
+    if (homes.length === 0) {
+      throw new Error(
+        `Slot "${slot}" of "${ability.key}" is not declared by ${options.id}`,
+      )
+    }
+    for (const home of homes) collected.push({ ...home, ability, ...owner })
+  }
+
+  for (const [slot, deck] of Object.entries(options.abilities)) {
+    for (const ability of deck) collect(ability, slot)
+  }
+  const sharedKeys = new Set(collected.map(entry => entry.ability.key))
+
+  /**
+   * Every ability a faction owns: its ability groups, plus the abilities
+   * printed on its units. Unit abilities a shared deck already registers
+   * (Sustain Damage) or that carry no controls are dropped — they are never
+   * configured per faction.
+   */
+  const collectFaction = (factionKey: string, faction: Faction): void => {
+    for (const [group, list] of Object.entries(faction.abilities ?? {})) {
+      for (const ability of list) {
+        collect(ability, factionSlot(group), { factionKey })
+      }
+    }
+
+    const seen = new Set<string>()
+    for (const [unitTypeKey, unit] of Object.entries(faction.units)) {
+      if (!unit) continue
+      const unitType = unitTypeKey as UnitBaseType
+      const slot = factionSlot(unitType)
+      for (const ability of [
+        ...(unit.BASE.ABILITIES ?? []),
+        ...(unit.UPGRADED?.ABILITIES ?? []),
+      ]) {
+        if (sharedKeys.has(ability.key)) continue
+        if (seen.has(ability.key) || !hasUI(ability)) continue
+        seen.add(ability.key)
+        collect(ability, slot, { factionKey })
+      }
+
+      // An upgraded DEPLOY replaces the base one on upgraded builds, the same
+      // way `getEffectiveStats` merges UNIT_ABILITIES.
+      const base = unit.BASE.UNIT_ABILITIES?.DEPLOY
+      const upgraded = unit.UPGRADED?.UNIT_ABILITIES?.DEPLOY
+      for (const [ability, deploy] of [
+        [base, { unitType, base: true, upgraded: !upgraded }],
+        [upgraded, { unitType, base: false, upgraded: true }],
+      ] as const) {
+        if (!ability || seen.has(ability.key) || !hasUI(ability)) continue
+        seen.add(ability.key)
+        collect(ability, slot, { factionKey, deploy })
+      }
+    }
+  }
 
   const getAbilities = (slot: string): readonly Ability[] => {
-    const result = options.sharedAbilities
-      .filter(entry => entry.slot === slot)
-      .map(entry => entry.ability)
+    const result = [...(options.abilities[slot] ?? [])]
 
     for (const faction of Object.values(gameData.factions)) {
       for (const [group, abilities] of Object.entries(
         faction.abilities ?? {},
       )) {
-        if (options.FACTION_KEY_TO_SLOT[group] === slot) {
+        if (factionSlot(group) === slot) {
           result.push(...abilities)
         }
       }
@@ -106,7 +199,7 @@ export function createGameData<FactionKey extends string>(
         UnitBaseType,
         UnitDefinition | undefined,
       ][]) {
-        if (!unit || options.unitSlot(type) !== slot) continue
+        if (!unit || factionSlot(type) !== slot) continue
         result.push(
           ...(unit.BASE.ABILITIES ?? []),
           ...(unit.UPGRADED?.ABILITIES ?? []),
@@ -133,7 +226,7 @@ export function createGameData<FactionKey extends string>(
     const result = {} as Record<UnitBaseType, UnitDefinition>
     for (const unitType of UNIT_TYPES) {
       result[unitType] = factionUnits[unitType] ??
-        options.baseUnits[unitType] ?? { BASE: {} }
+        options.units[unitType] ?? { BASE: {} }
     }
     return result
   }
@@ -175,118 +268,65 @@ export function createGameData<FactionKey extends string>(
     return keys
   }
 
-  const collectUnitAbilities = (
-    faction: Faction,
+  const getAvailableAbilities = (
     side: CombatSide,
+    factionKey: string,
     upgradedTypes?: ReadonlySet<UnitBaseType>,
-  ): RegisteredAbility[] => {
-    const seen = new Set<string>()
-    const result: RegisteredAbility[] = []
+  ): CollectedAbility[] => {
+    getFaction(factionKey)
+    const isNeutral = factionKey === 'NEUTRAL'
+    const result: CollectedAbility[] = []
+    const shown = new Set<string>()
 
-    for (const [unitTypeKey, unit] of Object.entries(faction.units)) {
-      if (!unit) continue
-      const unitType = unitTypeKey as UnitBaseType
-      const slot = options.unitSlot(unitType)
-      for (const ability of [
-        ...(unit.BASE.ABILITIES ?? []),
-        ...(unit.UPGRADED?.ABILITIES ?? []),
-      ]) {
-        if (options.sharedUnitAbilityKeys?.has(ability.key)) continue
-        if (seen.has(ability.key)) continue
-        if (!ability.headerUI && !ability.uiConfig) continue
-        if (ability.side && ability.side !== side) continue
-        seen.add(ability.key)
-        result.push({ ability, slot })
-      }
-
-      const effective = getEffectiveStats(
-        unit.BASE,
-        unit.UPGRADED,
-        upgradedTypes?.has(unitType) ?? false,
-      )
-      const deploy = effective.UNIT_ABILITIES?.DEPLOY
+    // Registration order — not config order — drives invoke resolution, so
+    // the collected list is walked as is; the config only decided where each
+    // entry may show.
+    for (const entry of collected) {
+      const ability = entry.ability
+      if (!shows(entry, factionKey)) continue
+      if (isNeutral && (!entry.neutral || ability.neutral === false)) continue
+      if (ability.side && ability.side !== side) continue
       if (
-        deploy &&
-        !seen.has(deploy.key) &&
-        (deploy.headerUI || deploy.uiConfig) &&
-        (!deploy.side || deploy.side === side)
+        entry.deploy &&
+        !(upgradedTypes?.has(entry.deploy.unitType)
+          ? entry.deploy.upgraded
+          : entry.deploy.base)
       ) {
-        seen.add(deploy.key)
-        result.push({ ability: deploy, slot })
+        continue
       }
+      shown.add(ability.key)
+      result.push(entry)
+    }
+
+    if (!external) return result
+
+    // Whatever no entry showed, but that reaches across the table anyway.
+    for (const entry of collected) {
+      const ability = entry.ability
+      if (entry.factionKey === undefined || entry.factionKey === factionKey) {
+        continue
+      }
+      if (shown.has(ability.key) || !hasUI(ability)) continue
+      if (!hasExternalInvoke(ability)) continue
+      shown.add(ability.key)
+      const icon = gameData.factions[entry.factionKey]?.icon
+      result.push({
+        ...external,
+        ability: { ...ability, ...(icon && { icon }) },
+        factionKey: entry.factionKey,
+      })
     }
 
     return result
   }
 
-  const neutralHiddenSlots = new Set(options.neutral?.hiddenSlots ?? [])
-  const neutralHiddenAbilityKeys = new Set(
-    options.neutral?.hiddenAbilityKeys ?? [],
-  )
-  const omittedOwnGroups = new Set(options.omitOwnFactionGroups ?? [])
-
-  const getAvailableAbilities = (
-    side: CombatSide,
-    factionKey: string,
-    upgradedTypes?: ReadonlySet<UnitBaseType>,
-  ): RegisteredAbility[] => {
-    const faction = getFaction(factionKey)
-    const ownedKeys = getFactionOwnedAbilityKeys(factionKey)
-    const isNeutral = factionKey === 'NEUTRAL'
-
-    const base = registeredAbilities.filter(entry => {
-      const ability = entry.ability
-      if (ability.side && ability.side !== side) return false
-      if (isNeutral) {
-        if (neutralHiddenSlots.has(entry.slot)) return false
-        if (neutralHiddenAbilityKeys.has(ability.key)) return false
-      }
-      if (
-        options.externalAbilityPool &&
-        entry.slot === options.externalAbilityPool.slot &&
-        ownedKeys.has(ability.key)
-      ) {
-        return false
-      }
-      return true
-    })
-
-    const factionAbilities: RegisteredAbility[] = []
-    for (const [group, list] of Object.entries(faction.abilities ?? {})) {
-      if (!Object.hasOwn(options.FACTION_KEY_TO_SLOT, group)) {
-        throw new Error(
-          `Faction ability group "${group}" on "${factionKey}" is not supported by ${options.id}`,
-        )
-      }
-      if (omittedOwnGroups.has(group)) continue
-      const slot =
-        options.ownFactionSlotOverrides?.[group] ??
-        options.FACTION_KEY_TO_SLOT[group]
-      for (const ability of list) {
-        if (ability.side && ability.side !== side) continue
-        factionAbilities.push({ ability, slot })
-      }
-    }
-
-    return [
-      ...base,
-      ...factionAbilities,
-      ...collectUnitAbilities(faction, side, upgradedTypes),
-    ]
-  }
-
   const gameData: GameData = {
     id: options.id,
     label: options.label,
-    defaultFaction: options.defaultFaction ?? 'NEUTRAL',
+    defaultFaction: Object.keys(options.factions)[0] ?? 'NEUTRAL',
     factions: {},
-    baseUnits: options.baseUnits,
-    abilities: registeredAbilities,
+    baseUnits: options.units,
     allAbilities: [],
-    FACTION_KEY_TO_SLOT: options.FACTION_KEY_TO_SLOT,
-    unitSlot: options.unitSlot,
-    SLOT_DISPLAY: options.SLOT_DISPLAY,
-    SLOT_ORDER: options.SLOT_ORDER,
     getAbilities,
     getFaction,
     getFactionUnitConfig,
@@ -295,91 +335,27 @@ export function createGameData<FactionKey extends string>(
     getFactionOwnedAbilityKeys,
   }
 
-  const factions = resolveFactions(gameData, options.factionDefinitions)
-  const resolvedFactions = Object.values(factions) as Faction[]
+  const factions = resolveFactions(gameData, options.factions)
 
-  const crossFactionAbilities = (options.crossFactionPools ?? []).flatMap(
-    pool =>
-      resolvedFactions.flatMap(faction =>
-        (faction.abilities?.[pool.factionGroup] ?? []).map(ability => ({
-          ability,
-          slot: pool.slot,
-        })),
-      ),
-  )
-
-  const displayedKeys = new Set([
-    ...options.sharedAbilities.map(entry => entry.ability.key),
-    ...crossFactionAbilities.map(entry => entry.ability.key),
-  ])
-
-  const externalAbilities: RegisteredAbility[] = []
-  if (options.externalAbilityPool) {
-    const seen = new Set<string>()
-    const add = (ability: Ability, faction: Faction) => {
-      if (!hasExternalInvoke(ability)) return
-      if (seen.has(ability.key) || displayedKeys.has(ability.key)) return
-      if (!ability.headerUI && !ability.uiConfig) return
-      seen.add(ability.key)
-      externalAbilities.push({
-        ability: { ...ability, icon: faction.icon },
-        slot: options.externalAbilityPool!.slot,
-      })
+  for (const [factionKey, faction] of Object.entries(factions)) {
+    for (const group of Object.keys(faction.abilities ?? {})) {
+      if (slots.some(slot => slot.slot === factionSlot(group))) continue
+      throw new Error(
+        `Faction ability group "${group}" on "${factionKey}" is not supported by ${options.id}`,
+      )
     }
-
-    for (const faction of resolvedFactions) {
-      for (const unit of Object.values(faction.units)) {
-        if (!unit) continue
-        for (const ability of [
-          ...(unit.BASE.ABILITIES ?? []),
-          ...(unit.UPGRADED?.ABILITIES ?? []),
-        ]) {
-          add(ability, faction)
-        }
-      }
-      for (const abilities of Object.values(faction.abilities ?? {})) {
-        for (const ability of abilities) add(ability, faction)
-      }
-    }
+    collectFaction(factionKey, faction)
   }
 
-  registeredAbilities = [
-    ...options.sharedAbilities,
-    ...crossFactionAbilities,
-    ...externalAbilities,
-  ]
-
-  const allAbilities: Ability[] = registeredAbilities.map(
-    entry => entry.ability,
-  )
-  for (const faction of resolvedFactions) {
-    for (const unit of Object.values(faction.units)) {
-      if (!unit) continue
-      for (const ability of [
-        ...(unit.BASE.ABILITIES ?? []),
-        ...(unit.UPGRADED?.ABILITIES ?? []),
-      ]) {
-        if (ability.headerUI || ability.uiConfig) allAbilities.push(ability)
-      }
-      for (const stats of [unit.BASE, unit.UPGRADED]) {
-        const deploy = stats?.UNIT_ABILITIES?.DEPLOY
-        if (deploy && (deploy.headerUI || deploy.uiConfig)) {
-          allAbilities.push(deploy)
-        }
-      }
-    }
-    for (const list of Object.values(faction.abilities ?? {})) {
-      allAbilities.push(...list)
-    }
+  const allAbilities: Ability[] = []
+  const seenKeys = new Set<string>()
+  for (const entry of collected) {
+    if (seenKeys.has(entry.ability.key)) continue
+    seenKeys.add(entry.ability.key)
+    allAbilities.push(entry.ability)
   }
 
-  Object.assign(gameData, {
-    defaultFaction:
-      options.defaultFaction ?? Object.keys(factions)[0] ?? 'NEUTRAL',
-    factions,
-    abilities: registeredAbilities,
-    allAbilities,
-  })
+  Object.assign(gameData, { factions, allAbilities })
 
-  return gameData as SystemGameData<FactionKey>
+  return gameData
 }
