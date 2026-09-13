@@ -11,6 +11,7 @@ export type {
   FactionDefinition,
   GameSystem,
   Lazy,
+  LazyContext,
 } from './faction'
 export type {
   CollectedAbility,

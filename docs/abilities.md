@@ -15,7 +15,7 @@ src/data/main/abilities/
   relic/            — relics (LIGHTRAIL_ORDNANCE, METALI_VOID_ARMAMENTS, ...)
 ```
 
-Faction abilities live in `src/data/main/faction/[faction_name]/` (TI4) or `src/data/tf/faction/[faction_name]/` (Twilight's Fall) alongside the faction definition. Twilight's Fall shared decks live in `src/data/tf/abilities/` (`ability/`, `genome/`, `paradigm/`, `action-card/`, `unit-upgrade/`); each deck folder has an `index.ts` listing its cards in display order, and `src/data/tf/index.ts` tags each deck with its slot. A TF card that reuses a TI4 implementation is still its own file: it imports the TI4 ability, clones it with `cloneAbility(ability, overrides)` from `src/data/tf/clone-ability.ts`, and exports the result. Always pass a `TF_`-prefixed `key` of the card's own (`TF_ALTRUISTIC_GENOME`), plus only the fields that differ from the source (TF name, description, or the originating faction icon when the source has none). The clone copies the invoke entries, points a self-excluding `excludeSubtypeSource` filter at the new key, and makes the card an opt-in toggle.
+Faction abilities live in `src/data/main/faction/[faction_name]/` (TI4) or `src/data/tf/faction/[faction_name]/` (Twilight's Fall) alongside the faction definition. Twilight's Fall shared decks live in `src/data/tf/abilities/` (`ability/`, `genome/`, `paradigm/`, `action-card/`, `unit-upgrade/`); each deck folder has an `index.ts` listing its cards in display order, and `src/data/tf/index.ts` tags each deck with its slot. The generic `cloneAbility(ability, overrides)` exported by `@/combat` copies an ability and gives static invoke entries fresh identities without changing any policy. A TF card that reuses a TI4 implementation is still its own file and uses the wrapper in `src/data/tf/clone-ability.ts`; that wrapper adds TF-specific subtype rekeying and opt-in defaults. Always pass a `TF_`-prefixed `key` of the card's own (`TF_ALTRUISTIC_GENOME`), plus only the fields that differ from the source (TF name, description, or the originating faction icon when the source has none).
 
 Each ability is one file (kebab-case matching the key). File exports a single `Ability` object.
 
@@ -565,16 +565,48 @@ abilities without depending on factory metadata or runtime unit modifications.
 
 ### Lazy faction data
 
-A faction module exports a `FactionDefinition`. Its `abilities` and any unit `ABILITIES` may be a function of the system's `GameData`, resolved once by `createGameData`:
+A faction module exports a `FactionDefinition`. Its `abilities` and any unit base/upgraded `ABILITIES` may be a function of `LazyContext`, resolved once per field by `createGameData`:
 
 ```typescript
-export const nekro_virus: FactionDefinition = {
-  abilities: data => ({ technology: copyTechnologies(data.factions) }),
-  units: { FLAGSHIP: { BASE: { ABILITIES: data => [...] } } },
+export const copyingFaction: FactionDefinition = {
+  name: 'Copying faction',
+  abilities: context => ({
+    technology: [...(context.getFaction('SOURCE').abilities?.technology ?? [])],
+  }),
+  units: {
+    FLAGSHIP: {
+      BASE: {
+        ABILITIES: context => [...context.getAbilities('FACTION_AGENT')],
+      },
+    },
+  },
 }
 ```
 
-This is the same `GameData` entity that the system exports. It exposes `id`, `baseUnits`, `factions`, and `getAbilities(slot)`. During lazy resolution, `factions` intentionally contains only static factions, so a lazy faction never sees another lazy faction. Use this instead of importing other faction modules.
+The context contains only `getFactionKeys()`, `getFaction(key)`, and
+`getAbilities(slot)`. `resolveFactions` runs once while constructing the system
+and recursively initializes dependencies requested through those lookups,
+regardless of faction declaration order. A lazy faction ability map initializes
+together because its group names are unknown until it returns. Runtime
+`GameData.getFaction` reads the completed roster and `GameData.getAbilities`
+filters the completed catalog; neither performs reconciliation.
+
+Factories in one construction share a context object, separate from runtime
+`GameData`. A reentrant lookup skips the initializer already running and resolves
+the remaining fields, so a flagship can request its own faction's abilities.
+Dependencies must be acyclic; reading an unfinished initializer's own result is
+unsupported. All fields finish before the runtime roster and catalog are returned.
+
+Use the context lookups instead of importing other faction definitions. Nekro is
+a static faction definition; its lazy ability initializer creates fresh copies
+once per system construction. Technological Singularity is a static ability whose
+callbacks look up targets from the current side's runtime abilities and create
+generic unit upgrades when needed.
+
+Nekro's copied faction technologies and flagship abilities come from
+`FACTION_TECHNOLOGY` and `FACTION_FLAGSHIP` slot lookups. Faction-unit stat
+copies use `getFactionKeys()` and `getFaction(key)`: units such as Letani Warrior
+II have no standalone ability for a slot lookup to return.
 
 ### Unit Abilities
 

@@ -35,8 +35,9 @@ a check there too.
 - **Invoke dedup is by object identity.** Two abilities sharing the same
   invoke objects (e.g. a shallow-cloned ability with a new key) fire only
   once between them. When re-keying a clone, clone the invokes too:
-  `invoke: original.invoke.map(inv => ({ ...inv }))` — `cloneAbility` in
-  `src/data/tf/clone-ability.ts` does this for every TF clone.
+  `invoke: original.invoke.map(inv => ({ ...inv }))`. The generic
+  `cloneAbility` in `src/combat/abilities-engine/clone-ability.ts` does this;
+  TF and Nekro both use it.
 
 - **Registered abilities are copies of their definitions.** `RegisteredAbility`
   is `Ability & { slot }`, and `createGameData` builds registered entries by
@@ -127,7 +128,7 @@ a check there too.
   with `hasStaticInvokes(ability)` first — see the guards in
   `nekro_virus/index.ts`, `nekro_virus/technological-singularity.ts`,
   `create-tf-singularity.ts`, `ssruu.ts`, `clever-genome.ts`, and the
-  `cloneAbility` in `tf/clone-ability.ts`.
+  the generic `cloneAbility`.
 
 - **Factory `invoke` is re-resolved on every param change** of that ability
   (`updateAbilityConfig`), not only on `isEnabled`/`uses` — `addAbilityInvokes`
@@ -146,12 +147,15 @@ a check there too.
   branch on a value that `onParamSet` derives; key it on the raw param the
   caller wrote (Ssruu keys on `agentKey`, Clever Genome on `genomeKey`).
 
-- **A lazy faction sees only static factions.** During resolution, the
-  system's `GameData.factions` excludes every definition that has a lazy part,
-  so two lazy factions cannot read each other. `allAbilities` is registered
-  for that static roster first; `getAbilities(slot)` filters this catalog.
-  The same `GameData` object gets the complete roster and rebuilt catalog in
-  roster order after resolution. Nekro is the only lazy faction today.
+- **Lazy dependencies resolve through lookup calls.** A factory receives a
+  `LazyContext` containing only `getFactionKeys()`, `getFaction(key)`, and
+  `getAbilities(slot)`.
+  `resolveFactions` runs once and recursively initializes the requested faction
+  or slot, including lazy dependencies in the same faction. Running initializers
+  are consumed before invocation so reentrant lookups can finish other fields
+  without restarting them. Dependencies must be acyclic. Runtime `GameData`
+  reads only the completed roster and catalog. Nekro uses the context's faction
+  keys and excludes itself from its copy sources.
 
 - **Config abilities resolve before unit-attached abilities within a timing
   pass.** A unit ability's PREPARE cannot pre-empt an ADVANCED phase driver's

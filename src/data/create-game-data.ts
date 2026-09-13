@@ -18,7 +18,8 @@ import type {
 import { factionSlot } from '@/utils/faction-slot'
 import { matchesAbilitySlot } from '@/utils/matches-ability-slot'
 
-import { resolveFactions } from './registry'
+import { collectFactionAbilities } from './collect-faction-abilities'
+import { resolveFactions } from './resolve-factions'
 
 export interface CreateGameDataOptions {
   id: GameSystem
@@ -53,10 +54,19 @@ function hasUI(ability: Ability): boolean {
   return Boolean(ability.headerUI || ability.uiConfig)
 }
 
-/**
- * Builds the complete public entry point for one game system. The same
- * GameData object is used while resolving lazy factions and at runtime.
- */
+function uniqueAbilities(
+  abilities: readonly RegisteredAbility[],
+): RegisteredAbility[] {
+  const seen = new Set<string>()
+  return abilities.filter(ability => {
+    if (seen.has(ability.key)) return false
+    seen.add(ability.key)
+    return true
+  })
+}
+
+/** Builds the runtime entry point after lazy fields and their dependencies
+ *  have reconciled through the minimal lazy context. */
 export function createGameData(options: CreateGameDataOptions): GameData {
   const slots = options.slots.flatMap(entry =>
     'items' in entry ? entry.items : [entry],
@@ -84,19 +94,14 @@ export function createGameData(options: CreateGameDataOptions): GameData {
           )
         : matchesAbilitySlot(ability, entry, factionKey),
     )
-  const collected: CollectedAbility[] = []
+  const hasSlot = (slot: string): boolean =>
+    slots.some(config =>
+      typeof config.slot === 'string'
+        ? config.slot === slot
+        : config.slot.includes(slot),
+    )
 
-  /**
-   * Register each ability once, independently of its presentation. Shared decks
-   * belong to entries without a strategy, faction-owned abilities to entries
-   * with one — an ability nobody would ever show is a data error.
-   */
-  const collect = (
-    ability: Ability,
-    slot: string,
-    owner: Pick<CollectedAbility, 'factionKey' | 'deploy'> = {},
-  ): void => {
-    const owned = owner.factionKey !== undefined
+  const assertSlot = (ability: Ability, slot: string, owned: boolean): void => {
     if (
       !slots.some(
         entry =>
@@ -110,68 +115,53 @@ export function createGameData(options: CreateGameDataOptions): GameData {
         `Slot "${slot}" of "${ability.key}" is not declared by ${options.id}`,
       )
     }
-    collected.push({ ...ability, slot, ...owner })
   }
 
+  const genericAbilities: CollectedAbility[] = []
   for (const [slot, deck] of Object.entries(options.abilities)) {
-    for (const ability of deck) collect(ability, slot)
-  }
-  const sharedCount = collected.length
-  const sharedKeys = new Set(collected.map(entry => entry.key))
-
-  /**
-   * Every ability a faction owns: its ability groups, plus the abilities
-   * printed on its units. Unit abilities a shared deck already registers
-   * (Sustain Damage) or that carry no controls are dropped — they are never
-   * configured per faction.
-   */
-  const collectFaction = (factionKey: string, faction: Faction): void => {
-    for (const [group, list] of Object.entries(faction.abilities ?? {})) {
-      for (const ability of list) {
-        collect(ability, factionSlot(group), { factionKey })
-      }
-    }
-
-    const seen = new Set<string>()
-    for (const [unitTypeKey, unit] of Object.entries(faction.units)) {
-      if (!unit) continue
-      const unitType = unitTypeKey as UnitBaseType
-      const slot = factionSlot(unitType)
-      for (const ability of [
-        ...(unit.BASE.ABILITIES ?? []),
-        ...(unit.UPGRADED?.ABILITIES ?? []),
-      ]) {
-        if (sharedKeys.has(ability.key)) continue
-        if (seen.has(ability.key) || !hasUI(ability)) continue
-        seen.add(ability.key)
-        collect(ability, slot, { factionKey })
-      }
-
-      // An upgraded DEPLOY replaces the base one on upgraded builds, the same
-      // way `getEffectiveStats` merges UNIT_ABILITIES.
-      const base = unit.BASE.UNIT_ABILITIES?.DEPLOY
-      const upgraded = unit.UPGRADED?.UNIT_ABILITIES?.DEPLOY
-      for (const [ability, deploy] of [
-        [base, { unitType, base: true, upgraded: !upgraded }],
-        [upgraded, { unitType, base: false, upgraded: true }],
-      ] as const) {
-        if (!ability || seen.has(ability.key) || !hasUI(ability)) continue
-        seen.add(ability.key)
-        collect(ability, slot, { factionKey, deploy })
-      }
+    for (const ability of deck) {
+      assertSlot(ability, slot, false)
+      genericAbilities.push({ ...ability, slot })
     }
   }
+  const genericAbilityKeys = new Set(
+    genericAbilities.map(ability => ability.key),
+  )
+
+  const factions = resolveFactions(options.factions, genericAbilities)
+
+  // Dependency order does not change registration order. Collect once after
+  // every field has finished, with generic abilities ahead of the roster.
+  const collected = [...genericAbilities]
+  for (const [key, faction] of Object.entries(factions)) {
+    for (const group of Object.keys(faction.abilities ?? {})) {
+      if (hasSlot(factionSlot(group))) continue
+      throw new Error(
+        `Faction ability group "${group}" on "${key}" is not supported by ${options.id}`,
+      )
+    }
+    for (const ability of collectFactionAbilities(
+      key,
+      faction,
+      genericAbilityKeys,
+    )) {
+      assertSlot(ability, ability.slot, true)
+      collected.push(ability)
+    }
+  }
+  const allAbilities = uniqueAbilities(collected)
 
   const getAbilities = (slot: string): readonly RegisteredAbility[] =>
-    gameData.allAbilities.filter(ability => ability.slot === slot)
+    allAbilities.filter(ability => ability.slot === slot)
 
   const getFaction = (factionKey: string): Faction => {
-    if (!Object.hasOwn(gameData.factions, factionKey)) {
+    const faction = factions[factionKey]
+    if (!faction) {
       throw new Error(
         `Faction "${factionKey}" is not available in ${options.id}`,
       )
     }
-    return gameData.factions[factionKey]
+    return faction
   }
 
   const getFactionUnitConfig = (
@@ -260,21 +250,21 @@ export function createGameData(options: CreateGameDataOptions): GameData {
       const external = { ...entry, slot: EXTERNAL_SLOT }
       if (!isAvailable(external, factionKey)) continue
       shown.add(entry.key)
-      const icon = gameData.factions[entry.factionKey]?.icon
+      const icon = factions[entry.factionKey]?.icon
       result.push({ ...external, ...(icon && { icon }) })
     }
 
     return result
   }
 
-  const gameData: GameData = {
+  return {
     id: options.id,
     label: options.label,
     slots: options.slots,
     defaultFaction: Object.keys(options.factions)[0] ?? 'NEUTRAL',
-    factions: {},
+    factions,
     baseUnits: options.units,
-    allAbilities: [],
+    allAbilities,
     getAbilities,
     getFaction,
     getFactionUnitConfig,
@@ -282,38 +272,4 @@ export function createGameData(options: CreateGameDataOptions): GameData {
     getUnitDefinitionAbilityKeys,
     getFactionOwnedAbilityKeys,
   }
-
-  resolveFactions(gameData, options.factions, factions => {
-    // Install static abilities before lazy factions read them, then rebuild
-    // in the complete roster's order so invoke resolution keeps that order.
-    collected.length = sharedCount
-    for (const [factionKey, faction] of Object.entries(factions)) {
-      for (const group of Object.keys(faction.abilities ?? {})) {
-        if (
-          slots.some(config =>
-            typeof config.slot === 'string'
-              ? config.slot === factionSlot(group)
-              : config.slot.includes(factionSlot(group)),
-          )
-        )
-          continue
-        throw new Error(
-          `Faction ability group "${group}" on "${factionKey}" is not supported by ${options.id}`,
-        )
-      }
-      collectFaction(factionKey, faction)
-    }
-
-    const allAbilities: RegisteredAbility[] = []
-    const seenKeys = new Set<string>()
-    for (const entry of collected) {
-      if (seenKeys.has(entry.key)) continue
-      seenKeys.add(entry.key)
-      allAbilities.push(entry)
-    }
-
-    Object.assign(gameData, { allAbilities })
-  })
-
-  return gameData
 }

@@ -33,10 +33,7 @@ export const proximaTargetingVi: Ability<Params> = {
     bombardmentMinGalvanized: 0,
   },
   headerUI: 'isEnabled',
-  uiConfig: ctx => {
-    const { resolveBombardment } = ctx.api.own.getAbilityConfig(
-      'PROXIMA_TARGETING_VI',
-    )
+  uiConfig: (_ctx, { resolveBombardment }) => {
     return [
       {
         key: 'resolveBombardment',

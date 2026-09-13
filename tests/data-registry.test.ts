@@ -4,7 +4,7 @@ import type { Ability } from '@/combat'
 import { createGameData } from '@/data/create-game-data'
 import { SLOTS as MAIN_SLOTS } from '@/data/main/ability-slots'
 import { SLOTS as TF_SLOTS } from '@/data/tf/ability-slots'
-import type { FactionAbilities, FactionDefinition, GameData } from '@/types'
+import type { FactionAbilities, FactionDefinition, LazyContext } from '@/types'
 import { getGameData } from '@/utils/get-game-data'
 
 const agentA: Ability = {
@@ -27,27 +27,33 @@ describe('GameData faction resolution', () => {
     units: {},
     abilities: staticAbilities,
   }
-  let resolvingGameData: GameData | undefined
+  const contexts: LazyContext[] = []
   const lazyOne: FactionDefinition = {
     name: 'Lazy one',
     units: {
       FLAGSHIP: {
-        BASE: { ABILITIES: data => [...data.getAbilities('FACTION_AGENT')] },
+        BASE: {
+          ABILITIES: context => {
+            contexts.push(context)
+            return [...context.getAbilities('FACTION_AGENT')]
+          },
+        },
       },
     },
-    abilities: data => {
-      resolvingGameData = data
-      return { technology: [...data.getAbilities('TECHNOLOGY')] }
+    abilities: context => {
+      contexts.push(context)
+      return { technology: [...context.getAbilities('TECHNOLOGY')] }
     },
   }
-  let seenByTwo: string[] = []
   let abilityKeysSeenByTwo: string[] = []
   const lazyTwo: FactionDefinition = {
     name: 'Lazy two',
     units: {},
-    abilities: data => {
-      seenByTwo = Object.keys(data.factions)
-      abilityKeysSeenByTwo = data.allAbilities.map(ability => ability.key)
+    abilities: context => {
+      contexts.push(context)
+      abilityKeysSeenByTwo = context
+        .getAbilities('FACTION_AGENT')
+        .map(ability => ability.key)
       return {}
     },
   }
@@ -62,7 +68,7 @@ describe('GameData faction resolution', () => {
   })
   const resolved = gameData.factions
 
-  it('resolves lazy abilities and unit ABILITIES from GameData', () => {
+  it('resolves lazy abilities and unit ABILITIES through the context', () => {
     expect(resolved.L.abilities?.technology).toMatchObject([
       { ...techT, slot: 'TECHNOLOGY' },
     ])
@@ -71,13 +77,19 @@ describe('GameData faction resolution', () => {
     ])
   })
 
-  it('passes the exported GameData entity to lazy definitions', () => {
-    expect(resolvingGameData).toBe(gameData)
-  })
-
-  it('exposes only static factions while lazy definitions resolve', () => {
-    expect(seenByTwo).toEqual(['S'])
-    expect(abilityKeysSeenByTwo).toEqual(['TECH_T', 'AGENT_A'])
+  it('shares a separate context containing only the dependency lookups', () => {
+    expect(contexts).toHaveLength(3)
+    for (const context of contexts) {
+      expect(context).toBe(contexts[0])
+      expect(context).not.toBe(gameData)
+      expect(Object.keys(context).sort()).toEqual([
+        'getAbilities',
+        'getFaction',
+        'getFactionKeys',
+      ])
+      expect(context.getFactionKeys()).toEqual(['S', 'L', 'M'])
+    }
+    expect(abilityKeysSeenByTwo).toEqual(['AGENT_A'])
   })
 
   it('returns registered entries once despite multiple presentation slots', () => {

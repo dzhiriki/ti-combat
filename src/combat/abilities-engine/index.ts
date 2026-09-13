@@ -16,6 +16,7 @@ export {
 export { abilityUtils } from './api/ability-utils'
 export { collectFreeCargo } from './api/collect-free-cargo'
 export { enforceFleetPool } from './api/enforce-fleet-pool'
+export { cloneAbility } from './clone-ability'
 export { declareParam, isDeclaredParam } from './declare-param'
 export { hasStaticInvokes, resolveInvokes } from './resolve-invokes'
 export { createLookups, createRuntimeAbilityList } from './runtime-ability-list'

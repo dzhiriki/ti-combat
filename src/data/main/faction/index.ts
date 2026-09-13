@@ -33,7 +33,7 @@ import { xxcha_kingdom } from './xxcha_kingdom'
 import { yin_brotherhood } from './yin_brotherhood'
 import { yssaril_tribes } from './yssaril_tribes'
 
-export default {
+const factions: Record<string, FactionDefinition> = {
   ARBOREC: arborec,
   ARGENT_FLIGHT: argent_flight,
   BARONY_OF_LETNEV: barony_of_letnev,
@@ -66,4 +66,6 @@ export default {
   YIN_BROTHERHOOD: yin_brotherhood,
   YSSARIL_TRIBES: yssaril_tribes,
   NEUTRAL: neutral,
-} satisfies Record<string, FactionDefinition>
+}
+
+export default factions

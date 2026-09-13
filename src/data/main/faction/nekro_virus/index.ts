@@ -1,8 +1,8 @@
 import nekroVirusIcon from '@/assets/faction/nekro_virus.svg?raw'
 import {
   type Ability,
+  cloneAbility,
   createRuntimeAbilityList,
-  hasStaticInvokes,
   resolveInvokes,
 } from '@/combat'
 import type {
@@ -14,15 +14,14 @@ import { sustainDamage } from '@/data/main/abilities/general/sustain-damage'
 import type {
   Faction,
   FactionDefinition,
-  GameData,
+  LazyContext,
   UnitBaseType,
   UnitDefinition,
 } from '@/types'
 import { getEffectiveStats } from '@/utils/get-simulation-units'
 
-import { createGenericUnitUpgrades } from './generic-unit-upgrades'
 import { mordred } from './mordred'
-import { createTechnologicalSingularity } from './technological-singularity'
+import { technologicalSingularity } from './technological-singularity'
 import { theAlastor } from './the-alastor'
 
 // ---------------------------------------------------------------------------
@@ -61,7 +60,7 @@ function createFactionUnitAbility(
     ? {
         ...stats,
         ABILITIES: stats.ABILITIES!.map(a =>
-          a === mainAbility ? { ...a, key } : a,
+          a === mainAbility ? cloneAbility(a, { key }) : a,
         ),
       }
     : stats
@@ -138,73 +137,34 @@ function createFactionUnitAbility(
 }
 
 // ---------------------------------------------------------------------------
-// Collect and memoize copies made from the game data's faction roster
+// Collect and memoize faction technologies and faction-unit stat copies
 // ---------------------------------------------------------------------------
 
-interface NekroCopies {
-  flagship: Ability[]
-  technology: Ability[]
-  unit: Ability[]
-  singularity: Ability
-}
-
-const copiesByGameData = new WeakMap<GameData, NekroCopies>()
-
-function collect(gameData: GameData): NekroCopies {
-  const cached = copiesByGameData.get(gameData)
-  if (cached) return cached
-
-  const others = gameData.factions
-  // Flagship text that only restates a GENERAL toggle (Sustain Damage) is
-  // already configurable there — don't copy it.
-  const generalKeys = new Set(
-    gameData.getAbilities('GENERAL').map(ability => ability.key),
-  )
-
-  const flagship = Object.values(others).flatMap(faction =>
-    (faction.units.FLAGSHIP?.BASE?.ABILITIES ?? [])
-      .filter(a => !generalKeys.has(a.key))
-      .map(ability => ({
-        ...ability,
-        key: `NEKRO_FLAGSHIP_${ability.key}`,
-        name: ability.name,
-        icon: faction.icon,
-        readOnly: false,
-        // Clone the invoke entries so each copy has its own references — the
-        // engine dedups "already invoked" by invoke identity, and originals
-        // with external invokes can share a side with this copy via the
-        // OTHER slot (same fix as the technology copies below).
-        invoke: hasStaticInvokes(ability)
-          ? ability.invoke.map(inv => ({ ...inv }))
-          : ability.invoke,
-        params: {
-          ...ability.params,
-          isEnabled: ability.headerUI === 'isEnabled' ? false : true,
-        },
-      })),
-  )
-
-  const technology = Object.values(others).flatMap(faction =>
-    (faction.abilities?.technology ?? []).map(ability => {
-      const external =
-        hasStaticInvokes(ability) &&
-        ability.invoke.some(inv => inv.external === true)
-      return {
-        ...ability,
-        // External techs keep both the original and Nekro's copy visible.
-        // Rename the copy so the two entries don't dedup, and shallow-clone
-        // the invoke entries so each copy has its own references — the
-        // engine tracks "already invoked" by invoke object identity.
-        key: external ? `NEKRO_${ability.key}` : ability.key,
-        invoke:
-          external && hasStaticInvokes(ability)
-            ? ability.invoke.map(inv => ({ ...inv }))
-            : ability.invoke,
-        name: ability.name,
-        icon: faction.icon,
-      }
+function copyFlagshipAbilities(context: LazyContext): Ability[] {
+  return context.getAbilities('FACTION_FLAGSHIP').map(ability =>
+    cloneAbility(ability, {
+      key: `NEKRO_FLAGSHIP_${ability.key}`,
+      readOnly: false,
+      params: {
+        ...ability.params,
+        isEnabled: ability.headerUI === 'isEnabled' ? false : true,
+      },
     }),
   )
+}
+
+function createCopies(context: LazyContext) {
+  const others = Object.fromEntries(
+    context
+      .getFactionKeys()
+      .filter(key => key !== 'NEKRO_VIRUS')
+      .map(key => [key, context.getFaction(key)]),
+  )
+  const technology = context.getAbilities('FACTION_TECHNOLOGY').map(ability => {
+    return cloneAbility(ability, {
+      key: `NEKRO_${ability.key}`,
+    })
+  })
 
   const unit = Object.entries(others)
     .filter(([factionKey]) => factionKey !== 'NEUTRAL')
@@ -216,56 +176,7 @@ function collect(gameData: GameData): NekroCopies {
         ),
     )
 
-  // Conflict map for generic unit upgrades: each unit type maps to the
-  // list of faction-unit ability keys that target the same unit type. If
-  // any such ability is enabled at fire time, the generic upgrade is
-  // skipped (e.g. Letani II already overrode INFANTRY).
-  const genericUpgradeConflicts: Partial<Record<UnitBaseType, string[]>> = {}
-  for (const a of unit) {
-    const ut = a.exclusiveGroup as UnitBaseType | undefined
-    if (!ut) continue
-    ;(genericUpgradeConflicts[ut] ??= []).push(a.key)
-  }
-  const genericUnitUpgrades = createGenericUnitUpgrades(
-    gameData.baseUnits,
-    genericUpgradeConflicts,
-  )
-
-  const taggedGenericTechs = gameData
-    .getAbilities('TECHNOLOGY')
-    .map(a => ({ ability: a, subcategory: 'TECHNOLOGY' as const }))
-  const taggedUnitUpgrades = genericUnitUpgrades.map(a => ({
-    ability: a,
-    subcategory: 'UNIT_UPGRADE' as const,
-  }))
-  const taggedTechnologies = technology.map(a => ({
-    ability: a,
-    subcategory: 'FACTION_TECHNOLOGY' as const,
-  }))
-  const taggedUnits = unit.map(a => ({
-    ability: a,
-    subcategory: 'FACTION_UNIT' as const,
-  }))
-  const taggedFlagships = flagship.map(a => ({
-    ability: a,
-    subcategory: 'FLAGSHIP' as const,
-  }))
-
-  const singularity = createTechnologicalSingularity(
-    [
-      ...taggedGenericTechs,
-      ...taggedUnitUpgrades,
-      ...taggedTechnologies,
-      ...taggedUnits,
-      ...taggedFlagships,
-    ],
-    [...taggedTechnologies, ...taggedUnits],
-    mordred,
-  )
-
-  const copies = { flagship, technology, unit, singularity }
-  copiesByGameData.set(gameData, copies)
-  return copies
+  return { technology, unit }
 }
 
 // ---------------------------------------------------------------------------
@@ -275,8 +186,8 @@ function collect(gameData: GameData): NekroCopies {
 export const nekro_virus: FactionDefinition = {
   name: 'Nekro Virus',
   icon: nekroVirusIcon,
-  abilities: gameData => {
-    const { singularity, technology, unit } = collect(gameData)
+  abilities: context => {
+    const { technology, unit } = createCopies(context)
     // A copied unit ability joins the slot of the unit type it upgrades, so
     // it renders next to Nekro's own units: `exclusiveGroup` is that type.
     const unitGroups: Record<string, Ability[]> = {}
@@ -284,7 +195,7 @@ export const nekro_virus: FactionDefinition = {
       const group = String(ability.exclusiveGroup).toLowerCase()
       ;(unitGroups[group] ??= []).push(ability)
     }
-    return { ability: [singularity], technology, ...unitGroups }
+    return { ability: [technologicalSingularity], technology, ...unitGroups }
   },
   units: {
     FLAGSHIP: {
@@ -300,11 +211,9 @@ export const nekro_virus: FactionDefinition = {
         UNIT_ABILITIES: {
           SUSTAIN_DAMAGE: true,
         },
-        ABILITIES: gameData => [
-          theAlastor,
-          sustainDamage,
-          ...collect(gameData).flagship,
-        ],
+        ABILITIES: context => {
+          return [theAlastor, sustainDamage, ...copyFlagshipAbilities(context)]
+        },
       },
     },
     MECH: {

@@ -1,19 +1,19 @@
-import { hasStaticInvokes } from '@/combat'
+import { resolveInvokes } from '@/combat'
 import { extractDefaults } from '@/combat/abilities-engine/declare-param'
 import type {
   Ability,
   AbilityCallContext,
+  AbilityLookupContext,
   AbilityReadContext,
   SelectGroup,
   SelectItem,
 } from '@/combat/abilities-engine/types'
+import baseUnits from '@/data/main/base-units'
+import type { UnitBaseType } from '@/types'
 
-type SingularityAbilityEntry = {
-  key: string
-  name: string
-  subcategory?: string
-  prepareCalls: ((ctx: AbilityCallContext, ...rest: unknown[]) => void)[]
-}
+import { createGenericUnitUpgrades } from './generic-unit-upgrades'
+
+const NONE = 'none'
 
 type TSParams = {
   enableAbilityKey: string
@@ -23,242 +23,204 @@ type TSParams = {
   opponentDestroyed?: boolean
 }
 
-type TaggedAbility = {
-  ability: Ability
-  subcategory:
-    | 'TECHNOLOGY'
-    | 'UNIT_UPGRADE'
-    | 'FACTION_TECHNOLOGY'
-    | 'FACTION_UNIT'
-    | 'FLAGSHIP'
+interface AbilityGroup {
+  group: string
+  abilities: readonly Ability[]
 }
 
-export function createTechnologicalSingularity(
-  enableAbilityList: TaggedAbility[],
-  disableAbilityList: TaggedAbility[],
-  mordredAbility: Ability,
-): Ability<TSParams> {
-  const NONE = 'none'
-  const enableAbilities = enableAbilityList.map(t =>
-    collectInvokes(t.ability, t.subcategory),
+function getAbilityGroups(
+  ctx: AbilityLookupContext,
+  action: 'enable' | 'disable',
+): AbilityGroup[] {
+  const units = ctx.abilities.own.all.filter(ability =>
+    ability.key.startsWith('NEKRO_UNIT_'),
   )
-  const disableAbilities = disableAbilityList.map(t =>
-    collectInvokes(t.ability, t.subcategory),
-  )
-
-  const abilityLookup = new Map<string, SingularityAbilityEntry>(
-    [...enableAbilities, ...disableAbilities].map(e => [e.key, e]),
-  )
-
-  // Map of enable-list keys → original ability, used to forward
-  // declareParamChange / declareSubtype at setup so the picked ability's
-  // declarations propagate (e.g. Hel Titan II → PDS as ground force).
-  const enableAbilityByKey = new Map<string, Ability>(
-    enableAbilityList.map(t => [t.ability.key, t.ability]),
-  )
-
-  const mordredEntry = collectInvokes(mordredAbility)
-
-  return {
-    key: 'TECHNOLOGICAL_SINGULARITY',
-    name: 'Technological Singularity',
-    description:
-      "Once per combat, after 1 of your opponent's units is destroyed, you may gain 1 technology that is owned by that player.",
-    params: {
-      isEnabled: false,
-      uses: Infinity,
-      enableAbilityKey: NONE,
-      disableAbilityKey: NONE,
-      enableMordred: false,
-      disableMordred: false,
+  const factionGroups: AbilityGroup[] = [
+    {
+      group: 'Faction Technology',
+      abilities: ctx.abilities.own.get('FACTION_TECHNOLOGY'),
     },
-    headerUI: 'isEnabled',
-    declareParamChange: (params, settings, ctx) => {
-      if (!params.isEnabled) return []
-      if (params.enableAbilityKey === NONE) return []
-      const target = enableAbilityByKey.get(params.enableAbilityKey)
-      if (!target?.declareParamChange) return []
-      const synth = {
-        ...extractDefaults(target),
-        [target.headerUI ?? 'isEnabled']: true,
-      } as Parameters<NonNullable<typeof target.declareParamChange>>[0]
-      return target.declareParamChange(synth, settings, {
-        abilities: ctx.abilities,
-        this: target,
-      })
+    { group: 'Faction Unit', abilities: units },
+  ]
+  if (action === 'disable') return factionGroups
+
+  // Generic upgrades are selectable only through Singularity, not registered
+  // cards. Their conflicts come from the copies available in this context.
+  const conflicts: Partial<Record<UnitBaseType, string[]>> = {}
+  for (const ability of units) {
+    const type = ability.exclusiveGroup as UnitBaseType | undefined
+    if (type) (conflicts[type] ??= []).push(ability.key)
+  }
+  return [
+    { group: 'Technology', abilities: ctx.abilities.own.get('TECHNOLOGY') },
+    {
+      group: 'Unit Upgrade',
+      abilities: createGenericUnitUpgrades(baseUnits, conflicts),
     },
-    uiConfig: ctx => {
-      const disableGroups = buildSelectGroups(
-        disableAbilities,
-        ctx,
-        enabled => enabled,
-      )
-      const mordredEnabled = !!ctx.api.own.getAbilityConfig(
-        'MORDRED' as keyof AbilityConfigMap,
-      )?.isEnabled
-      return [
-        {
-          key: 'enableAbilityKey' as const,
-          label: 'Enable ability',
-          type: 'select' as const,
-          items: [
-            { label: 'None', value: NONE } satisfies SelectItem,
-            ...buildSelectGroups(enableAbilities, ctx, enabled => !enabled),
-          ],
-        },
-        ...(disableGroups.length > 0
-          ? [
-              {
-                key: 'disableAbilityKey' as const,
-                label: 'Disable ability',
-                type: 'select' as const,
-                items: [
-                  { label: 'None', value: NONE } satisfies SelectItem,
-                  ...disableGroups,
-                ],
-              },
-            ]
-          : []),
-        mordredEnabled
-          ? {
-              key: 'disableMordred' as const,
-              label: 'Disable Mordred',
-              type: 'checkbox' as const,
-            }
-          : {
-              key: 'enableMordred' as const,
-              label: 'Enable Mordred',
-              type: 'checkbox' as const,
-            },
-      ]
+    ...factionGroups,
+    {
+      group: 'Flagship',
+      abilities: ctx.abilities.own
+        .get('FACTION_FLAGSHIP')
+        .filter(ability => ability.key.startsWith('NEKRO_FLAGSHIP_')),
     },
-    onParamSet: (currentParams, key, value) => {
-      if (
-        key === 'enableAbilityKey' &&
-        value !== NONE &&
-        value === currentParams.disableAbilityKey
-      ) {
-        return { ...currentParams, disableAbilityKey: NONE }
-      }
-      if (
-        key === 'disableAbilityKey' &&
-        value !== NONE &&
-        value === currentParams.enableAbilityKey
-      ) {
-        return { ...currentParams, enableAbilityKey: NONE }
-      }
-      return currentParams
-    },
-    invoke: [
+  ]
+}
+
+function findAbility(
+  ctx: AbilityLookupContext,
+  key: string,
+): Ability | undefined {
+  for (const group of getAbilityGroups(ctx, 'enable')) {
+    const ability = group.abilities.find(ability => ability.key === key)
+    if (ability) return ability
+  }
+}
+
+export const technologicalSingularity: Ability<TSParams> = {
+  key: 'TECHNOLOGICAL_SINGULARITY',
+  name: 'Technological Singularity',
+  description:
+    "Once per combat, after 1 of your opponent's units is destroyed, you may gain 1 technology that is owned by that player.",
+  params: {
+    isEnabled: false,
+    uses: Infinity,
+    enableAbilityKey: NONE,
+    disableAbilityKey: NONE,
+    enableMordred: false,
+    disableMordred: false,
+  },
+  headerUI: 'isEnabled',
+  declareParamChange: (params, settings, ctx) => {
+    if (!params.isEnabled || params.enableAbilityKey === NONE) return []
+    const target = findAbility(ctx, params.enableAbilityKey)
+    if (!target?.declareParamChange) return []
+    const synth = {
+      ...extractDefaults(target),
+      [target.headerUI ?? 'isEnabled']: true,
+    } as Parameters<NonNullable<typeof target.declareParamChange>>[0]
+    return target.declareParamChange(synth, settings, {
+      abilities: ctx.abilities,
+      this: target,
+    })
+  },
+  uiConfig: ctx => {
+    const disableGroups = buildSelectGroups(
+      getAbilityGroups(ctx, 'disable'),
+      ctx,
+      true,
+    )
+    const mordredEnabled = !!ctx.api.own.getAbilityConfig(
+      'MORDRED' as keyof AbilityConfigMap,
+    )?.isEnabled
+    return [
       {
-        timing: 'AFTER_DESTROY',
-        context: ['SPACE_COMBAT', 'GROUND_COMBAT'],
-        isCallable: (params, ctx, ids) => {
-          if (params.opponentDestroyed) return false
-          return ids.some(id => !!ctx.api.opponent.getUnitVariantKey(id))
-        },
-        call: (ctx, params) => {
-          ctx.api.own.updateAbilityConfig({ opponentDestroyed: true })
-
-          // Run disables first so their reset reverts don't overwrite
-          // newly applied PREPARE stats
-          if (params.disableAbilityKey !== NONE) {
-            const config = ctx.api.own.getAbilityConfig(
-              params.disableAbilityKey as keyof AbilityConfigMap,
-            ) as unknown as { reset: (ctx: AbilityCallContext) => void }
-            if (config.reset) {
-              config.reset(ctx)
-            }
-          }
-
-          if (params.enableAbilityKey !== NONE) {
-            const entry = abilityLookup.get(params.enableAbilityKey)
-            if (entry) {
-              const abilityParams =
-                ctx.api.own.getAbilityConfig(
-                  entry.key as keyof AbilityConfigMap,
-                ) ?? {}
-              for (const call of entry.prepareCalls) call(ctx, abilityParams)
-              ctx.api.own.updateAbilityConfig(params.enableAbilityKey, {
-                isEnabled: true,
-              })
-            }
-          }
-
-          if (params.enableMordred) {
-            for (const call of mordredEntry.prepareCalls)
-              call(
-                ctx,
-                ctx.api.own.getAbilityConfig(
-                  'MORDRED' as keyof AbilityConfigMap,
-                ) ?? {},
-              )
-            ctx.api.own.updateAbilityConfig('MORDRED', { isEnabled: true })
-          }
-          if (params.disableMordred) {
-            ctx.api.own.updateAbilityConfig('MORDRED', { isEnabled: false })
-          }
-        },
+        key: 'enableAbilityKey',
+        label: 'Enable ability',
+        type: 'select',
+        items: [
+          { label: 'None', value: NONE } satisfies SelectItem,
+          ...buildSelectGroups(getAbilityGroups(ctx, 'enable'), ctx, false),
+        ],
       },
-    ],
-  }
+      ...(disableGroups.length > 0
+        ? [
+            {
+              key: 'disableAbilityKey' as const,
+              label: 'Disable ability',
+              type: 'select' as const,
+              items: [
+                { label: 'None', value: NONE } satisfies SelectItem,
+                ...disableGroups,
+              ],
+            },
+          ]
+        : []),
+      mordredEnabled
+        ? { key: 'disableMordred', label: 'Disable Mordred', type: 'checkbox' }
+        : { key: 'enableMordred', label: 'Enable Mordred', type: 'checkbox' },
+    ]
+  },
+  onParamSet: (currentParams, key, value) => {
+    if (
+      key === 'enableAbilityKey' &&
+      value !== NONE &&
+      value === currentParams.disableAbilityKey
+    ) {
+      return { ...currentParams, disableAbilityKey: NONE }
+    }
+    if (
+      key === 'disableAbilityKey' &&
+      value !== NONE &&
+      value === currentParams.enableAbilityKey
+    ) {
+      return { ...currentParams, enableAbilityKey: NONE }
+    }
+    return currentParams
+  },
+  invoke: [
+    {
+      timing: 'AFTER_DESTROY',
+      context: ['SPACE_COMBAT', 'GROUND_COMBAT'],
+      isCallable: (params, ctx, ids) => {
+        if (params.opponentDestroyed) return false
+        return ids.some(id => !!ctx.api.opponent.getUnitVariantKey(id))
+      },
+      call: (ctx, params) => {
+        ctx.api.own.updateAbilityConfig({ opponentDestroyed: true })
+
+        // Run disables first so their resets do not overwrite newly gained stats.
+        if (params.disableAbilityKey !== NONE) {
+          const config = ctx.api.own.getAbilityConfig(
+            params.disableAbilityKey as keyof AbilityConfigMap,
+          ) as { reset?: (ctx: AbilityCallContext) => void } | undefined
+          config?.reset?.(ctx)
+        }
+
+        if (params.enableAbilityKey !== NONE) {
+          const ability = findAbility(ctx, params.enableAbilityKey)
+          if (ability) {
+            applyPrepare(ability, ctx)
+            ctx.api.own.updateAbilityConfig(ability.key, { isEnabled: true })
+          }
+        }
+
+        if (params.enableMordred) {
+          ctx.api.own.updateAbilityConfig('MORDRED', { isEnabled: true })
+        }
+
+        if (params.disableMordred) {
+          ctx.api.own.updateAbilityConfig('MORDRED', { isEnabled: false })
+        }
+      },
+    },
+  ],
 }
 
-function collectInvokes(
-  ability: Ability,
-  subcategory?:
-    | 'TECHNOLOGY'
-    | 'UNIT_UPGRADE'
-    | 'FACTION_TECHNOLOGY'
-    | 'FACTION_UNIT'
-    | 'FLAGSHIP'
-    | 'ABILITY',
-): SingularityAbilityEntry {
-  const prepareCalls: ((
-    ctx: AbilityCallContext,
-    ...rest: unknown[]
-  ) => void)[] = []
-  if (hasStaticInvokes(ability)) {
-    for (const inv of ability.invoke) {
-      if (inv.timing === 'PREPARE')
-        prepareCalls.push(
-          inv.call as (ctx: AbilityCallContext, ...rest: unknown[]) => void,
-        )
-    }
-  }
-  return {
-    key: ability.key,
-    name: ability.name,
-    subcategory,
-    prepareCalls,
+function applyPrepare(ability: Ability, ctx: AbilityCallContext): void {
+  const params = (ctx.api.own.getAbilityConfig(
+    ability.key as keyof AbilityConfigMap,
+  ) ?? {}) as Record<string, unknown>
+  for (const invoke of resolveInvokes(ability, params, ctx)) {
+    if (invoke.timing !== 'PREPARE') continue
+    invoke.call(ctx, params)
   }
 }
 
 function buildSelectGroups(
-  entries: SingularityAbilityEntry[],
+  groups: AbilityGroup[],
   ctx: AbilityReadContext,
-  filter: (isEnabled: boolean) => boolean,
+  enabled: boolean,
 ): SelectGroup[] {
-  const SUBCATEGORY_LABELS: Record<string, string> = {
-    TECHNOLOGY: 'Technology',
-    UNIT_UPGRADE: 'Unit Upgrade',
-    FACTION_TECHNOLOGY: 'Faction Technology',
-    FACTION_UNIT: 'Faction Unit',
-    FLAGSHIP: 'Flagship',
-  }
-  const grouped = new Map<string, { label: string; value: string }[]>()
-  for (const entry of entries) {
-    const config = ctx.api.own.getAbilityConfig(
-      entry.key as keyof AbilityConfigMap,
-    )
-    const isEnabled = !!config?.isEnabled
-    if (!filter(isEnabled)) continue
-    const sub = entry.subcategory ?? 'ABILITY'
-    if (!grouped.has(sub)) grouped.set(sub, [])
-    grouped.get(sub)!.push({ label: entry.name, value: entry.key })
-  }
-  return [...grouped.entries()].map(([sub, items]) => ({
-    group: SUBCATEGORY_LABELS[sub] ?? sub,
-    items,
-  }))
+  return groups.flatMap(({ group, abilities }) => {
+    const items = abilities
+      .filter(ability => {
+        const config = ctx.api.own.getAbilityConfig(
+          ability.key as keyof AbilityConfigMap,
+        )
+        return !!config?.isEnabled === enabled
+      })
+      .map(ability => ({ label: ability.name, value: ability.key }))
+    return items.length > 0 ? [{ group, items }] : []
+  })
 }

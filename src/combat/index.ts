@@ -9,6 +9,7 @@ export {
   type AbilityReadContext,
   type AbilityTiming,
   abilityUtils,
+  cloneAbility,
   collectFreeCargo,
   createLookups,
   createRuntimeAbilityList,

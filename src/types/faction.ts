@@ -1,6 +1,5 @@
-import type { Ability } from '@/combat'
+import type { Ability, RegisteredAbility } from '@/combat'
 
-import type { GameData } from './game-data'
 import type { UnitBaseType, UnitDefinition, UnitDefinitionInput } from './unit'
 
 // Game systems the calculator supports. TI4 is the base + expansions
@@ -19,10 +18,15 @@ export interface Faction {
   abilities?: FactionAbilities
 }
 
-/** Lazy definitions receive the same GameData entity exported by the system.
- *  While factions are resolving, its `factions` lookup intentionally exposes
- *  only static factions. */
-export type Lazy<T> = T | ((gameData: GameData) => T)
+/** Dependency lookups shared by all lazy fields in one system construction. */
+export interface LazyContext {
+  getFactionKeys(): readonly string[]
+  getFaction(key: string): Faction
+  getAbilities(slot: string): readonly RegisteredAbility[]
+}
+
+/** Lookup calls recursively initialize the requested faction or slot. */
+export type Lazy<T> = T | ((context: LazyContext) => T)
 
 /** Authoring shape of a faction module. Resolved to `Faction` by the system
  *  index; nothing outside `src/data` sees it. */

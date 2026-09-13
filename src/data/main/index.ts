@@ -14,7 +14,7 @@ import factions from './faction'
 // complete GameData entry point; code outside `src/data` selects it through
 // `getGameData` rather than importing system internals.
 
-// Lazy faction definitions (Nekro) resolve against this same GameData entity.
+// Lazy faction definitions (Nekro) resolve through faction and slot lookups.
 const gameData = createGameData({
   id: 'TI4',
   label: 'Twilight Imperium',

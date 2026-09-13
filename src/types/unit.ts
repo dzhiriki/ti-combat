@@ -57,8 +57,8 @@ export interface UnitDefinition {
   UPGRADED?: Partial<UnitStats>
 }
 
-/** Authoring shape of a unit's stats: `ABILITIES` may be computed from the
- *  system's GameData. Resolved to `UnitStats` by the system entry point. */
+/** Authoring shape of a unit's stats: `ABILITIES` may be computed through the
+ *  lazy context. Resolved to `UnitStats` by the system entry point. */
 export type UnitStatsInput = Omit<UnitStats, 'ABILITIES'> & {
   ABILITIES?: Lazy<readonly Ability[]>
 }

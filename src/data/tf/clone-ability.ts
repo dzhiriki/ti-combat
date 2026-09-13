@@ -1,4 +1,8 @@
-import { type Ability, hasStaticInvokes, isDeclaredParam } from '@/combat'
+import {
+  type Ability,
+  cloneAbility as cloneBaseAbility,
+  isDeclaredParam,
+} from '@/combat'
 
 // Twilight's Fall replaces TI4's faction-locked kit with shared draw decks —
 // Abilities, Genomes, Paradigms, Action Cards, Unit Upgrades — that any TF
@@ -20,18 +24,8 @@ export function cloneAbility(
   ability: Ability,
   overrides: Partial<Ability> & { key: string },
 ): Ability {
-  const cloned: Ability = {
-    ...ability,
-    invoke: hasStaticInvokes(ability)
-      ? ability.invoke.map(inv => ({ ...inv }))
-      : ability.invoke,
-    ...overrides,
-    params: rekeySubtypeSources(
-      overrides.params ?? ability.params,
-      ability.key,
-      overrides.key,
-    ),
-  }
+  const cloned = cloneBaseAbility(ability, overrides)
+  cloned.params = rekeySubtypeSources(cloned.params, ability.key, overrides.key)
   // TF abilities are optional draws from a shared deck — unlike their TI4
   // counterparts, none are always-on. Strip read-only locks and, unless the
   // card is a uses-counter (0 = unused), give it a simple on/off toggle that
