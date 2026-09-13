@@ -1,5 +1,3 @@
-import type { UnitDefinition } from '@/types'
-
 import { createGameData } from '../create-game-data'
 import actionCard from './abilities/action-card'
 import advanced from './abilities/advanced'
@@ -9,7 +7,7 @@ import general from './abilities/general'
 import relic from './abilities/relic'
 import technology from './abilities/technology'
 import { SLOTS } from './ability-slots'
-import baseUnits from './base-units'
+import units from './base-units'
 import factions from './faction'
 
 // Twilight Imperium 4 (base + expansions). This module default-exports its
@@ -21,9 +19,7 @@ const gameData = createGameData({
   id: 'TI4',
   label: 'Twilight Imperium',
   factions,
-  // base-units' literal COMBAT: number[] doesn't structurally match
-  // DiceGroup's tuple type, so the cast needs an `unknown` bridge.
-  units: baseUnits as unknown as Readonly<Record<string, UnitDefinition>>,
+  units,
   abilities: {
     GENERAL: general,
     ADVANCED: advanced,

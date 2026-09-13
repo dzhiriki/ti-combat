@@ -1,14 +1,16 @@
 import { planetaryShield } from '@/data/main/abilities/general/planetary-shield'
 import { sustainDamage } from '@/data/main/abilities/general/sustain-damage'
+import type { UnitBaseType, UnitDefinition } from '@/types'
 
 // Generic unit roster for Twilight's Fall. Stats mirror the base TI4 units,
 // with two differences:
 //   1. War Suns are part of the default roster (any faction can field them)
 //      rather than being gated behind a faction like the Embers of Muaat.
 //   2. There are no generic unit upgrades (Cruiser II, etc.). Twilight's Fall
-//      uses a separate deck of unit-upgrade cards, so every UPGRADED slot is
-//      null here; upgrades are layered in separately.
-const tfBaseUnits = {
+//      uses a separate deck of unit-upgrade cards, so no unit declares an
+//      UPGRADED block; upgrades are layered in separately.
+// Flagships and mechs are faction-specific, so the generic roster has none.
+const tfBaseUnits: Partial<Record<UnitBaseType, UnitDefinition>> = {
   WAR_SUN: {
     BASE: {
       COST: 12,
@@ -22,7 +24,6 @@ const tfBaseUnits = {
       },
       ABILITIES: [sustainDamage],
     },
-    UPGRADED: null,
   },
   CRUISER: {
     BASE: {
@@ -33,7 +34,6 @@ const tfBaseUnits = {
       CAPACITY: null,
       UNIT_ABILITIES: {},
     },
-    UPGRADED: null,
   },
   DREADNOUGHT: {
     BASE: {
@@ -48,7 +48,6 @@ const tfBaseUnits = {
       },
       ABILITIES: [sustainDamage],
     },
-    UPGRADED: null,
   },
   DESTROYER: {
     BASE: {
@@ -61,7 +60,6 @@ const tfBaseUnits = {
         AFB: [9, 2],
       },
     },
-    UPGRADED: null,
   },
   PDS: {
     BASE: {
@@ -75,7 +73,6 @@ const tfBaseUnits = {
       },
       ABILITIES: [planetaryShield],
     },
-    UPGRADED: null,
   },
   CARRIER: {
     BASE: {
@@ -86,7 +83,6 @@ const tfBaseUnits = {
       CAPACITY: 4,
       UNIT_ABILITIES: {},
     },
-    UPGRADED: null,
   },
   FIGHTER: {
     BASE: {
@@ -97,7 +93,6 @@ const tfBaseUnits = {
       CAPACITY_COST: 1,
       UNIT_ABILITIES: {},
     },
-    UPGRADED: null,
   },
   INFANTRY: {
     BASE: {
@@ -108,7 +103,6 @@ const tfBaseUnits = {
       CAPACITY_COST: 1,
       UNIT_ABILITIES: {},
     },
-    UPGRADED: null,
   },
   SPACE_DOCK: {
     BASE: {
@@ -118,7 +112,6 @@ const tfBaseUnits = {
       CAPACITY: null,
       UNIT_ABILITIES: {},
     },
-    UPGRADED: null,
   },
 }
 

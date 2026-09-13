@@ -4,8 +4,6 @@ import environment from '@/data/main/abilities/environment'
 import general from '@/data/main/abilities/general'
 import relic from '@/data/main/abilities/relic'
 
-import type { UnitDefinition } from '@/types'
-
 import { createGameData } from '../create-game-data'
 import ability from './abilities/ability'
 import actionCard from './abilities/action-card'
@@ -13,7 +11,7 @@ import genome from './abilities/genome'
 import paradigm from './abilities/paradigm'
 import unitUpgrade from './abilities/unit-upgrade'
 import { type AbilitySlot, SLOTS } from './ability-slots'
-import baseUnits from './base-units'
+import units from './base-units'
 import factions from './faction'
 
 // Twilight's Fall. This module default-exports its complete GameData entry
@@ -31,9 +29,7 @@ const gameData = createGameData({
   id: 'TF',
   label: "Twilight's Fall",
   factions,
-  // base-units' literal COMBAT: number[] doesn't structurally match
-  // DiceGroup's tuple type, so the cast needs an `unknown` bridge.
-  units: baseUnits as unknown as Readonly<Record<string, UnitDefinition>>,
+  units,
   // Registration order drives invoke resolution order within a timing pass
   // (panel display is grouped by slot instead, so it is unaffected). TF
   // unit-upgrade cards are the TF analog of TI4's build-time UPGRADED stats:

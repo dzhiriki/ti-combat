@@ -4,7 +4,7 @@ import type { UnitBaseType, UnitDefinition } from '@/types'
 import { getEffectiveStats } from '@/utils/get-simulation-units'
 
 export function createGenericUnitUpgrades(
-  baseUnits: Readonly<Record<string, UnitDefinition>>,
+  baseUnits: Readonly<Partial<Record<UnitBaseType, UnitDefinition>>>,
   conflictsByUnitType: Partial<Record<UnitBaseType, readonly string[]>>,
 ): Ability[] {
   const out: Ability[] = []

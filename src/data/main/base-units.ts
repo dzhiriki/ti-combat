@@ -1,8 +1,10 @@
 import { disablePlanetaryShield } from '@/data/main/abilities/general/disable-planetary-shield'
 import { planetaryShield } from '@/data/main/abilities/general/planetary-shield'
 import { sustainDamage } from '@/data/main/abilities/general/sustain-damage'
+import type { UnitBaseType, UnitDefinition } from '@/types'
 
-const baseUnits = {
+// Flagships and mechs are faction-specific, so the generic roster has none.
+const baseUnits: Partial<Record<UnitBaseType, UnitDefinition>> = {
   WAR_SUN: {
     BASE: {
       COST: 12,
@@ -16,7 +18,6 @@ const baseUnits = {
       },
       ABILITIES: [disablePlanetaryShield, sustainDamage],
     },
-    UPGRADED: null,
   },
   CRUISER: {
     BASE: {
