@@ -16,11 +16,8 @@ import type {
   UnitAbilityMeta,
 } from '../combat-state/types'
 import type { Logger } from '../logger'
-import type { AbilitySlot } from './ability-slot'
 import type { SideApi } from './api/ability-api'
 import type { ParamLimit } from './param-limit'
-
-export type { AbilitySlot }
 
 export type SyncSortSpec =
   | 'worth-asc'
@@ -190,7 +187,7 @@ export interface RuntimeAbilityList {
   readonly all: readonly Ability[]
   /** Abilities registered on this side under `slot`, in registration
    *  order. Cached per slot. */
-  get(slot: AbilitySlot): readonly Ability[]
+  get(slot: string): readonly Ability[]
 }
 
 /** What a declare hook or invoke factory may look at: the abilities
@@ -613,9 +610,9 @@ export interface Ability<Params extends Record<string, unknown> = any> {
       ) => AbilityInvoke<AbilityBaseParams & Params>[])
 }
 
-export interface RegisteredAbility {
+export interface RegisteredAbility<Slot extends string = string> {
   readonly ability: Ability
-  readonly slot: AbilitySlot
+  readonly slot: Slot
   /** Per-entry sub-header for slots whose cards split into groups the slot
    *  itself can't express (TF unit upgrades group by unit type). Overrides
    *  `SLOT_DISPLAY[slot].subcategory`. */

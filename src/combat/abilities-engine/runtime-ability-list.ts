@@ -1,6 +1,5 @@
 import type { CombatSide } from '@/types'
 
-import type { AbilitySlot } from './ability-slot'
 import type {
   Ability,
   OwnOpponentContext,
@@ -12,9 +11,9 @@ import type {
  *  lazily and caches per slot, so repeated UI/engine reads share one array. */
 export function createRuntimeAbilityList(
   abilities: readonly Ability[],
-  slots: ReadonlyMap<string, AbilitySlot>,
+  slots: ReadonlyMap<string, string>,
 ): RuntimeAbilityList {
-  const bySlot = new Map<AbilitySlot, readonly Ability[]>()
+  const bySlot = new Map<string, readonly Ability[]>()
   return {
     all: abilities,
     get(slot) {
@@ -34,7 +33,7 @@ export function createRuntimeAbilityListFromRegistered(
   registered: readonly RegisteredAbility[],
 ): RuntimeAbilityList {
   const abilities: Ability[] = []
-  const slots = new Map<string, AbilitySlot>()
+  const slots = new Map<string, string>()
   for (const r of registered) {
     if (slots.has(r.ability.key)) continue
     slots.set(r.ability.key, r.slot)

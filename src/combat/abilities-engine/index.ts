@@ -8,12 +8,6 @@ export {
   type InvokeCollections,
 } from './abilities-engine'
 export {
-  type AbilitySlot,
-  SLOT_DISPLAY,
-  SLOT_ORDER,
-  type SlotDisplay,
-} from './ability-slot'
-export {
   type AbilityBranch,
   AbilityBranchInterrupt,
   type SideApi,

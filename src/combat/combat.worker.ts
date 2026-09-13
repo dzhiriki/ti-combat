@@ -1,7 +1,6 @@
 import { prepareSimulationConfig } from '@/hooks/combat-setup'
 import type { SimulationInput } from '@/hooks/combat-setup/types'
 import type {
-  FactionKey,
   GameSystem,
   UnitBaseType,
   UnitIdList,
@@ -24,7 +23,7 @@ import { makeVariantId } from './utils/unit-variant'
 
 function buildSideState(
   system: GameSystem,
-  faction: FactionKey,
+  faction: string,
   selections: Record<UnitBaseType, UnitSelection>,
   abilities: SideAbilitiesConfig,
   gen: { _nextCode?: number },

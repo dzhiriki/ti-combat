@@ -2,7 +2,6 @@ import type { CombatMode, SideAbilitiesConfig } from '@/combat'
 import type { Precision } from '@/hooks/use-settings'
 import type {
   CombatSide,
-  FactionKey,
   GameSystem,
   UnitBaseType,
   UnitSelection,
@@ -10,8 +9,8 @@ import type {
 
 export interface SimulationInput {
   system: GameSystem
-  attackerFaction: FactionKey
-  defenderFaction: FactionKey
+  attackerFaction: string
+  defenderFaction: string
   attackerSelections: Record<UnitBaseType, UnitSelection>
   defenderSelections: Record<UnitBaseType, UnitSelection>
   combatMode: CombatMode

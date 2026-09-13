@@ -1,7 +1,6 @@
 import { makeVariantId } from '@/combat'
 import type { DeclaredSubtype } from '@/combat/abilities-engine/types'
 import type {
-  FactionKey,
   GameSystem,
   UnitBaseType,
   UnitIdList,
@@ -28,7 +27,7 @@ import { clampLimitParams } from './reconcile'
 // ============================================================================
 
 export interface SideConfig {
-  faction: FactionKey
+  faction: string
   units: Partial<Record<UnitBaseType, number>>
   upgrades?: UnitBaseType[]
   abilities?: Record<string, true | false | Record<string, unknown>>

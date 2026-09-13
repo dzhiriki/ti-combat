@@ -1,11 +1,12 @@
 import { hasStaticInvokes } from '@/combat'
-import { FACTION_KEY_TO_SLOT, unitSlot } from '@/constants/ability-slots'
+import type { AbilitySlot as MainAbilitySlot } from '@/data/main'
 import * as main from '@/data/main'
+import type { AbilitySlot as TfAbilitySlot } from '@/data/tf'
 import * as tf from '@/data/tf'
 import type {
+  AbilitySlotData,
   CombatSide,
   Faction,
-  FactionKey,
   GameSystem,
   UnitBaseType,
 } from '@/types'
@@ -15,13 +16,16 @@ import { getEffectiveStats } from '@/utils/get-simulation-units'
 
 import type {
   Ability,
-  AbilitySlot,
   RegisteredAbility,
 } from '../../combat/abilities-engine/types'
 
+function getAbilitySlotData(system: GameSystem): AbilitySlotData {
+  return system === 'TI4' ? main : tf
+}
+
 function tag(
   abilities: readonly Ability[],
-  slot: AbilitySlot,
+  slot: MainAbilitySlot,
 ): RegisteredAbility[] {
   return abilities.map(ability => ({ ability, slot }))
 }
@@ -47,15 +51,15 @@ const ti4Factions = Object.values(main.factions)
 
 const allPromissoryAbilities = ti4Factions.flatMap(
   faction => faction.abilities?.promissory ?? [],
-) as Ability[]
+)
 
 const allAgentAbilities = ti4Factions.flatMap(
   faction => faction.abilities?.agent ?? [],
-) as Ability[]
+)
 
 const allCommanderAbilities = ti4Factions.flatMap(
   faction => faction.abilities?.commander ?? [],
-) as Ability[]
+)
 
 // Keys already displayed via dedicated slots — agents/commanders/promissories
 // have their own cross-faction pools, generic abilities (technology, action
@@ -69,7 +73,7 @@ const alreadyDisplayedKeys = new Set<string>([
   ...allCommanderAbilities.map(a => a.key),
 ])
 
-const allExternalAbilities: RegisteredAbility[] = []
+const allExternalAbilities: RegisteredAbility<MainAbilitySlot>[] = []
 {
   const seen = new Set<string>()
   const addIfExternal = (ability: Ability, faction: Faction) => {
@@ -143,7 +147,7 @@ const allFactionAbilities: Ability[] = []
     if (!faction.abilities) continue
     for (const list of Object.values(faction.abilities)) {
       if (!list) continue
-      for (const ability of list as Ability[]) {
+      for (const ability of list) {
         if (seen.has(ability.key)) continue
         seen.add(ability.key)
         allFactionAbilities.push(ability)
@@ -171,20 +175,30 @@ export function getAllAbilities(): Ability[] {
 // promissory notes; TF abilities, paradigms, action cards, unit upgrades) and
 // has no fleet pool to enforce. It keeps the phase drivers, terrain effects,
 // and the agent-style pool of its system (TI4 agents / TF genomes).
-const NEUTRAL_HIDDEN_SLOTS: ReadonlySet<AbilitySlot> = new Set<AbilitySlot>([
+const TI4_NEUTRAL_HIDDEN_SLOTS = new Set<MainAbilitySlot>([
   'AGENDA',
   'TECHNOLOGY',
   'ACTION_CARD',
   'COMMANDER',
   'RELIC',
   'PROMISSORY',
+])
+
+const TF_NEUTRAL_HIDDEN_SLOTS = new Set<TfAbilitySlot>([
+  'RELIC',
   'TF_ABILITY',
   'TF_PARADIGM',
   'TF_ACTION_CARD',
   'TF_UNIT_UPGRADE',
 ])
 
+const NEUTRAL_HIDDEN_SLOTS: Record<GameSystem, ReadonlySet<string>> = {
+  TI4: TI4_NEUTRAL_HIDDEN_SLOTS,
+  TF: TF_NEUTRAL_HIDDEN_SLOTS,
+}
+
 function collectUnitAbilities(
+  system: GameSystem,
   faction: Faction,
   side: CombatSide,
   upgradedTypes?: ReadonlySet<UnitBaseType>,
@@ -195,7 +209,7 @@ function collectUnitAbilities(
   for (const [unitTypeStr, unitDef] of Object.entries(faction.units)) {
     if (!unitDef) continue
     const baseType = unitTypeStr as UnitBaseType
-    const slot = unitSlot(baseType)
+    const slot = getAbilitySlotData(system).unitSlot(baseType)
 
     for (const ability of [
       ...(unitDef.BASE.ABILITIES ?? []),
@@ -237,7 +251,7 @@ const unitDefAbilityKeysCache = new Map<string, ReadonlySet<string>>()
  *  corresponding unit type. */
 export function getUnitDefinitionAbilityKeys(
   system: GameSystem,
-  factionKey: FactionKey,
+  factionKey: string,
 ): ReadonlySet<string> {
   const cacheKey = `${system}:${factionKey}`
   const cached = unitDefAbilityKeysCache.get(cacheKey)
@@ -265,7 +279,7 @@ const factionOwnedKeysCache = new Map<string, ReadonlySet<string>>()
 
 export function getFactionOwnedAbilityKeys(
   system: GameSystem,
-  factionKey: FactionKey,
+  factionKey: string,
 ): ReadonlySet<string> {
   const cacheKey = `${system}:${factionKey}`
   const cached = factionOwnedKeysCache.get(cacheKey)
@@ -287,18 +301,19 @@ export function getFactionOwnedAbilityKeys(
 export function getAvailableAbilities(
   system: GameSystem,
   side: CombatSide,
-  factionKey: FactionKey,
+  factionKey: string,
   upgradedTypes?: ReadonlySet<UnitBaseType>,
 ): RegisteredAbility[] {
   const isNeutral = factionKey === 'NEUTRAL'
   const faction = getFaction(system, factionKey)
   const ownedKeys = getFactionOwnedAbilityKeys(system, factionKey)
+  const abilitySlots = getAbilitySlotData(system)
 
   const base: RegisteredAbility[] = registeredBySystem[system].filter(reg => {
     const a = reg.ability
     if (a.side && a.side !== side) return false
     if (isNeutral) {
-      if (NEUTRAL_HIDDEN_SLOTS.has(reg.slot)) return false
+      if (NEUTRAL_HIDDEN_SLOTS[system].has(reg.slot)) return false
       if (a.key === 'FLEET_POOL') return false
       return true
     }
@@ -310,18 +325,19 @@ export function getAvailableAbilities(
 
   const factionAbilities: RegisteredAbility[] = []
   if (faction.abilities) {
-    for (const [key, list] of Object.entries(faction.abilities) as [
-      keyof typeof FACTION_KEY_TO_SLOT,
-      Ability[] | undefined,
-    ][]) {
-      if (!list) continue
-      const slot = FACTION_KEY_TO_SLOT[key]
+    for (const [key, list] of Object.entries(faction.abilities)) {
+      if (!Object.hasOwn(abilitySlots.FACTION_KEY_TO_SLOT, key)) {
+        throw new Error(
+          `Faction ability group "${key}" on "${factionKey}" is not supported by ${system}`,
+        )
+      }
+      const slot = abilitySlots.FACTION_KEY_TO_SLOT[key]
       // Promissories live only in the cross-faction PROMISSORY pool above.
       if (slot === 'PROMISSORY') continue
       // Own faction's agents/commanders ALSO appear in the FACTION subgroup
       // (in addition to the cross-faction AGENT/COMMANDER pools). Same Ability
       // reference → shared params/config; the panel renders both entries.
-      let factionSlot: AbilitySlot = slot
+      let factionSlot: string = slot
       if (slot === 'AGENT') factionSlot = 'FACTION_AGENT'
       else if (slot === 'COMMANDER') factionSlot = 'FACTION_COMMANDER'
       for (const ability of list) {
@@ -331,7 +347,12 @@ export function getAvailableAbilities(
     }
   }
 
-  const unitAbilities = collectUnitAbilities(faction, side, upgradedTypes)
+  const unitAbilities = collectUnitAbilities(
+    system,
+    faction,
+    side,
+    upgradedTypes,
+  )
 
   return [...base, ...factionAbilities, ...unitAbilities]
 }

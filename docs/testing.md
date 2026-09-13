@@ -35,7 +35,7 @@ const t = combatTest({
   system?: 'TI4' | 'TF', // defaults from first non-neutral faction
   mode: 'SPACE' | 'GROUND',
   attacker: {
-    faction: FactionKey,          // e.g. 'ARBOREC', 'SARDAKK_NORR'
+    faction: string,              // e.g. 'ARBOREC', 'SARDAKK_NORR'
     units: { CRUISER: 2 },        // unit type -> count
     upgrades?: ['CRUISER'],       // unit types to use UPGRADED stats
     abilities?: {                 // ability configs

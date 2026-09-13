@@ -11,11 +11,10 @@ export type {
   Faction,
   FactionAbilities,
   FactionDefinition,
-  FactionKey,
   GameSystem,
   Lazy,
 } from './faction'
-export type { GameData } from './game-data'
+export type { AbilitySlotData, GameData, SlotDisplay } from './game-data'
 export {
   UnitListBooleanSchema,
   UnitListNumberSchema,

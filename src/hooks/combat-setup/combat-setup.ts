@@ -14,7 +14,6 @@ import {
 import { UNIT_LIMITS, UNIT_TYPES } from '@/constants/units'
 import type {
   CombatSide,
-  FactionKey,
   GameSystem,
   UnitBaseType,
   UnitIdList,
@@ -77,8 +76,8 @@ function createDefaultUnitSelections(): Record<UnitBaseType, UnitSelection> {
  */
 export class CombatSetup {
   private _system: GameSystem
-  private _attackerFaction: FactionKey
-  private _defenderFaction: FactionKey
+  private _attackerFaction: string
+  private _defenderFaction: string
   private _attackerSelections: Record<UnitBaseType, UnitSelection>
   private _defenderSelections: Record<UnitBaseType, UnitSelection>
   private _combatMode: CombatMode
@@ -188,11 +187,11 @@ export class CombatSetup {
     return this._system
   }
 
-  get attackerFaction(): FactionKey {
+  get attackerFaction(): string {
     return this._attackerFaction
   }
 
-  get defenderFaction(): FactionKey {
+  get defenderFaction(): string {
     return this._defenderFaction
   }
 
@@ -252,7 +251,7 @@ export class CombatSetup {
     this.setFaction('defender', faction)
   }
 
-  setFaction(side: CombatSide, faction: FactionKey): void {
+  setFaction(side: CombatSide, faction: string): void {
     // Reject cross-system selections before changing any setup state.
     getFaction(this._system, faction)
     if (side === 'attacker') {
@@ -562,8 +561,8 @@ export class CombatSetup {
   }
 
   loadConfig(config: SerializedConfig): void {
-    const af = config.af as FactionKey
-    const df = config.df as FactionKey
+    const af = config.af
+    const df = config.df
 
     // URL validation normalizes legacy links before they reach this method.
     // Reject inconsistent direct callers before mutating the current setup.
@@ -746,7 +745,7 @@ export class CombatSetup {
 
   private rebuildUnits(
     side: CombatSide,
-    faction: FactionKey,
+    faction: string,
     selections: Record<UnitBaseType, UnitSelection>,
   ): void {
     const upgradedSet = new Set(

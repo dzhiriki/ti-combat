@@ -1,6 +1,5 @@
 import type {
   CombatSide,
-  FactionKey,
   UnitBaseType,
   UnitId,
   UnitIdList,
@@ -21,7 +20,6 @@ import type {
 import { Logger } from '../logger'
 import { resolveUnitStats } from '../utils/resolve-unit-stats'
 import { parseVariantId } from '../utils/unit-variant'
-import type { AbilitySlot } from './ability-slot'
 import {
   type AbilityBranch,
   AbilityBranchInterrupt,
@@ -89,10 +87,10 @@ const PRE_SORTED_BUCKETS: AbilityTiming[] = [
 
 function dedupeRegistered(regs: readonly RegisteredAbility[]): {
   abilities: Ability[]
-  slots: Map<string, AbilitySlot>
+  slots: Map<string, string>
 } {
   const abilities: Ability[] = []
-  const slots = new Map<string, AbilitySlot>()
+  const slots = new Map<string, string>()
   for (const r of regs) {
     if (slots.has(r.ability.key)) continue
     slots.set(r.ability.key, r.slot)
@@ -125,7 +123,7 @@ function makeTrackerKey(
 export interface AbilityCandidate {
   ability: Ability
   source: AbilitySource
-  ownerFaction?: FactionKey
+  ownerFaction?: string
 }
 
 function resolveMergedParams(
@@ -174,7 +172,7 @@ function buildEntry(
   invoke: AbilityInvoke,
   params: Record<string, unknown>,
   source: AbilitySource,
-  ownerFaction: FactionKey | undefined,
+  ownerFaction: string | undefined,
 ): TimingInvokeEntry {
   return {
     ability,
@@ -197,7 +195,7 @@ interface TimingInvokeEntry {
   invoke: AbilityInvoke
   params: Record<string, unknown>
   source: AbilitySource
-  ownerFaction?: FactionKey
+  ownerFaction?: string
   trackerKey: string
 }
 
@@ -460,7 +458,7 @@ const unitsWithCandidatesCache = new WeakMap<AbilityCandidate[], Set<UnitId>>()
 export class AbilitiesEngine {
   private _combatState!: CombatState
   private _abilities!: Record<CombatSide, Ability[]>
-  private _abilitySlots!: Record<CombatSide, ReadonlyMap<string, AbilitySlot>>
+  private _abilitySlots!: Record<CombatSide, ReadonlyMap<string, string>>
   private _unitAbilityKeys!: Record<CombatSide, ReadonlySet<string>>
   private _attackerCtx!: AbilityContext
   private _defenderCtx!: AbilityContext
@@ -543,11 +541,11 @@ export class AbilitiesEngine {
 
   // ── Read accessors ──────────────────────────────────────────────────
 
-  get attackerFaction(): FactionKey {
+  get attackerFaction(): string {
     return this.state.attacker.faction
   }
 
-  get defenderFaction(): FactionKey {
+  get defenderFaction(): string {
     return this.state.defender.faction
   }
 
@@ -664,7 +662,7 @@ export class AbilitiesEngine {
       attacker: attackerDedup.abilities,
       defender: defenderDedup.abilities,
     }
-    const abilitySlots: Record<CombatSide, Map<string, AbilitySlot>> = {
+    const abilitySlots: Record<CombatSide, Map<string, string>> = {
       attacker: attackerDedup.slots,
       defender: defenderDedup.slots,
     }
@@ -713,7 +711,7 @@ export class AbilitiesEngine {
       attacker: attackerDedup.abilities,
       defender: defenderDedup.abilities,
     }
-    const abilitySlots: Record<CombatSide, Map<string, AbilitySlot>> = {
+    const abilitySlots: Record<CombatSide, Map<string, string>> = {
       attacker: attackerDedup.slots,
       defender: defenderDedup.slots,
     }
@@ -837,7 +835,7 @@ export class AbilitiesEngine {
     factionOwnedKeys: ReadonlySet<string>,
   ): AbilityCandidate[] {
     const candidates: AbilityCandidate[] = []
-    const ownerFactionIfOwned = (ability: Ability): FactionKey | undefined =>
+    const ownerFactionIfOwned = (ability: Ability): string | undefined =>
       factionOwnedKeys.has(ability.key) ? state[side].faction : undefined
 
     // 1. Config abilities (not unit abilities)

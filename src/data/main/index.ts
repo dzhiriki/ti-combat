@@ -1,4 +1,4 @@
-import type { Ability, AbilitySlot, RegisteredAbility } from '@/combat'
+import type { Ability, RegisteredAbility } from '@/combat'
 import type { UnitDefinition } from '@/types'
 
 import { resolveFactions } from '../registry'
@@ -9,6 +9,11 @@ import environment from './abilities/environment'
 import general from './abilities/general'
 import relic from './abilities/relic'
 import technology from './abilities/technology'
+import {
+  type AbilitySlot,
+  FACTION_KEY_TO_SLOT,
+  unitSlot,
+} from './ability-slots'
 import baseUnits from './base-units'
 import factionDefinitions from './faction'
 
@@ -18,19 +23,26 @@ import factionDefinitions from './faction'
 // `src/data` must import only these index modules.
 
 export { SHARED_UNIT_ABILITY_KEYS } from './abilities/general'
+export type { AbilitySlot } from './ability-slots'
+export {
+  FACTION_KEY_TO_SLOT,
+  SLOT_DISPLAY,
+  SLOT_ORDER,
+  unitSlot,
+} from './ability-slots'
 export { default as baseUnits } from './base-units'
 
 function tag(
   abilities: readonly Ability[],
   slot: AbilitySlot,
-): RegisteredAbility[] {
+): RegisteredAbility<AbilitySlot>[] {
   return abilities.map(ability => ({ ability, slot }))
 }
 
 // Shared ability pool in registration order — this order drives invoke
 // resolution within a timing pass, so keep GENERAL and ADVANCED (the phase
 // drivers) first.
-export const abilities: readonly RegisteredAbility[] = [
+export const abilities: readonly RegisteredAbility<AbilitySlot>[] = [
   ...tag(general, 'GENERAL'),
   ...tag(advanced, 'ADVANCED'),
   ...tag(environment, 'ENVIRONMENT'),
@@ -50,7 +62,10 @@ export const factions = resolveFactions(
   baseUnits as unknown as Readonly<Record<string, UnitDefinition>>,
   abilities,
   factionDefinitions,
+  { FACTION_KEY_TO_SLOT, unitSlot },
 )
+
+export type FactionKey = keyof typeof factions
 
 // Engine hooks that live next to the ability they belong to.
 export type { SavedRetreatData } from './abilities/advanced/retreat'

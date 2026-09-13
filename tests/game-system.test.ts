@@ -17,14 +17,48 @@ import {
   searchParamsToConfig,
 } from '@/hooks/use-url-sync'
 import { getFaction } from '@/utils/get-faction'
-import { GAME_SYSTEMS } from '@/utils/get-faction-system'
+import {
+  GAME_SYSTEMS,
+  getFactionKeysBySystem,
+} from '@/utils/get-faction-system'
 import { getFactionUnitConfig } from '@/utils/get-faction-unit-config'
+import { getGameData } from '@/utils/get-game-data'
 
 const abilityLookup = buildAbilityLookup(getAllAbilities())
 
 describe('explicit game system', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+  })
+
+  it.each(GAME_SYSTEMS)(
+    'owns a complete ability slot layout for %s',
+    system => {
+      const data = getGameData(system)
+      const displaySlots = Object.keys(data.SLOT_DISPLAY)
+
+      expect(new Set(data.SLOT_ORDER).size).toBe(data.SLOT_ORDER.length)
+      expect(new Set(data.SLOT_ORDER)).toEqual(new Set(displaySlots))
+
+      for (const faction of getFactionKeysBySystem(system)) {
+        for (const reg of getAvailableAbilities(system, 'attacker', faction)) {
+          expect(
+            Object.hasOwn(data.SLOT_DISPLAY, reg.slot),
+            `${system}:${faction} uses undeclared slot ${reg.slot}`,
+          ).toBe(true)
+        }
+      }
+    },
+  )
+
+  it('keeps system-specific slots out of the other system', () => {
+    const ti4 = getGameData('TI4')
+    const tf = getGameData('TF')
+
+    expect(ti4.SLOT_ORDER).not.toContain('TF_ABILITY')
+    expect(tf.SLOT_ORDER).not.toContain('TECHNOLOGY')
+    expect(ti4.FACTION_KEY_TO_SLOT.breakthrough).toBe('FACTION_BREAKTHROUGH')
+    expect(tf.FACTION_KEY_TO_SLOT.breakthrough).toBeUndefined()
   })
 
   it.each(GAME_SYSTEMS)('round-trips Neutral vs Neutral in %s', system => {

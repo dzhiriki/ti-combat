@@ -48,7 +48,7 @@ interface Ability<Params extends Record<string, unknown>> {
 }
 ```
 
-There is **no `category`/`subcategory` field**. An ability's category is derived from the registration slot it occupies (which `index.ts` array or faction slot it is added to), surfaced via `SLOT_DISPLAY` — abilities never declare it.
+There is **no `category`/`subcategory` field**. An ability's category is derived from the registration slot it occupies (which `index.ts` array or faction slot it is added to), surfaced via that game system's `SLOT_DISPLAY` — abilities never declare it. Each system owns its `AbilitySlot`, `FactionKey`, `FACTION_KEY_TO_SLOT`, `unitSlot`, `SLOT_DISPLAY`, and `SLOT_ORDER` declarations in `src/data/<system>`; the engine treats faction and slot names as opaque strings. The shared `FactionAbilities` runtime shape is `Record<string, Ability[]>`; every key must exist in the selected system's mapping or data resolution/collection throws (for example, Twilight's Fall has no breakthrough slot).
 
 **`params`** — includes `AbilityBaseParams` (`isEnabled: boolean`, `uses: number`) merged with custom `Params`. Example: `params: { isEnabled: false, uses: Infinity, strategy: 'BEST' }`.
 
@@ -271,7 +271,7 @@ interface AbilityLookupContext {
 }
 interface RuntimeAbilityList {
   readonly all: readonly Ability[]
-  get(slot: AbilitySlot): readonly Ability[] // registration order, cached
+  get(slot: string): readonly Ability[] // registration order, cached
 }
 ```
 
@@ -298,7 +298,7 @@ Used in both `isCallable` and `call` contexts. The same `SideApi` class is used 
 `GetUnitsOptions` is `{ includeVariants: boolean }` and is **required** wherever it appears.
 
 ```typescript
-getFaction(): FactionKey
+getFaction(): string
 getCombatMode(): CombatMode  // for hooks that receive only a SideApi (e.g. preventDestroy)
 getUnits(unitType: UnitType, options: GetUnitsOptions): UnitId[]
 hasUnit(unitId: UnitId): boolean

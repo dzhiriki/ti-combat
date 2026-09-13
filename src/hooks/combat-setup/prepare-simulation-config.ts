@@ -1,5 +1,5 @@
 import { createLookups } from '@/combat'
-import type { CombatSide, FactionKey, GameSystem } from '@/types'
+import type { CombatSide, GameSystem } from '@/types'
 
 import type {
   Ability,
@@ -42,8 +42,8 @@ interface SideAbilitiesData {
 export function prepareSimulationConfig(
   system: GameSystem,
   config: Record<CombatSide, SideAbilitiesConfig>,
-  attackerFaction: FactionKey,
-  defenderFaction: FactionKey,
+  attackerFaction: string,
+  defenderFaction: string,
   combatMode: CombatMode,
   customAbilities?: Ability[],
 ): Record<CombatSide, SideAbilitiesData> {

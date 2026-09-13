@@ -2,7 +2,6 @@ import type { UnitCategory } from '@/constants/units'
 import type {
   CombatSide,
   DiceGroup,
-  FactionKey,
   UnitAbility,
   UnitBaseType,
   UnitId,
@@ -997,7 +996,7 @@ export class SideApi {
 export class AbilityContext {
   logger?: Logger
   unitSource?: UnitId
-  ownerFaction?: FactionKey
+  ownerFaction?: string
   ability?: Ability
   /** True while dispatching an invoke flagged `declaration: true`. Used by
    *  `pushModifier` to tag emitted modifiers so the dice-math kernel can

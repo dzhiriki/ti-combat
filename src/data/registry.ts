@@ -1,6 +1,6 @@
-import type { Ability, AbilitySlot, RegisteredAbility } from '@/combat'
-import { FACTION_KEY_TO_SLOT, unitSlot } from '@/constants/ability-slots'
+import type { Ability, RegisteredAbility } from '@/combat'
 import type {
+  AbilitySlotData,
   DataRegistry,
   Faction,
   FactionAbilities,
@@ -80,13 +80,28 @@ function resolveDefinition(
   }
 }
 
+function assertFactionAbilityGroups(
+  system: GameSystem,
+  factionKey: string,
+  faction: Faction,
+  abilitySlots: AbilitySlotData,
+): void {
+  for (const key of Object.keys(faction.abilities ?? {})) {
+    if (Object.hasOwn(abilitySlots.FACTION_KEY_TO_SLOT, key)) continue
+    throw new Error(
+      `Faction ability group "${key}" on "${factionKey}" is not supported by ${system}`,
+    )
+  }
+}
+
 function createRegistry(
   system: GameSystem,
   baseUnits: Readonly<Record<string, UnitDefinition>>,
   shared: readonly RegisteredAbility[],
   factions: Readonly<Record<string, Faction>>,
+  abilitySlots: AbilitySlotData,
 ): DataRegistry {
-  const cache = new Map<AbilitySlot, readonly Ability[]>()
+  const cache = new Map<string, readonly Ability[]>()
   return {
     system,
     baseUnits,
@@ -100,15 +115,16 @@ function createRegistry(
       for (const faction of Object.values(factions)) {
         for (const [key, abilities] of Object.entries(
           faction.abilities ?? {},
-        ) as [keyof FactionAbilities, readonly Ability[] | undefined][]) {
-          if (abilities && FACTION_KEY_TO_SLOT[key] === slot)
+        )) {
+          if (abilitySlots.FACTION_KEY_TO_SLOT[key] === slot) {
             out.push(...abilities)
+          }
         }
         for (const [type, unit] of Object.entries(faction.units) as [
           UnitBaseType,
           UnitDefinition | undefined,
         ][]) {
-          if (!unit || unitSlot(type) !== slot) continue
+          if (!unit || abilitySlots.unitSlot(type) !== slot) continue
           out.push(
             ...(unit.BASE.ABILITIES ?? []),
             ...(unit.UPGRADED?.ABILITIES ?? []),
@@ -130,18 +146,31 @@ export function resolveFactions<K extends string>(
   baseUnits: Readonly<Record<string, UnitDefinition>>,
   shared: readonly RegisteredAbility[],
   definitions: Readonly<Record<K, FactionDefinition>>,
+  abilitySlots: AbilitySlotData,
 ): Readonly<Record<K, Faction>> {
   const statics: Record<string, Faction> = {}
   const entries = Object.entries(definitions) as [K, FactionDefinition][]
   for (const [key, def] of entries) {
-    if (!isLazyDefinition(def)) statics[key] = def as Faction
+    if (!isLazyDefinition(def)) {
+      const faction = def as Faction
+      assertFactionAbilityGroups(system, key, faction, abilitySlots)
+      statics[key] = faction
+    }
   }
-  const registry = createRegistry(system, baseUnits, shared, statics)
+  const registry = createRegistry(
+    system,
+    baseUnits,
+    shared,
+    statics,
+    abilitySlots,
+  )
   const out = {} as Record<K, Faction>
   for (const [key, def] of entries) {
-    out[key] = Object.hasOwn(statics, key)
+    const faction = Object.hasOwn(statics, key)
       ? statics[key]
       : resolveDefinition(def, registry)
+    assertFactionAbilityGroups(system, key, faction, abilitySlots)
+    out[key] = faction
   }
   return out
 }

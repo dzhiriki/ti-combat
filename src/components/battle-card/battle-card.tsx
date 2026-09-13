@@ -16,7 +16,6 @@ import {
 } from '@/constants/units'
 import type {
   CombatSide,
-  FactionKey,
   GameSystem,
   UnitBaseType,
   UnitSelection,
@@ -61,8 +60,8 @@ const SYSTEM_OPTIONS = GAME_SYSTEMS.map(system => ({
 interface BattleCardProps {
   system: GameSystem
   onSystemChange: (system: GameSystem) => void
-  attackerFaction: FactionKey
-  defenderFaction: FactionKey
+  attackerFaction: string
+  defenderFaction: string
   attackerSelections: Record<UnitBaseType, UnitSelection>
   defenderSelections: Record<UnitBaseType, UnitSelection>
   attackerConfig: Record<UnitBaseType, UnitConfig>
@@ -74,7 +73,7 @@ interface BattleCardProps {
   isComputing?: boolean
   combatMode: CombatMode
   onCombatModeChange: (mode: CombatMode) => void
-  onFactionChange: (side: CombatSide, faction: FactionKey) => void
+  onFactionChange: (side: CombatSide, faction: string) => void
   onSwap: () => void
   onUnitCountChange: (
     side: CombatSide,

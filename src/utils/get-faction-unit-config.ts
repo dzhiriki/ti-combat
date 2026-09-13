@@ -1,6 +1,5 @@
 import { UNIT_TYPES } from '@/constants/units'
 import {
-  type FactionKey,
   type GameSystem,
   type UnitBaseType,
   type UnitDefinition,
@@ -16,7 +15,7 @@ import { getGameData } from './get-game-data'
  */
 export function getFactionUnitConfig(
   system: GameSystem,
-  factionKey: FactionKey,
+  factionKey: string,
 ): Record<UnitBaseType, UnitDefinition> {
   const factionUnits = getFaction(system, factionKey).units
   const roster = getGameData(system).baseUnits

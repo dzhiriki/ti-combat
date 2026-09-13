@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { Faction, FactionKey, GameSystem } from '@/types'
+import type { Faction, GameSystem } from '@/types'
 import { GAME_SYSTEMS } from '@/utils/get-faction-system'
 import { getGameData } from '@/utils/get-game-data'
 import { namespaceSvgIds } from '@/utils/namespace-svg-ids'
@@ -40,9 +40,9 @@ function FactionIcon({ icon }: { icon: string }) {
 }
 
 interface FactionSelectProps {
-  value: FactionKey
+  value: string
   system: GameSystem
-  onValueChange: (value: FactionKey) => void
+  onValueChange: (value: string) => void
   className?: string
   align?: 'start' | 'center' | 'end'
 }

@@ -2,11 +2,12 @@ import { filter, groupBy, pipe } from 'remeda'
 
 import type {
   AbilityReadContext,
-  AbilitySlot,
   CombatMode,
   RegisteredAbility,
 } from '@/combat'
-import { extractDefaults, SLOT_DISPLAY, SLOT_ORDER } from '@/combat'
+import { extractDefaults } from '@/combat'
+import type { GameSystem, SlotDisplay } from '@/types'
+import { getGameData } from '@/utils/get-game-data'
 
 import styles from './abilities-panel.module.css'
 import { AbilityConfig } from './components/ability-config'
@@ -14,6 +15,7 @@ import { AbilityConfig } from './components/ability-config'
 export type AbilityFilterMode = 'all' | 'same' | 'enabled'
 
 interface AbilitiesPanelProps {
+  system: GameSystem
   abilities: RegisteredAbility[]
   readContext: AbilityReadContext
   combatMode: CombatMode
@@ -61,18 +63,36 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
   return false
 }
 
-// Per-entry sub-header wins over the slot's own (TF unit upgrades group by
-// unit type, so every card in the slot carries its own).
-function subcategoryOf(reg: RegisteredAbility): string | undefined {
-  return reg.subcategory ?? SLOT_DISPLAY[reg.slot].subcategory
+type SlotDisplayMap = Readonly<Record<string, SlotDisplay>>
+
+function displayOf(
+  reg: RegisteredAbility,
+  slotDisplay: SlotDisplayMap,
+): SlotDisplay {
+  const display = slotDisplay[reg.slot]
+  if (!display) throw new Error(`Missing display config for slot "${reg.slot}"`)
+  return display
 }
 
-function matchesSearch(reg: RegisteredAbility, query: string): boolean {
+// Per-entry sub-header wins over the slot's own (TF unit upgrades group by
+// unit type, so every card in the slot carries its own).
+function subcategoryOf(
+  reg: RegisteredAbility,
+  slotDisplay: SlotDisplayMap,
+): string | undefined {
+  return reg.subcategory ?? displayOf(reg, slotDisplay).subcategory
+}
+
+function matchesSearch(
+  reg: RegisteredAbility,
+  query: string,
+  slotDisplay: SlotDisplayMap,
+): boolean {
   const haystack = [
     reg.ability.name,
     reg.ability.description ?? '',
-    SLOT_DISPLAY[reg.slot].category,
-    subcategoryOf(reg) ?? '',
+    displayOf(reg, slotDisplay).category,
+    subcategoryOf(reg, slotDisplay) ?? '',
   ]
     .join(' ')
     .toLowerCase()
@@ -80,18 +100,21 @@ function matchesSearch(reg: RegisteredAbility, query: string): boolean {
   return tokens.every(token => fuzzyMatch(haystack, token))
 }
 
-function slotIndex(slot: AbilitySlot): number {
-  const i = SLOT_ORDER.indexOf(slot)
+function slotIndex(slot: string, slotOrder: readonly string[]): number {
+  const i = slotOrder.indexOf(slot)
   return i === -1 ? Infinity : i
 }
 
-function firstSlotIndex(regs: RegisteredAbility[] | undefined): number {
-  return Math.min(...(regs ?? []).map(reg => slotIndex(reg.slot)))
+function firstSlotIndex(
+  regs: RegisteredAbility[] | undefined,
+  slotOrder: readonly string[],
+): number {
+  return Math.min(...(regs ?? []).map(reg => slotIndex(reg.slot, slotOrder)))
 }
 
 // Slots where the faction icon would just repeat what the FACTION header
 // already says (own faction's agents/commanders surfaced under FACTION).
-const HIDE_ICON_SLOTS: ReadonlySet<AbilitySlot> = new Set<AbilitySlot>([
+const HIDE_ICON_SLOTS: ReadonlySet<string> = new Set([
   'FACTION_AGENT',
   'FACTION_COMMANDER',
 ])
@@ -121,6 +144,7 @@ function renderAbilityConfig(
 }
 
 export function AbilitiesPanel({
+  system,
   abilities,
   readContext,
   combatMode,
@@ -129,11 +153,16 @@ export function AbilitiesPanel({
   searchQuery,
   filterMode,
 }: AbilitiesPanelProps): React.ReactElement {
+  const { SLOT_DISPLAY: slotDisplay, SLOT_ORDER: slotOrder } =
+    getGameData(system)
   const normalizedQuery = searchQuery?.trim().toLowerCase() ?? ''
   const visible = pipe(
     abilities,
     filter(hasUI),
-    filter(reg => !normalizedQuery || matchesSearch(reg, normalizedQuery)),
+    filter(
+      reg =>
+        !normalizedQuery || matchesSearch(reg, normalizedQuery, slotDisplay),
+    ),
     filter(reg => {
       if (filterMode === 'all') return true
       if (filterMode === 'same') return isInCurrentMode(reg, combatMode)
@@ -141,11 +170,18 @@ export function AbilitiesPanel({
     }),
   )
 
-  const byCategory = groupBy(visible, reg => SLOT_DISPLAY[reg.slot].category)
+  const byCategory = groupBy(
+    visible,
+    reg => displayOf(reg, slotDisplay).category,
+  )
 
   const orderedCategories = Object.keys(byCategory).sort((a, b) => {
-    const minA = Math.min(...byCategory[a]!.map(r => slotIndex(r.slot)))
-    const minB = Math.min(...byCategory[b]!.map(r => slotIndex(r.slot)))
+    const minA = Math.min(
+      ...byCategory[a]!.map(r => slotIndex(r.slot, slotOrder)),
+    )
+    const minB = Math.min(
+      ...byCategory[b]!.map(r => slotIndex(r.slot, slotOrder)),
+    )
     return minA - minB
   })
 
@@ -154,18 +190,20 @@ export function AbilitiesPanel({
       {orderedCategories.map(category => {
         const entries = byCategory[category] ?? []
 
-        if (entries.some(reg => subcategoryOf(reg) !== undefined)) {
+        if (
+          entries.some(reg => subcategoryOf(reg, slotDisplay) !== undefined)
+        ) {
           const bySubcategory = groupBy(
             entries,
-            reg => subcategoryOf(reg) ?? 'ABILITY',
+            reg => subcategoryOf(reg, slotDisplay) ?? 'ABILITY',
           )
           // SLOT_ORDER governs cross-slot sub-headers (FACTION); within one
           // slot the sort is stable, so groups keep registration order — which
           // for the TF unit-upgrade deck is the UI's unit ordering.
           const subcategories = Object.keys(bySubcategory).sort(
             (a, b) =>
-              firstSlotIndex(bySubcategory[a]) -
-              firstSlotIndex(bySubcategory[b]),
+              firstSlotIndex(bySubcategory[a], slotOrder) -
+              firstSlotIndex(bySubcategory[b], slotOrder),
           )
 
           return (

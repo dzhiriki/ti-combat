@@ -11,7 +11,7 @@ import * as main from '@/data/main'
 import * as tf from '@/data/tf'
 import { CombatSetup } from '@/hooks/combat-setup'
 import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
-import type { FactionKey, GameSystem } from '@/types'
+import type { GameSystem } from '@/types'
 import { getFactionKeysBySystem } from '@/utils/get-faction-system'
 
 // Static invariants over every registered ability. Each check here enforces a
@@ -149,7 +149,7 @@ interface DisplayedEntry {
 }
 
 function collectDisplayed(): DisplayedEntry[] {
-  const bySystem: Record<GameSystem, FactionKey[]> = {
+  const bySystem: Record<GameSystem, string[]> = {
     TI4: getFactionKeysBySystem('TI4'),
     TF: getFactionKeysBySystem('TF'),
   }
@@ -159,7 +159,7 @@ function collectDisplayed(): DisplayedEntry[] {
 
   for (const [system, keys] of Object.entries(bySystem) as [
     GameSystem,
-    FactionKey[],
+    string[],
   ][]) {
     const setup = new CombatSetup()
     setup.setSystem(system)

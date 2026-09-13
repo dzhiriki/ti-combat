@@ -1,4 +1,4 @@
-import type { Ability, AbilitySlot, RegisteredAbility } from '@/combat'
+import type { Ability, RegisteredAbility } from '@/combat'
 import { UNIT_DISPLAY_NAMES } from '@/constants/units'
 import advanced from '@/data/main/abilities/advanced'
 import environment from '@/data/main/abilities/environment'
@@ -12,6 +12,11 @@ import actionCard from './abilities/action-card'
 import genome from './abilities/genome'
 import paradigm from './abilities/paradigm'
 import unitUpgrade from './abilities/unit-upgrade'
+import {
+  type AbilitySlot,
+  FACTION_KEY_TO_SLOT,
+  unitSlot,
+} from './ability-slots'
 import baseUnits from './base-units'
 import factionDefinitions from './faction'
 
@@ -20,12 +25,19 @@ import factionDefinitions from './faction'
 // `src/data/main` (see `GameData`); code outside `src/data` must import only
 // these index modules.
 
+export type { AbilitySlot } from './ability-slots'
+export {
+  FACTION_KEY_TO_SLOT,
+  SLOT_DISPLAY,
+  SLOT_ORDER,
+  unitSlot,
+} from './ability-slots'
 export { default as baseUnits } from './base-units'
 
 function tag(
   abilities: readonly Ability[],
   slot: AbilitySlot,
-): RegisteredAbility[] {
+): RegisteredAbility<AbilitySlot>[] {
   return abilities.map(ability => ({ ability, slot }))
 }
 
@@ -39,13 +51,14 @@ const tfGeneral = general.filter(a => a.key !== 'PRE_GALVANIZED')
 // The unit-upgrade deck spans every unit type, so each card carries its unit
 // type as the panel sub-header (the deck is grouped by unit type in display
 // order — see `abilities/unit-upgrade`).
-const unitUpgrades: RegisteredAbility[] = Object.entries(unitUpgrade).flatMap(
-  ([unitType, cards]) =>
-    cards.map(card => ({
-      slot: 'TF_UNIT_UPGRADE' as const,
-      subcategory: UNIT_DISPLAY_NAMES[unitType as UnitBaseType],
-      ability: card,
-    })),
+const unitUpgrades: RegisteredAbility<AbilitySlot>[] = Object.entries(
+  unitUpgrade,
+).flatMap(([unitType, cards]) =>
+  cards.map(card => ({
+    slot: 'TF_UNIT_UPGRADE' as const,
+    subcategory: UNIT_DISPLAY_NAMES[unitType as UnitBaseType],
+    ability: card,
+  })),
 )
 
 // Registration order drives invoke resolution order within a timing pass
@@ -53,7 +66,7 @@ const unitUpgrades: RegisteredAbility[] = Object.entries(unitUpgrade).flatMap(
 // unit-upgrade cards are the TF analog of TI4's build-time UPGRADED stats:
 // their PREPARE applies the stat block that the ADVANCED drivers (Capacity,
 // Fleet Pool) read during their own PREPARE enforcement, so they go first.
-export const abilities: readonly RegisteredAbility[] = [
+export const abilities: readonly RegisteredAbility<AbilitySlot>[] = [
   ...unitUpgrades,
   ...tag(tfGeneral, 'GENERAL'),
   ...tag(advanced, 'ADVANCED'),
@@ -72,4 +85,7 @@ export const factions = resolveFactions(
   baseUnits as unknown as Readonly<Record<string, UnitDefinition>>,
   abilities,
   factionDefinitions,
+  { FACTION_KEY_TO_SLOT, unitSlot },
 )
+
+export type FactionKey = keyof typeof factions

@@ -1,6 +1,4 @@
-import type { Ability, AbilitySlot } from '@/combat'
-import type { factions as mainFactions } from '@/data/main'
-import type { factions as tfFactions } from '@/data/tf'
+import type { Ability } from '@/combat'
 
 import type { UnitBaseType, UnitDefinition, UnitDefinitionInput } from './unit'
 
@@ -10,16 +8,7 @@ import type { UnitBaseType, UnitDefinition, UnitDefinitionInput } from './unit'
 // has its own data module: `src/data/main` and `src/data/tf`.
 export type GameSystem = 'TI4' | 'TF'
 
-export interface FactionAbilities {
-  faction?: readonly Ability[]
-  technology?: readonly Ability[]
-  unit?: readonly Ability[]
-  promissory?: readonly Ability[]
-  agent?: readonly Ability[]
-  commander?: readonly Ability[]
-  hero?: readonly Ability[]
-  breakthrough?: readonly Ability[]
-}
+export type FactionAbilities = Record<string, Ability[]>
 
 // Faction data structure
 export interface Faction {
@@ -38,7 +27,7 @@ export interface DataRegistry {
   /** Every ability registered under `slot`: shared decks from the system's
    *  `abilities` list, faction-owned lists via FACTION_KEY_TO_SLOT, and
    *  unit-attached abilities via `unitSlot`. Computed once per slot. */
-  getAbilities(slot: AbilitySlot): readonly Ability[]
+  getAbilities(slot: string): readonly Ability[]
 }
 
 export type Lazy<T> = T | ((registry: DataRegistry) => T)
@@ -51,7 +40,3 @@ export interface FactionDefinition {
   units: Partial<Record<UnitBaseType, UnitDefinitionInput>>
   abilities?: Lazy<FactionAbilities>
 }
-
-// All faction keys across every game system. A faction's system is the data
-// module it lives in — see `getFactionSystem`.
-export type FactionKey = keyof typeof mainFactions | keyof typeof tfFactions

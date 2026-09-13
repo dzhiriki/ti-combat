@@ -52,6 +52,7 @@ describe('resolveFactions', () => {
     {},
     [{ ability: techT, slot: 'TECHNOLOGY' }],
     { S: staticFaction, L: lazyOne, M: lazyTwo },
+    main,
   )
 
   it('resolves lazy abilities and unit ABILITIES from the registry', () => {
@@ -70,6 +71,26 @@ describe('resolveFactions', () => {
   it('keeps definition order and passes static factions through', () => {
     expect(Object.keys(resolved)).toEqual(['S', 'L', 'M'])
     expect(resolved.S.abilities?.agent).toBe(staticAbilities.agent)
+  })
+
+  it('rejects faction ability groups the system does not declare', () => {
+    expect(() =>
+      resolveFactions(
+        'TF',
+        {},
+        [],
+        {
+          INVALID: {
+            name: 'Invalid',
+            units: {},
+            abilities: { breakthrough: [agentA] },
+          },
+        },
+        tf,
+      ),
+    ).toThrow(
+      'Faction ability group "breakthrough" on "INVALID" is not supported by TF',
+    )
   })
 })
 
