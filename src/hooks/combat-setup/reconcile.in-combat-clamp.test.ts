@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { declareParam } from '@/combat/abilities-engine/declare-param'
-import type { Ability } from '@/combat/abilities-engine/types'
+import type { RegisteredAbility } from '@/combat/abilities-engine/types'
 import type { SideStateData } from '@/combat/combat-state/types'
 import type { UnitBaseType, UnitIdList, UnitList, UnitType } from '@/types'
 
@@ -20,9 +20,10 @@ function makeSide(units: Record<string, UnitType>): SideStateData {
   }
 }
 
-function makeAbility(): Ability {
+function makeAbility(): RegisteredAbility {
   return {
     key: 'TEST_LIMIT',
+    slot: 'OTHER',
     name: 'Test Limit',
     params: {
       isEnabled: true,
@@ -70,7 +71,10 @@ describe('reconcileAbilitiesConfig — IN_COMBAT clamps tuple values', () => {
       },
       defender: { SETTINGS: makeSettingsConfig() },
     }
-    const abilities = { attacker: [ability], defender: [] as Ability[] }
+    const abilities = {
+      attacker: [ability],
+      defender: [] as RegisteredAbility[],
+    }
     const state = {
       attacker: makeSide({
         a: 'CRUISER' as UnitType,
@@ -92,7 +96,10 @@ describe('reconcileAbilitiesConfig — IN_COMBAT clamps tuple values', () => {
       },
       defender: { SETTINGS: makeSettingsConfig() },
     }
-    const abilities = { attacker: [ability], defender: [] as Ability[] }
+    const abilities = {
+      attacker: [ability],
+      defender: [] as RegisteredAbility[],
+    }
     const state = {
       attacker: makeSide({
         a: 'CRUISER' as UnitType,

@@ -168,7 +168,7 @@ describe('slot config', () => {
   const shownTo = (factionKey: string, key: string) =>
     gameData
       .getAvailableAbilities('attacker', factionKey)
-      .filter(reg => reg.ability.key === key)
+      .filter(reg => reg.key === key)
   const slotsOf = (key: string): string[] =>
     shownTo('A', key).map(reg => reg.slot)
   const categoriesOf = (key: string): string[] =>

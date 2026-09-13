@@ -18,6 +18,7 @@ import type {
   AbilityBaseParams,
   DeclaredSubtype,
   ParamChange,
+  RegisteredAbility,
   SettingsParams,
   SyncSourceConfig,
 } from '@/combat/abilities-engine/types'
@@ -47,9 +48,11 @@ export type SideLookups = Record<
 
 /** Fallback for callers that hand over bare ability lists (tests): every
  *  slot lookup is empty, `all` is the side list. */
-function emptyLookups(abilities: Record<CombatSide, Ability[]>): SideLookups {
-  const attacker = createRuntimeAbilityList(abilities.attacker, new Map())
-  const defender = createRuntimeAbilityList(abilities.defender, new Map())
+function emptyLookups(
+  abilities: Record<CombatSide, RegisteredAbility[]>,
+): SideLookups {
+  const attacker = createRuntimeAbilityList(abilities.attacker)
+  const defender = createRuntimeAbilityList(abilities.defender)
   return {
     attacker: { own: attacker, opponent: defender },
     defender: { own: defender, opponent: attacker },
@@ -84,7 +87,7 @@ export type SyncSnapshots = Map<string, string[]>
 // ── Sync-source reconciliation helpers ────────────────────────────────────
 
 function resolveSettings(
-  abilities: Ability[],
+  abilities: RegisteredAbility[],
   config: SideConfig,
 ): { settings: SettingsParams; subtypes: DeclaredSubtype[] } {
   const settingsAbility = abilities.find(a => a.key === 'SETTINGS')
@@ -126,7 +129,7 @@ function buildValidList(
  */
 export function initializeAbilityDefaults(
   config: AbilitiesConfig,
-  abilities: Record<CombatSide, Ability[]>,
+  abilities: Record<CombatSide, RegisteredAbility[]>,
 ): void {
   for (const side of ['attacker', 'defender'] as const) {
     for (const ability of abilities[side]) {
@@ -142,7 +145,7 @@ export function initializeAbilityDefaults(
  */
 export function reconcileAbilitiesConfig(
   config: AbilitiesConfig,
-  abilities: Record<CombatSide, Ability[]>,
+  abilities: Record<CombatSide, RegisteredAbility[]>,
   combatMode: CombatMode,
   syncSnapshots?: SyncSnapshots,
   state?: Pick<CombatStateData, 'attacker' | 'defender'>,
@@ -169,7 +172,7 @@ export function reconcileAbilitiesConfig(
  *  re-runs sync to propagate. */
 function refreshDeclaredSubtypes(
   config: AbilitiesConfig,
-  abilities: Record<CombatSide, Ability[]>,
+  abilities: Record<CombatSide, RegisteredAbility[]>,
   lookups: SideLookups,
 ): boolean {
   let changed = false
@@ -212,7 +215,7 @@ function subtypesEqual(a: DeclaredSubtype[], b: DeclaredSubtype[]): boolean {
  */
 function resetBaseGroups(
   config: AbilitiesConfig,
-  abilities: Record<CombatSide, Ability[]>,
+  abilities: Record<CombatSide, RegisteredAbility[]>,
   lookups: SideLookups,
 ): void {
   for (const side of ['attacker', 'defender'] as const) {
@@ -297,7 +300,7 @@ function resetBaseGroups(
  */
 function ensureConsumerDefaults(
   config: AbilitiesConfig,
-  abilities: Record<CombatSide, Ability[]>,
+  abilities: Record<CombatSide, RegisteredAbility[]>,
 ): void {
   for (const side of ['attacker', 'defender'] as const) {
     for (const ability of abilities[side]) {
@@ -319,7 +322,7 @@ function ensureConsumerDefaults(
  */
 function reconcileSyncAll(
   config: AbilitiesConfig,
-  abilities: Record<CombatSide, Ability[]>,
+  abilities: Record<CombatSide, RegisteredAbility[]>,
   syncSnapshots?: SyncSnapshots,
   state?: Pick<CombatStateData, 'attacker' | 'defender'>,
 ): void {
@@ -375,7 +378,7 @@ function reconcileSyncAll(
  */
 function reconcileAbilityOrder(
   config: AbilitiesConfig,
-  abilities: Record<CombatSide, Ability[]>,
+  abilities: Record<CombatSide, RegisteredAbility[]>,
   combatMode: CombatMode,
   lookups: SideLookups,
 ): void {
@@ -432,7 +435,7 @@ function reconcileAbilityOrder(
 }
 
 function collectParamChanges(
-  abilities: readonly Ability[],
+  abilities: readonly RegisteredAbility[],
   params: Record<string, Record<string, unknown>>,
   settings: SettingsParams,
   lookups: OwnOpponentContext<RuntimeAbilityList>,
@@ -466,7 +469,7 @@ function collectParamChanges(
 }
 
 function collectDeclaredSubtypes(
-  abilities: readonly Ability[],
+  abilities: readonly RegisteredAbility[],
   params: Record<string, Record<string, unknown>>,
   lookups: OwnOpponentContext<RuntimeAbilityList>,
 ): DeclaredSubtype[] {
@@ -508,7 +511,7 @@ function collectDeclaredSubtypes(
 }
 
 function reconcileSyncSources(
-  abilities: readonly Ability[],
+  abilities: readonly RegisteredAbility[],
   params: Record<string, Record<string, unknown>>,
   ownSettings: SettingsParams,
   opponentSettings: SettingsParams,
@@ -604,7 +607,7 @@ function reconcileSyncSources(
  */
 export function snapshotConsumerParams(
   config: AbilitiesConfig,
-  abilities: Record<CombatSide, Ability[]>,
+  abilities: Record<CombatSide, RegisteredAbility[]>,
 ): Record<CombatSide, Record<string, Record<string, unknown>>> {
   const saved: Record<CombatSide, Record<string, Record<string, unknown>>> = {
     attacker: {},
@@ -627,7 +630,7 @@ export function snapshotConsumerParams(
  */
 export function restoreConsumerParams(
   config: AbilitiesConfig,
-  abilities: Record<CombatSide, Ability[]>,
+  abilities: Record<CombatSide, RegisteredAbility[]>,
   saved: Record<CombatSide, Record<string, Record<string, unknown>>>,
 ): void {
   for (const side of ['attacker', 'defender'] as const) {
@@ -655,7 +658,7 @@ export function restoreConsumerParams(
  */
 export function clampLimitParams(
   config: AbilitiesConfig,
-  abilities: Record<CombatSide, Ability[]>,
+  abilities: Record<CombatSide, RegisteredAbility[]>,
   state?: Pick<CombatStateData, 'attacker' | 'defender'>,
 ): void {
   for (const side of ['attacker', 'defender'] as const) {
@@ -731,7 +734,7 @@ export function clampLimitParams(
  */
 export function resetSettingsToBase(
   config: AbilitiesConfig,
-  abilities: Record<CombatSide, Ability[]>,
+  abilities: Record<CombatSide, RegisteredAbility[]>,
   lookups?: SideLookups,
 ): void {
   const resolved = lookups ?? emptyLookups(abilities)

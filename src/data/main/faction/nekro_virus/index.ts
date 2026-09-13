@@ -32,7 +32,7 @@ import { theAlastor } from './the-alastor'
 // createFactionUnitAbility runs while collecting Nekro's copies, forwarding
 // unit abilities' declareParamChange before any side context exists — pass
 // an empty lookup.
-const EMPTY_LIST = createRuntimeAbilityList([], new Map())
+const EMPTY_LIST = createRuntimeAbilityList([])
 const EMPTY_LOOKUPS = { own: EMPTY_LIST, opponent: EMPTY_LIST }
 
 const EXCLUDED_UNIT_TYPES = new Set(['FLAGSHIP', 'MECH', 'SPACE_DOCK'])

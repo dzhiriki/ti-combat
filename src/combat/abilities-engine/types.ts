@@ -183,11 +183,11 @@ export type AbilityTiming = keyof TimingContextMap
 // ============================================================================
 
 export interface RuntimeAbilityList {
-  /** Flat deduped list of all abilities registered for this side. */
-  readonly all: readonly Ability[]
+  /** Every ability registered for this side, once each. */
+  readonly all: readonly RegisteredAbility[]
   /** Abilities registered on this side under `slot`, in registration
    *  order. Cached per slot. */
-  get(slot: string): readonly Ability[]
+  get(slot: string): readonly RegisteredAbility[]
 }
 
 /** What a declare hook or invoke factory may look at: the abilities
@@ -611,3 +611,8 @@ export interface Ability<Params extends Record<string, unknown> = any> {
         ctx: AbilityLookupContext,
       ) => AbilityInvoke<AbilityBaseParams & Params>[])
 }
+
+/** An ability as the engine sees it: the definition plus the slot the game
+ *  system registered it under. `Ability` alone is for definitions; every
+ *  list the engine, reconcile, or the setup store holds is one of these. */
+export type RegisteredAbility = Ability & { readonly slot: string }

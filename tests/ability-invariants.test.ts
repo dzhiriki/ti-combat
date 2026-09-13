@@ -15,14 +15,21 @@ import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
 // dev-guide checklist — violations render wrong or silently misfire at
 // runtime, so they belong in CI, not in reviewers' memories.
 
-/** Every ability object reachable by the engine, labeled for error messages.
- *  Deduped by object reference — the same ability registered under several
- *  slots (agents, shared unit abilities) is one entry. */
+/** Every ability reachable by the engine, labeled for error messages.
+ *  Registered entries are per-slot copies of the definitions, so this dedupes
+ *  by key — the same ability registered under several slots (agents, shared
+ *  unit abilities) or reachable from a unit definition is one entry. */
 function collectAllAbilities(): Map<Ability, string> {
   const out = new Map<Ability, string>()
+  const seen = new Set<string>()
+  const add = (ability: Ability, label: string) => {
+    if (seen.has(ability.key)) return
+    seen.add(ability.key)
+    out.set(ability, label)
+  }
   for (const system of GAME_SYSTEMS) {
     for (const ability of getGameData(system).allAbilities) {
-      if (!out.has(ability)) out.set(ability, ability.key)
+      add(ability, ability.key)
     }
   }
   // GameData lookup pools skip unit-attached abilities with no UI — walk the unit
@@ -36,12 +43,10 @@ function collectAllAbilities(): Map<Ability, string> {
       for (const stats of [unitDef.BASE, unitDef.UPGRADED]) {
         if (!stats) continue
         for (const a of stats.ABILITIES ?? []) {
-          if (!out.has(a)) out.set(a, `${factionKey} ${a.key}`)
+          add(a, `${factionKey} ${a.key}`)
         }
         const deploy = stats.UNIT_ABILITIES?.DEPLOY
-        if (deploy && !out.has(deploy)) {
-          out.set(deploy, `${factionKey} ${deploy.key}`)
-        }
+        if (deploy) add(deploy, `${factionKey} ${deploy.key}`)
       }
     }
   }
@@ -147,7 +152,7 @@ interface DisplayedEntry {
 }
 
 function collectDisplayed(): DisplayedEntry[] {
-  const seen = new Set<Ability>()
+  const seen = new Set<string>()
   const out: DisplayedEntry[] = []
 
   for (const system of GAME_SYSTEMS) {
@@ -164,12 +169,11 @@ function collectDisplayed(): DisplayedEntry[] {
       setup.setFaction('attacker', factionKey)
       setup.setFaction('defender', factionKey)
       for (const side of ['attacker', 'defender'] as const) {
-        for (const reg of setup.getAvailableAbilities(side)) {
-          const ability = reg.ability
-          if (seen.has(ability)) continue
+        for (const ability of setup.getAvailableAbilities(side)) {
+          if (seen.has(ability.key)) continue
           // Same predicate the panel's hasUI filter applies.
           if (!ability.headerUI && !ability.uiConfig) continue
-          seen.add(ability)
+          seen.add(ability.key)
 
           const defaults = extractDefaults(ability)
           const params = {

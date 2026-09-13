@@ -1,4 +1,4 @@
-import type { Ability } from '@/combat'
+import type { Ability, RegisteredAbility } from '@/combat'
 
 import type { CombatSide } from './combat-side'
 import type { Faction, GameSystem } from './faction'
@@ -68,14 +68,13 @@ export interface SlotDisplay {
 }
 
 /**
- * An ability paired with one slot entry of the config that shows it. Built
+ * A registered ability plus the slot entry of the config that shows it. Built
  * once per system; `getAvailableAbilities` filters these for a faction.
  */
-export interface CollectedAbility {
-  ability: Ability
-  slot: string
+export interface CollectedAbility extends RegisteredAbility {
   strategy?: SlotStrategy
-  /** Whether the NEUTRAL faction sees this entry. */
+  /** Whether the NEUTRAL faction sees this entry: the slot entry's flag and
+   *  the definition's own `neutral` folded into one. */
   neutral: boolean
   display: SlotDisplay
   /** Owning faction; absent for the system's shared decks. */
@@ -91,7 +90,7 @@ export interface GameData {
   factions: Readonly<Record<string, Faction>>
   baseUnits: Readonly<Partial<Record<UnitBaseType, UnitDefinition>>>
   /** Every ability reachable through this system, for config validation. */
-  allAbilities: readonly Ability[]
+  allAbilities: readonly RegisteredAbility[]
   /** All shared, faction, and unit abilities registered under a slot. */
   getAbilities(slot: string): readonly Ability[]
   getFaction(factionKey: string): Faction

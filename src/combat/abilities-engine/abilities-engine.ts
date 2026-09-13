@@ -1,5 +1,4 @@
 import type {
-  CollectedAbility,
   CombatSide,
   UnitBaseType,
   UnitId,
@@ -33,6 +32,7 @@ import type {
   Ability,
   AbilityInvoke,
   AbilityTiming,
+  RegisteredAbility,
   RuntimeAbilityList,
 } from './types'
 
@@ -84,18 +84,6 @@ const PRE_SORTED_BUCKETS: AbilityTiming[] = [
 ]
 
 // ── Ability execution engine (module-private helpers) ────────────────────
-
-/** Split a side's registered list into the ability list and the key→slot
- *  map the runtime lookups are built from. Each ability appears once. */
-function indexRegistered(regs: readonly CollectedAbility[]): {
-  abilities: Ability[]
-  slots: Map<string, string>
-} {
-  return {
-    abilities: regs.map(r => r.ability),
-    slots: new Map(regs.map(r => [r.ability.key, r.slot])),
-  }
-}
 
 /** Source of an ability - either from config, a deploy ability, or a unit */
 type AbilitySource =
@@ -455,14 +443,13 @@ const unitsWithCandidatesCache = new WeakMap<AbilityCandidate[], Set<UnitId>>()
 
 export class AbilitiesEngine {
   private _combatState!: CombatState
-  private _abilities!: Record<CombatSide, Ability[]>
-  private _abilitySlots!: Record<CombatSide, ReadonlyMap<string, string>>
+  private _abilities!: Record<CombatSide, RegisteredAbility[]>
   private _unitAbilityKeys!: Record<CombatSide, ReadonlySet<string>>
   private _attackerCtx!: AbilityContext
   private _defenderCtx!: AbilityContext
   private _runtimeLists?: Partial<Record<CombatSide, RuntimeAbilityList>>
   private _abilityByKey?: Partial<
-    Record<CombatSide, ReadonlyMap<string, Ability>>
+    Record<CombatSide, ReadonlyMap<string, RegisteredAbility>>
   >
 
   /** Run-state of the `runAbilities` pass currently executing, or undefined
@@ -547,7 +534,7 @@ export class AbilitiesEngine {
     return this.state.defender.faction
   }
 
-  getAbilities(side: CombatSide): Ability[] {
+  getAbilities(side: CombatSide): RegisteredAbility[] {
     return this._abilities[side]
   }
 
@@ -624,7 +611,7 @@ export class AbilitiesEngine {
   /**
    * Create from pre-reconciled config data (simulation initialization path).
    *
-   * `registered` lists each ability once per side, in registration order —
+   * `abilities` lists each ability once per side, in registration order —
    * the data layer guarantees it (see `getAvailableAbilities`).
    *
    * Expects the caller to have already run reconciliation
@@ -633,24 +620,13 @@ export class AbilitiesEngine {
    */
   static fromConfig(
     combatState: CombatState,
-    registered: Record<CombatSide, CollectedAbility[]>,
+    abilities: Record<CombatSide, RegisteredAbility[]>,
     unitAbilityKeys: Record<CombatSide, ReadonlySet<string>>,
     factionOwnedKeys: Record<CombatSide, ReadonlySet<string>>,
   ): AbilitiesEngine {
-    const attackerIndex = indexRegistered(registered.attacker)
-    const defenderIndex = indexRegistered(registered.defender)
-    const abilities: Record<CombatSide, Ability[]> = {
-      attacker: attackerIndex.abilities,
-      defender: defenderIndex.abilities,
-    }
-    const abilitySlots: Record<CombatSide, Map<string, string>> = {
-      attacker: attackerIndex.slots,
-      defender: defenderIndex.slots,
-    }
     const instance = Object.create(AbilitiesEngine.prototype) as AbilitiesEngine
     instance._combatState = combatState
     instance._abilities = abilities
-    instance._abilitySlots = abilitySlots
     instance._unitAbilityKeys = unitAbilityKeys
     instance._attackerCtx = new AbilityContext('attacker', instance)
     instance._defenderCtx = new AbilityContext('defender', instance)
@@ -682,24 +658,13 @@ export class AbilitiesEngine {
    */
   static wrap(
     combatState: CombatState,
-    registered: Record<CombatSide, CollectedAbility[]>,
+    abilities: Record<CombatSide, RegisteredAbility[]>,
     unitAbilityKeys: Record<CombatSide, ReadonlySet<string>>,
     factionOwnedKeys: Record<CombatSide, ReadonlySet<string>>,
   ): AbilitiesEngine {
-    const attackerIndex = indexRegistered(registered.attacker)
-    const defenderIndex = indexRegistered(registered.defender)
-    const abilities: Record<CombatSide, Ability[]> = {
-      attacker: attackerIndex.abilities,
-      defender: defenderIndex.abilities,
-    }
-    const abilitySlots: Record<CombatSide, Map<string, string>> = {
-      attacker: attackerIndex.slots,
-      defender: defenderIndex.slots,
-    }
     const instance = Object.create(AbilitiesEngine.prototype) as AbilitiesEngine
     instance._combatState = combatState
     instance._abilities = abilities
-    instance._abilitySlots = abilitySlots
     instance._unitAbilityKeys = unitAbilityKeys
     instance._attackerCtx = new AbilityContext('attacker', instance)
     instance._defenderCtx = new AbilityContext('defender', instance)
@@ -726,15 +691,12 @@ export class AbilitiesEngine {
 
   runtimeAbilityList(side: CombatSide): RuntimeAbilityList {
     const lists = (this._runtimeLists ??= {})
-    return (lists[side] ??= createRuntimeAbilityList(
-      this._abilities[side],
-      this._abilitySlots[side],
-    ))
+    return (lists[side] ??= createRuntimeAbilityList(this._abilities[side]))
   }
 
   /** Registered ability for `key` on `side`, or undefined. O(1) after the
    *  first call per side; `_abilities[side]` never changes after creation. */
-  abilityForKey(side: CombatSide, key: string): Ability | undefined {
+  abilityForKey(side: CombatSide, key: string): RegisteredAbility | undefined {
     const maps = (this._abilityByKey ??= {})
     const map = (maps[side] ??= new Map(
       this._abilities[side].map(a => [a.key, a]),
@@ -811,7 +773,7 @@ export class AbilitiesEngine {
   static collectAbilityCandidates(
     state: CombatStateData,
     side: CombatSide,
-    abilities: Ability[],
+    abilities: readonly RegisteredAbility[],
     unitAbilityKeys: ReadonlySet<string>,
     factionOwnedKeys: ReadonlySet<string>,
   ): AbilityCandidate[] {

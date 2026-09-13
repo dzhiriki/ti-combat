@@ -20,15 +20,14 @@ interface AbilitiesPanelProps {
 }
 
 function hasUI(reg: CollectedAbility): boolean {
-  const a = reg.ability
-  return !!a.headerUI || (a.uiConfig?.length ?? 0) > 0
+  return !!reg.headerUI || (reg.uiConfig?.length ?? 0) > 0
 }
 
 function isAbilityEnabled(
   reg: CollectedAbility,
   params: Record<string, unknown> | undefined,
 ): boolean {
-  const merged = { ...extractDefaults(reg.ability), ...params }
+  const merged = { ...extractDefaults(reg), ...params }
   const isEnabled = merged.isEnabled
   const uses = merged.uses
   return isEnabled === true && (typeof uses !== 'number' || uses > 0)
@@ -38,7 +37,7 @@ function isInCurrentMode(
   reg: CollectedAbility,
   combatMode: CombatMode,
 ): boolean {
-  return !reg.ability.context || reg.ability.context === combatMode
+  return !reg.context || reg.context === combatMode
 }
 
 function isSubsequence(word: string, needle: string): boolean {
@@ -59,8 +58,8 @@ function fuzzyMatch(haystack: string, needle: string): boolean {
 
 function matchesSearch(reg: CollectedAbility, query: string): boolean {
   const haystack = [
-    reg.ability.name,
-    reg.ability.description ?? '',
+    reg.name,
+    reg.description ?? '',
     reg.display.category,
     reg.display.subcategory ?? '',
   ]
@@ -84,15 +83,14 @@ function renderAbilityConfig(
     params: Record<string, unknown>,
   ) => void,
 ): React.ReactElement {
-  const ability = reg.ability
   return (
     <AbilityConfig
-      key={ability.key}
-      ability={ability}
+      key={reg.key}
+      ability={reg}
       readContext={readContext}
       combatMode={combatMode}
-      params={params[ability.key] ?? {}}
-      onParamsChange={newParams => onParamsChange(ability.key, newParams)}
+      params={params[reg.key] ?? {}}
+      onParamsChange={newParams => onParamsChange(reg.key, newParams)}
       hideIcon={!reg.display.icon}
     />
   )
@@ -115,7 +113,7 @@ export function AbilitiesPanel({
     filter(reg => {
       if (filterMode === 'all') return true
       if (filterMode === 'same') return isInCurrentMode(reg, combatMode)
-      return isAbilityEnabled(reg, params[reg.ability.key])
+      return isAbilityEnabled(reg, params[reg.key])
     }),
   )
 

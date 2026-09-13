@@ -46,7 +46,7 @@ export function prepareSimulationConfig(
   // config and never reach the panel; file them under OTHER so they flow
   // through the same registered pipeline.
   const customRegistered: CollectedAbility[] = custom.map(ability => ({
-    ability,
+    ...ability,
     slot: 'OTHER',
     neutral: true,
     display: { category: 'OTHER', order: Infinity, icon: true },
@@ -61,34 +61,30 @@ export function prepareSimulationConfig(
       ...customRegistered,
     ],
   }
-  const abilities: Record<CombatSide, Ability[]> = {
-    attacker: registered.attacker.map(r => r.ability),
-    defender: registered.defender.map(r => r.ability),
-  }
   const lookups = createLookups(registered)
 
-  const savedParams = snapshotConsumerParams(config, abilities)
+  const savedParams = snapshotConsumerParams(config, registered)
   // Materialize every registered ability's static defaults into the config so
   // `sideData.abilities` carries a base entry for all of them (uses, isEnabled,
   // and simple defaults). Runs AFTER the snapshot so it only fills gaps —
   // snapshot/restore must not capture these defaults and overwrite reconciled
   // sync values. Mirrors the UI store's setup (combat-setup.ts).
-  initializeAbilityDefaults(config, abilities)
+  initializeAbilityDefaults(config, registered)
   reconcileAbilitiesConfig(
     config,
-    abilities,
+    registered,
     combatMode,
     undefined,
     undefined,
     lookups,
   )
-  restoreConsumerParams(config, abilities, savedParams)
+  restoreConsumerParams(config, registered, savedParams)
   // After restore, sync-source params with declared limits may carry
   // user-supplied values that exceed the cap. Clamp them in place without
   // re-expanding the valid list so that order-mode params (single-element
   // tuples) and user-trimmed lists are not affected.
-  clampLimitParams(config, abilities)
-  resetSettingsToBase(config, abilities, lookups)
+  clampLimitParams(config, registered)
+  resetSettingsToBase(config, registered, lookups)
 
   return {
     attacker: {

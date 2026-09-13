@@ -1,6 +1,5 @@
 import {
   AbilitiesEngine,
-  type Ability,
   type AbilityReadContext,
   type CombatMode,
   CombatState,
@@ -62,7 +61,6 @@ export class CombatSetup {
   private _defenderSelections: Record<UnitBaseType, UnitSelection>
   private _combatMode: CombatMode
   private _abilities: Record<CombatSide, SideAbilitiesConfig>
-  private _sideAbilities: Record<CombatSide, Ability[]>
   private _sideRegistered!: Record<CombatSide, CollectedAbility[]>
   private _lookups!: SideLookups
   private _unitAbilityKeys: Record<CombatSide, ReadonlySet<string>>
@@ -99,10 +97,6 @@ export class CombatSetup {
       defender: defenderRegistered,
     }
     this._lookups = createLookups(this._sideRegistered)
-    this._sideAbilities = {
-      attacker: attackerRegistered.map(r => r.ability),
-      defender: defenderRegistered.map(r => r.ability),
-    }
     this._unitAbilityKeys = {
       attacker: gameData.getUnitDefinitionAbilityKeys(defaultFaction),
       defender: gameData.getUnitDefinitionAbilityKeys(defaultFaction),
@@ -136,10 +130,10 @@ export class CombatSetup {
       combatMode: 'SPACE',
     }
 
-    initializeAbilityDefaults(this._abilities, this._sideAbilities)
+    initializeAbilityDefaults(this._abilities, this._sideRegistered)
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
@@ -248,7 +242,6 @@ export class CombatSetup {
     )
     this._sideRegistered[side] = reg
     this._lookups = createLookups(this._sideRegistered)
-    this._sideAbilities[side] = reg.map(r => r.ability)
     this._unitAbilityKeys[side] = gameData.getUnitDefinitionAbilityKeys(faction)
     this._factionOwnedKeys[side] = gameData.getFactionOwnedAbilityKeys(faction)
 
@@ -257,7 +250,7 @@ export class CombatSetup {
     const oldSideConfig = this._abilities[side]
     const newSideConfig: Record<string, Record<string, unknown>> = {}
 
-    for (const ability of this._sideAbilities[side]) {
+    for (const ability of this._sideRegistered[side]) {
       const defaults = extractDefaults(ability)
       if (oldSideConfig[ability.key]) {
         newSideConfig[ability.key] = { ...oldSideConfig[ability.key] }
@@ -279,7 +272,7 @@ export class CombatSetup {
     // Reconcile
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
@@ -317,7 +310,7 @@ export class CombatSetup {
     this.setParam(side, abilityKey, params)
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
@@ -336,7 +329,7 @@ export class CombatSetup {
     }
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
@@ -365,10 +358,9 @@ export class CombatSetup {
     )
     this._sideRegistered[side] = regReset
     this._lookups = createLookups(this._sideRegistered)
-    this._sideAbilities[side] = regReset.map(r => r.ability)
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
@@ -383,10 +375,10 @@ export class CombatSetup {
       ...this._stateData,
       [side]: { ...this._stateData[side], abilities: this._abilities[side] },
     }
-    initializeAbilityDefaults(this._abilities, this._sideAbilities)
+    initializeAbilityDefaults(this._abilities, this._sideRegistered)
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
@@ -442,10 +434,6 @@ export class CombatSetup {
       defender: defenderRegistered,
     }
     this._lookups = createLookups(this._sideRegistered)
-    this._sideAbilities = {
-      attacker: attackerRegistered.map(r => r.ability),
-      defender: defenderRegistered.map(r => r.ability),
-    }
     this._unitAbilityKeys = {
       attacker: gameData.getUnitDefinitionAbilityKeys(this._attackerFaction),
       defender: gameData.getUnitDefinitionAbilityKeys(this._defenderFaction),
@@ -469,7 +457,7 @@ export class CombatSetup {
 
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
@@ -502,10 +490,10 @@ export class CombatSetup {
       attacker: {},
       defender: {},
     }
-    initializeAbilityDefaults(freshAbilities, this._sideAbilities)
+    initializeAbilityDefaults(freshAbilities, this._sideRegistered)
     reconcileAbilitiesConfig(
       freshAbilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       undefined,
       this._stateData,
@@ -571,10 +559,6 @@ export class CombatSetup {
       defender: defenderReg,
     }
     this._lookups = createLookups(this._sideRegistered)
-    this._sideAbilities = {
-      attacker: attackerReg.map(r => r.ability),
-      defender: defenderReg.map(r => r.ability),
-    }
     this._unitAbilityKeys = {
       attacker: gameData.getUnitDefinitionAbilityKeys(af),
       defender: gameData.getUnitDefinitionAbilityKeys(df),
@@ -586,10 +570,10 @@ export class CombatSetup {
 
     // Initialize ability defaults, reconcile, then apply URL overrides
     this._abilities = { attacker: {}, defender: {} }
-    initializeAbilityDefaults(this._abilities, this._sideAbilities)
+    initializeAbilityDefaults(this._abilities, this._sideRegistered)
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
@@ -635,7 +619,7 @@ export class CombatSetup {
     // Final reconcile and engine rebuild
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
@@ -693,11 +677,10 @@ export class CombatSetup {
       )
       this._sideRegistered[side] = regUpd
       this._lookups = createLookups(this._sideRegistered)
-      this._sideAbilities[side] = regUpd.map(r => r.ability)
     }
     reconcileAbilitiesConfig(
       this._abilities,
-      this._sideAbilities,
+      this._sideRegistered,
       this._combatMode,
       this._syncSnapshots,
       this._stateData,
@@ -748,7 +731,7 @@ export class CombatSetup {
     abilityKey: string,
     params: Record<string, unknown>,
   ): void {
-    const ability = this._sideAbilities[side].find(a => a.key === abilityKey)
+    const ability = this._sideRegistered[side].find(a => a.key === abilityKey)
 
     let finalParams = params
     if (ability?.onParamSet) {
@@ -772,7 +755,7 @@ export class CombatSetup {
 
     // Mutual exclusion: disable other abilities in the same exclusive group
     if (ability?.exclusiveGroup && finalParams.isEnabled) {
-      for (const other of this._sideAbilities[side]) {
+      for (const other of this._sideRegistered[side]) {
         if (other.key === abilityKey) continue
         if (other.exclusiveGroup !== ability.exclusiveGroup) continue
         const otherParams = newSideConfig[other.key]

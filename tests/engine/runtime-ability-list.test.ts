@@ -40,9 +40,7 @@ describe('RuntimeAbilityList.get(slot)', () => {
     expect(agentKeys).toContain('THUNDARIAN')
     // Nomad's own agent keeps the same slot as everyone else's; only its
     // rendered category differs.
-    const thundarian = registered.attacker.find(
-      r => r.ability.key === 'THUNDARIAN',
-    )!
+    const thundarian = registered.attacker.find(r => r.key === 'THUNDARIAN')!
     expect(thundarian.slot).toBe('FACTION_AGENT')
     expect(thundarian.display.category).toBe('FACTION')
     expect(lookups.attacker.own.get('AGENT')).toEqual([])

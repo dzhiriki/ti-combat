@@ -17,8 +17,8 @@ describe('Twilight’s Fall cloned abilities', () => {
   it('every TF deck card has a TF_-prefixed key of its own', () => {
     for (const r of tfRegistered) {
       if (!r.slot.startsWith('TF_')) continue
-      expect(r.ability.key, r.ability.name).toMatch(/^TF_/)
-      expect(ti4Keys.has(r.ability.key), r.ability.key).toBe(false)
+      expect(r.key, r.name).toMatch(/^TF_/)
+      expect(ti4Keys.has(r.key), r.key).toBe(false)
     }
     expect(tfKeys.has('TF_AMBUSH')).toBe(true)
     expect(tfKeys.has('TF_ALTRUISTIC_GENOME')).toBe(true)

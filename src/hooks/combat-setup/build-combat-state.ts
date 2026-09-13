@@ -44,8 +44,8 @@ export interface CombatStateConfig {
    *  harnesses use it to shuffle iteration order; production leaves it
    *  unset. */
   prepareAbilities?: (abilities: {
-    attacker: import('@/types').CollectedAbility[]
-    defender: import('@/types').CollectedAbility[]
+    attacker: import('../../combat/abilities-engine/types').RegisteredAbility[]
+    defender: import('../../combat/abilities-engine/types').RegisteredAbility[]
   }) => void
 }
 
@@ -180,21 +180,11 @@ export function buildCombatState(config: CombatStateConfig): CombatState {
   // Stateful clamp pass: with real per-side state now built, clamp IN_COMBAT
   // and EXTRA values that bypassed the UI hook (e.g. tests that hand-feed
   // over-limit values via `buildCombatState`).
-  const flatAbilities = {
-    attacker: sideAbilities.attacker.registered.map(r => r.ability),
-    defender: sideAbilities.defender.registered.map(r => r.ability),
-  }
-  const dedupe = (
-    arr: import('../../combat/abilities-engine/types').Ability[],
-  ) => {
-    const seen = new Set<string>()
-    return arr.filter(a => (seen.has(a.key) ? false : (seen.add(a.key), true)))
-  }
   clampLimitParams(
     abilitiesConfig,
     {
-      attacker: dedupe(flatAbilities.attacker),
-      defender: dedupe(flatAbilities.defender),
+      attacker: sideAbilities.attacker.registered,
+      defender: sideAbilities.defender.registered,
     },
     { attacker: attackerSide, defender: defenderSide },
   )

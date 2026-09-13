@@ -1,6 +1,6 @@
 import { z } from 'zod/mini'
 
-import { type Ability, extractDefaults } from '@/combat'
+import { extractDefaults, type RegisteredAbility } from '@/combat'
 import { UNIT_LIMITS, UNIT_TYPES } from '@/constants/units'
 import type { GameSystem } from '@/types'
 import { GAME_SYSTEMS } from '@/utils/get-game-data'
@@ -25,9 +25,9 @@ export interface ValidationResult {
 }
 
 export function buildAbilityLookup(
-  abilities: readonly Ability[],
-): Map<string, Ability> {
-  const map = new Map<string, Ability>()
+  abilities: readonly RegisteredAbility[],
+): Map<string, RegisteredAbility> {
+  const map = new Map<string, RegisteredAbility>()
   for (const ability of abilities) {
     if (!map.has(ability.key)) {
       map.set(ability.key, ability)
@@ -132,7 +132,7 @@ function validateUnits(
 
 function validateAbilities(
   raw: unknown,
-  abilityLookup: Map<string, Ability>,
+  abilityLookup: Map<string, RegisteredAbility>,
   warnings: string[],
 ): Record<string, Record<string, unknown>> {
   const result: Record<string, Record<string, unknown>> = {}
@@ -173,7 +173,7 @@ function validateAbilities(
 }
 
 function mergeWithDefaults(
-  ability: Ability,
+  ability: RegisteredAbility,
   params: Record<string, unknown>,
 ): Record<string, unknown> {
   const defaults = extractDefaults(ability)

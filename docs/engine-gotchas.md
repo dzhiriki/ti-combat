@@ -38,6 +38,13 @@ a check there too.
   `invoke: original.invoke.map(inv => ({ ...inv }))` — `cloneAbility` in
   `src/data/tf/clone-ability.ts` does this for every TF clone.
 
+- **Registered abilities are copies of their definitions.** `RegisteredAbility`
+  is `Ability & { slot }`, and `createGameData` builds one per slot entry by
+  spreading the definition. Identity-based lookups (`Set<Ability>`, WeakMap
+  caches) therefore never match a registered entry against the unit-definition
+  object it came from — dedupe by `key` instead. Invoke objects are shared by
+  the copy, so invoke-identity dedup is unaffected.
+
 - **TF clones never share a key with their TI4 source.** Every `cloneAbility`
   call passes its own `TF_<NAME>` key, so a TF session addresses Altruistic
   Genome as `TF_ALTRUISTIC_GENOME`, not `TELLURIAN`. Anything

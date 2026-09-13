@@ -1,20 +1,23 @@
-import type { CollectedAbility, CombatSide } from '@/types'
+import type { CombatSide } from '@/types'
 
-import type { Ability, OwnOpponentContext, RuntimeAbilityList } from './types'
+import type {
+  OwnOpponentContext,
+  RegisteredAbility,
+  RuntimeAbilityList,
+} from './types'
 
-/** Build a per-side lookup over a deduped ability list. `get(slot)` filters
+/** Build a per-side lookup over a side's registered list. `get(slot)` filters
  *  lazily and caches per slot, so repeated UI/engine reads share one array. */
 export function createRuntimeAbilityList(
-  abilities: readonly Ability[],
-  slots: ReadonlyMap<string, string>,
+  abilities: readonly RegisteredAbility[],
 ): RuntimeAbilityList {
-  const bySlot = new Map<string, readonly Ability[]>()
+  const bySlot = new Map<string, readonly RegisteredAbility[]>()
   return {
     all: abilities,
     get(slot) {
       let list = bySlot.get(slot)
       if (list === undefined) {
-        list = abilities.filter(a => slots.get(a.key) === slot)
+        list = abilities.filter(a => a.slot === slot)
         bySlot.set(slot, list)
       }
       return list
@@ -22,22 +25,13 @@ export function createRuntimeAbilityList(
   }
 }
 
-export function createRuntimeAbilityListFromRegistered(
-  registered: readonly CollectedAbility[],
-): RuntimeAbilityList {
-  return createRuntimeAbilityList(
-    registered.map(r => r.ability),
-    new Map(registered.map(r => [r.ability.key, r.slot])),
-  )
-}
-
 /** Own/opponent lookups for both sides, built from the registered lists
  *  alone — usable before an engine exists (reconcile, worker setup). */
 export function createLookups(
-  registered: Record<CombatSide, readonly CollectedAbility[]>,
+  registered: Record<CombatSide, readonly RegisteredAbility[]>,
 ): Record<CombatSide, OwnOpponentContext<RuntimeAbilityList>> {
-  const attacker = createRuntimeAbilityListFromRegistered(registered.attacker)
-  const defender = createRuntimeAbilityListFromRegistered(registered.defender)
+  const attacker = createRuntimeAbilityList(registered.attacker)
+  const defender = createRuntimeAbilityList(registered.defender)
   return {
     attacker: { own: attacker, opponent: defender },
     defender: { own: defender, opponent: attacker },

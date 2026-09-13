@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-import { type Ability, extractDefaults } from '@/combat'
+import { extractDefaults, type RegisteredAbility } from '@/combat'
 import { getGameData } from '@/utils/get-game-data'
 
 import type { SerializedConfig } from './combat-setup/serialization'
@@ -134,7 +134,7 @@ export function searchParamsToConfig(search: string): Record<string, unknown> {
 
 function decodeValue(
   raw: string,
-  ability: Ability | undefined,
+  ability: RegisteredAbility | undefined,
   paramKey: string,
 ): unknown {
   // Base params — always known types regardless of ability lookup

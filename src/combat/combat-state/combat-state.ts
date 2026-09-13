@@ -1,6 +1,5 @@
 import { GROUND_FORCES, STRUCTURES } from '@/constants/units'
 import type {
-  CollectedAbility,
   CombatSide,
   DiceGroup,
   UnitAbility,
@@ -21,7 +20,11 @@ import {
 } from '../abilities-engine'
 import { AbilityContext } from '../abilities-engine/api/ability-api'
 import { extractDefaults } from '../abilities-engine/declare-param'
-import type { AbilitiesOverride, Ability } from '../abilities-engine/types'
+import type {
+  AbilitiesOverride,
+  Ability,
+  RegisteredAbility,
+} from '../abilities-engine/types'
 import { CombatSideState } from '../combat-side-state/combat-side-state'
 import type {
   DiceMathBranch,
@@ -235,7 +238,7 @@ export class CombatState {
     attacker: SideStateData,
     defender: SideStateData,
     combatMode: CombatMode,
-    abilities?: Record<import('@/types').CombatSide, CollectedAbility[]>,
+    abilities?: Record<import('@/types').CombatSide, RegisteredAbility[]>,
     unitAbilityKeys?: Record<import('@/types').CombatSide, ReadonlySet<string>>,
     factionOwnedKeys?: Record<
       import('@/types').CombatSide,
@@ -307,7 +310,7 @@ export class CombatState {
 
   public static fromDataStandalone(
     data: CombatStateData,
-    abilities?: Record<import('@/types').CombatSide, CollectedAbility[]>,
+    abilities?: Record<import('@/types').CombatSide, RegisteredAbility[]>,
     unitAbilityKeys?: Record<import('@/types').CombatSide, ReadonlySet<string>>,
     factionOwnedKeys?: Record<
       import('@/types').CombatSide,
@@ -343,7 +346,7 @@ export class CombatState {
    *  defaults. Only fills absent keys — never overwrites existing config. */
   private static _ensureAbilityDefaults(
     data: CombatStateData,
-    abilities: Record<import('@/types').CombatSide, CollectedAbility[]>,
+    abilities: Record<import('@/types').CombatSide, RegisteredAbility[]>,
   ): void {
     for (const side of ['attacker', 'defender'] as const) {
       const cfg = data[side].abilities
@@ -352,7 +355,7 @@ export class CombatState {
           cfg[ability.key] = { ...extractDefaults(ability) }
         }
       }
-      for (const { ability } of abilities[side]) fill(ability)
+      for (const ability of abilities[side]) fill(ability)
       for (const { ability } of AbilitiesEngine.collectUnitAbilities(
         data,
         side,

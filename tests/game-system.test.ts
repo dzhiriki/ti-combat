@@ -35,10 +35,10 @@ describe('explicit game system', () => {
           // The engine consumes this list as is — a repeated key would fire
           // its invokes twice.
           expect(
-            seen.has(reg.ability.key),
-            `${system}:${faction} lists ${reg.ability.key} twice (in ${where})`,
+            seen.has(reg.key),
+            `${system}:${faction} lists ${reg.key} twice (in ${where})`,
           ).toBe(false)
-          seen.add(reg.ability.key)
+          seen.add(reg.key)
         }
       }
     },
@@ -67,7 +67,7 @@ describe('explicit game system', () => {
     const where = (faction: string, key: string): string[] =>
       data
         .getAvailableAbilities('attacker', faction)
-        .filter(reg => reg.ability.key === key)
+        .filter(reg => reg.key === key)
         .map(reg => `${reg.slot}:${reg.display.category}`)
 
     // Sardakk's own commander sits under FACTION; for anyone else it is one
