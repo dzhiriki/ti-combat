@@ -46,10 +46,7 @@
     "clsx": "^2.1.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "remark-gfm": "^4.0.1",
-    "remark-parse": "^11.0.0",
     "remeda": "^2.33.6",
-    "unified": "^11.0.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -1,27 +1,13 @@
 /// <reference types="vitest" />
 import { execSync } from 'child_process'
-import fs from 'node:fs'
 import path from 'path'
 
 import react from '@vitejs/plugin-react'
-import remarkGfm from 'remark-gfm'
-import remarkParse from 'remark-parse'
-import { unified } from 'unified'
 import { defineConfig } from 'vite'
-
-const mdParser = unified().use(remarkParse).use(remarkGfm)
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    {
-      name: 'markdown-ast',
-      transform(_code, id) {
-        if (!id.endsWith('.md')) return
-        const content = fs.readFileSync(id, 'utf-8')
-        return `export default ${JSON.stringify(mdParser.parse(content))}`
-      },
-    },
     {
       name: 'html-branch-title',
       apply: 'serve',
