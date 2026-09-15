@@ -50,14 +50,10 @@ export default defineConfig({
     },
   },
   css: {
-    modules: {
-      generateScopedName: (name, filename) => {
-        const srcDir = path.resolve(import.meta.dirname, 'src')
-        const rel = path
-          .relative(srcDir, filename)
-          .replace(/\.module\.css$/, '')
-          .replace(/[\\/]/g, '-')
-        return `${rel}__${name}`
+    transformer: 'lightningcss',
+    lightningcss: {
+      cssModules: {
+        pattern: '[name]-[hash]__[local]',
       },
     },
   },

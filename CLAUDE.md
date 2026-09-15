@@ -45,6 +45,7 @@ npm run preview
 - **React 19.2**: Latest React with Fast Refresh support
 - **TypeScript 7**: Native compiler with strict mode enabled
 - **Vite 8**: Build tool with Fast Refresh via @vitejs/plugin-react
+- **Lightning CSS**: Native CSS transformation and CSS Modules
 - **Oxlint**: Native JavaScript and TypeScript linting
 - **Oxfmt**: High-performance formatting and import sorting
 
@@ -60,6 +61,8 @@ npm run preview
 ### Vite
 
 - React plugin configured with @vitejs/plugin-react
+- Bundled dev mode is enabled for the app and disabled for Vitest
+- Lightning CSS handles CSS transformation and CSS Modules
 - React Compiler is not enabled
 
 ### Oxlint
