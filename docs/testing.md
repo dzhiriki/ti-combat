@@ -2,7 +2,7 @@
 
 ## Test Framework
 
-- **Vitest 4** with globals enabled (`describe`, `it`, `expect` auto-available)
+- **Vitest 5** with globals enabled (`describe`, `it`, `expect` auto-available)
 - Custom matchers and `forEachSide` helpers loaded automatically via setup files
 - Run tests: `npm run test:run` (single run) or `npm run test` (watch mode)
 

@@ -38,7 +38,8 @@ export default defineConfig({
     react(),
   ],
   experimental: {
-    bundledDev: true,
+    // Bundling helps browser development but adds overhead to Vitest.
+    bundledDev: process.env.VITEST !== 'true',
   },
   server: {
     host: true,
@@ -63,6 +64,8 @@ export default defineConfig({
   test: {
     globals: true,
     css: true,
+    // Persist transforms locally; avoid the write cost in clean CI runs.
+    fsModuleCache: !process.env.CI,
     testTimeout: 10000,
     setupFiles: [
       'tests/utils/expect.ts',

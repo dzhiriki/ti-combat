@@ -15,9 +15,7 @@ declare module 'vitest' {
   export const describe: SuiteAPI & ForEachSideDescribe
 
   // oxlint-disable-next-line typescript/no-empty-object-type
-  interface Assertion extends CustomMatchers {}
-  // oxlint-disable-next-line typescript/no-empty-object-type
-  interface AsymmetricMatchersContaining extends CustomMatchers {}
+  interface Matchers<R, T> extends CustomMatchers<R> {}
 }
 
 interface BranchSpec<X> {
