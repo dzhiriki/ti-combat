@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Twilight Imperium battle simulator built with React, TypeScript, and Vite. The project uses modern React 19 with the React Compiler enabled for automatic optimization.
+This is a Twilight Imperium battle simulator built with React, TypeScript, and Vite.
 
 ## Development Commands
 
@@ -42,9 +42,9 @@ npm run preview
 
 ## Tech Stack
 
-- **React 19.2**: Latest React with compiler optimization enabled
-- **TypeScript 5.9**: Strict mode enabled with comprehensive linting rules
-- **Vite 7**: Build tool with Fast Refresh via @vitejs/plugin-react
+- **React 19.2**: Latest React with Fast Refresh support
+- **TypeScript 7**: Native compiler with strict mode enabled
+- **Vite 8**: Build tool with Fast Refresh via @vitejs/plugin-react
 - **ESLint 10**: Using flat config format with `defineConfig`/`globalIgnores` API
 - **Prettier 3**: Code formatting with single quotes, 80 char width, no semicolons
 
@@ -52,15 +52,15 @@ npm run preview
 
 ### TypeScript
 
-- Project uses TypeScript project references (tsconfig.app.json, tsconfig.node.json, tsconfig.profile.json, tsconfig.snapshots.json)
+- Native TypeScript 7 is used for builds, with the TypeScript 6 compatibility package available to API-dependent tooling
 - Strict mode enabled with noUnusedLocals and noUnusedParameters
 - Bundler module resolution
-- Target: ES2024 (app), ES2023 (node)
+- Target: ES2024
 
 ### Vite
 
-- React plugin configured with babel-plugin-react-compiler
-- React Compiler is enabled globally (impacts dev/build performance but optimizes React rendering)
+- React plugin configured with @vitejs/plugin-react
+- React Compiler is not enabled
 
 ### ESLint
 

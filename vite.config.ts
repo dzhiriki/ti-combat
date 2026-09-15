@@ -1,8 +1,7 @@
 /// <reference types="vitest" />
 import fs from 'node:fs'
 
-import babel from '@rolldown/plugin-babel'
-import react, { reactCompilerPreset } from '@vitejs/plugin-react'
+import react from '@vitejs/plugin-react'
 import { execSync } from 'child_process'
 import path from 'path'
 import remarkGfm from 'remark-gfm'
@@ -37,7 +36,6 @@ export default defineConfig({
       },
     },
     react(),
-    babel({ presets: [reactCompilerPreset()] }),
   ],
   experimental: {
     bundledDev: true,
