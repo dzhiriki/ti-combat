@@ -1,7 +1,8 @@
 /// <reference types="vitest" />
 import fs from 'node:fs'
 
-import react from '@vitejs/plugin-react'
+import babel from '@rolldown/plugin-babel'
+import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import { execSync } from 'child_process'
 import path from 'path'
 import remarkGfm from 'remark-gfm'
@@ -35,24 +36,24 @@ export default defineConfig({
         )
       },
     },
-    react({
-      babel: {
-        plugins: [['babel-plugin-react-compiler']],
-      },
-    }),
+    react(),
+    babel({ presets: [reactCompilerPreset()] }),
   ],
+  experimental: {
+    bundledDev: true,
+  },
   server: {
     host: true,
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
   css: {
     modules: {
       generateScopedName: (name, filename) => {
-        const srcDir = path.resolve(__dirname, 'src')
+        const srcDir = path.resolve(import.meta.dirname, 'src')
         const rel = path
           .relative(srcDir, filename)
           .replace(/\.module\.css$/, '')
