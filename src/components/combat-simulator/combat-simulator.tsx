@@ -27,6 +27,7 @@ import { getUnitConfig } from '@/utils/get-unit-config'
 
 import { ButtonIconPlain } from '../ui/button-icon-plain'
 import { Divider } from '../ui/divider'
+
 import styles from './combat-simulator.module.css'
 
 const FILTER_MODE_VALUES: readonly AbilityFilterMode[] = [
@@ -144,23 +145,23 @@ export function CombatSimulator({
 
   const attackerAbilities = useMemo(
     () => getAvailableAbilities('attacker'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
     [system, attackerFaction],
   )
   const defenderAbilities = useMemo(
     () => getAvailableAbilities('defender'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
     [system, defenderFaction],
   )
 
   const attackerReadContext = useMemo(
     () => getReadContext('attacker'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
     [stateData],
   )
   const defenderReadContext = useMemo(
     () => getReadContext('defender'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
     [stateData],
   )
 
@@ -182,7 +183,7 @@ export function CombatSimulator({
       attacker: flatten(a?.[key]),
       defender: flatten(d?.[key]),
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [stateData])
 
   const participatingTypes = useMemo(() => {
@@ -195,7 +196,7 @@ export function CombatSimulator({
       return Array.isArray(list) ? (list as string[]) : []
     }
     return { attacker: read('attacker'), defender: read('defender') }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [stateData])
 
   const combatResult = useMemo(() => {

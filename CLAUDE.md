@@ -24,7 +24,7 @@ npm run lint:fix
 # Lint CSS files
 npm run lint:css
 
-# Format code with Prettier
+# Format code with Oxfmt
 npm run format
 
 # Check code formatting without modifying
@@ -45,14 +45,14 @@ npm run preview
 - **React 19.2**: Latest React with Fast Refresh support
 - **TypeScript 7**: Native compiler with strict mode enabled
 - **Vite 8**: Build tool with Fast Refresh via @vitejs/plugin-react
-- **ESLint 10**: Using flat config format with `defineConfig`/`globalIgnores` API
-- **Prettier 3**: Code formatting with single quotes, 80 char width, no semicolons
+- **Oxlint**: Native JavaScript and TypeScript linting
+- **Oxfmt**: High-performance formatting and import sorting
 
 ## Build Configuration
 
 ### TypeScript
 
-- Native TypeScript 7 is used for builds, with the TypeScript 6 compatibility package available to API-dependent tooling
+- Native TypeScript 7 is used directly for builds
 - Strict mode enabled with noUnusedLocals and noUnusedParameters
 - Bundler module resolution
 - Target: ES2024
@@ -62,17 +62,18 @@ npm run preview
 - React plugin configured with @vitejs/plugin-react
 - React Compiler is not enabled
 
-### ESLint
+### Oxlint
 
-- Flat config format (eslint.config.js) using ESLint 10 `defineConfig` and `globalIgnores`
-- Extends @eslint/js recommended, typescript-eslint recommended, react-hooks flat recommended, react-refresh vite config
-- Plugins: simple-import-sort, check-file, react-refresh
-- Browser globals configured
+- Configuration is in `.oxlintrc.json`
+- Enforces the migrated ESLint core, TypeScript, and React Hooks rules
+- Browser globals are enabled outside `functions/`
+- Filename and folder conventions are checked by `scripts/check-file-names.mjs`
 - Ignores dist and .worktrees directories
-- Integrated with eslint-config-prettier to disable conflicting formatting rules
 
-### Prettier
+### Oxfmt
 
+- Configuration is in `.oxfmtrc.json`
+- Sorts imports and formats JavaScript, TypeScript, CSS, JSON, Markdown, and HTML
 - Single quotes, no semicolons
 - 80 character line width
 - 2 space indentation

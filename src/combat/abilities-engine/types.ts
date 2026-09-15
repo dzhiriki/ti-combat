@@ -516,7 +516,7 @@ export type AbilitiesOverride = {
     | Partial<AbilityBaseParams & AbilityConfigMap[K]>
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line typescript/no-explicit-any
 export interface Ability<Params extends Record<string, unknown> = any> {
   key: string
   name: string // Display name for UI
@@ -525,7 +525,7 @@ export interface Ability<Params extends Record<string, unknown> = any> {
   icon?: string // Raw SVG string for display next to name
   params: AbilityBaseParams & Params
   paramsSchema?: {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line typescript/no-explicit-any
     safeParse: (data: unknown) => { success: boolean; data?: any }
   }
   headerUI?: 'isEnabled' | 'uses' | (string & keyof Params) // Param key to render in header (checkbox for boolean, number input for number)

@@ -30,7 +30,7 @@ function describeForEachSide(name: string, fn: () => void) {
   })
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line typescript/no-explicit-any
 ;(it as any).forEachSide = itForEachSide
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line typescript/no-explicit-any
 ;(describe as any).forEachSide = describeForEachSide

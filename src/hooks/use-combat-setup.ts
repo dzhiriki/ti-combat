@@ -92,13 +92,13 @@ export function useCombatSetup() {
   // useSimulation uses this as an effect dependency
   const simulationInput = useMemo(
     () => setup.toSimulationInput(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
     [stateData],
   )
 
   const serializedConfig = useMemo(
     () => setup.toSerializedConfig(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
     [stateData],
   )
 

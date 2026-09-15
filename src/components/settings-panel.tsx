@@ -13,9 +13,10 @@ import { Input } from '@/components/ui/input'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import type { Settings, Theme } from '@/hooks/use-settings'
 
-import styles from './settings-panel.module.css'
 import { Divider } from './ui/divider'
 import { Tooltip } from './ui/tooltip'
+
+import styles from './settings-panel.module.css'
 
 const themeOptions = [
   { value: 'system' as const, label: 'System' },

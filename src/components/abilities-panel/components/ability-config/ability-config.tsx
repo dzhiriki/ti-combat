@@ -26,6 +26,7 @@ import {
   type OrderListValue,
 } from '../list'
 import { Select } from '../select'
+
 import styles from './ability-config.module.css'
 
 interface AbilityConfigProps {

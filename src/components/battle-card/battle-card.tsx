@@ -24,13 +24,14 @@ import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
 import type { UnitConfig } from '@/utils/get-unit-config'
 
 import { Divider } from '../ui/divider'
-import styles from './battle-card.module.css'
 import {
   type CombatResult,
   CombatResultBar,
 } from './components/combat-result-bar'
 import { FactionSelect } from './components/faction-select'
 import { UnitRowDual } from './components/unit-row-dual'
+
+import styles from './battle-card.module.css'
 
 const UNITS = [
   {

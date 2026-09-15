@@ -214,7 +214,7 @@ export function useUrlSync(
     } finally {
       loadedRef.current = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [])
 
   // Write URL on config change — skip until user makes a change

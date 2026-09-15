@@ -1007,7 +1007,7 @@ export class AbilitiesEngine {
         }
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // oxlint-disable-next-line typescript/no-explicit-any
       const inv = invoke as any
 
       const unitSource = source.type === 'unit' ? source.unitId : undefined
@@ -1542,7 +1542,7 @@ export class AbilitiesEngine {
         ctx.unitSource = undefined
         ctx.ownerFaction = firstEntry.ownerFaction
         ctx.ability = ability
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // oxlint-disable-next-line typescript/no-explicit-any
         const sortedIds = (ability.sort as any)(mergedParams, ctx, unitIds)
 
         for (let i = 0; i < positions.length; i++) {

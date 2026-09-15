@@ -12,13 +12,14 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 
-import styles from './abilities-dialog.module.css'
 import type {
   AbilityEntry,
   Section,
   Subsection,
 } from './utils/parse-abilities-md'
 import { parseAbilitiesMd } from './utils/parse-abilities-md'
+
+import styles from './abilities-dialog.module.css'
 
 const abilitiesData = parseAbilitiesMd(abilitiesAst)
 

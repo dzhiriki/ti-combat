@@ -6,13 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "lint:fix": "eslint --fix",
+    "lint": "oxlint . && node scripts/check-file-names.mjs",
+    "lint:fix": "oxlint --fix . && node scripts/check-file-names.mjs",
     "lint:css": "stylelint \"src/**/*.css\"",
     "lint:css:fix": "stylelint \"src/**/*.css\" --fix",
     "preview": "vite preview",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
     "test": "vitest --no-isolate --pool=threads",
     "test:run": "vitest run --no-isolate --pool=threads",
     "test:shuffle": "sh -c 'for i in $(seq ${N:-5}); do echo \"\\nShuffle run $i/$N...\"; SHUFFLE_SEED=random npx vitest run --no-isolate --pool=threads || exit 1; done'",
@@ -24,15 +24,16 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
+      "oxlint --fix",
+      "node scripts/check-file-names.mjs",
+      "oxfmt --write"
     ],
     "*.css": [
       "stylelint --fix",
-      "prettier --write"
+      "oxfmt --write"
     ],
     "*.{js,jsx,json,md,html}": [
-      "prettier --write"
+      "oxfmt --write"
     ]
   },
   "dependencies": {
@@ -53,28 +54,19 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260411.1",
-    "@eslint/js": "^10.0.1",
     "@types/node": "^25.3.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@typescript/native": "npm:typescript@~7.0.2",
     "@vitejs/plugin-react": "^6.1.1",
-    "eslint": "^10.0.1",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-check-file": "^3.3.1",
-    "eslint-plugin-react-hooks": "^7.1.0-canary-ab18f33d-20260220",
-    "eslint-plugin-react-refresh": "^0.5.0",
-    "eslint-plugin-simple-import-sort": "^12.1.1",
-    "globals": "^17.3.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
+    "oxfmt": "^0.68.0",
+    "oxlint": "^1.83.0",
     "postcss": "^8.5.6",
-    "prettier": "^3.8.1",
     "stylelint": "^17.3.0",
     "stylelint-config-standard": "^40.0.0",
     "stylelint-order": "^7.0.1",
-    "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "typescript-eslint": "^8.70.0",
+    "typescript": "~7.0.2",
     "vite": "^8.3.0",
     "vite-node": "^6.0.0",
     "vitest": "^4.0.18"

@@ -115,50 +115,47 @@ describe('CROWN_OF_THALNOS', () => {
     ])
   })
 
-  it.fails(
-    'selected with multi-die unit (FLAGSHIP) — destruction only when ALL dice miss after reroll',
-    () => {
-      // ARBOREC FLAGSHIP [7,2] selected by Crown, safeReroll OFF. Note: Crown's
-      // destroyUnits bypasses Sustain Damage (forced destroy).
-      // shouldReroll: !isNaturalHit && selectedSet.has(unitId)
-      // Per die: natural hit faces 7-10 (0.4), miss faces 1-6 (0.6).
-      //
-      // After rerolls (+1 modifier → reroll hits on face >=6 = prob 0.5):
-      //   Per-die effective hit prob: 0.4 + 0.6 * 0.5 = 0.7
-      //   Per-die effective miss prob: 0.6 * 0.5 = 0.3
-      //
-      // Unit destroyed iff final unit_hits == 0:
-      //   P(both miss) = 0.3 * 0.3 = 0.09
-      const t = combatTest({
-        mode: 'SPACE',
-        attacker: {
-          faction: 'ARBOREC',
-          units: { FLAGSHIP: 1 },
-          abilities: {
-            CROWN_OF_THALNOS: {
-              isEnabled: true,
-              safeReroll: false,
-              selectedUnitTypes: [['FLAGSHIP', true]],
-            },
+  it.fails('selected with multi-die unit (FLAGSHIP) — destruction only when ALL dice miss after reroll', () => {
+    // ARBOREC FLAGSHIP [7,2] selected by Crown, safeReroll OFF. Note: Crown's
+    // destroyUnits bypasses Sustain Damage (forced destroy).
+    // shouldReroll: !isNaturalHit && selectedSet.has(unitId)
+    // Per die: natural hit faces 7-10 (0.4), miss faces 1-6 (0.6).
+    //
+    // After rerolls (+1 modifier → reroll hits on face >=6 = prob 0.5):
+    //   Per-die effective hit prob: 0.4 + 0.6 * 0.5 = 0.7
+    //   Per-die effective miss prob: 0.6 * 0.5 = 0.3
+    //
+    // Unit destroyed iff final unit_hits == 0:
+    //   P(both miss) = 0.3 * 0.3 = 0.09
+    const t = combatTest({
+      mode: 'SPACE',
+      attacker: {
+        faction: 'ARBOREC',
+        units: { FLAGSHIP: 1 },
+        abilities: {
+          CROWN_OF_THALNOS: {
+            isEnabled: true,
+            safeReroll: false,
+            selectedUnitTypes: [['FLAGSHIP', true]],
           },
         },
-        defender: { faction: 'ARBOREC', units: { CARRIER: 1 } },
-      })
+      },
+      defender: { faction: 'ARBOREC', units: { CARRIER: 1 } },
+    })
 
-      const branches = t.advance()
+    const branches = t.advance()
 
-      expect(branches).toHaveBranches(unitCount('attacker', 'FLAGSHIP'), [
-        { value: 0, probability: 0.09 },
-        { value: 1, probability: 0.91 },
-      ])
+    expect(branches).toHaveBranches(unitCount('attacker', 'FLAGSHIP'), [
+      { value: 0, probability: 0.09 },
+      { value: 1, probability: 0.91 },
+    ])
 
-      expect(branches).toHaveBranches(pendingHits('defender'), [
-        { value: 0, probability: 0.09 },
-        { value: 1, probability: 0.42 },
-        { value: 2, probability: 0.49 },
-      ])
-    },
-  )
+    expect(branches).toHaveBranches(pendingHits('defender'), [
+      { value: 0, probability: 0.09 },
+      { value: 1, probability: 0.42 },
+      { value: 2, probability: 0.49 },
+    ])
+  })
 
   it('safe-mode rerolls hitValue<=2 unit; reroll always converts and unit is never destroyed', () => {
     const t = combatTest({
@@ -185,33 +182,30 @@ describe('CROWN_OF_THALNOS', () => {
     ])
   })
 
-  it.fails(
-    'rerolls with hitValue<=2 unit; reroll always converts and unit is never destroyed',
-    () => {
-      const t = combatTest({
-        mode: 'SPACE',
-        attacker: {
-          faction: 'SARDAKK_NORR',
-          units: { DREADNOUGHT: 1 },
-          abilities: {
-            RICKAR_RICKANI: true,
-            CROWN_OF_THALNOS: {
-              isEnabled: true,
-              safeReroll: false,
-              selectedUnitTypes: [['DREADNOUGHT', true]],
-            },
+  it.fails('rerolls with hitValue<=2 unit; reroll always converts and unit is never destroyed', () => {
+    const t = combatTest({
+      mode: 'SPACE',
+      attacker: {
+        faction: 'SARDAKK_NORR',
+        units: { DREADNOUGHT: 1 },
+        abilities: {
+          RICKAR_RICKANI: true,
+          CROWN_OF_THALNOS: {
+            isEnabled: true,
+            safeReroll: false,
+            selectedUnitTypes: [['DREADNOUGHT', true]],
           },
         },
-        defender: { faction: 'ARBOREC', units: { CARRIER: 1 } },
-      })
+      },
+      defender: { faction: 'ARBOREC', units: { CARRIER: 1 } },
+    })
 
-      const branches = t.advance()
+    const branches = t.advance()
 
-      expect(branches).toHaveBranches(pendingHits('defender'), [
-        { value: 1, probability: 1 },
-      ])
-    },
-  )
+    expect(branches).toHaveBranches(pendingHits('defender'), [
+      { value: 1, probability: 1 },
+    ])
+  })
 
   it.fails('selected predicate matches first, safe-mode is fallback', () => {
     // CRUISER selected AND safeReroll on. The selected predicate is declared

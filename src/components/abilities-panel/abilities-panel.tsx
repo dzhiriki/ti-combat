@@ -10,8 +10,9 @@ import type {
 } from '@/types'
 import { matchesAbilitySlot } from '@/utils/matches-ability-slot'
 
-import styles from './abilities-panel.module.css'
 import { AbilityConfig } from './components/ability-config'
+
+import styles from './abilities-panel.module.css'
 
 export type AbilityFilterMode = 'all' | 'same' | 'enabled'
 

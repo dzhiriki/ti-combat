@@ -489,9 +489,7 @@ export const myTech: Ability<Params> = {
   name: 'My Tech',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  invoke: [
-    /* ... */
-  ],
+  invoke: [/* ... */],
 }
 ```
 
@@ -522,9 +520,7 @@ export const my_faction: Faction = {
     hero: [heroAbility], // Available to all factions
     breakthrough: [breakthrough], // Breakthrough abilities
   },
-  units: {
-    /* ... */
-  },
+  units: {/* ... */},
 }
 ```
 

@@ -28,7 +28,7 @@ export default {
       },
     ],
 
-    // Formatting handled by Prettier
+    // Formatting handled by Oxfmt
     'declaration-empty-line-before': null,
     'rule-empty-line-before': null,
 

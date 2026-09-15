@@ -1,9 +1,9 @@
 /// <reference types="vitest" />
+import { execSync } from 'child_process'
 import fs from 'node:fs'
+import path from 'path'
 
 import react from '@vitejs/plugin-react'
-import { execSync } from 'child_process'
-import path from 'path'
 import remarkGfm from 'remark-gfm'
 import remarkParse from 'remark-parse'
 import { unified } from 'unified'
