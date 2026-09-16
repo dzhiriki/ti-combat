@@ -115,7 +115,7 @@ function pickTarget(
     // (e.g. by Viscount running first via ABILITY_ORDER) is still found.
     // modifyUnitType then upgrades the base entry; subtype factories
     // re-evaluate against it lazily.
-    if (!ctx.api.own.surface.hasUnitType(type, { includeVariants: true }))
+    if (!ctx.api.own.participating.hasUnitType(type, { includeVariants: true }))
       continue
     const upgraded = faction[type]?.UPGRADED
     if (!upgraded || Object.keys(upgraded).length === 0) continue

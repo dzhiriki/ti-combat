@@ -17,7 +17,9 @@ declare global {
 
 function ownShipsFielded(ctx: AbilityReadContext): boolean {
   return SHIPS.some(
-    t => ctx.api.own.surface.getUnits(t, { includeVariants: true }).length > 0,
+    t =>
+      ctx.api.own.participating.getUnits(t, { includeVariants: true }).length >
+      0,
   )
 }
 

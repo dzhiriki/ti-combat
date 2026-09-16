@@ -32,9 +32,10 @@ export const lastDispatch: Ability<Params> = {
         // Check there's at least 1 eligible opponent ship
         const { ships } = ctx.api.opponent.getAbilityConfig('SETTINGS')
         for (const shipType of ships) {
-          const ids = ctx.api.opponent.surface.getUnits(shipType as UnitType, {
-            includeVariants: true,
-          })
+          const ids = ctx.api.opponent.participating.getUnits(
+            shipType as UnitType,
+            { includeVariants: true },
+          )
           for (const id of ids) {
             if (isEligibleTarget(ctx, id)) return true
           }
@@ -43,7 +44,7 @@ export const lastDispatch: Ability<Params> = {
       },
       call: (ctx, params) => {
         for (const variantId of ctx.utils.getFlat(params.targetPriority)) {
-          const ids = ctx.api.opponent.surface.getUnits(variantId, {
+          const ids = ctx.api.opponent.participating.getUnits(variantId, {
             includeVariants: true,
           })
           for (const id of ids) {

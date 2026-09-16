@@ -209,6 +209,15 @@ class SurfaceUnitQueryApi extends ScopedUnitQueryApi {
   }
 }
 
+class SystemUnitQueryApi extends ScopedUnitQueryApi {
+  protected scopeOptions(): Pick<
+    GetUnitsOptions,
+    'participatingOnly' | 'surfaceId'
+  > {
+    return {}
+  }
+}
+
 class ParticipatingUnitsApi
   extends ScopedUnitQueryApi
   implements ParticipatingUnitQueryApi
@@ -266,6 +275,8 @@ function affectsParticipating(
 export class SideApi {
   private _side: CombatSide
   private _ctx!: AbilityContext
+  /** All alive units in the active system, across every surface. */
+  readonly system: UnitQueryApi
   /** Alive units physically located on the current combat surface. */
   readonly surface: UnitQueryApi
   /** Units in the derived combat-participant pool, regardless of surface. */
@@ -276,6 +287,7 @@ export class SideApi {
   constructor(side: CombatSide, ctx: AbilityContext) {
     this._side = side
     this._ctx = ctx
+    this.system = new SystemUnitQueryApi(side, ctx)
     this.surface = new SurfaceUnitQueryApi(side, ctx)
     this.participating = new ParticipatingUnitsApi(side, ctx)
   }

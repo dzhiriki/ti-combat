@@ -44,7 +44,7 @@ export const exotrireme: Ability<Params> = {
     const remaining = new Set(unitIds)
     const result: UnitId[] = []
     for (const variantId of ctx.utils.getFlat(params.sacrificePriority)) {
-      for (const id of ctx.api.own.surface.getUnits(variantId, {
+      for (const id of ctx.api.own.participating.getUnits(variantId, {
         includeVariants: false,
       })) {
         if (remaining.has(id)) {

@@ -4,6 +4,7 @@ import {
   createDefaultSurfaces,
   DEFAULT_PLANET_ID,
   SPACE_SURFACE_ID,
+  type SurfaceId,
   type UnitId,
   type UnitIdList,
 } from '@/types'
@@ -80,28 +81,36 @@ function withAbility(
 }
 
 describe('SideApi unit query scopes', () => {
-  it('separates units on the active surface from participants', () => {
+  it('separates units in the system, on the active surface, and participating', () => {
     const cs = makeCombatState()
     const cruiserId = 'a' as UnitId
     const infantryId = 'b' as UnitId
     const pdsId = 'c' as UnitId
+    const mechId = 'd' as UnitId
+    const destroyerId = 'e' as UnitId
+    const secondPlanetId = 'planet-2' as SurfaceId
     const side = cs.data.attacker
 
     side.participatingUnits = `${cruiserId}${infantryId}` as UnitIdList
-    side.nonParticipatingUnits = `${pdsId}` as UnitIdList
+    side.nonParticipatingUnits = `${pdsId}${mechId}${destroyerId}` as UnitIdList
     side.surfaceUnits = {
-      [SPACE_SURFACE_ID]: `${cruiserId}` as UnitIdList,
+      [SPACE_SURFACE_ID]: `${cruiserId}${destroyerId}` as UnitIdList,
       [DEFAULT_PLANET_ID]: `${infantryId}${pdsId}` as UnitIdList,
+      [secondPlanetId]: `${mechId}` as UnitIdList,
     }
     side.unitSurface = {
       [cruiserId]: SPACE_SURFACE_ID,
       [infantryId]: DEFAULT_PLANET_ID,
       [pdsId]: DEFAULT_PLANET_ID,
+      [mechId]: secondPlanetId,
+      [destroyerId]: SPACE_SURFACE_ID,
     }
     side.unitType = {
       [cruiserId]: 'CRUISER',
       [infantryId]: 'INFANTRY',
       [pdsId]: 'PDS',
+      [mechId]: 'MECH',
+      [destroyerId]: 'DESTROYER',
     }
     cs.data.activeSurfaceId = DEFAULT_PLANET_ID
 
@@ -127,9 +136,34 @@ describe('SideApi unit query scopes', () => {
     expect(api.participating.getAssignHitsTargets(1)).toEqual([infantryId])
     expect(side.participatingUnits).toBe(`${cruiserId}${infantryId}`)
 
+    expect(api.system.getUnits('CRUISER', exact)).toEqual([cruiserId])
+    expect(api.system.getUnits('PDS', exact)).toEqual([pdsId])
+    expect(api.system.getUnits('MECH', exact)).toEqual([mechId])
+    expect(api.system.getUnits('DESTROYER', exact)).toEqual([destroyerId])
+    expect(api.system.countUnits(undefined, exact)).toBe(5)
+    expect(api.system.hasUnitType('CRUISER', exact)).toBe(true)
+    expect(api.system.getUnitTypes()).toEqual([
+      'CRUISER',
+      'INFANTRY',
+      'PDS',
+      'MECH',
+      'DESTROYER',
+    ])
+    expect(api.system.findUnitByPriority(['PDS', 'INFANTRY'], exact)).toBe(
+      pdsId,
+    )
+
     cs.data.activeSurfaceId = SPACE_SURFACE_ID
     expect(api.surface.getUnits('CRUISER', exact)).toEqual([cruiserId])
-    expect(api.surface.countUnits(undefined, exact)).toBe(1)
+    expect(api.surface.getUnits('DESTROYER', exact)).toEqual([destroyerId])
+    expect(api.surface.countUnits(undefined, exact)).toBe(2)
+    expect(api.participating.hasUnitType('DESTROYER', exact)).toBe(false)
+    expect(api.system.countUnits(undefined, exact)).toBe(5)
+    expect('getAssignHitsTargets' in api.system).toBe(false)
+
+    api.removeUnits(pdsId)
+    expect(api.system.countUnits(undefined, exact)).toBe(4)
+    expect(api.system.hasUnitType('PDS', exact)).toBe(false)
   })
 })
 

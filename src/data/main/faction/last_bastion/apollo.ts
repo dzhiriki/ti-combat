@@ -28,7 +28,11 @@ export const apollo: Ability<Params> = {
     heroUnit: declareParam<UnitType | null>({
       source: 'units',
       default: null,
-      filter: { includeSubtypes: [GALVANIZED], excludeSubtypes: [HERO] },
+      filter: {
+        includeSubtypes: [GALVANIZED],
+        excludeSubtypes: [HERO],
+        includeNonParticipating: true,
+      },
     }),
     heroDesignated: false,
   },
@@ -87,8 +91,8 @@ export const apollo: Ability<Params> = {
         // different post-Apollo state).
         const opp = ctx.api.opponent
         const groups = new Map<string, UnitId[]>()
-        for (const baseType of opp.surface.getUnitTypes()) {
-          for (const id of opp.surface.getUnits(baseType, {
+        for (const baseType of opp.system.getUnitTypes()) {
+          for (const id of opp.system.getUnits(baseType, {
             includeVariants: true,
           })) {
             const variantKey = opp.getUnitVariantKey(id) ?? baseType
@@ -126,7 +130,7 @@ export const apollo: Ability<Params> = {
       isCallable: params => !!params.heroUnit,
       call: (ctx, params) => {
         const variantId = makeVariantId(params.heroUnit!, [HERO])
-        const [unitId] = ctx.api.own.surface.getUnits(variantId, {
+        const [unitId] = ctx.api.own.system.getUnits(variantId, {
           includeVariants: false,
         })
         ctx.api.own.removeSubtype(unitId, HERO)

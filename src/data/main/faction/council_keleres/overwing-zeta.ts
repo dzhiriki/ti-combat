@@ -56,10 +56,10 @@ export const overwingZeta: Ability<Params> = {
 
           // Sum current fleet pool cost
           let currentCost = 0
-          for (const baseType of ctx.api.own.surface.getUnitTypes()) {
+          for (const baseType of ctx.api.own.participating.getUnitTypes()) {
             const stats = ctx.api.own.getUnitStats(baseType)
             if (typeof stats?.FLEET_POOL_COST !== 'number') continue
-            const count = ctx.api.own.surface.countUnits(baseType, {
+            const count = ctx.api.own.participating.countUnits(baseType, {
               includeVariants: true,
             })
             currentCost += count * stats.FLEET_POOL_COST

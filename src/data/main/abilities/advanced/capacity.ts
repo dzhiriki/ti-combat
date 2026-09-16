@@ -96,7 +96,7 @@ function enforceCapacity(
   const api = ctx.api.own
 
   const totalCapacity = computeTotalCapacity(ctx)
-  const freeCargo = collectFreeCargo(api)
+  const freeCargo = collectFreeCargo(api, api.surface)
 
   // Collect carried units (CAPACITY_COST != null). Exempt from enforcement:
   // free cargo (a living carrier holds them free), and units with a fleet

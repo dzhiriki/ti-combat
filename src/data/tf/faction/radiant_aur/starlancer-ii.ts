@@ -12,7 +12,7 @@ function mechCounts(ctx: AbilityReadContext): {
 } {
   let alive = 0
   let damaged = 0
-  for (const id of ctx.api.own.surface.getUnits('MECH', {
+  for (const id of ctx.api.own.system.getUnits('MECH', {
     includeVariants: true,
   })) {
     alive++
@@ -72,7 +72,7 @@ export const starlancerII: Ability<Params> = {
         return true
       },
       call: ctx => {
-        for (const id of ctx.api.own.surface.getUnits('MECH', {
+        for (const id of ctx.api.own.system.getUnits('MECH', {
           includeVariants: true,
         })) {
           if (ctx.api.own.getUnitState(id)?.isDamaged) {

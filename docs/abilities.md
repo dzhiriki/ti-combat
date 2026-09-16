@@ -358,22 +358,45 @@ Used in both `isCallable` and `call` contexts. The same `SideApi` class is used 
 
 ### Read Methods
 
-`GetUnitsOptions` is `{ includeVariants: boolean }` and is **required** wherever it appears.
+Unit queries are grouped by scope. `system` sees every living unit across all
+surfaces in the active system, `surface` sees only the active combat surface,
+and `participating` sees the derived combat-participant pool regardless of
+surface. Effects that choose or affect combatants use `participating` in both
+space and ground combat, even when their text says “in the active system”;
+explicit planet or space-area effects use `surface`; effects that refer to
+general units throughout the active system use `system`.
+
+`UnitQueryOptions` is `{ includeVariants: boolean }` and is **required**
+wherever it appears.
 
 ```typescript
+interface UnitQueryApi {
+  getUnits(unitType: UnitType, options: UnitQueryOptions): UnitId[]
+  hasUnitType(unitType: UnitType, options: UnitQueryOptions): boolean
+  countUnits(
+    filter: UnitType | UnitType[] | undefined,
+    options: UnitQueryOptions,
+  ): number
+  findUnitByPriority(
+    priority: UnitType[],
+    options: FindUnitOptions | FindUnitsOptions,
+  ): UnitId | UnitId[] | undefined
+  getUnitTypes(): UnitBaseType[]
+}
+
+system: UnitQueryApi
+surface: UnitQueryApi
+participating: UnitQueryApi & {
+  getAssignHitsTargets(hits: number): UnitId[]
+}
+
 getFaction(): string
 getCombatMode(): CombatMode  // for hooks that receive only a SideApi (e.g. preventDestroy)
-getUnits(unitType: UnitType, options: GetUnitsOptions): UnitId[]
 hasUnit(unitId: UnitId): boolean
-hasUnitType(unitType: UnitType, options: GetUnitsOptions): boolean
-countUnits(filter: UnitType | UnitType[] | undefined, options: GetUnitsOptions): number
 getPendingHits(filter?: { base?: true; bonus?: true }): number
 getHitPoolValidTargets(): UnitType[]
-getActiveBaseTypes(): UnitBaseType[]
-getParticipatingUnitTypes(options?: { combatMode?: CombatMode }): UnitType[]
 getUnitVariantsOptions(filter?: ParamFilter): { label: string, value: string }[]
 getUnitVariantsOptions(paramKey: string): { label: string, value: string }[]   // reads filter/limit from the declareParam
-findUnitByPriority(priority: UnitType[]): UnitId | undefined
 getUnitStats(unitTypeOrId: string | UnitId): UnitStats
 getUnitVariantKey(unitId: UnitId): string | undefined
 getUnitState(unitId: UnitId): UnitState

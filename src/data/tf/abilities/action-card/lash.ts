@@ -48,7 +48,7 @@ function findOpponentTarget(
   for (const variant of priority) {
     const cost = ctx.api.opponent.getUnitStats(variant)?.COST
     if (typeof cost !== 'number' || cost > threshold) continue
-    const [unit] = ctx.api.opponent.surface.getUnits(variant, {
+    const [unit] = ctx.api.opponent.system.getUnits(variant, {
       includeVariants: true,
     })
     if (unit) return unit
@@ -58,8 +58,7 @@ function findOpponentTarget(
 
 // Twilight's Fall action card. When one of your units is destroyed, destroy an
 // opponent unit in the same system whose cost is equal to or lower than the
-// lost unit's. Single-system calculator, so "in its system" is every
-// participating unit. The trigger list picks which of your losses are worth
+// lost unit's. The trigger list picks which of your losses are worth
 // the card (don't burn it on a fighter); the target list is a drag-ordered
 // priority — the first checked type that fits under the cost threshold is
 // destroyed (defaults to most-valuable-first).
@@ -73,33 +72,33 @@ export const lash: Ability<Params> = {
     uses: 1,
     spaceTriggers: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'units',
       side: 'own',
       defaultItemValue: true,
-      filter: { combatMode: 'SPACE' },
+      filter: { combatMode: 'SPACE', includeNonParticipating: true },
     }),
     groundTriggers: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundCombatParticipating',
+      source: 'units',
       side: 'own',
       defaultItemValue: true,
-      filter: { combatMode: 'GROUND' },
+      filter: { combatMode: 'GROUND', includeNonParticipating: true },
     }),
     spaceTargetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'units',
       side: 'opponent',
       sort: 'worth-desc',
       defaultItemValue: true,
-      filter: { combatMode: 'SPACE' },
+      filter: { combatMode: 'SPACE', includeNonParticipating: true },
     }),
     groundTargetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundCombatParticipating',
+      source: 'units',
       side: 'opponent',
       sort: 'worth-desc',
       defaultItemValue: true,
-      filter: { combatMode: 'GROUND' },
+      filter: { combatMode: 'GROUND', includeNonParticipating: true },
     }),
   },
   headerUI: 'isEnabled',
