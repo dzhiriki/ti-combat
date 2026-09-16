@@ -407,23 +407,33 @@ export class SideApi {
     return CombatSideState.getUnitBaseType(this._sideData, unitId)
   }
 
-  isUnitAbilityLost(ability: UnitAbility, unitType: UnitType) {
+  isUnitAbilityLost(
+    ability: UnitAbility,
+    unitType: UnitType,
+    surfaceId: SurfaceId = this.state.activeSurfaceId,
+  ) {
     return CombatSideState.isRestricted(
       this.state,
       this._side,
       'lost',
       ability,
       unitType,
+      surfaceId,
     )
   }
 
-  isUnitAbilityCannotBeUsed(ability: UnitAbility, unitType: UnitType) {
+  isUnitAbilityCannotBeUsed(
+    ability: UnitAbility,
+    unitType: UnitType,
+    surfaceId: SurfaceId = this.state.activeSurfaceId,
+  ) {
     return CombatSideState.isRestricted(
       this.state,
       this._side,
       'cannotBeUsed',
       ability,
       unitType,
+      surfaceId,
     )
   }
 
@@ -637,6 +647,7 @@ export class SideApi {
     ability: UnitAbility,
     reason: string,
     target?: UnitBaseType | UnitCategory,
+    surfaceId?: SurfaceId,
   ) {
     CombatSideState.addRestriction(
       this.state,
@@ -645,6 +656,7 @@ export class SideApi {
       ability,
       reason,
       target,
+      surfaceId,
     )
   }
 
@@ -652,6 +664,7 @@ export class SideApi {
     ability: UnitAbility,
     reason: string,
     target?: UnitBaseType | UnitCategory,
+    surfaceId?: SurfaceId,
   ) {
     CombatSideState.removeRestriction(
       this.state,
@@ -660,6 +673,7 @@ export class SideApi {
       ability,
       reason,
       target,
+      surfaceId,
     )
   }
 
@@ -667,6 +681,7 @@ export class SideApi {
     ability: UnitAbility,
     reason: string,
     target?: UnitBaseType | UnitCategory,
+    surfaceId?: SurfaceId,
   ) {
     CombatSideState.addRestriction(
       this.state,
@@ -675,6 +690,7 @@ export class SideApi {
       ability,
       reason,
       target,
+      surfaceId,
     )
   }
 
@@ -682,6 +698,7 @@ export class SideApi {
     ability: UnitAbility,
     reason: string,
     target?: UnitBaseType | UnitCategory,
+    surfaceId?: SurfaceId,
   ) {
     CombatSideState.removeRestriction(
       this.state,
@@ -690,6 +707,7 @@ export class SideApi {
       ability,
       reason,
       target,
+      surfaceId,
     )
   }
 

@@ -109,6 +109,8 @@ export interface RestrictionEntry {
   reason: string
   unitType?: UnitBaseType
   category?: UnitCategory
+  /** Omitted restrictions apply globally. */
+  surfaceId?: SurfaceId
 }
 
 /** "This unit type ignores every restriction coming from `reason`."
@@ -128,13 +130,22 @@ export interface UnitAbilityRestrictions {
   immune?: RestrictionImmunity[]
 }
 
-/** Resolved form of `UnitAbilityRestrictions`, derived from the raw
- *  entries + current unit composition + live SETTINGS. Stored per layer
- *  per ability: either `'ALL'` (blanket restriction, applies to every
- *  unit type) or a `Set` of restricted variant keys / base types.
- *  Lookup is O(1) — built lazily on first read after any mutation
- *  that could affect restriction outcomes. */
-export type ResolvedRestrictionsLayer = Map<UnitAbility, Set<UnitType> | 'ALL'>
+export type ResolvedRestrictionScope = Set<UnitType> | 'ALL'
+
+/** Resolved restrictions for one unit ability. Global restrictions are
+ *  checked for every unit; surface restrictions are checked only for units
+ *  physically located on that surface. */
+export interface ResolvedAbilityRestriction {
+  global?: ResolvedRestrictionScope
+  surfaces?: Map<SurfaceId, ResolvedRestrictionScope>
+}
+
+/** Resolved form of `UnitAbilityRestrictions`, derived from the raw entries,
+ *  current unit composition, and live SETTINGS. */
+export type ResolvedRestrictionsLayer = Map<
+  UnitAbility,
+  ResolvedAbilityRestriction
+>
 export interface ResolvedRestrictions {
   cannotBeUsed: ResolvedRestrictionsLayer
   lost: ResolvedRestrictionsLayer

@@ -32,6 +32,7 @@ import type {
   MetaPhase,
   ResolvedRestrictions,
   ResolvedRestrictionsLayer,
+  ResolvedRestrictionScope,
   RestrictionEntry,
   SideAbilitiesConfig,
   SideStateData,
@@ -378,9 +379,11 @@ function isSourceDisabled(
   state: CombatStateData,
   reason: string,
   visited: Set<string>,
+  surfaceId?: SurfaceId,
 ): boolean {
-  if (visited.has(reason)) return false
-  visited.add(reason)
+  const visitKey = `${reason}@${surfaceId ?? '*'}`
+  if (visited.has(visitKey)) return false
+  visited.add(visitKey)
 
   const ability = reason as UnitAbility
   for (const side of ['attacker', 'defender'] as const) {
@@ -391,9 +394,19 @@ function isSourceDisabled(
       const entries = restrictions[layer]?.[ability]
       if (!entries || entries.length === 0) continue
 
-      const hasValidEntry = entries.some(
-        e => !isSourceDisabled(state, e.reason, visited),
-      )
+      const hasValidEntry = entries.some(e => {
+        if (
+          e.surfaceId !== undefined &&
+          (surfaceId === undefined || e.surfaceId !== surfaceId)
+        )
+          return false
+        return !isSourceDisabled(
+          state,
+          e.reason,
+          visited,
+          e.surfaceId ?? surfaceId,
+        )
+      })
       if (hasValidEntry) return true
     }
   }
@@ -451,8 +464,28 @@ function buildResolvedForSide(
     ability: UnitAbility,
     entry: RestrictionEntry,
   ) => {
-    const existing = target.get(ability)
+    let resolved = target.get(ability)
+    if (!resolved) {
+      resolved = {}
+      target.set(ability, resolved)
+    }
+    if (resolved.global === 'ALL') return
+
+    const existing = entry.surfaceId
+      ? resolved.surfaces?.get(entry.surfaceId)
+      : resolved.global
     if (existing === 'ALL') return
+
+    const setScope = (value: ResolvedRestrictionScope) => {
+      if (entry.surfaceId) {
+        const surfaces =
+          resolved.surfaces ??
+          (resolved.surfaces = new Map<SurfaceId, ResolvedRestrictionScope>())
+        surfaces.set(entry.surfaceId, value)
+      } else {
+        resolved.global = value
+      }
+    }
 
     const immune = immuneByReason.get(entry.reason)
     const isImmune = (baseType: string) =>
@@ -460,7 +493,7 @@ function buildResolvedForSide(
 
     if (!entry.unitType && !entry.category) {
       if (!immune) {
-        target.set(ability, 'ALL')
+        setScope('ALL')
         return
       }
       // Blanket entry with an immune unit type on the side: expand it into
@@ -472,7 +505,7 @@ function buildResolvedForSide(
         set.add(key)
         set.add(baseType as UnitType)
       }
-      target.set(ability, set)
+      setScope(set)
       return
     }
 
@@ -497,7 +530,7 @@ function buildResolvedForSide(
       }
     }
 
-    target.set(ability, set)
+    setScope(set)
   }
 
   for (const layer of ['lost', 'cannotBeUsed'] as const) {
@@ -508,7 +541,8 @@ function buildResolvedForSide(
       const entries = layerData[ability as UnitAbility]
       if (!entries) continue
       for (const entry of entries) {
-        if (isSourceDisabled(state, entry.reason, new Set())) continue
+        if (isSourceDisabled(state, entry.reason, new Set(), entry.surfaceId))
+          continue
         addToLayer(target, ability as UnitAbility, entry)
       }
     }
@@ -585,6 +619,7 @@ function addRestrictionEntry(
   reason: string,
   unitType?: UnitBaseType,
   category?: UnitCategory,
+  surfaceId?: SurfaceId,
 ): UnitAbilityRestrictions {
   const current = restrictions ?? {}
   const layerData = current[layer] ?? {}
@@ -592,6 +627,7 @@ function addRestrictionEntry(
   const entry: RestrictionEntry = { reason }
   if (unitType) entry.unitType = unitType
   if (category) entry.category = category
+  if (surfaceId) entry.surfaceId = surfaceId
 
   return {
     ...current,
@@ -609,6 +645,7 @@ function removeRestrictionEntry(
   reason: string,
   unitType?: UnitBaseType,
   category?: UnitCategory,
+  surfaceId?: SurfaceId,
 ): UnitAbilityRestrictions | undefined {
   if (!restrictions) return undefined
   const layerData = restrictions[layer]
@@ -618,7 +655,10 @@ function removeRestrictionEntry(
 
   const filtered = entries.filter(
     e =>
-      e.reason !== reason || e.unitType !== unitType || e.category !== category,
+      e.reason !== reason ||
+      e.unitType !== unitType ||
+      e.category !== category ||
+      e.surfaceId !== surfaceId,
   )
 
   const newLayerData = { ...layerData }
@@ -1243,12 +1283,17 @@ export class CombatSideState {
     layer: 'lost' | 'cannotBeUsed',
     ability: UnitAbility,
     unitType: string,
+    surfaceId?: SurfaceId,
   ): boolean {
     if (!state[side].unitAbilityRestrictions) return false
     const resolved = getResolvedRestrictions(state, side)[layer].get(ability)
     if (!resolved) return false
-    if (resolved === 'ALL') return true
-    return resolved.has(unitType as UnitType)
+    const matches = (scope: ResolvedRestrictionScope | undefined) =>
+      scope === 'ALL' || scope?.has(unitType as UnitType) === true
+    return (
+      matches(resolved.global) ||
+      (surfaceId !== undefined && matches(resolved.surfaces?.get(surfaceId)))
+    )
   }
 
   /** Check if a unit ability is fully blocked by a blanket restriction.
@@ -1261,8 +1306,8 @@ export class CombatSideState {
     if (!state[side].unitAbilityRestrictions) return false
     const resolved = getResolvedRestrictions(state, side)
     return (
-      resolved.lost.get(ability) === 'ALL' ||
-      resolved.cannotBeUsed.get(ability) === 'ALL'
+      resolved.lost.get(ability)?.global === 'ALL' ||
+      resolved.cannotBeUsed.get(ability)?.global === 'ALL'
     )
   }
 
@@ -1291,7 +1336,7 @@ export class CombatSideState {
       UnitType,
       readonly [number, number] | null
     >()
-    const restrictionChecked = new Map<UnitBaseType, boolean>()
+    const restrictionChecked = new Map<string, boolean>()
 
     const walk = (pool: UnitIdList, skipParticipatingCheck: boolean) => {
       for (const id of pool) {
@@ -1307,19 +1352,29 @@ export class CombatSideState {
         if (!skipParticipatingCheck && !participatingTypes.has(type)) continue
 
         if (source !== 'COMBAT') {
-          let allowed = restrictionChecked.get(type)
+          const surfaceId = s.unitSurface[id] as SurfaceId
+          const restrictionKey = `${type}@${surfaceId}`
+          let allowed = restrictionChecked.get(restrictionKey)
           if (allowed === undefined) {
             allowed = !(
-              CombatSideState.isRestricted(state, side, 'lost', source, type) ||
+              CombatSideState.isRestricted(
+                state,
+                side,
+                'lost',
+                source,
+                type,
+                surfaceId,
+              ) ||
               CombatSideState.isRestricted(
                 state,
                 side,
                 'cannotBeUsed',
                 source,
                 type,
+                surfaceId,
               )
             )
-            restrictionChecked.set(type, allowed)
+            restrictionChecked.set(restrictionKey, allowed)
           }
           if (!allowed) continue
         }
@@ -1948,6 +2003,7 @@ export class CombatSideState {
     ability: UnitAbility,
     reason: string,
     target?: UnitBaseType | UnitCategory,
+    surfaceId?: SurfaceId,
   ): void {
     const s = state[side]
     const isCategory = target !== undefined && target in UNIT_CATEGORIES
@@ -1958,6 +2014,7 @@ export class CombatSideState {
       reason,
       isCategory ? undefined : (target as UnitBaseType),
       isCategory ? (target as UnitCategory) : undefined,
+      surfaceId,
     )
     // Cascade crosses sides — drop both caches.
     invalidateResolvedRestrictions(state)
@@ -1970,6 +2027,7 @@ export class CombatSideState {
     ability: UnitAbility,
     reason: string,
     target?: UnitBaseType | UnitCategory,
+    surfaceId?: SurfaceId,
   ): void {
     const s = state[side]
     const isCategory = target !== undefined && target in UNIT_CATEGORIES
@@ -1980,6 +2038,7 @@ export class CombatSideState {
       reason,
       isCategory ? undefined : (target as UnitBaseType),
       isCategory ? (target as UnitCategory) : undefined,
+      surfaceId,
     )
     invalidateResolvedRestrictions(state)
   }
