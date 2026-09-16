@@ -1,7 +1,7 @@
 import { UNIT_TYPES } from '@/constants/units'
 import type { UnitBaseType } from '@/types'
 
-import type { SideApi } from './ability-api'
+import type { SideApi, UnitQueryApi } from './ability-api'
 
 /** Carried unit types exempt from capacity because a LIVING unit on the side
  *  carries them free (`UnitStats.FREE_CARGO` — A Strangled Whisper's
@@ -9,13 +9,16 @@ import type { SideApi } from './ability-api'
  *  ends the moment the carrier dies. Shared by the capacity and fleet-pool
  *  drivers: free cargo neither consumes capacity nor spills into the fleet
  *  pool. */
-export function collectFreeCargo(api: SideApi): ReadonlySet<UnitBaseType> {
+export function collectFreeCargo(
+  api: SideApi,
+  units: UnitQueryApi,
+): ReadonlySet<UnitBaseType> {
   const free = new Set<UnitBaseType>()
   for (const baseType of UNIT_TYPES) {
     const cargo = api.getUnitStats(baseType)?.FREE_CARGO
     if (!cargo?.length) continue
     if (
-      api.surface.countUnits(baseType, {
+      units.countUnits(baseType, {
         includeVariants: true,
       }) === 0
     )

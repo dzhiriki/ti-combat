@@ -30,7 +30,7 @@ export const a3Valiance: Ability = {
         const { subtypes } = parseVariantId(variantKey)
         if (!subtypes.includes(GALVANIZED)) return false
         if (
-          !ctx.api.own.surface.hasUnitType('INFANTRY', {
+          !ctx.api.own.system.hasUnitType('INFANTRY', {
             includeVariants: true,
           })
         )
@@ -41,7 +41,7 @@ export const a3Valiance: Ability = {
         return tokens > 0
       },
       call: ctx => {
-        const ids = ctx.api.own.surface.getUnits('INFANTRY', {
+        const ids = ctx.api.own.system.getUnits('INFANTRY', {
           includeVariants: true,
         })
         let count = 0

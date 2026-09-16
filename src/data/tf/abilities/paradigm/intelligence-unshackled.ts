@@ -28,7 +28,7 @@ export const intelligenceUnshackled: Ability<Params> = {
       isCallable: (_params, ctx, ids) => {
         const hasOwn = ids.some(id => ctx.api.own.getUnitVariantKey(id) != null)
         if (!hasOwn) return false
-        return ctx.api.opponent.surface.getUnitTypes().length > 0
+        return ctx.api.opponent.system.getUnitTypes().length > 0
       },
       call: (ctx, _params, ids) => {
         // Catalyst = the destroyed own unit with the lowest combat value.
@@ -50,8 +50,8 @@ export const intelligenceUnshackled: Ability<Params> = {
         // Apollo) to avoid a 2^N branch explosion on large identical stacks.
         const opp = ctx.api.opponent
         const groups = new Map<string, UnitId[]>()
-        for (const baseType of opp.surface.getUnitTypes()) {
-          for (const id of opp.surface.getUnits(baseType, {
+        for (const baseType of opp.system.getUnitTypes()) {
+          for (const id of opp.system.getUnits(baseType, {
             includeVariants: true,
           })) {
             const variantKey = opp.getUnitVariantKey(id) ?? baseType

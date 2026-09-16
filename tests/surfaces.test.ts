@@ -369,3 +369,325 @@ describe('surface combat behavior', () => {
     expect(outcome.defenderSurfaces[PLANET_1].INFANTRY).toHaveLength(1)
   })
 })
+
+describe('multi-surface ability behavior', () => {
+  it('A3 Valiance galvanizes infantry on another planet', () => {
+    const t = combatTest({
+      mode: 'GROUND',
+      surfaces: SURFACES,
+      activeSurfaceId: PLANET_2,
+      attacker: {
+        faction: 'LAST_BASTION',
+        units: {},
+        placements: {
+          [PLANET_1]: { INFANTRY: 3 },
+          [PLANET_2]: { MECH: 1 },
+        },
+        abilities: {
+          PRE_GALVANIZED: {
+            isEnabled: true,
+            galvanizedUnits: [['MECH', 1]],
+            reinforcementTokens: 3,
+          },
+          SUSTAIN_DAMAGE: { groundPriority: [['MECH:Galvanized', true]] },
+        },
+      },
+      defender: {
+        faction: 'ARBOREC',
+        units: {},
+        placements: { [PLANET_2]: { INFANTRY: 4 } },
+      },
+    })
+
+    t.advanceTo('GROUND_COMBAT')
+    t.advanceRound({ attacker: 2 })
+
+    const remote = t.state.attacker.surfaceUnits[PLANET_1]
+    expect(remote).toHaveLength(3)
+    expect(
+      [...remote].every(id =>
+        t.state.attacker.unitType[id].includes('Galvanized'),
+      ),
+    ).toBe(true)
+  })
+
+  it('Emergency Repairs repairs a damaged unit on another planet', () => {
+    const t = combatTest({
+      mode: 'GROUND',
+      surfaces: SURFACES,
+      activeSurfaceId: PLANET_2,
+      attacker: {
+        faction: 'ARBOREC',
+        units: {},
+        placements: {
+          [PLANET_1]: { MECH: 1 },
+          [PLANET_2]: { INFANTRY: 1 },
+        },
+        abilities: { EMERGENCY_REPAIRS: true },
+      },
+      defender: {
+        faction: 'ARBOREC',
+        units: {},
+        placements: { [PLANET_2]: { INFANTRY: 1 } },
+      },
+    })
+    const mech = t.state.attacker.surfaceUnits[PLANET_1][0] as UnitId
+    t.state.attacker.unitState[mech] = { isDamaged: true }
+
+    t.advanceTo('GROUND_COMBAT')
+    t.advanceRound()
+
+    expect(t.abilityLog('EMERGENCY_REPAIRS')).not.toHaveLength(0)
+    expect(t.state.attacker.unitState[mech]?.isDamaged).not.toBe(true)
+  })
+
+  it('Apollo rolls against opponent units on every surface', () => {
+    const t = combatTest({
+      mode: 'SPACE',
+      surfaces: SURFACES,
+      activeSurfaceId: SPACE_SURFACE_ID,
+      attacker: {
+        faction: 'LAST_BASTION',
+        units: {},
+        placements: { [SPACE_SURFACE_ID]: { CRUISER: 1 } },
+        abilities: {
+          PRE_GALVANIZED: {
+            isEnabled: true,
+            galvanizedUnits: [['CRUISER', 1]],
+          },
+          APOLLO: { isEnabled: true, heroUnit: 'CRUISER:Galvanized' },
+        },
+      },
+      defender: {
+        faction: 'ARBOREC',
+        units: {},
+        placements: {
+          [SPACE_SURFACE_ID]: { CRUISER: 1 },
+          [PLANET_1]: { INFANTRY: 1 },
+        },
+      },
+    })
+
+    t.advanceToTiming(
+      'BEFORE_ASSIGN_HITS',
+      { attacker: 1, defender: 0 },
+      'SPACE_COMBAT',
+    )
+    expect(t.step()).toHaveLength(4)
+  })
+
+  it('Atomize destroys non-ship units on other surfaces', () => {
+    const t = combatTest({
+      system: 'TF',
+      mode: 'SPACE',
+      surfaces: SURFACES,
+      activeSurfaceId: SPACE_SURFACE_ID,
+      attacker: {
+        faction: 'AVARICE_REX',
+        units: {},
+        placements: { [SPACE_SURFACE_ID]: { FLAGSHIP: 1 } },
+        abilities: { TF_ATOMIZE: true },
+      },
+      defender: {
+        faction: 'AVARICE_REX',
+        units: {},
+        placements: {
+          [SPACE_SURFACE_ID]: { CRUISER: 2 },
+          [PLANET_1]: { INFANTRY: 1 },
+          [PLANET_2]: { PDS: 1 },
+        },
+      },
+    })
+
+    t.advanceTo('SPACE_COMBAT')
+    t.advanceRound({ attacker: 2 })
+
+    expect(t.state.defender.surfaceUnits[SPACE_SURFACE_ID]).toHaveLength(0)
+    expect(t.state.defender.surfaceUnits[PLANET_1]).toHaveLength(0)
+    expect(t.state.defender.surfaceUnits[PLANET_2]).toHaveLength(0)
+  })
+
+  it('Dame Briar galvanizes a surviving unit on another planet', () => {
+    const t = combatTest({
+      mode: 'GROUND',
+      surfaces: SURFACES,
+      activeSurfaceId: PLANET_2,
+      attacker: {
+        faction: 'LAST_BASTION',
+        units: {},
+        placements: {
+          [PLANET_1]: { INFANTRY: 1 },
+          [PLANET_2]: { INFANTRY: 1 },
+        },
+        abilities: {
+          DAME_BRIAR: { isEnabled: true, groundUnitType: 'INFANTRY' },
+          PRE_GALVANIZED: { reinforcementTokens: 1 },
+        },
+      },
+      defender: {
+        faction: 'ARBOREC',
+        units: {},
+        placements: { [PLANET_2]: { INFANTRY: 2 } },
+      },
+    })
+
+    t.advanceTo('GROUND_COMBAT')
+    t.advanceRound({ attacker: 1 })
+
+    const remote = t.state.attacker.surfaceUnits[PLANET_1][0]
+    expect(t.state.attacker.unitType[remote]).toContain('Galvanized')
+  })
+
+  it('Evelyn DeLouis does not select a non-participating ground force on another planet', () => {
+    const t = combatTest({
+      mode: 'GROUND',
+      surfaces: SURFACES,
+      activeSurfaceId: PLANET_2,
+      attacker: {
+        faction: 'FEDERATION_OF_SOL',
+        units: {},
+        placements: {
+          [PLANET_1]: { MECH: 1 },
+          [PLANET_2]: { INFANTRY: 1 },
+        },
+        abilities: {
+          EVELYN_DELOUIS: { isEnabled: true, unitType: 'MECH' },
+        },
+      },
+      defender: {
+        faction: 'ARBOREC',
+        units: {},
+        placements: { [PLANET_2]: { INFANTRY: 1 } },
+      },
+    })
+
+    t.advanceToTiming('BEFORE_DICE_ROLL', 0, 'GROUND_COMBAT')
+
+    expect(t.abilityLog('EVELYN_DELOUIS')).toHaveLength(0)
+    const mech = t.state.attacker.surfaceUnits[PLANET_1][0]
+    expect(t.state.attacker.unitType[mech]).not.toContain('Evelyn')
+  })
+
+  it('Intelligence Unshackled rolls against units on every surface', () => {
+    const t = combatTest({
+      system: 'TF',
+      mode: 'SPACE',
+      surfaces: SURFACES,
+      activeSurfaceId: SPACE_SURFACE_ID,
+      attacker: {
+        faction: 'AVARICE_REX',
+        units: {},
+        placements: { [SPACE_SURFACE_ID]: { CRUISER: 1 } },
+        abilities: { TF_INTELLIGENCE_UNSHACKLED: true },
+      },
+      defender: {
+        faction: 'AVARICE_REX',
+        units: {},
+        placements: {
+          [SPACE_SURFACE_ID]: { CRUISER: 1 },
+          [PLANET_1]: { INFANTRY: 1 },
+        },
+      },
+    })
+
+    t.advanceToTiming(
+      'BEFORE_ASSIGN_HITS',
+      { attacker: 1, defender: 0 },
+      'SPACE_COMBAT',
+    )
+    expect(t.step()).toHaveLength(4)
+  })
+
+  it('Lash can destroy a non-participant on another surface', () => {
+    const t = combatTest({
+      system: 'TF',
+      mode: 'SPACE',
+      surfaces: SURFACES,
+      activeSurfaceId: SPACE_SURFACE_ID,
+      attacker: {
+        faction: 'AVARICE_REX',
+        units: {},
+        placements: { [SPACE_SURFACE_ID]: { CRUISER: 1 } },
+        abilities: {
+          TF_LASH: {
+            isEnabled: true,
+            spaceTargetPriority: [['INFANTRY', true]],
+          },
+        },
+      },
+      defender: {
+        faction: 'AVARICE_REX',
+        units: {},
+        placements: {
+          [SPACE_SURFACE_ID]: { CRUISER: 1 },
+          [PLANET_1]: { INFANTRY: 1 },
+        },
+      },
+    })
+
+    t.advanceTo('SPACE_COMBAT')
+    t.advanceRound({ attacker: 1, defender: 0 })
+
+    expect(t.abilityLog('TF_LASH')).not.toHaveLength(0)
+    expect(t.state.defender.surfaceUnits[PLANET_1]).toHaveLength(0)
+  })
+
+  it("Moyin's Ashes counts mechs on other planets", () => {
+    const t = combatTest({
+      mode: 'GROUND',
+      surfaces: SURFACES,
+      activeSurfaceId: PLANET_2,
+      attacker: {
+        faction: 'YIN_BROTHERHOOD',
+        units: {},
+        placements: {
+          [PLANET_1]: { MECH: 4 },
+          [PLANET_2]: { INFANTRY: 2 },
+        },
+        abilities: { INDOCTRINATION: true, MOYINS_ASHES: true },
+      },
+      defender: {
+        faction: 'ARBOREC',
+        units: {},
+        placements: { [PLANET_2]: { INFANTRY: 3 } },
+      },
+    })
+
+    t.advanceTo('GROUND_COMBAT')
+    t.advanceRound()
+
+    expect(t.abilityLog('INDOCTRINATION')).not.toHaveLength(0)
+    expect(t.abilityLog('MOYINS_ASHES')).toHaveLength(0)
+    expect(t.attacker.units.MECH).toHaveLength(4)
+  })
+
+  it('Starlancer II repairs mechs on another planet', () => {
+    const t = combatTest({
+      system: 'TF',
+      mode: 'GROUND',
+      surfaces: SURFACES,
+      activeSurfaceId: PLANET_2,
+      attacker: {
+        faction: 'RADIANT_AUR',
+        units: {},
+        placements: {
+          [PLANET_1]: { MECH: 1 },
+          [PLANET_2]: { INFANTRY: 1 },
+        },
+        abilities: { TF_STARLANCER_II: { uses: 1 } },
+      },
+      defender: {
+        faction: 'AVARICE_REX',
+        units: {},
+        placements: { [PLANET_2]: { INFANTRY: 1 } },
+      },
+    })
+    const mech = t.state.attacker.surfaceUnits[PLANET_1][0] as UnitId
+    t.state.attacker.unitState[mech] = { isDamaged: true }
+
+    t.advanceToTiming('BEFORE_DICE_ROLL', 0, 'GROUND_COMBAT')
+
+    expect(t.abilityLog('TF_STARLANCER_II')).not.toHaveLength(0)
+    expect(t.state.attacker.unitState[mech]?.isDamaged).not.toBe(true)
+  })
+})

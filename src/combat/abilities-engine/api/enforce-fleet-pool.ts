@@ -16,7 +16,7 @@ export function enforceFleetPool(api: SideApi): void {
 
   // Types riding free on a living carrier (A Strangled Whisper) neither
   // consume capacity nor spill into the fleet pool.
-  const freeCargo = collectFreeCargo(api)
+  const freeCargo = collectFreeCargo(api, api.participating)
 
   // "Fighters in excess of your ships' capacity count against your fleet
   // pool" — the excess is measured against the ships' printed capacity from
@@ -36,7 +36,7 @@ export function enforceFleetPool(api: SideApi): void {
     if (!stats || stats.CAPACITY_COST != null) continue
     const cap = stats.CAPACITY
     if (cap == null || cap <= 0) continue
-    const count = api.surface.countUnits(baseType, {
+    const count = api.participating.countUnits(baseType, {
       includeVariants: true,
     })
     if (count > 0) totalCapacity += cap * count
@@ -57,7 +57,7 @@ export function enforceFleetPool(api: SideApi): void {
       continue
     capacityUsedByNonFP +=
       stats.CAPACITY_COST *
-      api.surface.countUnits(baseType, {
+      api.participating.countUnits(baseType, {
         includeVariants: true,
       })
   }
@@ -66,12 +66,12 @@ export function enforceFleetPool(api: SideApi): void {
 
   // Sum fleet pool cost across all units using FLEET_POOL_COST stat
   let totalCost = 0
-  const activeTypes = api.surface.getUnitTypes()
+  const activeTypes = api.participating.getUnitTypes()
   for (const baseType of activeTypes) {
     const stats = api.getUnitStats(baseType)
     if (typeof stats?.FLEET_POOL_COST !== 'number') continue
 
-    const count = api.surface.countUnits(baseType, {
+    const count = api.participating.countUnits(baseType, {
       includeVariants: true,
     })
 
@@ -111,12 +111,12 @@ export function enforceFleetPool(api: SideApi): void {
     const stats = api.getUnitStats(type)
     if (typeof stats?.FLEET_POOL_COST !== 'number') continue
     const cost = stats.FLEET_POOL_COST
-    const unitCount = api.surface.countUnits(type as UnitBaseType, {
+    const unitCount = api.participating.countUnits(type as UnitBaseType, {
       includeVariants: true,
     })
     const toRemove = Math.min(Math.ceil(excess / cost), unitCount)
     for (let i = 0; i < toRemove; i++) {
-      const id = api.surface.getUnits(type as UnitBaseType, {
+      const id = api.participating.getUnits(type as UnitBaseType, {
         includeVariants: true,
       })[0]
       if (!id) break

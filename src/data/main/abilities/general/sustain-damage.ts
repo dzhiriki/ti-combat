@@ -57,7 +57,7 @@ export const sustainDamage: Ability<Params> = {
     const remaining = new Set(unitIds)
     const result: UnitId[] = []
     for (const variantId of ctx.utils.getFlat(priority)) {
-      for (const id of ctx.api.own.surface.getUnits(variantId, {
+      for (const id of ctx.api.own.participating.getUnits(variantId, {
         includeVariants: false,
       })) {
         if (remaining.has(id)) {

@@ -29,13 +29,21 @@ export const dameBriar: Ability<Params> = {
     uses: 1,
     spaceUnitType: declareParam<UnitType>({
       default: 'DESTROYER',
-      source: 'spaceCombatParticipating',
-      filter: { excludeSubtypes: [GALVANIZED], combatMode: 'SPACE' },
+      source: 'units',
+      filter: {
+        excludeSubtypes: [GALVANIZED],
+        includeNonParticipating: true,
+        combatMode: 'SPACE',
+      },
     }),
     groundUnitType: declareParam<UnitType>({
       default: 'INFANTRY',
-      source: 'groundCombatParticipating',
-      filter: { excludeSubtypes: [GALVANIZED], combatMode: 'GROUND' },
+      source: 'units',
+      filter: {
+        excludeSubtypes: [GALVANIZED],
+        includeNonParticipating: true,
+        combatMode: 'GROUND',
+      },
     }),
   },
   headerUI: 'isEnabled',
@@ -68,9 +76,7 @@ export const dameBriar: Ability<Params> = {
           ctx.state.combatMode === 'GROUND'
             ? params.groundUnitType
             : params.spaceUnitType
-        if (
-          !ctx.api.own.surface.hasUnitType(target, { includeVariants: false })
-        )
+        if (!ctx.api.own.system.hasUnitType(target, { includeVariants: false }))
           return false
         const tokens =
           ctx.api.own.getAbilityConfig('PRE_GALVANIZED')?.reinforcementTokens ??
@@ -82,7 +88,7 @@ export const dameBriar: Ability<Params> = {
           ctx.state.combatMode === 'GROUND'
             ? params.groundUnitType
             : params.spaceUnitType
-        const ids = ctx.api.own.surface.getUnits(target, {
+        const ids = ctx.api.own.system.getUnits(target, {
           includeVariants: true,
         })
         for (const id of ids) {

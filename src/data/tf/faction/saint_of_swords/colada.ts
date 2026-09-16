@@ -15,7 +15,9 @@ function capacityTargets(ctx: AbilityReadContext): UnitBaseType[] {
       continue
     }
     if (
-      ctx.api.own.surface.countUnits(baseType, { includeVariants: true }) === 0
+      ctx.api.own.participating.countUnits(baseType, {
+        includeVariants: true,
+      }) === 0
     ) {
       continue
     }

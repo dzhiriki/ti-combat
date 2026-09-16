@@ -26,8 +26,8 @@ function getUnitsWithSustain(
   ctx: AbilityReadContext | AbilityCallContext,
 ): UnitId[] {
   const result: UnitId[] = []
-  for (const type of ctx.api.own.surface.getUnitTypes()) {
-    for (const unitId of ctx.api.own.surface.getUnits(type, {
+  for (const type of ctx.api.own.system.getUnitTypes()) {
+    for (const unitId of ctx.api.own.system.getUnits(type, {
       includeVariants: true,
     })) {
       if (ctx.api.own.getUnitStats(unitId)?.UNIT_ABILITIES?.SUSTAIN_DAMAGE) {
