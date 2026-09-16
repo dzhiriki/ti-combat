@@ -17,7 +17,7 @@ declare global {
 
 function ownShipsFielded(ctx: AbilityReadContext): boolean {
   return SHIPS.some(
-    t => ctx.api.own.getUnits(t, { includeVariants: true }).length > 0,
+    t => ctx.api.own.surface.getUnits(t, { includeVariants: true }).length > 0,
   )
 }
 
@@ -28,9 +28,8 @@ function mechsParticipating(ctx: AbilityReadContext): boolean {
 }
 
 function spaceMechsRemaining(ctx: AbilityReadContext): number {
-  return ctx.api.own.countUnits('MECH', {
+  return ctx.api.own.surface.countUnits('MECH', {
     includeVariants: true,
-    surfaceId: ctx.api.own.getSpaceSurfaceId(),
   })
 }
 

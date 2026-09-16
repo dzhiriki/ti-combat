@@ -50,7 +50,7 @@ export const courageousToTheEnd: Ability<Params> = {
         const ownEnabled = ctx.utils.getFlat(params.ownPriority)
         if (!ownEnabled.some(v => ownDestroyedVariants.has(v))) return false
 
-        const targets = ctx.api.opponent.getAssignHitsTargets(2)
+        const targets = ctx.api.opponent.participating.getAssignHitsTargets(2)
         const targetEnabled = new Set<string>(
           ctx.utils.getFlat(params.targetPriority),
         )
@@ -80,7 +80,8 @@ export const courageousToTheEnd: Ability<Params> = {
         ctx.rollDice([[combatValue, 2]], (branchCtx, hits) => {
           const total = hits[0]
           if (total === 0) return
-          const targets = branchCtx.api.opponent.getAssignHitsTargets(total)
+          const targets =
+            branchCtx.api.opponent.participating.getAssignHitsTargets(total)
           branchCtx.api.opponent.destroyUnits(targets)
         })
       },

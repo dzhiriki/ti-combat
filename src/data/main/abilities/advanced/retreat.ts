@@ -158,11 +158,10 @@ export const retreat: Ability<Params> = {
       isCallable: params => params._currentRound >= params.rounds,
       call: ctx => {
         const allIds: UnitId[] = []
-        for (const type of ctx.api.own.getActiveBaseTypes()) {
+        for (const type of ctx.api.own.participating.getUnitTypes()) {
           allIds.push(
-            ...ctx.api.own.getUnits(type, {
+            ...ctx.api.own.participating.getUnits(type, {
               includeVariants: true,
-              participatingOnly: true,
             }),
           )
         }

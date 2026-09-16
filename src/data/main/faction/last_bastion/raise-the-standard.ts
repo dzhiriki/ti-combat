@@ -76,9 +76,8 @@ export const raiseTheStandard: Ability<Params> = {
             : params.spaceUnitPriority
         const target = findTarget(ctx.api.own, priority)
         if (target === undefined) return
-        const ids = ctx.api.own.getUnits(target, {
+        const ids = ctx.api.own.participating.getUnits(target, {
           includeVariants: true,
-          participatingOnly: true,
         })
         for (const id of ids) {
           if (galvanizeUnit(ctx, id, true)) break
@@ -93,9 +92,8 @@ function findTarget(api: SideApi, priority: UnitList): UnitType | undefined {
     const type = t as UnitType
     if (parseVariantId(type).subtypes.includes(GALVANIZED)) continue
     if (
-      api.hasUnitType(type, {
+      api.participating.hasUnitType(type, {
         includeVariants: true,
-        participatingOnly: true,
       })
     )
       return type

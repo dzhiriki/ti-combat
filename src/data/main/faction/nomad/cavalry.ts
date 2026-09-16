@@ -93,15 +93,13 @@ export const cavalry: Ability<Params> = {
     {
       timing: 'START_OF_COMBAT',
       isCallable: (params, ctx) => {
-        return ctx.api.own.hasUnitType(params.unitType, {
+        return ctx.api.own.participating.hasUnitType(params.unitType, {
           includeVariants: false,
-          participatingOnly: true,
         })
       },
       call: (ctx, params) => {
-        const [unitId] = ctx.api.own.getUnits(params.unitType, {
+        const [unitId] = ctx.api.own.participating.getUnits(params.unitType, {
           includeVariants: false,
-          participatingOnly: true,
         })
 
         if (unitId !== undefined) ctx.api.own.addSubtype(unitId, CAVALRY)
@@ -113,9 +111,8 @@ export const cavalry: Ability<Params> = {
       context: 'SPACE_COMBAT',
       call: (ctx, params) => {
         const variantId = makeVariantId(params.unitType, [CAVALRY])
-        const [unitId] = ctx.api.own.getUnits(variantId, {
+        const [unitId] = ctx.api.own.participating.getUnits(variantId, {
           includeVariants: false,
-          participatingOnly: true,
         })
         if (unitId !== undefined) ctx.api.own.removeSubtype(unitId, CAVALRY)
       },

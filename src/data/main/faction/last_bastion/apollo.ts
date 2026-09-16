@@ -87,8 +87,10 @@ export const apollo: Ability<Params> = {
         // different post-Apollo state).
         const opp = ctx.api.opponent
         const groups = new Map<string, UnitId[]>()
-        for (const baseType of opp.getActiveBaseTypes()) {
-          for (const id of opp.getUnits(baseType, { includeVariants: true })) {
+        for (const baseType of opp.surface.getUnitTypes()) {
+          for (const id of opp.surface.getUnits(baseType, {
+            includeVariants: true,
+          })) {
             const variantKey = opp.getUnitVariantKey(id) ?? baseType
             const state = opp.getUnitState(id) ?? {}
             const stateKey = Object.keys(state)
@@ -124,7 +126,7 @@ export const apollo: Ability<Params> = {
       isCallable: params => !!params.heroUnit,
       call: (ctx, params) => {
         const variantId = makeVariantId(params.heroUnit!, [HERO])
-        const [unitId] = ctx.api.own.getUnits(variantId, {
+        const [unitId] = ctx.api.own.surface.getUnits(variantId, {
           includeVariants: false,
         })
         ctx.api.own.removeSubtype(unitId, HERO)

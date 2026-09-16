@@ -887,7 +887,18 @@ export class CombatSideState {
     options?: GetUnitsOptions,
   ): number {
     if (!filter) {
-      return s.participatingUnits.length + s.nonParticipatingUnits.length
+      const onRequestedSurface = (id: string) =>
+        !options?.surfaceId || s.unitSurface[id] === options.surfaceId
+      let total = 0
+      for (const id of s.participatingUnits) {
+        if (onRequestedSurface(id)) total += 1
+      }
+      if (!options?.participatingOnly) {
+        for (const id of s.nonParticipatingUnits) {
+          if (onRequestedSurface(id)) total += 1
+        }
+      }
+      return total
     }
     const filters = typeof filter === 'string' ? [filter] : filter
     let total = 0
@@ -900,13 +911,11 @@ export class CombatSideState {
   static findUnitByPriority(
     s: SideStateData,
     priority: UnitType[],
-    participatingTypes: ReadonlySet<UnitBaseType> | undefined,
     options: GetUnitsOptions & { predicate?: FindUnitPredicate },
   ): UnitId | undefined
   static findUnitByPriority(
     s: SideStateData,
     priority: UnitType[],
-    participatingTypes: ReadonlySet<UnitBaseType> | undefined,
     options: GetUnitsOptions & {
       amount: number
       predicate?: FindUnitPredicate
@@ -915,7 +924,6 @@ export class CombatSideState {
   static findUnitByPriority(
     s: SideStateData,
     priority: UnitType[],
-    participatingTypes: ReadonlySet<UnitBaseType> | undefined,
     options: GetUnitsOptions & {
       amount?: number
       predicate?: FindUnitPredicate
@@ -927,10 +935,7 @@ export class CombatSideState {
     const result: UnitId[] = []
 
     for (const variantId of priority) {
-      const { type } = parseVariantId(variantId)
-      if (participatingTypes && !participatingTypes.has(type)) continue
       for (const id of CombatSideState.getUnits(s, variantId, options)) {
-        if (!s.participatingUnits.includes(id)) continue
         if (predicate && !predicate(s.unitType[id], id)) continue
         if (!collect) return id
         result.push(id)
@@ -965,17 +970,21 @@ export class CombatSideState {
   /** Get all active base types (types with at least one alive unit). */
   static getActiveBaseTypes(
     s: SideStateData,
-    surfaceId?: SurfaceId,
+    options?: Pick<GetUnitsOptions, 'participatingOnly' | 'surfaceId'>,
   ): UnitBaseType[] {
     const { participatingUnits, nonParticipatingUnits, unitType } = s
     const types = new Set<UnitBaseType>()
     for (const id of participatingUnits) {
-      if (surfaceId && s.unitSurface[id] !== surfaceId) continue
+      if (options?.surfaceId && s.unitSurface[id] !== options.surfaceId)
+        continue
       types.add(parseVariantId(unitType[id]).type as UnitBaseType)
     }
-    for (const id of nonParticipatingUnits) {
-      if (surfaceId && s.unitSurface[id] !== surfaceId) continue
-      types.add(parseVariantId(unitType[id]).type as UnitBaseType)
+    if (!options?.participatingOnly) {
+      for (const id of nonParticipatingUnits) {
+        if (options?.surfaceId && s.unitSurface[id] !== options.surfaceId)
+          continue
+        types.add(parseVariantId(unitType[id]).type as UnitBaseType)
+      }
     }
     return [...types]
   }

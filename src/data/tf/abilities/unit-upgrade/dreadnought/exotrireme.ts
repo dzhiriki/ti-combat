@@ -75,11 +75,11 @@ export const exotrireme: Ability<Params> = {
       timing: 'AFTER_COMBAT_ROUND',
       context: 'SPACE_COMBAT',
       isCallable: (params, ctx) =>
-        ctx.api.own.findUnitByPriority(
+        ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.sacrificePriority),
           { includeVariants: false },
         ) !== undefined &&
-        ctx.api.opponent.findUnitByPriority(
+        ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
           { includeVariants: false },
         ) !== undefined,
@@ -90,11 +90,11 @@ export const exotrireme: Ability<Params> = {
         const usesLeft = params.uses
         let spent = 0
         while (spent < usesLeft) {
-          const sacrifice = ctx.api.own.findUnitByPriority(
+          const sacrifice = ctx.api.own.participating.findUnitByPriority(
             ctx.utils.getFlat(params.sacrificePriority),
             { includeVariants: false },
           )
-          const targets = ctx.api.opponent.findUnitByPriority(
+          const targets = ctx.api.opponent.participating.findUnitByPriority(
             ctx.utils.getFlat(params.targetPriority),
             { includeVariants: false, amount: 2 },
           )

@@ -69,7 +69,7 @@ export const supercharge: Ability<Params> = {
           ctx.state.combatMode === 'GROUND'
             ? params.groundPriority
             : params.spacePriority
-        const target = ctx.api.own.findUnitByPriority(
+        const target = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(priority),
           { includeVariants: false },
         )

@@ -56,15 +56,13 @@ export const evelynDelouis: Ability<Params> = {
       timing: 'START_OF_COMBAT_ROUND',
       external: true,
       isCallable: (params, ctx) => {
-        return ctx.api.own.hasUnitType(params.unitType, {
+        return ctx.api.own.participating.hasUnitType(params.unitType, {
           includeVariants: false,
-          participatingOnly: true,
         })
       },
       call: (ctx, params) => {
-        const [unitId] = ctx.api.own.getUnits(params.unitType, {
+        const [unitId] = ctx.api.own.participating.getUnits(params.unitType, {
           includeVariants: false,
-          participatingOnly: true,
         })
         ctx.api.own.addSubtype(unitId, EVELYN)
       },
@@ -76,17 +74,15 @@ export const evelynDelouis: Ability<Params> = {
       isCallable: (params, ctx) => {
         const variantId = makeVariantId(params.unitType, [EVELYN])
         return (
-          ctx.api.own.getUnits(variantId, {
+          ctx.api.own.participating.getUnits(variantId, {
             includeVariants: true,
-            participatingOnly: true,
           }).length > 0
         )
       },
       call: (ctx, params) => {
         const variantId = makeVariantId(params.unitType, [EVELYN])
-        const [unitId] = ctx.api.own.getUnits(variantId, {
+        const [unitId] = ctx.api.own.participating.getUnits(variantId, {
           includeVariants: true,
-          participatingOnly: true,
         })
         ctx.api.own.removeSubtype(unitId, EVELYN)
       },

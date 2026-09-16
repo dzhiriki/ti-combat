@@ -48,7 +48,7 @@ function findOpponentTarget(
   for (const variant of priority) {
     const cost = ctx.api.opponent.getUnitStats(variant)?.COST
     if (typeof cost !== 'number' || cost > threshold) continue
-    const [unit] = ctx.api.opponent.getUnits(variant, {
+    const [unit] = ctx.api.opponent.surface.getUnits(variant, {
       includeVariants: true,
     })
     if (unit) return unit

@@ -15,7 +15,7 @@ export const moyinsAshes: Ability = {
       timing: 'WHEN_INDOCTRINATION',
       isCallable: (_params, ctx) => {
         return (
-          ctx.api.own.countUnits('MECH', { includeVariants: true }) <
+          ctx.api.own.surface.countUnits('MECH', { includeVariants: true }) <
           UNIT_LIMITS.MECH
         )
       },

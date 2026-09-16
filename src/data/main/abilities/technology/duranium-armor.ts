@@ -97,7 +97,7 @@ function findRepairTarget(
     : params.spaceRepairPriority
 
   for (const [variantId] of priority) {
-    for (const unitId of ctx.api.own.getUnits(variantId as UnitType, {
+    for (const unitId of ctx.api.own.surface.getUnits(variantId as UnitType, {
       includeVariants: false,
     })) {
       const state = ctx.api.own.getUnitState(unitId)

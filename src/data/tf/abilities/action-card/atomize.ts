@@ -29,10 +29,10 @@ export const atomize: Ability = {
         const opSettings = ctx.api.opponent.getAbilityConfig('SETTINGS')
 
         const opIds: UnitId[] = opSettings.ships.flatMap(type =>
-          ctx.api.opponent.getUnits(type, { includeVariants: true }),
+          ctx.api.opponent.surface.getUnits(type, { includeVariants: true }),
         )
         const ownIds: UnitId[] = ownSettings.ships.flatMap(type =>
-          ctx.api.own.getUnits(type, { includeVariants: true }),
+          ctx.api.own.surface.getUnits(type, { includeVariants: true }),
         )
 
         ctx.api.opponent.destroyUnits(opIds)

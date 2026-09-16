@@ -13,7 +13,6 @@ export function enforceFleetPool(api: SideApi): void {
   if (!config?.isEnabled) return
 
   const { fleetPool, shipPriority } = config
-  const spaceId = api.getSpaceSurfaceId()
 
   // Types riding free on a living carrier (A Strangled Whisper) neither
   // consume capacity nor spill into the fleet pool.
@@ -37,9 +36,8 @@ export function enforceFleetPool(api: SideApi): void {
     if (!stats || stats.CAPACITY_COST != null) continue
     const cap = stats.CAPACITY
     if (cap == null || cap <= 0) continue
-    const count = api.countUnits(baseType, {
+    const count = api.surface.countUnits(baseType, {
       includeVariants: true,
-      surfaceId: spaceId,
     })
     if (count > 0) totalCapacity += cap * count
   }
@@ -59,9 +57,8 @@ export function enforceFleetPool(api: SideApi): void {
       continue
     capacityUsedByNonFP +=
       stats.CAPACITY_COST *
-      api.countUnits(baseType, {
+      api.surface.countUnits(baseType, {
         includeVariants: true,
-        surfaceId: spaceId,
       })
   }
 
@@ -69,14 +66,13 @@ export function enforceFleetPool(api: SideApi): void {
 
   // Sum fleet pool cost across all units using FLEET_POOL_COST stat
   let totalCost = 0
-  const activeTypes = api.getActiveBaseTypes(spaceId)
+  const activeTypes = api.surface.getUnitTypes()
   for (const baseType of activeTypes) {
     const stats = api.getUnitStats(baseType)
     if (typeof stats?.FLEET_POOL_COST !== 'number') continue
 
-    const count = api.countUnits(baseType, {
+    const count = api.surface.countUnits(baseType, {
       includeVariants: true,
-      surfaceId: spaceId,
     })
 
     if (stats.CAPACITY_COST != null) {
@@ -115,15 +111,13 @@ export function enforceFleetPool(api: SideApi): void {
     const stats = api.getUnitStats(type)
     if (typeof stats?.FLEET_POOL_COST !== 'number') continue
     const cost = stats.FLEET_POOL_COST
-    const unitCount = api.countUnits(type as UnitBaseType, {
+    const unitCount = api.surface.countUnits(type as UnitBaseType, {
       includeVariants: true,
-      surfaceId: spaceId,
     })
     const toRemove = Math.min(Math.ceil(excess / cost), unitCount)
     for (let i = 0; i < toRemove; i++) {
-      const id = api.getUnits(type as UnitBaseType, {
+      const id = api.surface.getUnits(type as UnitBaseType, {
         includeVariants: true,
-        surfaceId: spaceId,
       })[0]
       if (!id) break
       api.removeUnits(id)

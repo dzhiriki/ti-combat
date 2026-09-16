@@ -46,14 +46,14 @@ export const dunlainReaper: Ability<Params> = {
       isCallable: (params, ctx) => {
         if (params.availableMechs <= 0) return false
         return (
-          ctx.api.own.findUnitByPriority(
+          ctx.api.own.participating.findUnitByPriority(
             ctx.utils.getFlat(params.targetPriority),
             { includeVariants: false },
           ) !== undefined
         )
       },
       call: (ctx, params) => {
-        const target = ctx.api.own.findUnitByPriority(
+        const target = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
           { includeVariants: false },
         )!

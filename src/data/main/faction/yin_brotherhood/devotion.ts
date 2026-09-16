@@ -42,11 +42,11 @@ export const devotion: Ability<Params> = {
     {
       timing: 'END_OF_COMBAT_ROUND',
       isCallable: (params, ctx) => {
-        const sacrifice = ctx.api.own.findUnitByPriority(
+        const sacrifice = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.sacrificePriority),
           { includeVariants: false },
         )
-        const target = ctx.api.opponent.findUnitByPriority(
+        const target = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
           { includeVariants: false },
         )
@@ -55,11 +55,11 @@ export const devotion: Ability<Params> = {
         return true
       },
       call: (ctx, params) => {
-        const sacrifice = ctx.api.own.findUnitByPriority(
+        const sacrifice = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.sacrificePriority),
           { includeVariants: false },
         )
-        const target = ctx.api.opponent.findUnitByPriority(
+        const target = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
           { includeVariants: false },
         )

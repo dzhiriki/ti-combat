@@ -41,22 +41,25 @@ function findVoidShieldTarget(ctx: AbilityReadContext): UnitId | undefined {
   const validTargets = ctx.api.own.getHitPoolValidTargets()
   const validTargetSet = validTargets ? new Set(validTargets) : null
 
-  const target = ctx.api.own.findUnitByPriority(ctx.utils.getFlat(priority), {
-    includeVariants: false,
-    predicate: (variant, unitId) => {
-      if (validTargetSet && !validTargetSet.has(variant)) return false
-      if (ctx.api.own.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', variant)) {
-        return false
-      }
-      // Ignore units that don't have sustain because it lost
-      if (ctx.api.own.isUnitAbilityLost('SUSTAIN_DAMAGE', variant)) {
-        return false
-      }
+  const target = ctx.api.own.participating.findUnitByPriority(
+    ctx.utils.getFlat(priority),
+    {
+      includeVariants: false,
+      predicate: (variant, unitId) => {
+        if (validTargetSet && !validTargetSet.has(variant)) return false
+        if (ctx.api.own.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', variant)) {
+          return false
+        }
+        // Ignore units that don't have sustain because it lost
+        if (ctx.api.own.isUnitAbilityLost('SUSTAIN_DAMAGE', variant)) {
+          return false
+        }
 
-      if (ctx.api.own.getUnitState(unitId)?.isDamaged) return false
-      return true
+        if (ctx.api.own.getUnitState(unitId)?.isDamaged) return false
+        return true
+      },
     },
-  })
+  )
 
   return target
 }
