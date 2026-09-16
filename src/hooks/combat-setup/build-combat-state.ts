@@ -1,5 +1,8 @@
 import { makeVariantId } from '@/combat'
-import type { DeclaredSubtype } from '@/combat/abilities-engine/types'
+import type {
+  DeclaredSubtype,
+  RegisteredAbility,
+} from '@/combat/abilities-engine/types'
 import { SHIPS, STRUCTURES } from '@/constants/units'
 import type {
   CombatSide,
@@ -31,6 +34,7 @@ import type {
   SideAbilitiesConfig,
   SideStateData,
 } from '../../combat/combat-state/types'
+import { applyAbilityPlacementOverrides } from './ability-placement'
 import { prepareSimulationConfig } from './prepare-simulation-config'
 import { clampLimitParams } from './reconcile'
 
@@ -74,6 +78,7 @@ function buildSideState(
   system: GameSystem,
   config: SideConfig,
   abilities: SideAbilitiesConfig,
+  registeredAbilities: readonly RegisteredAbility[],
   gen: { _nextCode?: number },
   side: CombatSide,
   surfaces: SurfaceDefinition[],
@@ -84,6 +89,11 @@ function buildSideState(
   const unitStats: Record<string, UnitStats> = {}
 
   const factionConfig = getFactionUnitConfig(system, config.faction)
+  const placementStats = applyAbilityPlacementOverrides(
+    buildUnitStatsMap(system, config.faction, upgradedSet),
+    registeredAbilities,
+    abilities,
+  )
 
   const rawPlacements = config.placements
     ? Object.entries(config.placements).flatMap(([surfaceId, units]) =>
@@ -144,7 +154,13 @@ function buildSideState(
 
     const destination =
       surfaceId ??
-      defaultSurfaceId(surfaces, activeSurfaceId, side, unitType_, stats)
+      defaultSurfaceId(
+        surfaces,
+        activeSurfaceId,
+        side,
+        unitType_,
+        placementStats[unitType_] ?? stats,
+      )
     if (!placements[destination]) continue
     placements[destination][unitType_] = {
       count: placements[destination][unitType_].count + count,
@@ -159,6 +175,7 @@ function buildSideState(
     placements as SurfaceUnitSelections,
     surfaces,
     gen,
+    placementStats,
   )
 
   const settings = abilities['SETTINGS'] as
@@ -243,6 +260,7 @@ export function buildCombatState(config: CombatStateConfig): CombatState {
     config.system,
     config.attacker,
     abilitiesConfig.attacker,
+    sideAbilities.attacker.registered,
     gen,
     'attacker',
     surfaces,
@@ -252,6 +270,7 @@ export function buildCombatState(config: CombatStateConfig): CombatState {
     config.system,
     config.defender,
     abilitiesConfig.defender,
+    sideAbilities.defender.registered,
     gen,
     'defender',
     surfaces,

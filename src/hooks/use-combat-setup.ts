@@ -161,6 +161,8 @@ export function useCombatSetup(
     selectedPlanetId: setup.selectedPlanetId,
     surfaceSelections: setup.surfaceSelections,
     abilities: setup.abilities,
+    attackerConfig: setup.getUnitConfig('attacker'),
+    defenderConfig: setup.getUnitConfig('defender'),
     stateData,
     getReadContext: setup.getReadContext.bind(setup),
     getAvailableAbilities: setup.getAvailableAbilities.bind(setup),

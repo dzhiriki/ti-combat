@@ -33,16 +33,17 @@ export function getUnitConfig(
       unitDef.UPGRADED != null &&
       Object.keys(unitDef.UPGRADED).length > 0
 
+    const allowedSurfaces = allowedSurfaceTypes(
+      unitType,
+      unitDef.UPGRADED?.ALLOWED_SURFACES
+        ? { ...unitDef.BASE, ...unitDef.UPGRADED }
+        : unitDef.BASE,
+    )
     result[unitType] = {
       name: UNIT_DISPLAY_NAMES[unitType],
       shortName: UNIT_SHORT_NAMES[unitType],
       hasUpgrade,
-      allowedSurfaces: allowedSurfaceTypes(
-        unitType,
-        unitDef.UPGRADED?.ALLOWED_SURFACES
-          ? { ...unitDef.BASE, ...unitDef.UPGRADED }
-          : unitDef.BASE,
-      ),
+      allowedSurfaces,
     }
   }
 

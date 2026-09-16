@@ -5,12 +5,14 @@ import type { Faction } from '@/types'
 import { alarum } from './alarum'
 import { lastDispatch } from './last-dispatch'
 import { linkshipI, linkshipII } from './linkship'
+import { miniaturization } from './miniaturization'
 import { watchfulOjz } from './watchful-ojz'
 
 export const ral_nel: Faction = {
   name: 'Ral Nel Consortium',
   icon: ralNelIcon,
   abilities: {
+    ability: [miniaturization],
     commander: [watchfulOjz],
   },
   units: {
