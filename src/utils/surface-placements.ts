@@ -46,13 +46,15 @@ export function defaultSurfaceId(
   side: CombatSide,
   type: UnitBaseType,
   stats?: UnitStats,
+  preferredSurfaceType?: SurfaceType,
 ): SurfaceId {
   const allowed = allowedSurfaceTypes(type, stats)
-  const preferred: SurfaceType =
+  const defaultPreferred: SurfaceType =
     SHIPS.includes(type) ||
     (GROUND_FORCES.includes(type) && side === 'attacker')
       ? 'SPACE'
       : 'PLANET'
+  const preferred = preferredSurfaceType ?? defaultPreferred
   const preferredType = allowed.includes(preferred) ? preferred : allowed[0]
   const active = surfaces.find(s => s.id === activePlanetId)
   if (preferredType === 'PLANET' && active?.type === 'PLANET') return active.id
@@ -101,6 +103,7 @@ export function expandSimplifiedSelections(
   planetId: SurfaceId,
   side: CombatSide,
   stats: Partial<Record<UnitBaseType, UnitStats>>,
+  combatMode: 'SPACE' | 'GROUND',
 ): SurfaceUnitSelections {
   const next: SurfaceUnitSelections = {}
   for (const surface of surfaces) {
@@ -116,12 +119,18 @@ export function expandSimplifiedSelections(
   next[planetId] = createEmptyUnitSelections()
   for (const type of UNIT_TYPES) {
     const selection = selections[type]
+    const preferredSurfaceType: SurfaceType =
+      SHIPS.includes(type) ||
+      (GROUND_FORCES.includes(type) && combatMode === 'SPACE')
+        ? 'SPACE'
+        : 'PLANET'
     const destination = defaultSurfaceId(
       surfaces,
       planetId,
       side,
       type,
       stats[type],
+      preferredSurfaceType,
     )
     next[destination][type] = { ...selection }
     for (const surface of surfaces) {

@@ -512,7 +512,13 @@ export class CombatSetup {
       this._stateData,
       this._lookups,
     )
-    this.rebuildEngine()
+    if (this._editorMode === 'SIMPLIFIED') {
+      this.commitSimplifiedSelections('attacker')
+      this.commitSimplifiedSelections('defender')
+      this.rebuildAllUnits()
+    } else {
+      this.rebuildEngine()
+    }
   }
 
   setEditorMode(mode: UnitEditorMode): void {
@@ -1073,6 +1079,7 @@ export class CombatSetup {
       this._selectedPlanetId,
       side,
       this.getPlacementUnitStats(side),
+      this._combatMode,
     )
   }
 

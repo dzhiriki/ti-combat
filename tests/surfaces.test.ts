@@ -17,18 +17,52 @@ const SURFACES: SurfaceDefinition[] = [
 ]
 
 describe('surface editor conversion', () => {
-  it('expands simplified counts with the default placement rules', () => {
+  it('places both sides ships and ground forces in space for space combat', () => {
     const setup = new CombatSetup()
     setup.setUnitCount('attacker', 'CRUISER', 1)
     setup.setUnitCount('attacker', 'INFANTRY', 2)
+    setup.setUnitCount('defender', 'DREADNOUGHT', 1)
     setup.setUnitCount('defender', 'INFANTRY', 3)
     setup.setUnitCount('defender', 'PDS', 1)
 
     const input = setup.toSimulationInput()!
     expect(input.attackerPlacements[SPACE_SURFACE_ID].CRUISER.count).toBe(1)
     expect(input.attackerPlacements[SPACE_SURFACE_ID].INFANTRY.count).toBe(2)
-    expect(input.defenderPlacements[PLANET_1].INFANTRY.count).toBe(3)
+    expect(input.defenderPlacements[SPACE_SURFACE_ID].DREADNOUGHT.count).toBe(1)
+    expect(input.defenderPlacements[SPACE_SURFACE_ID].INFANTRY.count).toBe(3)
     expect(input.defenderPlacements[PLANET_1].PDS.count).toBe(1)
+  })
+
+  it('places both sides ground forces on the planet for ground combat', () => {
+    const setup = new CombatSetup()
+    setup.setUnitCount('attacker', 'CRUISER', 1)
+    setup.setUnitCount('attacker', 'INFANTRY', 2)
+    setup.setUnitCount('defender', 'DREADNOUGHT', 1)
+    setup.setUnitCount('defender', 'MECH', 3)
+
+    setup.setCombatMode('GROUND')
+
+    const input = setup.toSimulationInput()!
+    expect(input.attackerPlacements[SPACE_SURFACE_ID].CRUISER.count).toBe(1)
+    expect(input.defenderPlacements[SPACE_SURFACE_ID].DREADNOUGHT.count).toBe(1)
+    expect(input.attackerPlacements[PLANET_1].INFANTRY.count).toBe(2)
+    expect(input.defenderPlacements[PLANET_1].MECH.count).toBe(3)
+    expect(input.attackerPlacements[SPACE_SURFACE_ID].INFANTRY.count).toBe(0)
+    expect(input.defenderPlacements[SPACE_SURFACE_ID].MECH.count).toBe(0)
+
+    expect(setup.surfaceSelections.attacker[PLANET_1].INFANTRY.count).toBe(2)
+    expect(setup.surfaceSelections.defender[PLANET_1].MECH.count).toBe(3)
+
+    setup.setCombatMode('SPACE')
+
+    expect(
+      setup.surfaceSelections.attacker[SPACE_SURFACE_ID].INFANTRY.count,
+    ).toBe(2)
+    expect(setup.surfaceSelections.defender[SPACE_SURFACE_ID].MECH.count).toBe(
+      3,
+    )
+    expect(setup.surfaceSelections.attacker[PLANET_1].INFANTRY.count).toBe(0)
+    expect(setup.surfaceSelections.defender[PLANET_1].MECH.count).toBe(0)
   })
 
   it('preserves hidden planets while switching tabs in simplified mode', () => {
