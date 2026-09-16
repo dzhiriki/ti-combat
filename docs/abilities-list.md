@@ -131,8 +131,7 @@
 
 ### Ral Nel Consortium
 
-- [x] **Linkship I** (Special Unit) — Anti-Fighter Barrage 9 (x2). This unit can use the Space Cannon ability of one of your structures in its space area; each structure can only be triggered once.
-- [x] **Linkship II** (Faction Technology) — Anti-Fighter Barrage 6 (x3). This unit can use the Space Cannon ability of one of your structures in its space area; each linkship can trigger the same structure.
+- [x] **Linkship I / Linkship II** (Special Unit / Faction Technology) — Anti-Fighter Barrage 9 (x2), upgraded to Anti-Fighter Barrage 6 (x3). This unit can use the Space Cannon ability of one of your structures in its space area; Linkship I can trigger each structure once, while each Linkship II can trigger the same structure.
 - [x] **Alarum** (Mech) — At the end of a round of ground combat on this planet, you may move up to 2 of your ground forces to this planet from planets in adjacent systems.
 - [x] **Last Dispatch** (Flagship) — When this unit retreats, you may destroy 1 ship in the active system that does not have Sustain Damage.
 - [x] **Watchful Ojz** (Commander) — When you declare a retreat: Immediately retreat up to 2 of your ships from the active system to an adjacent system that does not contain another player's ships. Place a command token from your reinforcements into that system.

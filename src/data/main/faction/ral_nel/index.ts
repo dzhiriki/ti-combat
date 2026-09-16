@@ -4,7 +4,7 @@ import type { Faction } from '@/types'
 
 import { alarum } from './alarum'
 import { lastDispatch } from './last-dispatch'
-import { linkshipI, linkshipII } from './linkship'
+import { linkship } from './linkship'
 import { miniaturization } from './miniaturization'
 import { watchfulOjz } from './watchful-ojz'
 
@@ -59,7 +59,7 @@ export const ral_nel: Faction = {
         UNIT_ABILITIES: {
           AFB: [9, 2],
         },
-        ABILITIES: [linkshipI],
+        ABILITIES: [linkship],
       },
       UPGRADED: {
         NAME: 'Linkship II',
@@ -70,7 +70,6 @@ export const ral_nel: Faction = {
         UNIT_ABILITIES: {
           AFB: [6, 3],
         },
-        ABILITIES: [linkshipII],
       },
     },
   },

@@ -1,17 +1,21 @@
 import { describe, expect, it } from 'vitest'
 
+import { SPACE_SURFACE_ID } from '@/types'
+
 import { combatTest } from '../utils/combat-test'
 
-describe.forEachSide('LINKSHIP_2', () => {
+describe.forEachSide('LINKSHIP II', () => {
   it('allows all linkships to fire using the same structure', () => {
     const t = combatTest({
       mode: 'SPACE',
       attacker: { faction: 'ARBOREC', units: { CRUISER: 3 } },
       defender: {
         faction: 'RAL_NEL',
-        units: { DESTROYER: 3 },
+        units: {},
+        placements: {
+          [SPACE_SURFACE_ID]: { DESTROYER: 3, PDS: 1 },
+        },
         upgrades: ['DESTROYER'],
-        abilities: { LINKSHIP_2: { structures: [['PDS', 1]] } },
       },
     })
 
@@ -19,8 +23,8 @@ describe.forEachSide('LINKSHIP_2', () => {
     const pool = t.dicePool()
 
     // Linkship II: all 3 destroyers fire SC using the 1 PDS
-    expect(pool.defender.LINKSHIP_2).toHaveLength(3)
-    expect(pool.defender).toContainDice('LINKSHIP_2', [6, 1])
+    expect(pool.defender.LINKSHIP).toHaveLength(3)
+    expect(pool.defender).toContainDice('LINKSHIP', [6, 1])
   })
 
   it('is capped by linkship count', () => {
@@ -29,9 +33,11 @@ describe.forEachSide('LINKSHIP_2', () => {
       attacker: { faction: 'ARBOREC', units: { CRUISER: 3 } },
       defender: {
         faction: 'RAL_NEL',
-        units: { DESTROYER: 1 },
+        units: {},
+        placements: {
+          [SPACE_SURFACE_ID]: { DESTROYER: 1, PDS: 3 },
+        },
         upgrades: ['DESTROYER'],
-        abilities: { LINKSHIP_2: { structures: [['PDS', 3]] } },
       },
     })
 
@@ -39,27 +45,28 @@ describe.forEachSide('LINKSHIP_2', () => {
     const pool = t.dicePool()
 
     // 1 linkship, 3 PDS structures → 1 SC dice group
-    expect(pool.defender.LINKSHIP_2).toHaveLength(1)
+    expect(pool.defender.LINKSHIP).toHaveLength(1)
   })
 
-  it('works without structures in the units list', () => {
+  it('reads structures directly from the space area', () => {
     const t = combatTest({
       mode: 'SPACE',
       attacker: { faction: 'ARBOREC', units: { CRUISER: 3 } },
       defender: {
         faction: 'RAL_NEL',
-        units: { DESTROYER: 1 },
+        units: {},
+        placements: {
+          [SPACE_SURFACE_ID]: { DESTROYER: 1, PDS: 1 },
+        },
         upgrades: ['DESTROYER'],
-        abilities: { LINKSHIP_2: { structures: [['PDS', 1]] } },
       },
     })
 
     t.advanceTo('SPACE_COMBAT')
     const pool = t.dicePool()
 
-    // No PDS in units list, but SC value derived from faction config
-    expect(pool.defender.LINKSHIP_2).toHaveLength(1)
-    expect(pool.defender).toContainDice('LINKSHIP_2', [6, 1])
+    expect(pool.defender.LINKSHIP).toHaveLength(1)
+    expect(pool.defender).toContainDice('LINKSHIP', [6, 1])
   })
 
   it('uses best SC source among structures', () => {
@@ -68,12 +75,12 @@ describe.forEachSide('LINKSHIP_2', () => {
       attacker: { faction: 'ARBOREC', units: { CRUISER: 3 } },
       defender: {
         faction: 'RAL_NEL',
-        units: { DESTROYER: 1, SPACE_DOCK: 1 },
-        upgrades: ['DESTROYER'],
-        abilities: {
-          LINKSHIP_2: { structures: [['SPACE_DOCK', 1]] },
-          LIGHTRAIL_ORDNANCE: true,
+        units: {},
+        placements: {
+          [SPACE_SURFACE_ID]: { DESTROYER: 1, SPACE_DOCK: 1 },
         },
+        upgrades: ['DESTROYER'],
+        abilities: { LIGHTRAIL_ORDNANCE: true },
       },
     })
 
@@ -81,6 +88,6 @@ describe.forEachSide('LINKSHIP_2', () => {
     const pool = t.dicePool()
 
     // Linkship uses Space Dock's SC [5, 2] (better than PDS [6, 1])
-    expect(pool.defender).toContainDice('LINKSHIP_2', [5, 2])
+    expect(pool.defender).toContainDice('LINKSHIP', [5, 2])
   })
 })

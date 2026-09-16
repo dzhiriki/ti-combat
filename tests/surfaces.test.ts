@@ -33,6 +33,27 @@ describe('surface editor conversion', () => {
     expect(input.defenderPlacements[PLANET_1].PDS.count).toBe(1)
   })
 
+  it('places space-capable structures in space during simplified space combat', () => {
+    const setup = new CombatSetup()
+    setup.setFaction('attacker', 'RAL_NEL')
+    setup.setFaction('defender', 'RAL_NEL')
+    setup.setUnitCount('attacker', 'PDS', 1)
+    setup.setUnitCount('defender', 'SPACE_DOCK', 1)
+
+    let input = setup.toSimulationInput()!
+    expect(input.attackerPlacements[SPACE_SURFACE_ID].PDS.count).toBe(1)
+    expect(input.defenderPlacements[SPACE_SURFACE_ID].SPACE_DOCK.count).toBe(1)
+    expect(input.attackerPlacements[PLANET_1].PDS.count).toBe(0)
+    expect(input.defenderPlacements[PLANET_1].SPACE_DOCK.count).toBe(0)
+
+    setup.setCombatMode('GROUND')
+    input = setup.toSimulationInput()!
+    expect(input.attackerPlacements[SPACE_SURFACE_ID].PDS.count).toBe(0)
+    expect(input.defenderPlacements[SPACE_SURFACE_ID].SPACE_DOCK.count).toBe(0)
+    expect(input.attackerPlacements[PLANET_1].PDS.count).toBe(1)
+    expect(input.defenderPlacements[PLANET_1].SPACE_DOCK.count).toBe(1)
+  })
+
   it('places both sides ground forces on the planet for ground combat', () => {
     const setup = new CombatSetup()
     setup.setUnitCount('attacker', 'CRUISER', 1)

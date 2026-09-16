@@ -1,71 +1,47 @@
-import { z } from 'zod/mini'
-
-import { type Ability, declareParam } from '@/combat'
+import { type Ability, type AbilityReadContext } from '@/combat'
 import type { SideApi } from '@/combat/abilities-engine/api/ability-api'
-import type { DiceGroup, UnitBaseType, UnitList, UnitType } from '@/types'
-import { UnitListNumberSchema } from '@/types'
+import { STRUCTURES } from '@/constants/units'
+import type { DiceGroup, UnitList, UnitType } from '@/types'
 
-type LinkshipIParams = {
-  structures: UnitList<number>
-}
-
-type LinkshipIIParams = {
-  structures: UnitList<number>
-}
-
-// Linkship I: each structure can only be triggered once
-export const linkshipI: Ability<LinkshipIParams> = {
-  key: 'LINKSHIP_1',
-  name: 'Linkship I',
+export const linkship: Ability = {
+  key: 'LINKSHIP',
+  name: 'Linkship',
   description:
-    'This unit can use the Space Cannon ability of one of your structures in its space area; each structure can only be triggered once.',
+    'Linkship I: This unit can use the Space Cannon ability of one of your structures in its space area; each structure can only be triggered once.\n\nLinkship II: This unit can use the Space Cannon ability of one of your structures in its space area; each linkship can trigger the same structure.',
+  warning:
+    'In simplified view, all Ral Nel structures are placed in the space area during space combat. For fine-tuned placement, use full view.',
   context: 'SPACE',
-  paramsSchema: z.object({
-    structures: UnitListNumberSchema,
-  }),
   params: {
     isEnabled: true,
     uses: Infinity,
-    structures: declareParam<UnitList<number>>({
-      default: [],
-      source: 'structures',
-      defaultItemValue: 0,
-      filter: {
-        include: ['PDS', 'SPACE_DOCK'] as UnitBaseType[],
-        includeNonParticipating: true,
-      },
-      limit: 'EXTRA',
-    }),
   },
   headerUI: 'isEnabled',
-  uiConfig: ctx => [
-    {
-      key: 'structures',
-      type: 'unit-list',
-      mode: 'number',
-      items: ctx.api.own.getUnitVariantsOptions('structures'),
-    },
-  ],
   invoke: [
     {
-      // Which structures this Linkship pass has already spent lives in run
-      // state — scoped to the single BEFORE_UNIT_ABILITY_ROLL pass and
-      // discarded after, so it never leaks into state identity or the next
-      // roll. Each linkship fires once and consumes its best free structure.
+      // Linkship I consumes a structure for this Space Cannon pass. Linkship
+      // II can reuse the same structure for every linkship. Reading the
+      // source unit's effective stats also handles upgrades gained in combat.
       timing: 'BEFORE_UNIT_ABILITY_ROLL',
       context: 'SPACE_CANNON_OFFENSE',
-      isCallable: (params, ctx) =>
-        availableStructures(params.structures, getConsumed(ctx.api.own)).some(
-          ([, count]) => count > 0,
-        ),
-      call: (ctx, params) => {
-        const best = findBestSpaceCannon(
-          availableStructures(params.structures, getConsumed(ctx.api.own)),
-          ctx.api.own,
-        )
+      isCallable: (_params, ctx) => {
+        const structuresInSpace = getStructuresInSpace(ctx.api.own)
+        const available = isLinkshipII(ctx)
+          ? structuresInSpace
+          : availableStructures(structuresInSpace, getConsumed(ctx.api.own))
+        return available.some(([, count]) => count > 0)
+      },
+      call: ctx => {
+        const upgraded = isLinkshipII(ctx)
+        const structuresInSpace = getStructuresInSpace(ctx.api.own)
+        const structures = upgraded
+          ? structuresInSpace
+          : availableStructures(structuresInSpace, getConsumed(ctx.api.own))
+        const best = findBestSpaceCannon(structures, ctx.api.own)
         if (!best) return
 
         ctx.api.own.addDiceGroup(best.sc)
+        if (upgraded) return
+
         ctx.api.own.updateRunState({
           consumed: (prev?: UnitList<number>) => {
             const list = prev ?? []
@@ -83,53 +59,8 @@ export const linkshipI: Ability<LinkshipIParams> = {
   ],
 }
 
-// Linkship II: each linkship can trigger the same structure
-export const linkshipII: Ability<LinkshipIIParams> = {
-  key: 'LINKSHIP_2',
-  name: 'Linkship II',
-  description:
-    'This unit can use the Space Cannon ability of one of your structures in its space area; each linkship can trigger the same structure.',
-  context: 'SPACE',
-  paramsSchema: z.object({
-    structures: UnitListNumberSchema,
-  }),
-  params: {
-    isEnabled: true,
-    uses: Infinity,
-    structures: declareParam<UnitList<number>>({
-      default: [],
-      source: 'structures',
-      defaultItemValue: 0,
-      filter: {
-        include: ['PDS', 'SPACE_DOCK'] as UnitBaseType[],
-        includeNonParticipating: true,
-      },
-      limit: 'EXTRA',
-    }),
-  },
-  headerUI: 'isEnabled',
-  uiConfig: ctx => [
-    {
-      key: 'structures',
-      type: 'unit-list',
-      mode: 'number',
-      items: ctx.api.own.getUnitVariantsOptions('structures'),
-    },
-  ],
-  invoke: [
-    {
-      timing: 'BEFORE_UNIT_ABILITY_ROLL',
-      context: 'SPACE_CANNON_OFFENSE',
-      isCallable: (params, ctx) =>
-        ctx.utils.getFlat(params.structures).length > 0,
-      call: (ctx, params) => {
-        const best = findBestSpaceCannon(params.structures, ctx.api.own)
-        if (!best) return
-
-        ctx.api.own.addDiceGroup(best.sc)
-      },
-    },
-  ],
+function isLinkshipII(ctx: AbilityReadContext): boolean {
+  return ctx.api.own.getUnitStats(ctx.getUnit())?.NAME === 'Linkship II'
 }
 
 function expectedHits(sc: DiceGroup): number {
@@ -138,9 +69,23 @@ function expectedHits(sc: DiceGroup): number {
 
 function getConsumed(api: SideApi): UnitList<number> {
   return (
-    (api.getRunState('LINKSHIP_1')?.consumed as UnitList<number> | undefined) ??
+    (api.getRunState('LINKSHIP')?.consumed as UnitList<number> | undefined) ??
     []
   )
+}
+
+function getStructuresInSpace(api: SideApi): UnitList<number> {
+  const counts = new Map<UnitType, number>()
+  for (const structure of STRUCTURES) {
+    for (const id of api.surface.getUnits(structure, {
+      includeVariants: true,
+    })) {
+      const unitType = api.getUnitVariantKey(id)
+      if (!unitType) continue
+      counts.set(unitType, (counts.get(unitType) ?? 0) + 1)
+    }
+  }
+  return [...counts]
 }
 
 function availableStructures(
