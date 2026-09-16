@@ -119,9 +119,10 @@ export function expandSimplifiedSelections(
   next[planetId] = createEmptyUnitSelections()
   for (const type of UNIT_TYPES) {
     const selection = selections[type]
+    const allowed = allowedSurfaceTypes(type, stats[type])
     const preferredSurfaceType: SurfaceType =
-      SHIPS.includes(type) ||
-      (GROUND_FORCES.includes(type) && combatMode === 'SPACE')
+      (combatMode === 'SPACE' && allowed.includes('SPACE')) ||
+      SHIPS.includes(type)
         ? 'SPACE'
         : 'PLANET'
     const destination = defaultSurfaceId(

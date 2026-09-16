@@ -94,7 +94,7 @@ describe('MINIATURIZATION', () => {
     expect(pool).toContainDice('SPACE_DOCK', [5, 2])
   })
 
-  it('lets Linkship use a transported structure Space Cannon', () => {
+  it('lets Linkship use a structure placed directly in the space area', () => {
     const t = combatTest({
       mode: 'SPACE',
       surfaces: SURFACES,
@@ -106,7 +106,6 @@ describe('MINIATURIZATION', () => {
         placements: {
           [SPACE_SURFACE_ID]: { DESTROYER: 1, PDS: 1 },
         },
-        abilities: { LINKSHIP_1: { structures: [['PDS', 1]] } },
       },
     })
 
@@ -114,7 +113,28 @@ describe('MINIATURIZATION', () => {
     const pool = t.dicePool().defender
 
     expect(pool.PDS).toBeUndefined()
-    expect(pool).toContainDice('LINKSHIP_1', [6, 1])
+    expect(pool).toContainDice('LINKSHIP', [6, 1])
+  })
+
+  it('does not let Linkship use a structure on a planet', () => {
+    const t = combatTest({
+      mode: 'SPACE',
+      surfaces: SURFACES,
+      activeSurfaceId: SPACE_SURFACE_ID,
+      attacker: { faction: 'ARBOREC', units: { CRUISER: 1 } },
+      defender: {
+        faction: 'RAL_NEL',
+        units: {},
+        placements: {
+          [SPACE_SURFACE_ID]: { DESTROYER: 1 },
+          [DEFAULT_PLANET_ID]: { PDS: 1 },
+        },
+      },
+    })
+
+    t.advanceTo('SPACE_COMBAT')
+
+    expect(t.dicePool().defender.LINKSHIP).toBeUndefined()
   })
 
   it('registers Miniaturization as an inherent faction ability', () => {
