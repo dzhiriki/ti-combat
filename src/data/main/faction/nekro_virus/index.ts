@@ -10,6 +10,7 @@ import type {
   ParamChange,
   SettingsParams,
 } from '@/combat/abilities-engine/types'
+import { DEFAULT_UNIT_SURFACES } from '@/constants/units'
 import { sustainDamage } from '@/data/main/abilities/general/sustain-damage'
 import type {
   Faction,
@@ -34,7 +35,7 @@ import { theAlastor } from './the-alastor'
 const EMPTY_LIST = createRuntimeAbilityList([])
 const EMPTY_LOOKUPS = { own: EMPTY_LIST, opponent: EMPTY_LIST }
 
-const EXCLUDED_UNIT_TYPES = new Set(['FLAGSHIP', 'MECH', 'SPACE_DOCK'])
+const EXCLUDED_UNIT_TYPES = new Set(['FLAGSHIP', 'MECH'])
 
 const STANDARD_ABILITY_KEYS = new Set([
   'SUSTAIN_DAMAGE',
@@ -88,6 +89,13 @@ function createFactionUnitAbility(
     name: displayName,
     icon: faction.icon,
     exclusiveGroup: unitType,
+    unitPlacements: [
+      {
+        unitType,
+        allowedSurfaces:
+          effectiveStats.ALLOWED_SURFACES ?? DEFAULT_UNIT_SURFACES[unitType],
+      },
+    ],
     description: mainAbility?.description,
     params: {
       isEnabled: false,
