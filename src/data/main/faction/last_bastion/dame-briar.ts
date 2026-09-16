@@ -68,7 +68,9 @@ export const dameBriar: Ability<Params> = {
           ctx.state.combatMode === 'GROUND'
             ? params.groundUnitType
             : params.spaceUnitType
-        if (!ctx.api.own.hasUnitType(target, { includeVariants: false }))
+        if (
+          !ctx.api.own.surface.hasUnitType(target, { includeVariants: false })
+        )
           return false
         const tokens =
           ctx.api.own.getAbilityConfig('PRE_GALVANIZED')?.reinforcementTokens ??
@@ -80,7 +82,9 @@ export const dameBriar: Ability<Params> = {
           ctx.state.combatMode === 'GROUND'
             ? params.groundUnitType
             : params.spaceUnitType
-        const ids = ctx.api.own.getUnits(target, { includeVariants: true })
+        const ids = ctx.api.own.surface.getUnits(target, {
+          includeVariants: true,
+        })
         for (const id of ids) {
           if (galvanizeUnit(ctx, id, true)) break
         }

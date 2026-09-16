@@ -70,7 +70,7 @@ export const eidolonMaximum: Ability = {
         })
 
         // Repair damaged mechs at start of each round
-        for (const id of ctx.api.own.getUnits('MECH', {
+        for (const id of ctx.api.own.surface.getUnits('MECH', {
           includeVariants: true,
         })) {
           if (!ctx.api.own.isParticipating(id)) continue

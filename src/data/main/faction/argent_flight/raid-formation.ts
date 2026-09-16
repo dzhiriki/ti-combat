@@ -35,22 +35,26 @@ export const raidFormation: Ability<Params> = {
       context: 'AFB',
       isCallable: (_, ctx) => {
         const pendingHits = ctx.api.opponent.getPendingHits()
-        const fighterCount = ctx.api.opponent.countUnits('FIGHTER', {
-          includeVariants: true,
-          participatingOnly: true,
-        })
+        const fighterCount = ctx.api.opponent.participating.countUnits(
+          'FIGHTER',
+          {
+            includeVariants: true,
+          },
+        )
 
         return pendingHits > fighterCount
       },
       call: (ctx, params) => {
         const pendingHits = ctx.api.opponent.getPendingHits()
-        const fighterCount = ctx.api.opponent.countUnits('FIGHTER', {
-          includeVariants: true,
-          participatingOnly: true,
-        })
+        const fighterCount = ctx.api.opponent.participating.countUnits(
+          'FIGHTER',
+          {
+            includeVariants: true,
+          },
+        )
         const excess = pendingHits - fighterCount
 
-        const targets = ctx.api.opponent.findUnitByPriority(
+        const targets = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
           {
             includeVariants: false,

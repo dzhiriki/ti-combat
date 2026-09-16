@@ -13,7 +13,7 @@ type Params = {
 function savedByHitCancel(ctx: AbilityReadContext): UnitId | undefined {
   const hits = ctx.api.own.getPendingHits()
   if (hits <= 0) return undefined
-  const victims = ctx.api.own.getAssignHitsTargets(hits)
+  const victims = ctx.api.own.participating.getAssignHitsTargets(hits)
   return victims[0]
 }
 

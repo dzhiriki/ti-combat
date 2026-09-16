@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
   createDefaultSurfaces,
+  DEFAULT_PLANET_ID,
   SPACE_SURFACE_ID,
+  type UnitId,
   type UnitIdList,
 } from '@/types'
 
@@ -76,6 +78,60 @@ function withAbility(
   ctx.upgradeForCall(ability)
   return { ctx, api: ctx.api.own, ability }
 }
+
+describe('SideApi unit query scopes', () => {
+  it('separates units on the active surface from participants', () => {
+    const cs = makeCombatState()
+    const cruiserId = 'a' as UnitId
+    const infantryId = 'b' as UnitId
+    const pdsId = 'c' as UnitId
+    const side = cs.data.attacker
+
+    side.participatingUnits = `${cruiserId}${infantryId}` as UnitIdList
+    side.nonParticipatingUnits = `${pdsId}` as UnitIdList
+    side.surfaceUnits = {
+      [SPACE_SURFACE_ID]: `${cruiserId}` as UnitIdList,
+      [DEFAULT_PLANET_ID]: `${infantryId}${pdsId}` as UnitIdList,
+    }
+    side.unitSurface = {
+      [cruiserId]: SPACE_SURFACE_ID,
+      [infantryId]: DEFAULT_PLANET_ID,
+      [pdsId]: DEFAULT_PLANET_ID,
+    }
+    side.unitType = {
+      [cruiserId]: 'CRUISER',
+      [infantryId]: 'INFANTRY',
+      [pdsId]: 'PDS',
+    }
+    cs.data.activeSurfaceId = DEFAULT_PLANET_ID
+
+    const { api } = withAbility(cs)
+    const exact = { includeVariants: false }
+
+    expect(api.surface.getUnits('PDS', exact)).toEqual([pdsId])
+    expect(api.surface.countUnits(undefined, exact)).toBe(2)
+    expect(api.surface.hasUnitType('CRUISER', exact)).toBe(false)
+    expect(api.surface.getUnitTypes()).toEqual(['INFANTRY', 'PDS'])
+    expect(api.surface.findUnitByPriority(['PDS', 'INFANTRY'], exact)).toBe(
+      pdsId,
+    )
+
+    expect(api.participating.getUnits('CRUISER', exact)).toEqual([cruiserId])
+    expect(api.participating.countUnits(undefined, exact)).toBe(2)
+    expect(api.participating.hasUnitType('PDS', exact)).toBe(false)
+    expect(api.participating.getUnitTypes()).toEqual(['CRUISER', 'INFANTRY'])
+    expect(
+      api.participating.findUnitByPriority(['PDS', 'INFANTRY'], exact),
+    ).toBe(infantryId)
+
+    expect(api.participating.getAssignHitsTargets(1)).toEqual([infantryId])
+    expect(side.participatingUnits).toBe(`${cruiserId}${infantryId}`)
+
+    cs.data.activeSurfaceId = SPACE_SURFACE_ID
+    expect(api.surface.getUnits('CRUISER', exact)).toEqual([cruiserId])
+    expect(api.surface.countUnits(undefined, exact)).toBe(1)
+  })
+})
 
 describe('SideApi.declareRollTrigger', () => {
   let cs: CombatState

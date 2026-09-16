@@ -44,7 +44,7 @@ export const exotrireme: Ability<Params> = {
     const remaining = new Set(unitIds)
     const result: UnitId[] = []
     for (const variantId of ctx.utils.getFlat(params.sacrificePriority)) {
-      for (const id of ctx.api.own.getUnits(variantId, {
+      for (const id of ctx.api.own.surface.getUnits(variantId, {
         includeVariants: false,
       })) {
         if (remaining.has(id)) {
@@ -63,7 +63,7 @@ export const exotrireme: Ability<Params> = {
       timing: 'AFTER_COMBAT_ROUND',
       isCallable: (params, ctx) => {
         if (
-          ctx.api.opponent.findUnitByPriority(
+          ctx.api.opponent.participating.findUnitByPriority(
             ctx.utils.getFlat(params.targetPriority),
             { includeVariants: false },
           ) === undefined
@@ -78,7 +78,7 @@ export const exotrireme: Ability<Params> = {
       },
       call: (ctx, params) => {
         const self = ctx.getUnit()
-        const targets = ctx.api.opponent.findUnitByPriority(
+        const targets = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
           { includeVariants: false, amount: 2 },
         )

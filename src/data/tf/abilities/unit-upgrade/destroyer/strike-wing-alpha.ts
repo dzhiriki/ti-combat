@@ -33,7 +33,7 @@ export const strikeWingAlpha: Ability = {
       declaration: true,
       call: ctx => {
         const unitTypes: UnitType[] = []
-        const [destroyer] = ctx.api.own.getUnits('DESTROYER', {
+        const [destroyer] = ctx.api.own.surface.getUnits('DESTROYER', {
           includeVariants: true,
         })
         if (destroyer) {
@@ -43,7 +43,7 @@ export const strikeWingAlpha: Ability = {
           )
         }
         if (janovetInherits(ctx.api.own, 'TF_UPGRADE_STRIKE_WING_ALPHA')) {
-          const [flagship] = ctx.api.own.getUnits('FLAGSHIP', {
+          const [flagship] = ctx.api.own.surface.getUnits('FLAGSHIP', {
             includeVariants: true,
           })
           if (flagship) {
@@ -58,10 +58,12 @@ export const strikeWingAlpha: Ability = {
           unitType: unitTypes,
           faces: [9, 10],
           effect: (count, branchCtx) => {
-            const infantry = branchCtx.api.opponent.getUnits('INFANTRY', {
-              includeVariants: true,
-              surfaceId: branchCtx.api.opponent.getSpaceSurfaceId(),
-            })
+            const infantry = branchCtx.api.opponent.surface.getUnits(
+              'INFANTRY',
+              {
+                includeVariants: true,
+              },
+            )
             const toDestroy = infantry.slice(0, count)
             if (toDestroy.length > 0)
               branchCtx.api.opponent.destroyUnits(toDestroy)

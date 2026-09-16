@@ -17,11 +17,10 @@ export const salaiSaiCorian: Ability = {
       context: 'SPACE_COMBAT',
       call: ctx => {
         let nonFighterCount = 0
-        for (const type of ctx.api.opponent.getParticipatingUnitTypes()) {
+        for (const type of ctx.api.opponent.participating.getUnitTypes()) {
           if (type === 'FIGHTER') continue
-          nonFighterCount += ctx.api.opponent.countUnits(type, {
+          nonFighterCount += ctx.api.opponent.participating.countUnits(type, {
             includeVariants: true,
-            participatingOnly: true,
           })
         }
 

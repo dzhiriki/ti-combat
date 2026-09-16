@@ -42,7 +42,7 @@ export const morphwing: Ability = {
       context: 'GROUND_COMBAT',
       isCallable: (_params, ctx) => ctx.side === 'attacker',
       call: ctx => {
-        const fighters = ctx.api.own.getUnits('FIGHTER', {
+        const fighters = ctx.api.own.surface.getUnits('FIGHTER', {
           includeVariants: true,
         })
         ctx.api.own.moveUnits(fighters, ctx.api.own.getSpaceSurfaceId())

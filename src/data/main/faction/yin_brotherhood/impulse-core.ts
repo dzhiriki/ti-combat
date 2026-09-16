@@ -48,24 +48,24 @@ export const impulseCore: Ability<Params> = {
     {
       timing: 'START_OF_COMBAT',
       isCallable: (params, ctx) => {
-        const sacrifice = ctx.api.own.findUnitByPriority(
+        const sacrifice = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.sacrificePriority),
           { includeVariants: false },
         )
         if (sacrifice === undefined) return false
         return (
-          ctx.api.opponent.findUnitByPriority(
+          ctx.api.opponent.participating.findUnitByPriority(
             ctx.utils.getFlat(params.targetPriority),
             { includeVariants: false },
           ) !== undefined
         )
       },
       call: (ctx, params) => {
-        const sacrifice = ctx.api.own.findUnitByPriority(
+        const sacrifice = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.sacrificePriority),
           { includeVariants: false },
         )
-        const target = ctx.api.opponent.findUnitByPriority(
+        const target = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
           { includeVariants: false },
         )

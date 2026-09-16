@@ -125,7 +125,7 @@ export const sleeperCell: Ability<Params> = {
           const baseType = type as UnitBaseType
           const available = availableMap.get(baseType) ?? 0
           if (available <= 0) continue
-          const existing = ctx.api.own.countUnits(baseType, {
+          const existing = ctx.api.own.surface.countUnits(baseType, {
             includeVariants: true,
           })
           const onBoardCanPlace = Math.max(0, UNIT_LIMITS[baseType] - existing)

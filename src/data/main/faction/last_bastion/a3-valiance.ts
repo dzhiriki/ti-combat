@@ -29,7 +29,11 @@ export const a3Valiance: Ability = {
         const variantKey = ctx.api.own.getUnitVariantKey(myId)!
         const { subtypes } = parseVariantId(variantKey)
         if (!subtypes.includes(GALVANIZED)) return false
-        if (!ctx.api.own.hasUnitType('INFANTRY', { includeVariants: true }))
+        if (
+          !ctx.api.own.surface.hasUnitType('INFANTRY', {
+            includeVariants: true,
+          })
+        )
           return false
         const tokens =
           ctx.api.own.getAbilityConfig('PRE_GALVANIZED')?.reinforcementTokens ??
@@ -37,7 +41,9 @@ export const a3Valiance: Ability = {
         return tokens > 0
       },
       call: ctx => {
-        const ids = ctx.api.own.getUnits('INFANTRY', { includeVariants: true })
+        const ids = ctx.api.own.surface.getUnits('INFANTRY', {
+          includeVariants: true,
+        })
         let count = 0
         for (const id of ids) {
           if (count >= 3) break

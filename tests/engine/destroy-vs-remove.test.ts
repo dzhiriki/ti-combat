@@ -19,7 +19,9 @@ const destroyOpponentCruiser: Ability = {
     {
       timing: 'START_OF_COMBAT_ROUND',
       isCallable: (_params, ctx) =>
-        ctx.api.opponent.hasUnitType('CRUISER', { includeVariants: false }),
+        ctx.api.opponent.surface.hasUnitType('CRUISER', {
+          includeVariants: false,
+        }),
       call: ctx => {
         ctx.api.opponent.destroyUnits('CRUISER')
       },
@@ -35,7 +37,9 @@ const removeOpponentCruiser: Ability = {
     {
       timing: 'START_OF_COMBAT_ROUND',
       isCallable: (_params, ctx) =>
-        ctx.api.opponent.hasUnitType('CRUISER', { includeVariants: false }),
+        ctx.api.opponent.surface.hasUnitType('CRUISER', {
+          includeVariants: false,
+        }),
       call: ctx => {
         ctx.api.opponent.removeUnits('CRUISER')
       },

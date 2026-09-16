@@ -17,11 +17,14 @@ export {
   declareParam,
   type DicePool,
   enforceFleetPool,
+  type FindUnitOptions,
+  type FindUnitsOptions,
   hasStaticInvokes,
   isDeclaredParam,
   type OwnOpponentContext,
   type ParamChange,
   type ParamFilter,
+  type ParticipatingUnitQueryApi,
   type RegisteredAbility,
   resolveInvokes,
   type RuntimeAbilityList,
@@ -30,6 +33,8 @@ export {
   type SyncSortSpec,
   type SyncSourceConfig,
   type UnitListMode,
+  type UnitQueryApi,
+  type UnitQueryOptions,
   withRunningAbility,
 } from './abilities-engine'
 export {

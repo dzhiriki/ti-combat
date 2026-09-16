@@ -96,6 +96,134 @@ export class AbilityBranchInterrupt {
   }
 }
 
+export interface UnitQueryOptions {
+  includeVariants: boolean
+}
+
+export interface FindUnitOptions extends UnitQueryOptions {
+  predicate?: FindUnitPredicate
+}
+
+export interface FindUnitsOptions extends FindUnitOptions {
+  amount: number
+}
+
+export interface UnitQueryApi {
+  getUnits(unitType: UnitType, options: UnitQueryOptions): UnitId[]
+  hasUnitType(unitType: UnitType, options: UnitQueryOptions): boolean
+  countUnits(
+    filter: UnitType | UnitType[] | undefined,
+    options: UnitQueryOptions,
+  ): number
+  findUnitByPriority(
+    priority: UnitType[],
+    options: FindUnitOptions,
+  ): UnitId | undefined
+  findUnitByPriority(priority: UnitType[], options: FindUnitsOptions): UnitId[]
+  getUnitTypes(): UnitBaseType[]
+}
+
+export interface ParticipatingUnitQueryApi extends UnitQueryApi {
+  /** Simulate unrestricted hit assignment without mutating the state. */
+  getAssignHitsTargets(hits: number): UnitId[]
+}
+
+abstract class ScopedUnitQueryApi implements UnitQueryApi {
+  private readonly side: CombatSide
+  protected readonly ctx: AbilityContext
+
+  constructor(side: CombatSide, ctx: AbilityContext) {
+    this.side = side
+    this.ctx = ctx
+  }
+
+  protected get sideData(): SideStateData {
+    return this.ctx.state[this.side]
+  }
+
+  protected abstract scopeOptions(): Pick<
+    GetUnitsOptions,
+    'participatingOnly' | 'surfaceId'
+  >
+
+  private options<T extends UnitQueryOptions>(
+    options: T,
+  ): T & Pick<GetUnitsOptions, 'participatingOnly' | 'surfaceId'> {
+    return { ...options, ...this.scopeOptions() }
+  }
+
+  getUnits(unitType: UnitType, options: UnitQueryOptions): UnitId[] {
+    return CombatSideState.getUnits(
+      this.sideData,
+      unitType,
+      this.options(options),
+    )
+  }
+
+  hasUnitType(unitType: UnitType, options: UnitQueryOptions): boolean {
+    return CombatSideState.hasUnitType(
+      this.sideData,
+      unitType,
+      this.options(options),
+    )
+  }
+
+  countUnits(
+    filter: UnitType | UnitType[] | undefined,
+    options: UnitQueryOptions,
+  ): number {
+    return CombatSideState.countUnits(
+      this.sideData,
+      filter,
+      this.options(options),
+    )
+  }
+
+  findUnitByPriority(
+    priority: UnitType[],
+    options: FindUnitOptions,
+  ): UnitId | undefined
+  findUnitByPriority(priority: UnitType[], options: FindUnitsOptions): UnitId[]
+  findUnitByPriority(
+    priority: UnitType[],
+    options: FindUnitOptions | FindUnitsOptions,
+  ): UnitId | UnitId[] | undefined {
+    return CombatSideState.findUnitByPriority(
+      this.sideData,
+      priority,
+      this.options(options),
+    )
+  }
+
+  getUnitTypes(): UnitBaseType[] {
+    return CombatSideState.getActiveBaseTypes(
+      this.sideData,
+      this.scopeOptions(),
+    )
+  }
+}
+
+class SurfaceUnitQueryApi extends ScopedUnitQueryApi {
+  protected scopeOptions(): Pick<GetUnitsOptions, 'surfaceId'> {
+    return { surfaceId: this.ctx.state.activeSurfaceId }
+  }
+}
+
+class ParticipatingUnitsApi
+  extends ScopedUnitQueryApi
+  implements ParticipatingUnitQueryApi
+{
+  protected scopeOptions(): Pick<GetUnitsOptions, 'participatingOnly'> {
+    return { participatingOnly: true }
+  }
+
+  getAssignHitsTargets(hits: number): UnitId[] {
+    const dirty = this.sideData._needsCanonicalize
+    if (dirty) canonicalizeUnitState(this.sideData, dirty)
+    return CombatSideState.getAssignHitsTargets(this.sideData, hits)
+  }
+}
+
 // ============================================================================
 // PARTICIPATION RESYNC
 // ============================================================================
@@ -138,12 +266,18 @@ function affectsParticipating(
 export class SideApi {
   private _side: CombatSide
   private _ctx!: AbilityContext
+  /** Alive units physically located on the current combat surface. */
+  readonly surface: UnitQueryApi
+  /** Units in the derived combat-participant pool, regardless of surface. */
+  readonly participating: ParticipatingUnitQueryApi
   _abilityKey?: string
   _abilitiesParams?: AbilitiesEngine
 
   constructor(side: CombatSide, ctx: AbilityContext) {
     this._side = side
     this._ctx = ctx
+    this.surface = new SurfaceUnitQueryApi(side, ctx)
+    this.participating = new ParticipatingUnitsApi(side, ctx)
   }
 
   private get _sideData(): SideStateData {
@@ -189,41 +323,8 @@ export class SideApi {
     return this._sideData.participatingUnits.includes(unitId)
   }
 
-  private _onSurface(options: GetUnitsOptions): GetUnitsOptions {
-    return options.surfaceId === undefined
-      ? { ...options, surfaceId: this.state.activeSurfaceId }
-      : options
-  }
-
-  getUnits(unitType: UnitType, options: GetUnitsOptions) {
-    return CombatSideState.getUnits(
-      this._sideData,
-      unitType,
-      this._onSurface(options),
-    )
-  }
-
   hasUnit(unitId: UnitId) {
     return CombatSideState.hasUnit(this._sideData, unitId)
-  }
-
-  hasUnitType(unitType: UnitType, options: GetUnitsOptions) {
-    return CombatSideState.hasUnitType(
-      this._sideData,
-      unitType,
-      this._onSurface(options),
-    )
-  }
-
-  countUnits(
-    filter: UnitType | UnitType[] | undefined,
-    options: GetUnitsOptions,
-  ) {
-    return CombatSideState.countUnits(
-      this._sideData,
-      filter,
-      this._onSurface(options),
-    )
   }
 
   getPendingHits(filter?: { base?: true; bonus?: true }) {
@@ -232,20 +333,6 @@ export class SideApi {
 
   getHitPoolValidTargets() {
     return CombatSideState.getHitPoolValidTargets(this._sideData)
-  }
-
-  getActiveBaseTypes(surfaceId?: SurfaceId) {
-    return CombatSideState.getActiveBaseTypes(
-      this._sideData,
-      surfaceId ?? this.state.activeSurfaceId,
-    )
-  }
-
-  getParticipatingUnitTypes(options?: { combatMode?: CombatMode }) {
-    return CombatSideState.getParticipatingUnitTypes(
-      this._sideData,
-      options?.combatMode ?? this.state.combatMode,
-    )
   }
 
   getUnitVariantsOptions(filter?: ParamFilter): {
@@ -302,49 +389,6 @@ export class SideApi {
     const raw = (ability.params as Record<string, unknown>)[paramKey]
     if (!isDeclaredParam(raw)) return undefined
     return raw as DeclaredParamValue<unknown>
-  }
-
-  findUnitByPriority(
-    priority: UnitType[],
-    options: GetUnitsOptions & { predicate?: FindUnitPredicate },
-  ): UnitId | undefined
-  findUnitByPriority(
-    priority: UnitType[],
-    options: GetUnitsOptions & {
-      amount: number
-      predicate?: FindUnitPredicate
-    },
-  ): UnitId[]
-  findUnitByPriority(
-    priority: UnitType[],
-    options: GetUnitsOptions & {
-      amount?: number
-      predicate?: FindUnitPredicate
-    },
-  ): UnitId | UnitId[] | undefined {
-    const participating = new Set(
-      CombatSideState.getParticipatingUnitTypes(
-        this._sideData,
-        this.state.combatMode,
-      ),
-    )
-    return CombatSideState.findUnitByPriority(
-      this._sideData,
-      priority,
-      participating,
-      this._onSurface(options),
-    )
-  }
-
-  /** Simulate resolving N unrestricted hits against this side's current
-   *  units — returns the UnitIds that would be destroyed, in sacrifice
-   *  order. Non-destructive. */
-  getAssignHitsTargets(hits: number): UnitId[] {
-    const dirty = this._sideData._needsCanonicalize
-    if (dirty) {
-      canonicalizeUnitState(this._sideData, dirty)
-    }
-    return CombatSideState.getAssignHitsTargets(this._sideData, hits)
   }
 
   getUnitStats(unitTypeOrId: string | UnitId) {

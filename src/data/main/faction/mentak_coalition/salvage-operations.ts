@@ -67,9 +67,8 @@ export const salvageOperations: Ability<Params> = {
 
         if (params._destroyedShipTypes.length === 0) return false
         if (
-          ctx.api.own.countUnits(ownShips, {
+          ctx.api.own.surface.countUnits(ownShips, {
             includeVariants: true,
-            surfaceId: ctx.api.own.getSpaceSurfaceId(),
           }) === 0
         )
           return false

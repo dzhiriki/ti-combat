@@ -31,7 +31,7 @@ export const shieldPaling: Ability = {
     {
       timing: 'AFTER_DESTROY',
       isCallable: (_params, ctx) =>
-        !ctx.api.own.hasUnitType('MECH', {
+        !ctx.api.own.surface.hasUnitType('MECH', {
           includeVariants: true,
         }),
       call: ctx => {

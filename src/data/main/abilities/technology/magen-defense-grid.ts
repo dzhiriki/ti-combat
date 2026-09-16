@@ -34,13 +34,13 @@ export const magenDefenseGrid: Ability<Params> = {
       isCallable: (_, ctx) => {
         const { structures } = ctx.api.own.getAbilityConfig('SETTINGS')
         return (
-          ctx.api.own.countUnits(structures, {
+          ctx.api.own.surface.countUnits(structures, {
             includeVariants: true,
           }) > 0
         )
       },
       call: (ctx, params) => {
-        const target = ctx.api.opponent.findUnitByPriority(
+        const target = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
           { includeVariants: false },
         )!

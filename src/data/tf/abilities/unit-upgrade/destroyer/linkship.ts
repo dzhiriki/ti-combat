@@ -25,7 +25,7 @@ function bestTarget(ctx: AbilityReadContext): UnitId | undefined {
   let best: UnitId | undefined
   let bestWorth = -1
   for (const shipType of ships) {
-    for (const id of ctx.api.opponent.getUnits(shipType as UnitType, {
+    for (const id of ctx.api.opponent.surface.getUnits(shipType as UnitType, {
       includeVariants: true,
     })) {
       if (!isEligible(ctx, id)) continue
