@@ -1,6 +1,7 @@
 import type {
   CombatSide,
   DiceGroup,
+  SurfaceType,
   UnitBaseType,
   UnitId,
   UnitStats,
@@ -542,6 +543,13 @@ export interface Ability<Params extends Record<string, unknown> = any> {
   sync?: boolean
   /** Abilities sharing the same exclusiveGroup are mutually exclusive — enabling one disables others in the group. */
   exclusiveGroup?: string
+  /** Placement permissions supplied by this ability while it is enabled.
+   *  Setup uses this before PREPARE invokes run so copied or transformed
+   *  units can be authored on the same surfaces their runtime stats allow. */
+  unitPlacements?: readonly {
+    unitType: UnitBaseType
+    allowedSurfaces: readonly SurfaceType[]
+  }[]
   /** Called when a user changes a param. Can modify other params in response.
    *  Receives the params with the new value already applied, the changed key,
    *  the value, and a lookup context (`ctx.this` is this ability; `ctx.abilities`

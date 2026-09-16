@@ -48,6 +48,7 @@ export function getSimulationUnitsOnSurfaces(
   placements: SurfaceUnitSelections,
   surfaces: readonly SurfaceDefinition[],
   gen: { _nextCode?: number },
+  placementStats?: Partial<Record<UnitBaseType, UnitStats>>,
 ): {
   units: UnitIdList
   unitType: Record<string, UnitType>
@@ -85,7 +86,9 @@ export function getSimulationUnitsOnSurfaces(
       )
       if (!effectiveStats) continue
       const allowed =
-        effectiveStats.ALLOWED_SURFACES ?? DEFAULT_UNIT_SURFACES[baseType]
+        placementStats?.[baseType]?.ALLOWED_SURFACES ??
+        effectiveStats.ALLOWED_SURFACES ??
+        DEFAULT_UNIT_SURFACES[baseType]
       if (!allowed.includes(surface.type)) {
         throw new Error(`${baseType} cannot be placed on ${surface.type}`)
       }

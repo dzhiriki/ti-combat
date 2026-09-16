@@ -297,6 +297,18 @@ function sortPreSortedBuckets(
   sideConfig: Record<string, Record<string, unknown>>,
 ): void {
   for (const bucket of side.values()) {
+    // Unit copies and transformations must establish their stats before
+    // setup enforcement such as Capacity or Fleet Pool reads those stats.
+    // Array.sort is stable, so registration order remains authoritative
+    // within the modifier and non-modifier groups.
+    const prepare = bucket.get('PREPARE')
+    if (prepare && prepare.length > 1) {
+      prepare.sort(
+        (a, b) =>
+          Number(Boolean(b.ability.unitPlacements?.length)) -
+          Number(Boolean(a.ability.unitPlacements?.length)),
+      )
+    }
     for (const timing of PRE_SORTED_BUCKETS) {
       const entries = bucket.get(timing)
       if (entries && entries.length > 1) sortBucket(entries, sideConfig, timing)

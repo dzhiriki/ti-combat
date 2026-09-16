@@ -1,4 +1,5 @@
 import { prepareSimulationConfig } from '@/hooks/combat-setup'
+import { applyAbilityPlacementOverrides } from '@/hooks/combat-setup/ability-placement'
 import type { SimulationInput } from '@/hooks/combat-setup/types'
 import type {
   GameSystem,
@@ -12,6 +13,7 @@ import {
 } from '@/utils/get-simulation-units'
 
 import type { DeclaredSubtype } from './abilities-engine/types'
+import type { RegisteredAbility } from './abilities-engine/types'
 import { CombatEngine } from './combat-engine'
 import { CombatState } from './combat-state'
 import type {
@@ -27,6 +29,7 @@ function buildSideState(
   placements: SurfaceUnitSelections,
   surfaces: readonly SurfaceDefinition[],
   abilities: SideAbilitiesConfig,
+  registeredAbilities: readonly RegisteredAbility[],
   gen: { _nextCode?: number },
 ): SideStateData {
   const upgradedSet = new Set<import('@/types').UnitBaseType>()
@@ -35,8 +38,20 @@ function buildSideState(
       if (v.upgraded) upgradedSet.add(k as import('@/types').UnitBaseType)
     }
   }
+  const placementStats = applyAbilityPlacementOverrides(
+    buildUnitStatsMap(system, faction, upgradedSet),
+    registeredAbilities,
+    abilities,
+  )
   const { units, unitType, unitState, unitStats, surfaceUnits, unitSurface } =
-    getSimulationUnitsOnSurfaces(system, faction, placements, surfaces, gen)
+    getSimulationUnitsOnSurfaces(
+      system,
+      faction,
+      placements,
+      surfaces,
+      gen,
+      placementStats,
+    )
 
   const baseUnitStats: Record<string, UnitStatsEntry> = {
     ...buildUnitStatsMap(system, faction, upgradedSet),
@@ -105,6 +120,7 @@ self.onmessage = (e: MessageEvent<SimulationInput>) => {
       attackerPlacements,
       surfaces,
       abilities.attacker,
+      sideAbilities.attacker.registered,
       gen,
     ),
     buildSideState(
@@ -113,6 +129,7 @@ self.onmessage = (e: MessageEvent<SimulationInput>) => {
       defenderPlacements,
       surfaces,
       abilities.defender,
+      sideAbilities.defender.registered,
       gen,
     ),
     combatMode,

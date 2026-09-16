@@ -25,7 +25,6 @@ import { useSimulation } from '@/hooks/use-simulation'
 import { useUrlSync } from '@/hooks/use-url-sync'
 import type { CombatSide, UnitBaseType } from '@/types'
 import { getGameData } from '@/utils/get-game-data'
-import { getUnitConfig } from '@/utils/get-unit-config'
 
 import { ButtonIconPlain } from '../ui/button-icon-plain'
 import { Divider } from '../ui/divider'
@@ -85,6 +84,8 @@ export function CombatSimulator({
     surfaceSelections,
     combatMode,
     abilities,
+    attackerConfig,
+    defenderConfig,
     stateData,
     getReadContext,
     getAvailableAbilities,
@@ -157,15 +158,6 @@ export function CombatSimulator({
       if (!next.attacker && !next.defender) setSearchQuery('')
       return next
     })
-
-  const attackerConfig = useMemo(
-    () => getUnitConfig(system, attackerFaction),
-    [system, attackerFaction],
-  )
-  const defenderConfig = useMemo(
-    () => getUnitConfig(system, defenderFaction),
-    [system, defenderFaction],
-  )
 
   const attackerAbilities = useMemo(
     () => getAvailableAbilities('attacker'),

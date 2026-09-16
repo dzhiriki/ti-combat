@@ -33,6 +33,10 @@ import {
   getSimulationUnitsOnSurfaces,
 } from '@/utils/get-simulation-units'
 import {
+  getUnitConfig as buildUnitConfig,
+  type UnitConfig,
+} from '@/utils/get-unit-config'
+import {
   collapseAllSurfaces,
   collapseVisibleSurfaces,
   createEmptySurfaceSelections,
@@ -41,6 +45,10 @@ import {
   normalizeSurfaceSelections,
 } from '@/utils/surface-placements'
 
+import {
+  applyAbilityPlacementOverrides,
+  getAbilityPlacementOverrides,
+} from './ability-placement'
 import {
   initializeAbilityDefaults,
   reconcileAbilitiesConfig,
@@ -263,6 +271,22 @@ export class CombatSetup {
     return this._engine.context(side) as unknown as AbilityReadContext
   }
 
+  getUnitConfig(side: CombatSide): Record<UnitBaseType, UnitConfig> {
+    const faction =
+      side === 'attacker' ? this._attackerFaction : this._defenderFaction
+    const result = buildUnitConfig(this._system, faction)
+    const overrides = getAbilityPlacementOverrides(
+      this._sideRegistered[side],
+      this._abilities[side],
+    )
+
+    for (const [unitType, allowedSurfaces] of Object.entries(overrides)) {
+      const type = unitType as UnitBaseType
+      result[type] = { ...result[type], allowedSurfaces }
+    }
+    return result
+  }
+
   // ── Mutations ──────────────────────────────────────────────────────
 
   /**
@@ -412,14 +436,12 @@ export class CombatSetup {
           upgraded,
         }
       }
-      const faction =
-        side === 'attacker' ? this._attackerFaction : this._defenderFaction
       this._surfaceSelections[side] = normalizeSurfaceSelections(
         placements,
         this._surfaces,
         this._selectedPlanetId,
         side,
-        buildUnitStatsMap(this._system, faction, this.getUpgradedTypes(side)),
+        this.getPlacementUnitStats(side),
       )
       this.refreshSideAfterUnitChange(side, true)
       return
@@ -441,6 +463,9 @@ export class CombatSetup {
     abilityKey: string,
     params: Record<string, unknown>,
   ): void {
+    const changesPlacement = this._sideRegistered[side].some(
+      ability => ability.key === abilityKey && ability.unitPlacements?.length,
+    )
     this.setParam(side, abilityKey, params)
     reconcileAbilitiesConfig(
       this._abilities,
@@ -450,6 +475,22 @@ export class CombatSetup {
       this._stateData,
       this._lookups,
     )
+    if (changesPlacement) {
+      if (this._editorMode === 'SIMPLIFIED') {
+        this.commitSimplifiedSelections(side)
+      } else {
+        this._surfaceSelections[side] = normalizeSurfaceSelections(
+          this._surfaceSelections[side],
+          this._surfaces,
+          this._selectedPlanetId,
+          side,
+          this.getPlacementUnitStats(side),
+        )
+      }
+      const faction =
+        side === 'attacker' ? this._attackerFaction : this._defenderFaction
+      this.rebuildUnits(side, faction)
+    }
     // Force new stateData reference so React memoization triggers
     this._stateData = { ...this._stateData }
     this.rebuildEngine()
@@ -592,14 +633,12 @@ export class CombatSetup {
         [unitType]: { ...surface[unitType], count: nextCount },
       },
     }
-    const faction =
-      side === 'attacker' ? this._attackerFaction : this._defenderFaction
     this._surfaceSelections[side] = normalizeSurfaceSelections(
       this._surfaceSelections[side],
       this._surfaces,
       this._selectedPlanetId,
       side,
-      buildUnitStatsMap(this._system, faction, this.getUpgradedTypes(side)),
+      this.getPlacementUnitStats(side),
     )
     this.refreshSideAfterUnitChange(side, false)
   }
@@ -651,6 +690,20 @@ export class CombatSetup {
       this._stateData,
       this._lookups,
     )
+    if (this._editorMode === 'SIMPLIFIED') {
+      this.commitSimplifiedSelections(side)
+    } else {
+      this._surfaceSelections[side] = normalizeSurfaceSelections(
+        this._surfaceSelections[side],
+        this._surfaces,
+        this._selectedPlanetId,
+        side,
+        this.getPlacementUnitStats(side),
+      )
+    }
+    const faction =
+      side === 'attacker' ? this._attackerFaction : this._defenderFaction
+    this.rebuildUnits(side, faction)
     // Force new stateData reference so React memoization triggers
     this._stateData = { ...this._stateData }
     this.rebuildEngine()
@@ -946,13 +999,12 @@ export class CombatSetup {
     }
 
     for (const side of ['attacker', 'defender'] as const) {
-      const faction = side === 'attacker' ? af : df
       this._surfaceSelections[side] = normalizeSurfaceSelections(
         this._surfaceSelections[side],
         this._surfaces,
         this._selectedPlanetId,
         side,
-        buildUnitStatsMap(this._system, faction, this.getUpgradedTypes(side)),
+        this.getPlacementUnitStats(side),
       )
     }
 
@@ -1013,8 +1065,6 @@ export class CombatSetup {
 
   private effectivePlacements(side: CombatSide): SurfaceUnitSelections {
     if (this._editorMode === 'FULL') return this._surfaceSelections[side]
-    const faction =
-      side === 'attacker' ? this._attackerFaction : this._defenderFaction
     return expandSimplifiedSelections(
       this._surfaceSelections[side],
       this.selectionsForSide(side),
@@ -1022,7 +1072,17 @@ export class CombatSetup {
       SPACE_SURFACE_ID,
       this._selectedPlanetId,
       side,
+      this.getPlacementUnitStats(side),
+    )
+  }
+
+  private getPlacementUnitStats(side: CombatSide) {
+    const faction =
+      side === 'attacker' ? this._attackerFaction : this._defenderFaction
+    return applyAbilityPlacementOverrides(
       buildUnitStatsMap(this._system, faction, this.getUpgradedTypes(side)),
+      this._sideRegistered[side],
+      this._abilities[side],
     )
   }
 
@@ -1096,6 +1156,7 @@ export class CombatSetup {
         placements,
         this._surfaces,
         gen,
+        this.getPlacementUnitStats(side),
       )
     this._stateData = {
       ...this._stateData,
