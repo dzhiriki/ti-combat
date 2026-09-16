@@ -1,5 +1,7 @@
+import { UNIT_ABILITIES } from '@/constants/units'
 import type {
   CombatSide,
+  UnitAbility,
   UnitBaseType,
   UnitId,
   UnitIdList,
@@ -64,6 +66,8 @@ const SORT_KEY_BY_TIMING = new Map<AbilityTiming, string>()
 for (const group of TIMING_GROUPS) {
   for (const t of group.timings) SORT_KEY_BY_TIMING.set(t, group.paramKey)
 }
+
+const UNIT_ABILITY_KEYS = new Set<string>(UNIT_ABILITIES)
 
 /** Timings whose entries are collected in a "parent" bucket so a single call
  *  (e.g. `runAbilities('START_OF_COMBAT')` in round 1) fires both the parent
@@ -967,6 +971,31 @@ export class AbilitiesEngine {
       const { ability, invoke, params, source, ownerFaction } = entry
 
       if (sideTracker.has(entry.trackerKey)) continue
+
+      if (source.type === 'unit' && UNIT_ABILITY_KEYS.has(ability.key)) {
+        const unitType = state[side].unitType[source.unitId]
+        const surfaceId = state[side].unitSurface[source.unitId]
+        const unitAbility = ability.key as UnitAbility
+        if (
+          CombatSideState.isRestricted(
+            state,
+            side,
+            'lost',
+            unitAbility,
+            unitType,
+            surfaceId,
+          ) ||
+          CombatSideState.isRestricted(
+            state,
+            side,
+            'cannotBeUsed',
+            unitAbility,
+            unitType,
+            surfaceId,
+          )
+        )
+          continue
+      }
 
       if (source.type === 'deploy') {
         if (

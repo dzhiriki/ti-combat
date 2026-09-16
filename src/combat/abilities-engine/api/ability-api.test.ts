@@ -133,6 +133,62 @@ describe('SideApi unit query scopes', () => {
   })
 })
 
+describe('SideApi unit ability restriction scopes', () => {
+  it('applies scoped restrictions only on their surface and omitted scopes globally', () => {
+    const cs = makeCombatState()
+    const spacePds = 'a' as UnitId
+    const planetPds = 'b' as UnitId
+    const side = cs.data.attacker
+    side.nonParticipatingUnits = `${spacePds}${planetPds}` as UnitIdList
+    side.surfaceUnits = {
+      [SPACE_SURFACE_ID]: `${spacePds}` as UnitIdList,
+      [DEFAULT_PLANET_ID]: `${planetPds}` as UnitIdList,
+    }
+    side.unitSurface = {
+      [spacePds]: SPACE_SURFACE_ID,
+      [planetPds]: DEFAULT_PLANET_ID,
+    }
+    side.unitType = { [spacePds]: 'PDS', [planetPds]: 'PDS' }
+
+    const { api } = withAbility(cs)
+    api.setUnitAbilityCannotBeUsed(
+      'SPACE_CANNON',
+      'SPACE_ONLY',
+      'STRUCTURES',
+      SPACE_SURFACE_ID,
+    )
+
+    expect(
+      api.isUnitAbilityCannotBeUsed('SPACE_CANNON', 'PDS', SPACE_SURFACE_ID),
+    ).toBe(true)
+    expect(
+      api.isUnitAbilityCannotBeUsed('SPACE_CANNON', 'PDS', DEFAULT_PLANET_ID),
+    ).toBe(false)
+    expect(api.isUnitAbilityCannotBeUsed('SPACE_CANNON', 'PDS')).toBe(true)
+
+    cs.data.activeSurfaceId = DEFAULT_PLANET_ID
+    expect(api.isUnitAbilityCannotBeUsed('SPACE_CANNON', 'PDS')).toBe(false)
+
+    api.setUnitAbilityLost('PLANETARY_SHIELD', 'GLOBAL', 'PDS')
+    expect(
+      api.isUnitAbilityLost('PLANETARY_SHIELD', 'PDS', SPACE_SURFACE_ID),
+    ).toBe(true)
+    expect(
+      api.isUnitAbilityLost('PLANETARY_SHIELD', 'PDS', DEFAULT_PLANET_ID),
+    ).toBe(true)
+
+    api.removeUnitAbilityCannotBeUsed(
+      'SPACE_CANNON',
+      'SPACE_ONLY',
+      'STRUCTURES',
+      SPACE_SURFACE_ID,
+    )
+    expect(
+      api.isUnitAbilityCannotBeUsed('SPACE_CANNON', 'PDS', SPACE_SURFACE_ID),
+    ).toBe(false)
+  })
+})
+
 describe('SideApi.declareRollTrigger', () => {
   let cs: CombatState
   beforeEach(() => {
