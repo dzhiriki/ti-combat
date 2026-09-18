@@ -16,9 +16,9 @@ export const waylay: Ability = {
       timing: 'BEFORE_UNIT_ABILITY_ROLL',
       context: 'AFB',
       call: ctx => {
-        const { ships } = ctx.api.opponent.getAbilityConfig('SETTINGS')
         ctx.api.opponent.updateAbilityConfig('SETTINGS', {
-          validTargetsAntiFighterBarrage: [...ships],
+          validTargetsAntiFighterBarrage:
+            ctx.api.opponent.participating.getUnitTypes(),
         })
       },
     },

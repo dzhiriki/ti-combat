@@ -126,7 +126,7 @@ describe('canonicalizeUnitState', () => {
     expect(side.unitState[B]).toEqual({ isDamaged: false })
   })
 
-  test('non-participating units share the variant pool', () => {
+  test('keeps non-participating units in a separate variant pool', () => {
     const side: SideStateData = {
       faction: 'ARBOREC',
       participatingUnits: [A].join('') as UnitIdList,
@@ -145,7 +145,7 @@ describe('canonicalizeUnitState', () => {
 
     canonicalizeUnitState(side)
 
-    expect(side.unitState[A]).toEqual({ isDamaged: true })
-    expect(side.unitState[B]).toBeUndefined()
+    expect(side.unitState[A]).toBeUndefined()
+    expect(side.unitState[B]).toEqual({ isDamaged: true })
   })
 })

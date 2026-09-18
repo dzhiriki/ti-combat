@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { combatTest } from '../utils/combat-test'
+import { isUnitCategory } from '@/combat/utils/unit-combat-properties'
+import { DEFAULT_PLANET_ID, SPACE_SURFACE_ID, type UnitId } from '@/types'
 
-// Il Na Viroset mech: participates in space combat as if it were a ship, +1
-// per anomaly it is in or adjacent to. Mechs only join while the side has a
-// ship fielded; `mechsOnGround` says how many stay on the planet (the rest
-// are in the space area and keep the combat going after the fleet dies).
+import { combatTest, unitsByBaseType } from '../utils/combat-test'
+
+// Starlancer XI uses native ship and ground-force categories. Special
+// combat-end rules are deferred; ordinary participation uses the active surface.
 describe('TF_STARLANCER_XI', () => {
   it('mechs roll in space combat alongside ships', () => {
     const t = combatTest({
@@ -95,7 +96,7 @@ describe('TF_STARLANCER_XI', () => {
     expect(t.attacker.units.CRUISER).toHaveLength(1)
   })
 
-  it('with no ships fielded, the mechs stay on the ground — no space combat', () => {
+  it('mechs participate without any other ships', () => {
     const t = combatTest({
       system: 'TF',
       mode: 'SPACE',
@@ -103,37 +104,45 @@ describe('TF_STARLANCER_XI', () => {
       defender: { faction: 'IL_NA_VIROSET', units: { MECH: 2 } },
     })
 
+    t.advanceTo('SPACE_COMBAT')
     t.advanceRound()
 
-    // The defender never fields a space force: attacker takes the system,
-    // and the mechs survive untouched on the ground.
-    expect(t.state.winnerSide).toBe('attacker')
-    expect(t.defender.units.MECH).toHaveLength(2)
+    expect(t.isFinished()).toBe(false)
+    expect(t.dicePool().defender.MECH).toEqual([
+      [6, 1],
+      [6, 1],
+    ])
+    for (const mech of unitsByBaseType(t.state.defender).MECH!) {
+      expect(isUnitCategory(t.state.defender, mech, 'SHIPS')).toBe(true)
+      expect(isUnitCategory(t.state.defender, mech, 'GROUND_FORCES')).toBe(true)
+    }
   })
 
-  it('combat ends when the last ship dies — ground mechs do not hold the space area', () => {
+  it('only mechs on the active space surface participate', () => {
     const t = combatTest({
       system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',
-        units: { CRUISER: 1, MECH: 1 },
-        abilities: {
-          TF_STARLANCER_XI: { isEnabled: true, mechsOnGround: 1 },
+        units: {},
+        placements: {
+          [SPACE_SURFACE_ID]: { MECH: 1 },
+          [DEFAULT_PLANET_ID]: { MECH: 1 },
         },
       },
-      defender: { faction: 'AVARICE_REX', units: { CRUISER: 3 } },
+      defender: { faction: 'AVARICE_REX', units: { CRUISER: 1 } },
     })
 
     t.advanceTo('SPACE_COMBAT')
-    // Attacker receives 2 hits: the mech sustains one, the cruiser dies to
-    // the other. With no ships left the combat ends immediately — the
-    // damaged mech survives on the ground instead of fighting round 2 alone.
-    t.advanceRound({ attacker: 2, defender: 0 })
+    t.advanceRound()
 
-    expect(t.state.winnerSide).toBe('defender')
-    expect(t.attacker.units.CRUISER).toBeUndefined()
-    expect(t.attacker.units.MECH).toHaveLength(1)
+    expect(t.dicePool().attacker.MECH).toEqual([[6, 1]])
+    const mechs = unitsByBaseType(t.state.attacker).MECH!
+    for (const id of mechs) {
+      expect(t.state.attacker.participatingUnits.includes(id)).toBe(
+        t.state.attacker.unitSurface[id] === SPACE_SURFACE_ID,
+      )
+    }
   })
 
   it('space-area mechs keep the combat going after the last ship dies — and can win', () => {
@@ -144,8 +153,6 @@ describe('TF_STARLANCER_XI', () => {
         faction: 'IL_NA_VIROSET',
         units: { CRUISER: 1, MECH: 1 },
         abilities: {
-          // mechsOnGround defaults to 0 — the mech is in the space area.
-          TF_STARLANCER_XI: { isEnabled: true, mechsOnGround: 0 },
           // Deterministic: no sustain, the cruiser soaks the hit.
           SUSTAIN_DAMAGE: { isEnabled: false },
           UNIT_PRIORITY: { spaceUnitPriority: [['CRUISER'], ['MECH']] },
@@ -166,63 +173,70 @@ describe('TF_STARLANCER_XI', () => {
     expect(t.state.winnerSide).toBe('attacker')
   })
 
-  it('preserve strategies give up the space mechs first — the ground pool survives', () => {
+  it('retains native ground-force participation', () => {
+    const t = combatTest({
+      system: 'TF',
+      mode: 'GROUND',
+      attacker: { faction: 'IL_NA_VIROSET', units: { MECH: 1 } },
+      defender: { faction: 'AVARICE_REX', units: { INFANTRY: 1 } },
+    })
+    t.advanceTo('GROUND_COMBAT')
+    t.advanceRound()
+    expect(t.dicePool().attacker).toContainDice('MECH', [6, 1])
+  })
+
+  it('automatically joins the first mech placed during combat', () => {
+    let placed: UnitId
     const t = combatTest({
       system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',
-        units: { CRUISER: 1, MECH: 2 },
-        abilities: {
-          TF_STARLANCER_XI: {
-            isEnabled: true,
-            mechsOnGround: 1,
-            strategy: 'PRESERVE_SUSTAIN',
-          },
-          SUSTAIN_DAMAGE: { isEnabled: false },
-          UNIT_PRIORITY: { spaceUnitPriority: [['CRUISER'], ['MECH']] },
-        },
+        units: { CRUISER: 1 },
+        abilities: { TF_STARLANCER_XI: { anomalies: 2 } },
       },
-      defender: { faction: 'AVARICE_REX', units: { CRUISER: 2 } },
+      defender: { faction: 'AVARICE_REX', units: { CRUISER: 1 } },
+      customAbilities: [
+        {
+          key: 'TEST_REINFORCEMENTS',
+          name: 'Reinforcements',
+          params: { isEnabled: true, uses: 1 },
+          invoke: [
+            {
+              timing: 'START_OF_COMBAT_ROUND',
+              isCallable: (_params, ctx) => ctx.side === 'attacker',
+              call: ctx => {
+                ;[placed] = ctx.api.own.placeUnits({ MECH: 1 }).MECH
+              },
+            },
+          ],
+        },
+      ],
     })
-
     t.advanceTo('SPACE_COMBAT')
-    // 2 hits: the cruiser dies, then a mech — attributed to the space pool
-    // first. Nothing holds the space area any more, so the combat ends with
-    // the ground mech alive.
-    t.advanceRound({ attacker: 2, defender: 0 })
-
-    expect(t.state.winnerSide).toBe('defender')
-    expect(t.attacker.units.MECH).toHaveLength(1)
+    t.advanceRound()
+    expect(t.state.attacker.participatingUnits).toContain(placed!)
+    expect(isUnitCategory(t.state.attacker, placed!, 'SHIPS')).toBe(true)
+    expect(isUnitCategory(t.state.attacker, placed!, 'GROUND_FORCES')).toBe(
+      true,
+    )
+    expect(t.state.attacker.unitCombat?.[placed!]).toBeUndefined()
+    expect(t.dicePool().attacker).toContainDice('MECH', [4, 1])
   })
 
-  it('win-in-space gives up the ground mechs first — the fight goes on', () => {
+  it('can sustain space cannon hits as a native ship', () => {
     const t = combatTest({
       system: 'TF',
       mode: 'SPACE',
-      attacker: {
-        faction: 'IL_NA_VIROSET',
-        units: { CRUISER: 1, MECH: 2 },
-        abilities: {
-          // Same scenario as above under the default strategy: the dead
-          // mech came from the ground pool, so a space mech still holds the
-          // area and the combat continues.
-          TF_STARLANCER_XI: { isEnabled: true, mechsOnGround: 1 },
-          SUSTAIN_DAMAGE: { isEnabled: false },
-          UNIT_PRIORITY: { spaceUnitPriority: [['CRUISER'], ['MECH']] },
-        },
-      },
-      defender: { faction: 'AVARICE_REX', units: { CRUISER: 2 } },
+      attacker: { faction: 'IL_NA_VIROSET', units: { MECH: 1 } },
+      defender: { faction: 'AVARICE_REX', units: { PDS: 1, CRUISER: 1 } },
     })
-
-    t.advanceTo('SPACE_COMBAT')
-    t.advanceRound({ attacker: 2, defender: 0 })
-
-    expect(t.isFinished()).toBe(false)
+    t.advanceTo('SPACE_COMBAT', { attacker: 1 })
     expect(t.attacker.units.MECH).toHaveLength(1)
+    expect(t.attacker.units.MECH![0].isDamaged).toBe(true)
   })
 
-  it('the no-sustain strategy keeps mechs from spending their sustain in space', () => {
+  it('uses the normal Sustain Priority control to withhold mech sustain', () => {
     const t = combatTest({
       system: 'TF',
       mode: 'SPACE',
@@ -230,10 +244,7 @@ describe('TF_STARLANCER_XI', () => {
         faction: 'IL_NA_VIROSET',
         units: { CRUISER: 1, MECH: 1 },
         abilities: {
-          TF_STARLANCER_XI: {
-            isEnabled: true,
-            strategy: 'PRESERVE_NO_SUSTAIN',
-          },
+          SUSTAIN_DAMAGE: { spacePriority: [['MECH', false]] },
           // Mechs soak first so the hit would go to the mech either way.
           UNIT_PRIORITY: { spaceUnitPriority: [['MECH'], ['CRUISER']] },
         },
@@ -242,8 +253,8 @@ describe('TF_STARLANCER_XI', () => {
     })
 
     t.advanceTo('SPACE_COMBAT')
-    // With sustain the mech would absorb the hit (damaged, alive); with the
-    // no-sustain strategy it dies outright.
+    // With sustain the mech would absorb the hit; disabling it in the
+    // standard priority control makes the mech die outright.
     t.advanceRound({ attacker: 1, defender: 0 })
 
     expect(t.attacker.units.MECH).toBeUndefined()

@@ -15,12 +15,8 @@ export const reflectiveShielding: Ability = {
     {
       timing: 'WHEN_SUSTAIN_DAMAGE_USE',
       context: 'SPACE_COMBAT',
-      isCallable: (_params, ctx, unitId) => {
-        const { ships } = ctx.api.own.getAbilityConfig('SETTINGS')
-        const variant = ctx.api.own.getUnitBaseType(unitId)!
-
-        return ships.includes(variant)
-      },
+      isCallable: (_params, ctx, unitId) =>
+        ctx.api.own.isUnitCategory(unitId, 'SHIPS'),
       call: ctx => {
         ctx.api.opponent.addHits(2)
       },

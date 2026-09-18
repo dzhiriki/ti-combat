@@ -30,6 +30,7 @@ export interface HitValueModifierDecl {
    *  (split out of the variant's bucket). Used by abilities like
    *  Gravleash Maneuvers that target a single ship. */
   singleUnit?: string
+  unitId?: string
   /** True when the source invoke was flagged `declaration: true` — the
    *  dispatch-time `uses` decrement was deferred; the kernel must bill
    *  one use if this modifier survives the firing-side filter. */

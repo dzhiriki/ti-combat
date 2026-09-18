@@ -277,8 +277,7 @@ function resetBaseGroups(
 
     // onParamSet recomputes DERIVED groups (spaceCombatParticipating,
     // groundCombatParticipating, ...) from the base groups, clobbering
-    // declared additions that target a derived group (e.g. Starlancer XI
-    // adding MECH to spaceCombatParticipating). Re-apply the declared
+    // declared additions that target a derived group. Re-apply the declared
     // changes on top — base-group additions are already present, so the
     // includes check makes them no-ops.
     const postDeriveChanges = collectParamChanges(

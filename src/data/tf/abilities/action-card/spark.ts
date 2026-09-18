@@ -22,10 +22,8 @@ export const spark: Ability<Params> = {
   params: {
     isEnabled: true,
     uses: 0,
-    // Sourced from the participation lists (not `nonFighterShips` /
-    // `groundForces`) so units granted space participation by other cards —
-    // e.g. Starlancer XI mechs — stay targetable; fighters and infantry are
-    // excluded as they can never sustain.
+    // Candidate lists include units that abilities can bring into combat.
+    // Fighters and infantry are excluded as they cannot sustain.
     spaceTargets: declareParam<UnitList<boolean>>({
       default: [],
       source: 'spaceCombatParticipating',

@@ -2,10 +2,12 @@ import type { UnitId, UnitState, UnitType } from '@/types'
 
 import type { SideStateData } from '../combat-state/types'
 import { stateDestroyScore } from './state-destroy-score'
+import { unitCombatSignature } from './unit-combat-properties'
 
 /**
  * Canonicalize per-variant state assignments by permuting `unitState`
- * VALUES across UnitIds. Within each variant pool, lowest UnitId ends
+ * VALUES across UnitIds with the same variant, surface, and combat grants.
+ * Within each equivalent pool, lowest UnitId ends
  * up owning the worst-state value (highest destroyScore); highest
  * UnitId owns the best (clean) value.
  *
@@ -18,14 +20,17 @@ import { stateDestroyScore } from './state-destroy-score'
  * matches how `getUnitsHash` filters falsy fields and keeps the in-memory
  * representation aligned with the hash.
  *
- * Mutates `s.unitState` in place. Caller must invoke
- * `ensureUnitStateOwned` first if CoW protection is needed.
+ * Owns the state map before permutation so sibling branches are isolated.
  */
 export function canonicalizeUnitState(
   s: SideStateData,
   types?: ReadonlySet<UnitType>,
 ): void {
   s._needsCanonicalize = undefined
+  if (s._unitStateShared) {
+    s.unitState = { ...s.unitState }
+    s._unitStateShared = false
+  }
   const pools = collectVariantPools(s, types)
   for (const ids of pools.values()) canonicalizePool(s, ids)
 }
@@ -35,19 +40,19 @@ function collectVariantPools(
   types?: ReadonlySet<UnitType>,
 ): Map<string, UnitId[]> {
   const pools = new Map<string, UnitId[]>()
-  const collect = (pool: string) => {
+  const collect = (pool: string, participating: boolean) => {
     for (const id of pool) {
       const type = s.unitType[id]
       if (!type) continue
       if (types && !types.has(type)) continue
-      const key = `${s.unitSurface[id] ?? ''}\0${type}`
+      const key = `${s.unitSurface[id] ?? ''}\0${type}\0${participating}\0${unitCombatSignature(s, id)}`
       const pool = pools.get(key)
       if (pool) pool.push(id as UnitId)
       else pools.set(key, [id as UnitId])
     }
   }
-  collect(s.participatingUnits)
-  collect(s.nonParticipatingUnits)
+  collect(s.participatingUnits, true)
+  collect(s.nonParticipatingUnits, false)
   return pools
 }
 

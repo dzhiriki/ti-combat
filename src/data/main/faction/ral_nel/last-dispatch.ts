@@ -1,5 +1,5 @@
 import { type Ability, type AbilityReadContext, declareParam } from '@/combat'
-import type { UnitId, UnitList, UnitType } from '@/types'
+import type { UnitId, UnitList } from '@/types'
 
 type Params = {
   targetPriority: UnitList<boolean>
@@ -30,15 +30,10 @@ export const lastDispatch: Ability<Params> = {
         if (unitId !== ctx.getUnit()) return false
 
         // Check there's at least 1 eligible opponent ship
-        const { ships } = ctx.api.opponent.getAbilityConfig('SETTINGS')
-        for (const shipType of ships) {
-          const ids = ctx.api.opponent.participating.getUnits(
-            shipType as UnitType,
-            { includeVariants: true },
-          )
-          for (const id of ids) {
-            if (isEligibleTarget(ctx, id)) return true
-          }
+        for (const id of ctx.api.opponent.participating.getUnits(undefined, {
+          includeVariants: true,
+        })) {
+          if (isEligibleTarget(ctx, id)) return true
         }
         return false
       },
@@ -75,7 +70,7 @@ function isEligibleTarget(ctx: AbilityReadContext, unitId: UnitId) {
   const variantKey = ctx.api.opponent.getUnitVariantKey(unitId)
   if (!variantKey) return false
   return (
-    ctx.api.opponent.isUnitAbilityLost('SUSTAIN_DAMAGE', variantKey) ||
-    ctx.api.opponent.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', variantKey)
+    ctx.api.opponent.isUnitAbilityLost('SUSTAIN_DAMAGE', unitId) ||
+    ctx.api.opponent.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', unitId)
   )
 }

@@ -1,16 +1,17 @@
 import type { SurfaceType } from '../types/surface'
 import type { UnitAbility, UnitBaseType } from '../types/unit'
 
-export const NON_FIGHTER_SHIPS: UnitBaseType[] = [
+export const SHIPS: UnitBaseType[] = [
   'FLAGSHIP',
   'WAR_SUN',
   'DREADNOUGHT',
   'CARRIER',
   'CRUISER',
   'DESTROYER',
+  'FIGHTER',
 ]
 
-export const SHIPS: UnitBaseType[] = [...NON_FIGHTER_SHIPS, 'FIGHTER']
+export const NON_FIGHTER_SHIPS = SHIPS.filter(type => type !== 'FIGHTER')
 
 export const GROUND_FORCES: UnitBaseType[] = ['MECH', 'INFANTRY']
 
@@ -29,7 +30,6 @@ export type UnitCategory = keyof typeof UNIT_CATEGORIES
 
 export const UNIT_CATEGORIES = {
   SHIPS,
-  NON_FIGHTER_SHIPS,
   GROUND_FORCES,
   STRUCTURES,
 } as const

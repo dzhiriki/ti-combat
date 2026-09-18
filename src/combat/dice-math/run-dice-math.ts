@@ -129,7 +129,7 @@ export function runDiceMath(input: DiceMathInput): DiceMathResult {
   const hvAttacker: HitValueModifierDecl[] = []
   const hvDefender: HitValueModifierDecl[] = []
   for (const m of input.modifiers) {
-    if (m.type !== 'HIT_VALUE') continue
+    if (m.type !== 'HIT_VALUE' || m.unitId) continue
     if (m.side === 'attacker') hvAttacker.push(m)
     else hvDefender.push(m)
   }

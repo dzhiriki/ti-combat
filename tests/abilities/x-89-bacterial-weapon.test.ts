@@ -24,6 +24,27 @@ describe('X_89_BACTERIAL_WEAPON', () => {
     expect(t.defender.units.INFANTRY).toHaveLength(2)
   })
 
+  it('keeps added bombardment hits subject to phase eligibility', () => {
+    const t = combatTest({
+      mode: 'GROUND',
+      attacker: {
+        faction: 'ARBOREC',
+        units: { DREADNOUGHT: 1, INFANTRY: 1 },
+        abilities: { X_89_BACTERIAL_WEAPON: true },
+      },
+      defender: {
+        faction: 'NAAZ_ROKHA_ALLIANCE',
+        units: { MECH: 1 },
+        abilities: { EIDOLON_MAXIMUM: true },
+      },
+    })
+
+    t.advanceTo('SPACE_CANNON_DEFENSE', { defender: 1 })
+
+    expect(t.defender.units.MECH).toHaveLength(1)
+    expect(t.defender.units.MECH![0].isDamaged).toBeFalsy()
+  })
+
   it('doubles ground combat hits', () => {
     const t = combatTest({
       mode: 'GROUND',

@@ -5,6 +5,7 @@ export const cmorranNorr: Ability = {
   name: "C'morran N'orr",
   description:
     "Apply +1 to the result of each of your other ship's combat rolls in this system.",
+  context: 'SPACE',
   params: {
     isEnabled: true,
     uses: Infinity,
@@ -15,12 +16,7 @@ export const cmorranNorr: Ability = {
     {
       timing: 'BEFORE_DICE_ROLL',
       call: ctx => {
-        const settings = ctx.api.own.getAbilityConfig('SETTINGS')
-        const ships = settings?.ships ?? []
-        for (const shipType of ships) {
-          if (shipType === 'FLAGSHIP') continue
-          ctx.api.own.applyBonusToResult(1, shipType)
-        }
+        ctx.api.own.applyBonusToResult(1, { exclude: ['FLAGSHIP'] })
       },
     },
   ],

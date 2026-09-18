@@ -118,7 +118,10 @@ function createFactionUnitAbility(
         timing: 'PREPARE',
         call: (ctx: AbilityCallContext) => {
           // Save original stats before overwriting
-          const original = { ...ctx.api.own.getUnitStats(unitType)! }
+          const original = {
+            CATEGORIES: undefined,
+            ...ctx.api.own.getUnitStats(unitType)!,
+          }
           ctx.api.own.updateAbilityConfig(key, {
             reset: () => (ctx: AbilityCallContext) => {
               ctx.api.own.modifyUnitType(unitType, original)

@@ -28,6 +28,7 @@ export const il_na_viroset: Faction = {
     MECH: {
       BASE: {
         NAME: 'Starlancer XI',
+        CATEGORIES: ['GROUND_FORCES', 'SHIPS'],
         DESCRIPTION:
           'This unit participates in space combat as if it were a ship. For each anomaly this unit is in or adjacent to, apply +1 to this unit’s rolls.',
         COST: 2,

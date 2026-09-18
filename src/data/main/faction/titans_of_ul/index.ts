@@ -69,6 +69,7 @@ export const titans_of_ul: Faction = {
     PDS: {
       BASE: {
         NAME: 'Hel-Titan I',
+        CATEGORIES: ['STRUCTURES', 'GROUND_FORCES'],
         DESCRIPTION:
           'This unit is treated as both a structure and a ground force. It cannot be transported.',
         COMBAT: [7, 1],

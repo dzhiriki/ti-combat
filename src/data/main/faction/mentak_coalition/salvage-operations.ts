@@ -44,8 +44,6 @@ export const salvageOperations: Ability<Params> = {
       timing: 'DESTROY',
       system: true,
       call: (ctx, params, ids) => {
-        const { ships } = ctx.api.own.getAbilityConfig('SETTINGS')
-        const shipsSet = new Set<UnitBaseType>(ships)
         const collected = new Set<UnitBaseType>(params._destroyedShipTypes)
         for (const id of ids) {
           const variantKey =
@@ -53,7 +51,7 @@ export const salvageOperations: Ability<Params> = {
             ctx.api.opponent.getUnitVariantKey(id)
           if (!variantKey) continue
           const { type } = parseVariantId(variantKey)
-          if (shipsSet.has(type)) collected.add(type)
+          if (ctx.api.own.isUnitTypeCategory(type, 'SHIPS')) collected.add(type)
         }
         ctx.api.own.updateAbilityConfig({
           _destroyedShipTypes: [...collected],
@@ -63,11 +61,9 @@ export const salvageOperations: Ability<Params> = {
     {
       timing: 'END_OF_COMBAT',
       isCallable: (params, ctx) => {
-        const { ships: ownShips } = ctx.api.own.getAbilityConfig('SETTINGS')
-
         if (params._destroyedShipTypes.length === 0) return false
         if (
-          ctx.api.own.participating.countUnits(ownShips, {
+          ctx.api.own.participating.countUnits(undefined, {
             includeVariants: true,
           }) === 0
         )

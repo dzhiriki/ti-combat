@@ -16,7 +16,13 @@ export const blitz: Ability = {
     {
       timing: 'PREPARE',
       call: ctx => {
-        const { nonFighterShips } = ctx.api.own.getAbilityConfig('SETTINGS')
+        const nonFighterShips = ctx.api.own.system
+          .getUnitTypes()
+          .filter(
+            type =>
+              type !== 'FIGHTER' &&
+              ctx.api.own.isUnitTypeCategory(type, 'SHIPS'),
+          )
         for (const unitType of nonFighterShips) {
           const stats = ctx.api.own.getUnitStats(unitType)!
           const hasBombardment = stats.UNIT_ABILITIES?.BOMBARDMENT

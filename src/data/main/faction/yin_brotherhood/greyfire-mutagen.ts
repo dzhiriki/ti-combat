@@ -37,9 +37,8 @@ export const greyfireMutagen: Ability<Params> = {
       timing: 'START_OF_COMBAT',
       isCallable: (params, ctx) => {
         if (ctx.api.opponent.getFaction() === 'YIN_BROTHERHOOD') return false
-        const { groundForces } = ctx.api.opponent.getAbilityConfig('SETTINGS')
         if (
-          ctx.api.opponent.participating.countUnits(groundForces, {
+          ctx.api.opponent.participating.countUnits(undefined, {
             includeVariants: true,
           }) < 2
         )
