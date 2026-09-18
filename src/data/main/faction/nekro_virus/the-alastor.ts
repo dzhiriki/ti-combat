@@ -1,5 +1,4 @@
 import type { Ability } from '@/combat'
-import type { UnitBaseType } from '@/types'
 
 export const theAlastor: Ability = {
   key: 'THE_ALASTOR',
@@ -21,19 +20,11 @@ export const theAlastor: Ability = {
     {
       timing: 'START_OF_COMBAT',
       call: ctx => {
-        const settings = ctx.api.own.getAbilityConfig('SETTINGS')
-        const groundForces = settings.groundForces
-
-        ctx.api.own.updateAbilityConfig('SETTINGS', {
-          ships: (current: UnitBaseType[]) => [
-            ...current,
-            ...groundForces.filter(u => !current.includes(u)),
-          ],
-          spaceCombatParticipatingFromAnySurface: (current: UnitBaseType[]) => [
-            ...current,
-            ...groundForces.filter(u => !current.includes(u)),
-          ],
-        })
+        const selected = ctx.api.own.system
+          .getUnits(undefined, { includeVariants: true })
+          .filter(id => ctx.api.own.isUnitCategory(id, 'GROUND_FORCES'))
+        ctx.api.own.setUnitCategory(selected, 'SHIPS', true)
+        ctx.api.own.setUnitParticipation(selected, true)
       },
     },
   ],

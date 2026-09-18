@@ -49,6 +49,10 @@ import type {
 import { getDiceOutcomes } from '../../dice-math/utils/get-dice-outcomes'
 import type { Logger } from '../../logger'
 import { canonicalizeUnitState } from '../../utils/canonicalize-unit-state'
+import {
+  isNativeCategory,
+  isUnitCategory,
+} from '../../utils/unit-combat-properties'
 import type {
   AbilitiesEngine,
   AbilityCandidate,
@@ -109,7 +113,7 @@ export interface FindUnitsOptions extends FindUnitOptions {
 }
 
 export interface UnitQueryApi {
-  getUnits(unitType: UnitType, options: UnitQueryOptions): UnitId[]
+  getUnits(unitType: UnitType | undefined, options: UnitQueryOptions): UnitId[]
   hasUnitType(unitType: UnitType, options: UnitQueryOptions): boolean
   countUnits(
     filter: UnitType | UnitType[] | undefined,
@@ -124,7 +128,7 @@ export interface UnitQueryApi {
 }
 
 export interface ParticipatingUnitQueryApi extends UnitQueryApi {
-  /** Simulate unrestricted hit assignment without mutating the state. */
+  /** Simulate casualty order among participating units. */
   getAssignHitsTargets(hits: number): UnitId[]
 }
 
@@ -152,7 +156,10 @@ abstract class ScopedUnitQueryApi implements UnitQueryApi {
     return { ...options, ...this.scopeOptions() }
   }
 
-  getUnits(unitType: UnitType, options: UnitQueryOptions): UnitId[] {
+  getUnits(
+    unitType: UnitType | undefined,
+    options: UnitQueryOptions,
+  ): UnitId[] {
     return CombatSideState.getUnits(
       this.sideData,
       unitType,
@@ -234,39 +241,13 @@ class ParticipatingUnitsApi
 }
 
 // ============================================================================
-// PARTICIPATION RESYNC
+// PRIORITY RESYNC
 // ============================================================================
 
-/** Keys whose changes alter which base types participate in the
- *  current combat mode. Only `updateAbilityConfig` writes that touch
- *  these trigger a participating/non-participating re-split. */
-const SETTINGS_PARTICIPATION_KEYS = new Set([
-  'ships',
-  'groundForces',
-  'spaceCombatParticipating',
-  'groundCombatParticipating',
-  'spaceCombatParticipatingFromAnySurface',
-  'groundCombatParticipatingFromAnySurface',
-])
-const UNIT_PRIORITY_PARTICIPATION_KEYS = new Set([
+const UNIT_PRIORITY_ORDER_KEYS = new Set([
   'spaceUnitPriority',
   'groundUnitPriority',
 ])
-
-function affectsParticipating(
-  abilityKey: string,
-  updatedKeys: readonly string[],
-): boolean {
-  const set =
-    abilityKey === 'SETTINGS'
-      ? SETTINGS_PARTICIPATION_KEYS
-      : abilityKey === 'UNIT_PRIORITY'
-        ? UNIT_PRIORITY_PARTICIPATION_KEYS
-        : undefined
-  if (!set) return false
-  for (const k of updatedKeys) if (set.has(k)) return true
-  return false
-}
 
 // ============================================================================
 // SIDE API
@@ -335,16 +316,56 @@ export class SideApi {
     return this._sideData.participatingUnits.includes(unitId)
   }
 
+  /** Override membership for these ids, including units on other surfaces. */
+  setUnitParticipation(
+    ids: UnitId | readonly UnitId[],
+    participating: boolean | undefined,
+  ): void {
+    CombatSideState.setUnitParticipation(
+      this._sideData,
+      typeof ids === 'string' ? [ids] : ids,
+      participating,
+    )
+    const combat = this._abilitiesParams?.combatState
+    combat?.resyncParticipating(this._side)
+    // End-of-combat grant cleanup must not rewrite the settled result.
+    if (this.state.winnerSide === undefined)
+      combat?.queueCompletionCheck(this._ctx.phaseStack ?? [])
+  }
+
+  /** Override one category without changing participation or unit identity. */
+  setUnitCategory(
+    ids: UnitId | readonly UnitId[],
+    category: UnitCategory,
+    member: boolean | undefined,
+  ): void {
+    CombatSideState.setUnitCategory(
+      this._sideData,
+      typeof ids === 'string' ? [ids] : ids,
+      category,
+      member,
+    )
+  }
+
+  isUnitCategory(id: UnitId, category: UnitCategory): boolean {
+    return isUnitCategory(this._sideData, id, category)
+  }
+
+  /** Native membership for production/reinforcement choices. */
+  isUnitTypeCategory(type: UnitType, category: UnitCategory): boolean {
+    return isNativeCategory(this._sideData, type, category)
+  }
+
+  canAssignHitToUnit(id: UnitId): boolean {
+    return CombatSideState.canAssignHitToUnit(this._sideData, id)
+  }
+
   hasUnit(unitId: UnitId) {
     return CombatSideState.hasUnit(this._sideData, unitId)
   }
 
   getPendingHits(filter?: { base?: true; bonus?: true }) {
     return CombatSideState.getPendingHits(this._sideData, filter)
-  }
-
-  getHitPoolValidTargets() {
-    return CombatSideState.getHitPoolValidTargets(this._sideData)
   }
 
   getUnitVariantsOptions(filter?: ParamFilter): {
@@ -421,8 +442,8 @@ export class SideApi {
 
   isUnitAbilityLost(
     ability: UnitAbility,
-    unitType: UnitType,
-    surfaceId: SurfaceId = this.state.activeSurfaceId,
+    unitType: UnitType | UnitId,
+    surfaceId?: SurfaceId,
   ) {
     return CombatSideState.isRestricted(
       this.state,
@@ -430,14 +451,17 @@ export class SideApi {
       'lost',
       ability,
       unitType,
-      surfaceId,
+      surfaceId ??
+        (unitType.length === 1
+          ? this._sideData.unitSurface[unitType]
+          : this.state.activeSurfaceId),
     )
   }
 
   isUnitAbilityCannotBeUsed(
     ability: UnitAbility,
-    unitType: UnitType,
-    surfaceId: SurfaceId = this.state.activeSurfaceId,
+    unitType: UnitType | UnitId,
+    surfaceId?: SurfaceId,
   ) {
     return CombatSideState.isRestricted(
       this.state,
@@ -445,7 +469,10 @@ export class SideApi {
       'cannotBeUsed',
       ability,
       unitType,
-      surfaceId,
+      surfaceId ??
+        (unitType.length === 1
+          ? this._sideData.unitSurface[unitType]
+          : this.state.activeSurfaceId),
     )
   }
 
@@ -589,6 +616,8 @@ export class SideApi {
         abilitiesParams.addUnitInvokes(this._side, vKey, ids)
       }
     }
+    if ('CATEGORIES' in updates)
+      abilitiesParams?.combatState.resyncParticipating(this._side)
   }
 
   modifyUnitState(unitId: UnitId, updates: Partial<UnitState>): void {
@@ -604,7 +633,7 @@ export class SideApi {
   resortUnits(unitId: UnitId): void {
     const type = this._sideData.unitType[unitId]
     if (!type) return
-    const set = this._sideData._needsCanonicalize ?? new Set<UnitType>()
+    const set = new Set(this._sideData._needsCanonicalize)
     set.add(type)
     this._sideData._needsCanonicalize = set
   }
@@ -620,17 +649,9 @@ export class SideApi {
     CombatSideState.liftHitPoolRestriction(this._sideData, abilityKey)
   }
 
-  /** Two overloads:
-   *  - `addHits(n)`: adds N unrestricted ability hits to this side's
-   *    main pool's `additional` slot (creates the pool if absent).
-   *  - `addHits(n, types)`: creates a single restricted custom entry
-   *    keyed to the calling ability, with `unitPriority = types` in the
-   *    caller-given order. The landing side's `hitPool` must be
-   *    undefined at call time (throws otherwise).
-   *  Either form, when called while no pool exists on either side,
-   *  schedules an inline assign-hits step (the `wasEmpty` path).
-   *  Otherwise the in-flight dice-roll group's existing `ASSIGN_HITS`
-   *  step drains everything together. */
+  /** Add ordinary hits. An explicit type priority creates a separate
+   *  resolution and requires an empty pool. When no hits are in flight,
+   *  schedules their assignment immediately. */
   addHits(hits: number): void
   addHits(hits: number, validTargets: UnitType[]): void
   addHits(hits: number, validTargets?: UnitType[]): void {
@@ -844,30 +865,14 @@ export class SideApi {
       )
     }
 
-    // Re-split participating/non-participating only when the update
-    // touches a participation-affecting field. Keeps the hot path cheap
-    // while catching Alastor / Eidolon / custom priority edits.
+    // Priority edits affect ordering only; category option lists never
+    // change runtime participation.
     if (
       abilitiesParams &&
-      affectsParticipating(targetKey, Object.keys(updates))
+      targetKey === 'UNIT_PRIORITY' &&
+      Object.keys(updates).some(key => UNIT_PRIORITY_ORDER_KEYS.has(key))
     ) {
-      const hadParticipating = CombatSideState.hasParticipatingUnits(sideData)
       abilitiesParams.combatState.resyncParticipating(side)
-      const hasParticipating = CombatSideState.hasParticipatingUnits(sideData)
-      if (state.winnerSide !== undefined) {
-        abilitiesParams.combatState.syncWinnerSide()
-      } else if (hadParticipating && !hasParticipating) {
-        abilitiesParams.combatState.queueCompletionCheck(
-          this._ctx.phaseStack ?? [],
-        )
-      }
-    }
-
-    // SETTINGS drives `isCategoryMember`, which feeds the resolved-
-    // restrictions cache. Drop the side's cache so the next check
-    // rebuilds with fresh category membership.
-    if (targetKey === 'SETTINGS') {
-      sideData._resolvedRestrictions = undefined
     }
   }
 
@@ -935,7 +940,11 @@ export class SideApi {
    */
   applyBonusToResult(
     amount: number,
-    target?: UnitType | { exclude: UnitBaseType[] } | { singleUnit: UnitType },
+    target?:
+      | UnitType
+      | { exclude: UnitBaseType[] }
+      | { singleUnit: UnitType }
+      | { unitId: UnitId },
   ): void {
     const abilityKey = this._ctx.ability?.key
     if (abilityKey === undefined) {
@@ -960,6 +969,10 @@ export class SideApi {
       'singleUnit' in target
         ? target.singleUnit
         : undefined
+    const unitId =
+      typeof target === 'object' && 'unitId' in target
+        ? target.unitId
+        : undefined
     const excludeUnitTypes =
       target !== undefined && typeof target === 'object' && 'exclude' in target
         ? target.exclude
@@ -972,6 +985,7 @@ export class SideApi {
           m.abilityKey === abilityKey &&
           m.unitType === unitType &&
           m.singleUnit === singleUnit &&
+          m.unitId === unitId &&
           arraysEqual(m.excludeUnitTypes, excludeUnitTypes),
       )
     ) {
@@ -985,6 +999,7 @@ export class SideApi {
       amount: -amount,
       unitType,
       singleUnit,
+      unitId,
       excludeUnitTypes,
       wasDeclaration: this._ctx.isDeclarationInvoke === true,
     })

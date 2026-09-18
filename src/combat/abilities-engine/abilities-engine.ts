@@ -985,7 +985,6 @@ export class AbilitiesEngine {
       if (sideTracker.has(entry.trackerKey)) continue
 
       if (source.type === 'unit' && UNIT_ABILITY_KEYS.has(ability.key)) {
-        const unitType = state[side].unitType[source.unitId]
         const surfaceId = state[side].unitSurface[source.unitId]
         const unitAbility = ability.key as UnitAbility
         if (
@@ -994,7 +993,7 @@ export class AbilitiesEngine {
             side,
             'lost',
             unitAbility,
-            unitType,
+            source.unitId,
             surfaceId,
           ) ||
           CombatSideState.isRestricted(
@@ -1002,7 +1001,7 @@ export class AbilitiesEngine {
             side,
             'cannotBeUsed',
             unitAbility,
-            unitType,
+            source.unitId,
             surfaceId,
           )
         )

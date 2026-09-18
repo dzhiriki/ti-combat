@@ -1,4 +1,4 @@
-import type { UnitBaseType, UnitId, UnitIdList, UnitType } from '@/types'
+import type { UnitId, UnitIdList, UnitType } from '@/types'
 
 import type { SideStateData } from '../combat-state/types'
 import { parseVariantId } from './unit-variant'
@@ -6,9 +6,7 @@ import { parseVariantId } from './unit-variant'
 /**
  * Splits `side.participatingUnits` and `side.nonParticipatingUnits`:
  *
- * - An id is participating when its base type is in
- *   `participatingTypes` (the authoritative "is this unit in combat"
- *   set derived from SETTINGS).
+ * - Membership comes from `participatingUnit`, independently of priority.
  * - Participating ids are sorted so that `priorityList[0]` lands at
  *   the TAIL (tail-slice assign-hits kills the tail first, and
  *   `priorityList[0]` is the first variant to be sacrificed). Ids
@@ -20,14 +18,13 @@ import { parseVariantId } from './unit-variant'
  * priority list contains only the base (e.g. `CRUISER` ranks
  * `CRUISER:Cavalry` too).
  *
- * Mutates both arrays (replaces with fresh arrays). `side.unitType`
+ * Replaces both packed id lists. `side.unitType`
  * is not modified.
  */
 export function sortUnitsByPriority(
   side: SideStateData,
   priorityList: readonly UnitType[],
-  participatingTypes?: ReadonlySet<UnitBaseType>,
-  participatingUnit?: (id: UnitId) => boolean,
+  participatingUnit: (id: UnitId) => boolean,
 ): void {
   const rank = new Map<UnitType, number>()
   for (let i = 0; i < priorityList.length; i++) {
@@ -40,18 +37,8 @@ export function sortUnitsByPriority(
     const base = parseVariantId(key).type as UnitType
     const baseRank = rank.get(base)
     if (baseRank !== undefined) return baseRank
-    // Unranked variants sort as "higher priority than anything ranked"
-    // (die last). Using -1 places them below index 0 in the ra-rb sort.
-    return -1
-  }
-
-  const participates = (id: UnitId): boolean => {
-    if (participatingUnit) return participatingUnit(id)
-    if (participatingTypes) {
-      const base = parseVariantId(side.unitType[id]).type as UnitBaseType
-      return participatingTypes.has(base)
-    }
-    return rankOf(side.unitType[id]) !== -1
+    // Unranked variants are kept ahead of ranked casualties and die last.
+    return Infinity
   }
 
   const participating: UnitId[] = []
@@ -59,7 +46,7 @@ export function sortUnitsByPriority(
   const seed = (pool: UnitIdList) => {
     for (const id of pool) {
       const unitId = id as UnitId
-      if (participates(unitId)) participating.push(unitId)
+      if (participatingUnit(unitId)) participating.push(unitId)
       else nonParticipating.push(unitId)
     }
   }

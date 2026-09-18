@@ -3,6 +3,8 @@ import type {
   CombatSide,
   UnitAbility,
   UnitBaseType,
+  UnitCombatOverrides,
+  UnitId,
   UnitIdList,
   UnitState,
   UnitStats,
@@ -90,18 +92,26 @@ export interface CustomHitPool {
   unitPriority: UnitType[]
 }
 
+/** All supplied conditions must match the actual target unit. */
+export interface UnitTargetFilter {
+  types?: readonly UnitType[]
+  excludeTypes?: readonly UnitType[]
+  unitAbility?: boolean
+}
+
 /** A pool of unassigned hits.
  *  `base` = from dice rolls; `additional` = from abilities.
  *  X-89-style hit doubling only doubles `base`.
- *  The main pool (`base` + `additional`) is always unrestricted — it
- *  drains by tail-slice on the side's pre-sorted `participatingUnits`.
- *  All target-restricted hits live in `custom` entries, each carrying
- *  its own `unitPriority`. Custom entries drain after the main pool,
- *  in declaration order. */
+ *  `targetFilter`, when present, belongs to the assignment phase and applies
+ *  to the main pool and every custom entry. Custom entries additionally carry
+ *  their own `unitPriority` and drain after the main pool, in declaration
+ *  order. */
 export interface HitPool {
   base: number
   additional: number
   custom: CustomHitPool[]
+  /** Eligibility imposed by the current assignment phase. */
+  targetFilter?: UnitTargetFilter
 }
 
 /** A single restriction entry explaining why an ability is restricted */
@@ -130,7 +140,7 @@ export interface UnitAbilityRestrictions {
   immune?: RestrictionImmunity[]
 }
 
-export type ResolvedRestrictionScope = Set<UnitType> | 'ALL'
+export type ResolvedRestrictionScope = Set<UnitType | UnitId> | 'ALL'
 
 /** Resolved restrictions for one unit ability. Global restrictions are
  *  checked for every unit; surface restrictions are checked only for units
@@ -184,6 +194,8 @@ export interface SideStateData {
   unitType: Record<string, UnitType>
   /** UnitId → per-unit mutable state (flat map, sparse — only entries with non-default state) */
   unitState: Record<string, UnitState>
+  /** Sparse, copy-on-write instance grants; retained for destroy reactions. */
+  unitCombat?: Record<string, UnitCombatOverrides>
   /** Variant key → shared stats template (may be a factory for subtypes) */
   unitStats: Record<UnitType, UnitStatsEntry>
   /** The side's pending hit pool, or undefined when no hits are queued.

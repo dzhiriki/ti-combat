@@ -19,8 +19,7 @@ export const shieldsHolding: Ability = {
         return ctx.api.own.getPendingHits() > 0
       },
       call: ctx => {
-        const pending = ctx.api.own.getPendingHits()
-        ctx.api.own.reduceHits(Math.min(2, pending))
+        ctx.api.own.reduceHits(2)
       },
     },
   ],

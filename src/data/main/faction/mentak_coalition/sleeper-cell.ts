@@ -70,22 +70,17 @@ export const sleeperCell: Ability<Params> = {
       timing: 'DESTROY',
       isCallable: (params, ctx, ids) => {
         if (!params.isActive) return false
-        const { ships } = ctx.api.own.getAbilityConfig('SETTINGS')
-        const shipsSet = new Set<UnitBaseType>(ships)
         for (const id of ids) {
           const variantKey =
             ctx.api.own.getUnitVariantKey(id) ??
             ctx.api.opponent.getUnitVariantKey(id)
           if (!variantKey) continue
           const { type } = parseVariantId(variantKey)
-          if (shipsSet.has(type)) return true
+          if (ctx.api.own.isUnitTypeCategory(type, 'SHIPS')) return true
         }
         return false
       },
       call: (ctx, params, ids) => {
-        const { ships } = ctx.api.own.getAbilityConfig('SETTINGS')
-        const shipsSet = new Set<UnitBaseType>(ships)
-
         const opponentDestroyed: Partial<Record<UnitBaseType, number>> = {}
         const ownDestroyed: Partial<Record<UnitBaseType, number>> = {}
 
@@ -93,14 +88,14 @@ export const sleeperCell: Ability<Params> = {
           const ownKey = ctx.api.own.getUnitVariantKey(id)
           if (ownKey) {
             const { type } = parseVariantId(ownKey)
-            if (!shipsSet.has(type)) continue
+            if (!ctx.api.own.isUnitTypeCategory(type, 'SHIPS')) continue
             ownDestroyed[type] = (ownDestroyed[type] ?? 0) + 1
             continue
           }
           const oppKey = ctx.api.opponent.getUnitVariantKey(id)
           if (oppKey) {
             const { type } = parseVariantId(oppKey)
-            if (!shipsSet.has(type)) continue
+            if (!ctx.api.own.isUnitTypeCategory(type, 'SHIPS')) continue
             opponentDestroyed[type] = (opponentDestroyed[type] ?? 0) + 1
           }
         }

@@ -7,7 +7,6 @@ import type {
   UnitAbility,
   UnitBaseType,
   UnitId,
-  UnitIdList,
   UnitType,
 } from '@/types'
 
@@ -22,6 +21,7 @@ import {
   type InvokeCollections,
 } from '../abilities-engine'
 import { AbilityContext } from '../abilities-engine/api/ability-api'
+import { returnCommittedFighters } from '../abilities-engine/api/commit-fighters'
 import { extractDefaults } from '../abilities-engine/declare-param'
 import type {
   AbilitiesOverride,
@@ -34,12 +34,19 @@ import type {
   PendingEffect,
 } from '../dice-math/branch-accumulator'
 import { runDiceMath } from '../dice-math/run-dice-math'
-import type { RollTriggerDecl, SideDiceCollection } from '../dice-math/types'
+import type {
+  HitValueModifierDecl,
+  RollTriggerDecl,
+  SideDiceCollection,
+} from '../dice-math/types'
 import { marginalizeBaseHits } from '../dice-math/utils/marginalize-base-hits'
 import { type LogEntry, Logger } from '../logger'
 import { canonicalizeUnitState } from '../utils/canonicalize-unit-state'
 import { sortUnitsByPriority } from '../utils/sort-units-by-priority'
-import { parseVariantId } from '../utils/unit-variant'
+import {
+  isNativeCategory,
+  participatesInCombat,
+} from '../utils/unit-combat-properties'
 import type {
   CombatMode,
   CombatStateData,
@@ -51,6 +58,7 @@ import type {
   PhaseStepGroup,
   SideStateData,
   UnitAbilityMeta,
+  UnitTargetFilter,
 } from './types'
 import { isDiceRollContext } from './types'
 
@@ -83,59 +91,11 @@ function unwrapUnitListKeys(raw: unknown): UnitType[] {
   return result
 }
 
-/** Starlancer's strategy chooses which physical mech pool absorbs casualties
- * first. Preserve the configured unit-type priority and only reorder MECH ids
- * inside their existing slots: ids nearer the tail are destroyed first. */
-function sortStarlancerMechsBySurface(
-  data: CombatStateData,
-  side: CombatSide,
-): void {
-  if (data.combatMode !== 'SPACE') return
-
-  const sideData = data[side]
-  const base = sideData.abilities['TF_STARLANCER_XI']
-  const live = sideData.liveAbilities['TF_STARLANCER_XI']
-  const params = live === undefined ? base : { ...base, ...live }
-  if (params?.isEnabled === false) return
-
-  const strategy = params?.strategy as string | undefined
-  const preserveGround =
-    strategy === 'PRESERVE_SUSTAIN' || strategy === 'PRESERVE_NO_SUSTAIN'
-  const spaceId = data.surfaces!.find(surface => surface.type === 'SPACE')?.id
-  if (!spaceId) return
-
-  const pool = [...sideData.participatingUnits] as UnitId[]
-  const positions: number[] = []
-  const mechs: UnitId[] = []
-  for (let index = 0; index < pool.length; index++) {
-    const id = pool[index]
-    if (parseVariantId(sideData.unitType[id]).type !== 'MECH') continue
-    positions.push(index)
-    mechs.push(id)
-  }
-  if (mechs.length < 2) return
-
-  mechs.sort((a, b) => {
-    const aInSpace = sideData.unitSurface[a] === spaceId
-    const bInSpace = sideData.unitSurface[b] === spaceId
-    if (aInSpace === bInSpace) return a > b ? -1 : a < b ? 1 : 0
-    const aProtected = preserveGround ? !aInSpace : aInSpace
-    return aProtected ? -1 : 1
-  })
-  for (let index = 0; index < positions.length; index++) {
-    pool[positions[index]] = mechs[index]
-  }
-  sideData.participatingUnits = pool.join('') as UnitIdList
-  if (sideData._locationHash && !sideData._locationHash.startsWith('='))
-    sideData._locationHash = undefined
-}
-
 function sortUnitsAtSetup(data: CombatStateData): void {
   const mode = data.combatMode
   for (const side of ['attacker', 'defender'] as const) {
-    // Merge base + live SETTINGS and UNIT_PRIORITY — PREPARE may have
-    // written derived fields (Hel Titan → groundCombatParticipating
-    // includes PDS) into liveAbilities.
+    // Saved and live priority lists control order; membership is derived
+    // independently from native categories and instance grants.
     const baseSide = data[side].abilities
     const liveSide = data[side].liveAbilities
 
@@ -155,50 +115,11 @@ function sortUnitsAtSetup(data: CombatStateData): void {
       mode === 'GROUND'
         ? unitPriority?.groundUnitPriority
         : unitPriority?.spaceUnitPriority
-    if (!rawList) continue
-    const list = unwrapUnitListKeys(rawList)
+    const list = rawList ? unwrapUnitListKeys(rawList) : []
 
-    // Membership comes from SETTINGS.{space,ground}CombatParticipating
-    // — the authoritative runtime field. UNIT_PRIORITY only dictates
-    // order; it's synced from an extended "source" view and may list
-    // variants/types that aren't currently participating.
-    const baseSettings = baseSide['SETTINGS']
-    const liveSettings = liveSide['SETTINGS']
-    const settings = (
-      liveSettings === undefined
-        ? baseSettings
-        : baseSettings === undefined
-          ? liveSettings
-          : { ...baseSettings, ...liveSettings }
-    ) as
-      | {
-          spaceCombatParticipating?: UnitBaseType[]
-          groundCombatParticipating?: UnitBaseType[]
-          spaceCombatParticipatingFromAnySurface?: UnitBaseType[]
-          groundCombatParticipatingFromAnySurface?: UnitBaseType[]
-        }
-      | undefined
-    const partList =
-      mode === 'GROUND'
-        ? settings?.groundCombatParticipating
-        : settings?.spaceCombatParticipating
-    const participatingTypes = partList ? new Set(partList) : undefined
-    const anySurfaceList =
-      mode === 'GROUND'
-        ? settings?.groundCombatParticipatingFromAnySurface
-        : settings?.spaceCombatParticipatingFromAnySurface
-    const anySurfaceTypes = new Set(anySurfaceList ?? [])
-    const activeSurfaceId = data.activeSurfaceId!
-
-    sortUnitsByPriority(data[side], list, participatingTypes, id => {
-      const type = parseVariantId(data[side].unitType[id]).type as UnitBaseType
-      return (
-        (participatingTypes?.has(type) ?? false) &&
-        (data[side].unitSurface[id] === activeSurfaceId ||
-          anySurfaceTypes.has(type))
-      )
-    })
-    sortStarlancerMechsBySurface(data, side)
+    sortUnitsByPriority(data[side], list, id =>
+      participatesInCombat(data[side], id, mode, data.activeSurfaceId),
+    )
   }
 }
 
@@ -744,15 +665,10 @@ export class CombatState {
     if (!space || !target) return
 
     const attacker = data.attacker
-    const settings = CombatSideState.getLiveParams(attacker, 'SETTINGS')
-    const eligible = new Set(
-      (settings?.groundCombatParticipating as UnitBaseType[] | undefined) ??
-        GROUND_FORCES,
-    )
     const moving: UnitId[] = []
     for (const id of attacker.surfaceUnits[space.id] ?? '') {
-      const type = parseVariantId(attacker.unitType[id]).type as UnitBaseType
-      if (eligible.has(type)) moving.push(id as UnitId)
+      if (isNativeCategory(attacker, attacker.unitType[id], 'GROUND_FORCES'))
+        moving.push(id as UnitId)
     }
     CombatSideState.moveUnits(attacker, moving, target.id)
     this.resyncParticipating('attacker')
@@ -834,45 +750,17 @@ export class CombatState {
   }
 
   private _setComplete(): void {
+    returnCommittedFighters(this.data)
+    this.resyncParticipating('attacker')
+    this.resyncParticipating('defender')
     this.data.isFinished = true
   }
 
-  /** Re-split participating vs non-participating units for one side.
-   *  SETTINGS.{space,ground}CombatParticipating is the authoritative
-   *  "is this base type in combat?" source — UNIT_PRIORITY is used for
-   *  ordering only (it can lag behind SETTINGS mid-combat because
-   *  `declareParam` source sync runs only at reconcile). Called by
-   *  `updateAbilityConfig` when a participation-affecting ability param
-   *  changes. */
+  /** Rebuild membership from native categories and explicit instance grants. */
   public resyncParticipating(side: CombatSide): void {
     const data = this.data
     const liveSide = data[side].liveAbilities
     const baseSide = data[side].abilities
-
-    const liveSettings = liveSide['SETTINGS']
-    const baseSettings = baseSide['SETTINGS']
-    const settings =
-      liveSettings === undefined
-        ? baseSettings
-        : baseSettings === undefined
-          ? liveSettings
-          : { ...baseSettings, ...liveSettings }
-    if (!settings) return
-    const partList =
-      data.combatMode === 'GROUND'
-        ? (settings.groundCombatParticipating as UnitBaseType[] | undefined)
-        : (settings.spaceCombatParticipating as UnitBaseType[] | undefined)
-    if (!partList) return
-    const participatingTypes = new Set<UnitBaseType>(partList)
-    const anySurfaceList =
-      data.combatMode === 'GROUND'
-        ? (settings.groundCombatParticipatingFromAnySurface as
-            | UnitBaseType[]
-            | undefined)
-        : (settings.spaceCombatParticipatingFromAnySurface as
-            | UnitBaseType[]
-            | undefined)
-    const anySurfaceTypes = new Set(anySurfaceList ?? [])
 
     const liveUP = liveSide['UNIT_PRIORITY']
     const baseUP = baseSide['UNIT_PRIORITY']
@@ -889,17 +777,16 @@ export class CombatState {
         : unitPriority.spaceUnitPriority) as unknown)
     const orderList = rawOrderList
       ? (unwrapUnitListKeys(rawOrderList) as UnitType[])
-      : (partList as unknown as UnitType[])
+      : []
 
-    sortUnitsByPriority(data[side], orderList, participatingTypes, id => {
-      const type = parseVariantId(data[side].unitType[id]).type as UnitBaseType
-      return (
-        participatingTypes.has(type) &&
-        (data[side].unitSurface[id] === data.activeSurfaceId ||
-          anySurfaceTypes.has(type))
-      )
-    })
-    sortStarlancerMechsBySurface(data, side)
+    sortUnitsByPriority(data[side], orderList, id =>
+      participatesInCombat(
+        data[side],
+        id,
+        data.combatMode,
+        data.activeSurfaceId,
+      ),
+    )
   }
 
   /** Replace any in-flight pending steps with the completion sequence and
@@ -1071,7 +958,7 @@ export class CombatState {
     const meta = innerMeta(phase)
 
     // validTargets uses SETTINGS, which BEFORE_UNIT_ABILITY_ROLL abilities
-    // (e.g. WAYLAY, EIDOLON_MAXIMUM) may have just modified — compute here,
+    // (e.g. WAYLAY) may have just modified — compute here,
     // after they ran. Regular combat rolls leave it empty so hit assignment
     // uses the fast tail-slice path.
     const validTargets = ctx.isUnitAbility
@@ -1283,7 +1170,25 @@ export class CombatState {
       // hitPool object reference until the first mutation on each branch.
       // Thundarian-style cancels clear `hitPool` entirely.
       for (const side of ['attacker', 'defender'] as const) {
-        const pending = branch.pendingHitPool[side]
+        const rawPending = branch.pendingHitPool[side]
+        const landingSide = ctx.selfTarget
+          ? side === 'attacker'
+            ? 'defender'
+            : 'attacker'
+          : side
+        const validTargets = ctx.isUnitAbility
+          ? CombatSideState.getValidTargetsForPhase(
+              baseData[landingSide],
+              metaPhase,
+            )
+          : undefined
+        const targetFilter: UnitTargetFilter | undefined = ctx.isUnitAbility
+          ? {
+              types: validTargets,
+              unitAbility: true,
+            }
+          : undefined
+        const pending = rawPending
         if (pending.base === 0 && pending.custom.length === 0) continue
         const sideData = branchData[side]
         if (sideData.hitPool === undefined) {
@@ -1291,6 +1196,7 @@ export class CombatState {
             base: pending.base,
             additional: 0,
             custom: pending.custom.map(c => ({ ...c })),
+            ...(targetFilter && { targetFilter }),
           }
           sideData._hitPoolShared = false
         } else {
@@ -1302,6 +1208,7 @@ export class CombatState {
             sideData._hitPoolShared = false
           }
           const own = sideData.hitPool
+          if (targetFilter) own.targetFilter = targetFilter
           own.base += pending.base
           for (const c of pending.custom) own.custom.push({ ...c })
         }
@@ -1731,6 +1638,10 @@ function collectSideDice(
     ctx.hitSource,
     ctx.allowedUnitTypes,
     ctx.sourceSurfaceIds,
+    (ctx.modifiers ?? []).filter(
+      (mod): mod is HitValueModifierDecl =>
+        mod.type === 'HIT_VALUE' && mod.side === side && !!mod.unitId,
+    ),
   )
 }
 

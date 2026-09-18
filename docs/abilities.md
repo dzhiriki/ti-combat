@@ -354,7 +354,7 @@ call: ctx => {
 
 ## SideApi
 
-Used in both `isCallable` and `call` contexts. The same `SideApi` class is used for both read and write — write methods are only available during `call` (Immer draft context).
+Used in both `isCallable` and `call` contexts. The same `SideApi` class is used for both read and write — write methods are only available during `call` (mutable combat context).
 
 ### Read Methods
 
@@ -366,12 +366,14 @@ space and ground combat, even when their text says “in the active system”;
 explicit planet or space-area effects use `surface`; effects that refer to
 general units throughout the active system use `system`.
 
-`UnitQueryOptions` is `{ includeVariants: boolean }` and is **required**
-wherever it appears.
+`UnitQueryOptions` is `{ includeVariants: boolean }` and is **required** wherever
+it appears. The namespace selects the pool; `participating` already contains
+the units admitted to combat. Queries do not filter by category. When an effect
+needs a category within `system` or `surface`, check each ID with `isUnitCategory`.
 
 ```typescript
 interface UnitQueryApi {
-  getUnits(unitType: UnitType, options: UnitQueryOptions): UnitId[]
+  getUnits(unitType: UnitType | undefined, options: UnitQueryOptions): UnitId[]
   hasUnitType(unitType: UnitType, options: UnitQueryOptions): boolean
   countUnits(
     filter: UnitType | UnitType[] | undefined,
@@ -394,7 +396,10 @@ getFaction(): string
 getCombatMode(): CombatMode  // for hooks that receive only a SideApi (e.g. preventDestroy)
 hasUnit(unitId: UnitId): boolean
 getPendingHits(filter?: { base?: true; bonus?: true }): number
-getHitPoolValidTargets(): UnitType[]
+canAssignHitToUnit(unitId: UnitId): boolean  // Includes phase and unit-ability hit restrictions
+isParticipating(unitId: UnitId): boolean
+isUnitCategory(unitId: UnitId, category: UnitCategory): boolean
+isUnitTypeCategory(unitType: UnitType, category: UnitCategory): boolean  // Native categories, for production choices
 getUnitVariantsOptions(filter?: ParamFilter): { label: string, value: string }[]
 getUnitVariantsOptions(paramKey: string): { label: string, value: string }[]   // reads filter/limit from the declareParam
 getUnitStats(unitTypeOrId: string | UnitId): UnitStats
@@ -402,8 +407,8 @@ getUnitVariantKey(unitId: UnitId): string | undefined
 getUnitState(unitId: UnitId): UnitState
 getUnitBaseType(unitId: UnitId): UnitBaseType
 getAbilityConfig(key: string): Record<string, unknown>
-isUnitAbilityLost(ability: UnitAbility, unitType: UnitType): boolean
-isUnitAbilityCannotBeUsed(ability: UnitAbility, unitType: UnitType): boolean
+isUnitAbilityLost(ability: UnitAbility, unitType: UnitType | UnitId): boolean
+isUnitAbilityCannotBeUsed(ability: UnitAbility, unitType: UnitType | UnitId): boolean
 ```
 
 ### Write Methods (available in `call` only)
@@ -416,30 +421,62 @@ removeUnits(target: UnitBaseType | UnitId | UnitId[]): void   // Remove without 
 placeUnits(unitsToAdd: Partial<Record<UnitType, number>>): Record<UnitType, UnitId[]>  // Returns the placed UnitIds (keyed by variant key)
 modifyUnitType(key: UnitType, updates: Partial<UnitStats>): void   // Modify stats for all units of a type
 modifyUnitState(unitId: UnitId, updates: Partial<UnitState>): void // Modify per-unit mutable state
+setUnitParticipation(ids: UnitId | readonly UnitId[], participating: boolean | undefined): void
+setUnitCategory(ids: UnitId | readonly UnitId[], category: UnitCategory, member: boolean | undefined): void
 ```
+
+Native `UnitStats.CATEGORIES` defaults to the base type's categories. Native ships
+join space combat and native ground forces join ground combat on the active
+surface automatically, including newly placed units. Hel-Titans natively belong
+to both `STRUCTURES` and `GROUND_FORCES`.
+
+Participation and temporary category overrides are independent and apply only to
+the selected IDs. `undefined` clears an override. Granting participation can
+include units on another surface without moving them; granting a category does
+not make a unit participate. The categories are `SHIPS`, `GROUND_FORCES`, and
+`STRUCTURES`. Non-fighter ships are ships whose base type is not `FIGHTER`;
+they are not a separate category. Base types and variants remain unchanged.
+
+Alastor snapshots its chosen ground forces and grants both ship membership and
+participation. Matriarch and Morphwing snapshot fighters at commitment, move them
+to the active planet, and return their surviving selections to space at completion.
+Later reinforcements do not inherit these grants. Their current abilities select
+all eligible units; the per-ID API supports partial selections.
+
+`declareParamChange` and SETTINGS groups such as `ships` and
+`spaceCombatParticipating` declare possible setup options, including Sustain
+Priority and Assign Hits Order. Runtime effects use scoped queries and
+`isUnitCategory` instead. Starlancer XI has native ship and ground-force
+membership, like Hel-Titan's native dual category. Its special combat-end rules
+are deferred; no passive participation-rule API is provided.
 
 #### Hit Operations
 
 ```typescript
 reduceHits(amount: number): void
-addHits(hits: number): void                       // Unrestricted hits on the landing side
-addHits(hits: number, validTargets: UnitType[]): void  // Restricted; throws if the landing side's hitPool is non-empty
+addHits(hits: number): void                       // Ordinary hits on the landing side
+addHits(hits: number, priority: UnitType[]): void  // Type-restricted; throws if the landing side's hitPool is non-empty
 
 // Apply a flat +/- to each combat roll result for this dice-roll group.
 // target omitted = all of this side's dice; { singleUnit } = one unit type;
-// { exclude } = all but the listed base types.
+// { exclude } = all but the listed base types; unitId selects one actual unit.
 applyBonusToResult(
   amount: number,
-  target?: UnitType | { exclude: UnitBaseType[] } | { singleUnit: UnitType },
+  target?: UnitType | { exclude: UnitBaseType[] } | { singleUnit: UnitType }
+    | { unitId: UnitId },
 ): void
 ```
+
+`addHits` and `reduceHits` do not carry category or unit-ability metadata. The
+participating pool and the assignment phase determine eligible casualties.
+Effects that select a sustaining unit must check `canAssignHitToUnit` first.
 
 #### Unit Ability Restrictions
 
 Two-layer system — **lost** (ability removed) vs **cannotBeUsed** (ability present but blocked):
 
 ```typescript
-// Disable ability for all units, specific type, or category
+// Disable ability for all units, a specific base type, or a category
 setUnitAbilityLost(ability: UnitAbility, reason: string, target?: UnitBaseType | UnitCategory): void
 removeUnitAbilityLost(ability: UnitAbility, reason: string, target?: UnitBaseType | UnitCategory): void
 setUnitAbilityCannotBeUsed(ability: UnitAbility, reason: string, target?: UnitBaseType | UnitCategory): void
@@ -452,7 +489,10 @@ removeUnitAbilityRestrictionImmunity(reason: string, unitType: UnitBaseType): vo
 
 `reason` is the ability key that caused the restriction. Used to cleanly remove restrictions without affecting other abilities' restrictions.
 
-`target` can be a specific `UnitBaseType` (e.g., `'MECH'`) or a `UnitCategory` (`'SHIPS'`, `'NON_FIGHTER_SHIPS'`, `'GROUND_FORCES'`, `'STRUCTURES'`). Categories are resolved at check time, so changes to category membership are automatically reflected.
+`target` can be a specific `UnitBaseType` such as `'MECH'` or a `UnitCategory`
+(`'SHIPS'`, `'GROUND_FORCES'`, or `'STRUCTURES'`). Categories are resolved
+against individual units, so temporary per-unit category changes are reflected.
+Omit the target to apply the restriction to every unit in scope.
 
 **Immunity** is the inverse of a restriction: `setUnitAbilityRestrictionImmunity('ENTROPIC_SCAR', 'FLAGSHIP')` makes flagships ignore every restriction that scar added, blanket ones included. It resolves lazily alongside the restrictions themselves, so it can be declared before or after the restricting ability's PREPARE (see the Il Na Viroset flagship, `il_na_viroset/enigma.ts`).
 

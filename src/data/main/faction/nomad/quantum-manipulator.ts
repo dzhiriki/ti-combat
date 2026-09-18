@@ -26,10 +26,9 @@ export const quantumManipulator: Ability = {
         )
           return false
         if (ctx.api.own.getUnitState(unitId)?.isDamaged) return false
-        const unitType = ctx.api.own.getUnitBaseType(unitId)!
         if (
-          ctx.api.own.isUnitAbilityLost('SUSTAIN_DAMAGE', unitType) ||
-          ctx.api.own.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', unitType)
+          ctx.api.own.isUnitAbilityLost('SUSTAIN_DAMAGE', unitId) ||
+          ctx.api.own.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', unitId)
         ) {
           return false
         }

@@ -1,6 +1,5 @@
 import { type Ability, type AbilityReadContext } from '@/combat'
 import type { SideApi } from '@/combat/abilities-engine/api/ability-api'
-import { STRUCTURES } from '@/constants/units'
 import type { DiceGroup, UnitList, UnitType } from '@/types'
 
 export const linkship: Ability = {
@@ -76,14 +75,13 @@ function getConsumed(api: SideApi): UnitList<number> {
 
 function getStructuresInSpace(api: SideApi): UnitList<number> {
   const counts = new Map<UnitType, number>()
-  for (const structure of STRUCTURES) {
-    for (const id of api.surface.getUnits(structure, {
-      includeVariants: true,
-    })) {
-      const unitType = api.getUnitVariantKey(id)
-      if (!unitType) continue
-      counts.set(unitType, (counts.get(unitType) ?? 0) + 1)
-    }
+  for (const id of api.surface.getUnits(undefined, {
+    includeVariants: true,
+  })) {
+    if (!api.isUnitCategory(id, 'STRUCTURES')) continue
+    const unitType = api.getUnitVariantKey(id)
+    if (!unitType) continue
+    counts.set(unitType, (counts.get(unitType) ?? 0) + 1)
   }
   return [...counts]
 }

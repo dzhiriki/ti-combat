@@ -32,11 +32,8 @@ export const sustainDamage: Ability<Params> = {
   params: {
     isEnabled: true,
     uses: Infinity,
-    // Sourced from PARTICIPATING units (minus fighters) rather than
-    // nonFighterShips so non-ship space combatants (Starlancer XI mechs)
-    // appear in the panel and the allow-list. For every normal faction
-    // spaceCombatParticipating === ships, so the list is identical to the
-    // old nonFighterShips source.
+    // Setup candidates include units that abilities can bring into combat.
+    // Actual participation and hit eligibility are checked per unit below.
     spacePriority: declareParam<UnitList<boolean>>({
       default: [],
       source: 'spaceCombatParticipating',
@@ -83,7 +80,6 @@ export const sustainDamage: Ability<Params> = {
           return false
         }
 
-        const unitType = ctx.api.own.getUnitBaseType(unitId)!
         const variantId = ctx.api.own.getUnitVariantKey(unitId)!
 
         const isGround = ctx.state.combatMode === 'GROUND'
@@ -92,14 +88,11 @@ export const sustainDamage: Ability<Params> = {
           : params.spacePriority
         if (!ctx.utils.getFlat(allowedUnits).includes(variantId)) return false
 
-        const validTargets = ctx.api.own.getHitPoolValidTargets()
-        if (validTargets && !validTargets.includes(unitType)) {
-          return false
-        }
+        if (!ctx.api.own.canAssignHitToUnit(unitId)) return false
 
         if (
-          ctx.api.own.isUnitAbilityLost('SUSTAIN_DAMAGE', unitType) ||
-          ctx.api.own.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', unitType)
+          ctx.api.own.isUnitAbilityLost('SUSTAIN_DAMAGE', unitId) ||
+          ctx.api.own.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', unitId)
         ) {
           return false
         }

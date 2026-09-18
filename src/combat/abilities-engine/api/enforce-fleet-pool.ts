@@ -23,12 +23,7 @@ export function enforceFleetPool(api: SideApi): void {
   // the stats, independent of whether the CAPACITY enforcement toggle is on
   // (the toggle controls removal of illegal cargo, not how much capacity
   // the ships actually have).
-  const settings = api.getAbilityConfig('SETTINGS')
-  const allTypes = [
-    ...settings.ships,
-    ...settings.groundForces,
-    ...settings.structures,
-  ]
+  const allTypes = api.participating.getUnitTypes()
 
   let totalCapacity = 0
   for (const baseType of allTypes) {

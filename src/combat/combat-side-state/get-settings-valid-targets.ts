@@ -15,10 +15,6 @@ export function getSettingsValidTargets(
       return (params.validTargetsBombardment as UnitBaseType[]) ?? []
     case 'SPACE_CANNON_DEFENSE':
       return (params.validTargetsSpaceCannonDefense as UnitBaseType[]) ?? []
-    case 'SPACE_COMBAT':
-      return (params.spaceCombatParticipating as UnitBaseType[]) ?? []
-    case 'GROUND_COMBAT':
-      return (params.groundCombatParticipating as UnitBaseType[]) ?? []
     default:
       return []
   }

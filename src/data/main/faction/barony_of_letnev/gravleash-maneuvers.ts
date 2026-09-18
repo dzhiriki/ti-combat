@@ -40,11 +40,7 @@ export const gravleashManeuvers: Ability<Params> = {
     {
       timing: 'BEFORE_DICE_ROLL',
       call: (ctx, params) => {
-        const { ships } = ctx.api.own.getAbilityConfig('SETTINGS')
-        const shipTypes = new Set(ships)
-        const shipTypeCount = ctx.api.own.participating
-          .getUnitTypes()
-          .filter(unitType => shipTypes.has(unitType)).length
+        const shipTypeCount = ctx.api.own.participating.getUnitTypes().length
 
         const target = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.shipPriority),
@@ -54,7 +50,7 @@ export const gravleashManeuvers: Ability<Params> = {
         const variantKey = ctx.api.own.getUnitVariantKey(target)
         if (!variantKey) return
         ctx.api.own.applyBonusToResult(shipTypeCount, {
-          singleUnit: variantKey,
+          unitId: target,
         })
       },
     },

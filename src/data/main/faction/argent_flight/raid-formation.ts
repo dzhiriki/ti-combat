@@ -61,7 +61,7 @@ export const raidFormation: Ability<Params> = {
             amount: excess,
             predicate: (variant, unitId) => {
               if (
-                ctx.api.opponent.isUnitAbilityLost('SUSTAIN_DAMAGE', variant)
+                ctx.api.opponent.isUnitAbilityLost('SUSTAIN_DAMAGE', unitId)
               ) {
                 return false
               }

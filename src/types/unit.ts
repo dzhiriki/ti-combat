@@ -1,8 +1,9 @@
 import type { Ability } from '@/combat'
+import type { UnitCategory } from '@/constants/units'
 
 import type { DiceGroup } from './die'
 import type { Lazy } from './faction'
-import type { SurfaceType } from './surface'
+import type { SurfaceId, SurfaceType } from './surface'
 
 export type UnitVariantId = string & { readonly __brand: 'UnitVariantId' }
 
@@ -34,7 +35,19 @@ interface UnitAbilities {
 
 export type UnitAbility = keyof UnitAbilities
 
+/** Combat-local grants belong to an instance, never to its damage state. */
+export interface UnitCombatOverrides {
+  /** Matriarch/Morphwing's committed fighters return even if their source dies. */
+  returnAfterCombat?: SurfaceId
+  participating?: boolean
+  categories?: Partial<Record<UnitCategory, boolean>>
+}
+
 export interface UnitStats {
+  /** Native categories inherited by every new instance. Omission uses the
+   *  base unit type's categories. Temporary grants are stored per UnitId. */
+  CATEGORIES?: readonly UnitCategory[]
+  UNIT_ABILITY_HIT_IMMUNE?: boolean
   NAME?: string
   DESCRIPTION?: string
   COST?: number | null

@@ -92,11 +92,9 @@ export type SettingsParams = {
   groundForces: UnitBaseType[]
   structures: UnitBaseType[]
   units: UnitBaseType[]
+  /** Setup option lists, not runtime participation. */
   spaceCombatParticipating: UnitBaseType[]
   groundCombatParticipating: UnitBaseType[]
-  /** Types whose participation may originate outside the active surface. */
-  spaceCombatParticipatingFromAnySurface: UnitBaseType[]
-  groundCombatParticipatingFromAnySurface: UnitBaseType[]
   validTargetsSpaceCannonOffense: UnitBaseType[]
   validTargetsBombardment: UnitBaseType[]
   validTargetsSpaceCannonDefense: UnitBaseType[]
@@ -104,7 +102,10 @@ export type SettingsParams = {
   subtypes: DeclaredSubtype[]
 }
 
-type ParamChangeKey = Exclude<keyof SettingsParams, 'subtypes'>
+type ParamChangeKey = Exclude<
+  keyof SettingsParams,
+  'subtypes' | `validTargets${string}`
+>
 
 export type ParamChange = {
   [K in ParamChangeKey]: {

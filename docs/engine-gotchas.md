@@ -229,8 +229,8 @@ a check there too.
   uses `hasAnyUnits` for non-combat metas (so SCO/AFB wipes end things),
   but a would-be winner whose remaining units are all non-participating
   (ferried ground forces, structures) is downgraded to 'draw' in SPACE
-  mode — only ship-mechs (Eidolon Maximum, Starlancer XI with ships
-  fielded) win via participation. Combat-round wipes and GROUND mode are
+  mode — ship-mechs (Eidolon Maximum, Starlancer XI) win via native
+  participation on the active surface. Combat-round wipes and GROUND mode are
   untouched (see `tests/engine/space-combat-winner-participation.test.ts`).
 
 ## Reconcile and config
@@ -246,36 +246,24 @@ a check there too.
   `tests/game-system.test.ts` for URL and worker regression coverage.
 
 - **`resetSettingsToBase` intentionally does NOT re-apply
-  `declareParamChange`.** The asymmetry with `resetBaseGroups` is
-  load-bearing (Alastor/Eidolon tests). If an ability needs its
-  participation change to survive into the engine run, restore it at
-  runtime in its PREPARE (see Hel-Titan's `onPrepare`).
+  `declareParamChange`.** These declarations expose possible setup options;
+  native `CATEGORIES` and per-unit grants determine runtime participation.
+  Hel-Titan and Starlancer XI inherit their categories from native stats,
+  including when the first unit is placed after PREPARE.
 
-- **`declareParamChange` additions to DERIVED settings groups survive only
-  because `resetBaseGroups` re-applies them after `onParamSet`.** The
-  derivation (`ships` → `spaceCombatParticipating`, etc.) recomputes derived
-  groups from the base groups, clobbering anything pushed into them earlier
-  in the pass. Base-group targets (Hel-Titan's `groundForces`) never hit
-  this; derived-group targets (Starlancer XI's `spaceCombatParticipating`)
-  rely on the post-derivation re-apply — don't remove it.
+- **`declareParamChange` additions to derived settings groups are re-applied
+  after `onParamSet`.** Deriving `spaceCombatParticipating` from `ships`, for
+  example, replaces its previous contents. The second pass preserves direct
+  declarations to derived groups. These groups control setup options only.
 
-- **`declareParam` sourced params sync only at reconcile — but the reconciled
-  value SURVIVES into the engine run.** A runtime `updateAbilityConfig` to a
-  source list (e.g. `SETTINGS.spaceCombatParticipating`) does not propagate to
-  params sourced from it (fleet pool, sustain priorities, unit priority).
-  When the addition came from a `declareParamChange` at reconcile, the
-  dependent lists already contain it and `resetSettingsToBase` does not touch
-  them — only the SETTINGS group itself needs the runtime restore (Starlancer
-  XI restores `spaceCombatParticipating` in PREPARE and nothing else). Update
-  a dependent ability's config at runtime only for additions that never went
-  through reconcile.
+- **`declareParam` sourced params sync only at reconcile, and those values
+  survive into the engine run.** A runtime source-list edit does not update
+  dependent priorities. Use the reconciled priorities to order candidates,
+  and scoped unit queries to determine runtime eligibility.
 
-- **`SETTINGS.ships` and `SETTINGS.spaceCombatParticipating` are distinct.**
-  `ships` cascades (via `onParamSet`) into `nonFighterShips`,
-  `spaceCombatParticipating`, and SCO targets; setting
-  `spaceCombatParticipating` directly grants combat participation WITHOUT
-  ship-ness (fleet pool, capacity, SCO targeting untouched) — that's how
-  Starlancer XI mechs fight in space from the ground.
+- **Starlancer XI uses native ship and ground-force categories.** It needs
+  no other ship to participate on the active surface. Its special combat-end
+  rules are deferred; do not restore the old SETTINGS participation adapter.
 
 - **Capacity and Fleet Pool split Fighter-II-style cargo between them.**
   Units with BOTH `CAPACITY_COST` and `FLEET_POOL_COST` (Fighter II, the TF

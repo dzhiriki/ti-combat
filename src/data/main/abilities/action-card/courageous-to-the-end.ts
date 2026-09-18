@@ -45,7 +45,8 @@ export const courageousToTheEnd: Ability<Params> = {
         const ownDestroyedVariants = new Set<string>()
         for (const id of ids) {
           const key = ctx.api.own.getUnitVariantKey(id)
-          if (key) ownDestroyedVariants.add(key)
+          if (key && ctx.api.own.isUnitCategory(id, 'SHIPS'))
+            ownDestroyedVariants.add(key)
         }
         const ownEnabled = ctx.utils.getFlat(params.ownPriority)
         if (!ownEnabled.some(v => ownDestroyedVariants.has(v))) return false
@@ -54,8 +55,11 @@ export const courageousToTheEnd: Ability<Params> = {
         const targetEnabled = new Set<string>(
           ctx.utils.getFlat(params.targetPriority),
         )
-        return targets.every(targetId =>
-          targetEnabled.has(ctx.api.opponent.getUnitVariantKey(targetId)!),
+        return (
+          targets.length > 0 &&
+          targets.every(targetId =>
+            targetEnabled.has(ctx.api.opponent.getUnitVariantKey(targetId)!),
+          )
         )
       },
       call: (ctx, params, ids) => {
@@ -64,7 +68,8 @@ export const courageousToTheEnd: Ability<Params> = {
         const ownDestroyedVariants = new Set<string>()
         for (const id of ids) {
           const key = ctx.api.own.getUnitVariantKey(id)
-          if (key) ownDestroyedVariants.add(key)
+          if (key && ctx.api.own.isUnitCategory(id, 'SHIPS'))
+            ownDestroyedVariants.add(key)
         }
         let combatValue: number | undefined
         for (const variantKey of ctx.utils.getFlat(params.ownPriority)) {
