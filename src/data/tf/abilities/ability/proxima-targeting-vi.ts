@@ -59,7 +59,7 @@ export const proximaTargetingVi: Ability<Params> = {
         ctx.resolveStep('BOMBARDMENT', { dice: [[7, 3]], target: 'OWN' })
         ctx.resolveStep('BOMBARDMENT', {
           dice: [[7, 3]],
-          deferCompletionCheck: true,
+          deferPhaseEndCheck: true,
         })
       },
     },

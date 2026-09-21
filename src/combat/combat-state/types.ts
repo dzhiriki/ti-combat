@@ -381,15 +381,13 @@ export interface CombatStateData {
   surfaces: SurfaceDefinition[]
   /** Space for SPACE mode, or the planet whose invasion is being resolved. */
   activeSurfaceId: SurfaceId
-  /** The side that won, or 'draw'. Set whenever a side is wiped (via
-   *  `_removeOne` or `_postAssignHits`) or via an ability's `transitionTo`.
-   *  Guaranteed to be defined whenever `isFinished` is true — combat
-   *  cannot complete without it (the completion script is only pushed by
-   *  `_triggerCompletion`, which sets this if it isn't already set). */
+  /** The side that won, or 'draw'. Derived when the ordered phase flow is
+   *  exhausted, or pinned earlier by an explicit `transitionTo`. Guaranteed
+   *  to be defined whenever `isFinished` is true. */
   winnerSide?: CombatSide | 'draw'
-  /** True once combat has completed — set by `_setComplete` after the
-   *  END_OF_COMBAT / CLEANUP_ROUND / CLEANUP timings run. Engine/test
-   *  harness check this instead of reading the (now-removed) `currentPhase`. */
+  /** True once combat has completed — set after the END_OF_COMBAT / CLEANUP
+   *  timings run. Engine/test harness check this instead of reading the
+   *  (now-removed) `currentPhase`. */
   isFinished?: boolean
   /** Next codepoint to mint as a `UnitId` when either side places new
    *  units. Shared across both sides so cross-side IDs never collide,

@@ -4,7 +4,6 @@ import {
   type CombatStateData,
   type DicePool,
   getInitialMetaPhase,
-  getNextPhaseInFlow,
   type HitSource,
   isCombatMeta,
   type LogEntry,
@@ -411,23 +410,20 @@ export class CombatTest {
   }
 
   /** If the script for the current phase has not been loaded yet, load it.
-   *  If the script has drained, transition to the next phase (combat metas
-   *  loop back to themselves) and load that phase's script. Returns false
-   *  when combat has completed — combat-state owns the path to `_setComplete`,
-   *  so the harness only observes via `isFinished`. */
+   *  If the script has drained, ask combat-state for the next phase. Combat
+   *  phases repeat only while both sides can enter them; exhausted flow loads
+   *  the normal end-of-combat timings. */
   private _ensureScriptLoaded(): boolean {
     if (this._cs.isFinished()) return false
     if (this._cs.pendingSteps.length > 0) return true
 
     if (this._loadedForPhase === this._currentMeta) {
-      const next: MetaPhase = isCombatMeta(this._currentMeta)
-        ? this._currentMeta
-        : (getNextPhaseInFlow(
-            this._currentMeta,
-            this._state.combatMode,
-          ) as MetaPhase)
+      const next = this._cs.getNextPhase(this._currentMeta)
+      if (next === 'COMPLETE') {
+        this._cs.loadEndScript(this._currentMeta)
+        return true
+      }
       this._currentMeta = next
-      if (this._cs.isFinished()) return false
     }
     if (isCombatMeta(this._currentMeta)) {
       this._round++
@@ -621,19 +617,19 @@ export function hasParkedPass(state: CombatState): boolean {
   return false
 }
 
-/** Transition from the given meta to the next one (combat metas self-loop)
- *  and load its script. Returns the new meta when a script was loaded, or
- *  `null` when combat is finished — combat-state owns completion, so we
- *  only check `isFinished` here. */
+/** Transition from the given meta to the next one and load its script.
+ *  Exhausted flow loads end-of-combat timings and returns `null`. */
 export function transitionAndLoad(
   state: CombatState,
   currentMeta: MetaPhase,
   round: number,
 ): MetaPhase | null {
   if (state.isFinished()) return null
-  const next: MetaPhase = isCombatMeta(currentMeta)
-    ? currentMeta
-    : (getNextPhaseInFlow(currentMeta, state.combatMode) as MetaPhase)
+  const next = state.getNextPhase(currentMeta)
+  if (next === 'COMPLETE') {
+    state.loadEndScript(currentMeta)
+    return null
+  }
   state.loadPhaseScript(next, round)
   return next
 }

@@ -78,18 +78,19 @@ describe('space combat winner requires participating units', () => {
     expect(t.state.winnerSide).toBe('attacker')
   })
 
-  it('base Z-Grav Eidolon mechs alone do not win without a combat to transform in', () => {
-    // The Z-Grav transform fires at START_OF_COMBAT; against an empty
-    // opponent no combat ever starts, so the mechs never become ships.
+  it('base Z-Grav Eidolon mechs cannot bootstrap space combat', () => {
+    // The transform fires at START_OF_COMBAT. With no native ship on its
+    // side, combat never starts and the mechs never become ships.
     const t = combatTest({
       mode: 'SPACE',
       attacker: { faction: 'NAAZ_ROKHA_ALLIANCE', units: { MECH: 2 } },
-      defender: { faction: 'ARBOREC', units: {} },
+      defender: { faction: 'ARBOREC', units: { CRUISER: 1 } },
     })
 
     t.advanceTo('COMPLETE')
 
-    expect(t.state.winnerSide).toBe('draw')
+    expect(t.abilityLog('EIDOLON')).toHaveLength(0)
+    expect(t.state.winnerSide).toBe('defender')
   })
 
   it('combat-round wipes are unaffected: surviving ships still win over ferried infantry', () => {

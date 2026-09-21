@@ -328,9 +328,7 @@ export class SideApi {
     )
     const combat = this._abilitiesParams?.combatState
     combat?.resyncParticipating(this._side)
-    // End-of-combat grant cleanup must not rewrite the settled result.
-    if (this.state.winnerSide === undefined)
-      combat?.queueCompletionCheck(this._ctx.phaseStack ?? [])
+    combat?.queuePhaseEndCheck(this._ctx.phaseStack ?? [])
   }
 
   /** Override one category without changing participation or unit identity. */
@@ -521,8 +519,9 @@ export class SideApi {
     }
 
     CombatSideState.removeUnits(s, destroyed)
-    const combatState = this._abilitiesParams?.combatState
-    combatState?.queueCompletionCheck(this._ctx.phaseStack ?? [])
+    this._abilitiesParams?.combatState.queuePhaseEndCheck(
+      this._ctx.phaseStack ?? [],
+    )
 
     if (this._abilitiesParams) {
       this._ctx.runDestroyAbilities(destroyed)
@@ -560,8 +559,9 @@ export class SideApi {
 
   removeUnits(target: UnitBaseType | UnitId | UnitId[]): void {
     CombatSideState.removeUnits(this._sideData, target)
-    const combatState = this._abilitiesParams?.combatState
-    combatState?.queueCompletionCheck(this._ctx.phaseStack ?? [])
+    this._abilitiesParams?.combatState.queuePhaseEndCheck(
+      this._ctx.phaseStack ?? [],
+    )
   }
 
   placeUnits(
@@ -585,7 +585,6 @@ export class SideApi {
       // placeUnits appends to the tail of participatingUnits; resort so the
       // configured UNIT_PRIORITY governs hit assignment for the new units.
       abilitiesParams.combatState.resyncParticipating(this._side)
-      abilitiesParams.combatState.syncWinnerSide()
     }
     enforceFleetPool(this)
     return placed as Record<UnitType, UnitId[]>
@@ -1461,13 +1460,10 @@ export class AbilityContext {
     if (outcome === 'LOST') {
       winner = getOpponentSide(this._side)
     }
-    // Drop the current meta's script. Trigger steps pushed after this call
-    // survive (they land on the empty stack); to keep any triggers, callers
-    // must invoke `transitionTo` before pushing them.
-    this._abilitiesParams.combatState._triggerCompletion(
-      this.phaseStack!,
-      winner,
-    )
+    // Drop the current phase. Trigger steps pushed after this call survive
+    // (they land above round cleanup); callers that need them must invoke
+    // `transitionTo` before pushing them.
+    this._abilitiesParams.combatState.forceOutcome(this.phaseStack!, winner)
   }
 
   runDestroyAbilities(destroyed: UnitId[]): void {
@@ -1619,7 +1615,7 @@ export class AbilityContext {
       dice?: DiceGroup[]
       target?: 'OWN' | 'OPPONENT'
       firing?: ('OWN' | 'OPPONENT')[]
-      deferCompletionCheck?: boolean
+      deferPhaseEndCheck?: boolean
       abilitiesOverride?: AbilitiesOverride
     },
   ): void {
@@ -1657,7 +1653,7 @@ export class AbilityContext {
       outerPhase: this.phaseStack,
       customDice,
       selfTarget,
-      deferCompletionCheck: overrides?.deferCompletionCheck,
+      deferPhaseEndCheck: overrides?.deferPhaseEndCheck,
       abilitiesOverride: overrides?.abilitiesOverride,
     })
   }

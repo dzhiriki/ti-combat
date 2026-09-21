@@ -185,20 +185,16 @@ a check there too.
   first — the TAIL dies first.** The unit spared by cancelling one hit is
   `result[0]`, not `result[n-1]` (see Divinity's `savedByHitCancel`).
 
-- **Out-of-band ability hits need their own wipe check.** When `addHits`
-  creates a hit pool outside a dice-roll group, `CombatState.assignHits`
-  queues both assignment and `_postAssignHits`. Keep that completion check
-  after the destruction cascade; otherwise a Magen Defense Grid wipe resumes
-  `START_OF_COMBAT` and rolls combat dice before ending the combat.
+- **Out-of-band ability hits queue assignment and a combat-phase end check.**
+  `CombatState.assignHits` drains hit assignment and its destruction cascade,
+  then aborts the remaining combat phase if either side has no participants.
+  Top-level pre-combat phases are not aborted by participant state.
 
-- **Direct unit removal must park, drain destruction effects, then check for
-  a wipe.** `removeUnits` and `destroyUnits` queue a completion check before
-  their ability timing resumes; when already inside a destruction cascade,
-  that check belongs at the end of the active group so `AFTER_DESTROY`
-  abilities such as Brother Milor still fire. Parking must compare the actual
-  next step (`peekStep`), not the next timing (`currentStep`), because a queued
-  method-only check otherwise leaves the invoking timing in place and repeats
-  it indefinitely (Fragment Reality + Fleet Pool).
+- **Direct unit removal must park, drain destruction effects, then check the
+  combat phase.** `destroyUnits` pushes its destruction cascade so
+  `AFTER_DESTROY` abilities such as Brother Milor can restore or replace units
+  before participant loss is evaluated. Parking must compare the actual next
+  step (`peekStep`), not merely the next timing (`currentStep`).
 
 - **A blanket restriction stops being blanket once anything is immune to
   it.** `setUnitAbilityRestrictionImmunity(reason, unitType)` makes a
@@ -225,13 +221,14 @@ a check there too.
   phase drivers (AFB, Space Cannon, Bombardment, Retreat, Fleet Pool,
   Capacity) — never hide it, even for Twilight's Fall.
 
-- **Winning SPACE combat requires participating units.** `_postAssignHits`
-  uses `hasAnyUnits` for non-combat metas (so SCO/AFB wipes end things),
-  but a would-be winner whose remaining units are all non-participating
-  (ferried ground forces, structures) is downgraded to 'draw' in SPACE
-  mode — ship-mechs (Eidolon Maximum, Starlancer XI) win via native
-  participation on the active surface. Combat-round wipes and GROUND mode are
-  untouched (see `tests/engine/space-combat-winner-participation.test.ts`).
+- **Winning and entering SPACE combat require participating units.** A combat
+  phase starts only when both sides already have participants; a
+  `START_OF_COMBAT` effect cannot bootstrap admission. Base Z-Grav Eidolon
+  therefore does not transform when its side has no native ship. When flow is
+  exhausted, a side whose remaining units are ferried ground forces or
+  structures cannot win; Eidolon Maximum and Starlancer XI can because they
+  participate natively. See
+  `tests/engine/space-combat-winner-participation.test.ts`.
 
 ## Reconcile and config
 
@@ -288,6 +285,17 @@ a check there too.
   `fightersLast` moves fighters to the end to PROTECT them.)
 
 ## Combat engine
+
+- **Participant loss ends the active combat phase; the scheduler owns what
+  follows.** After destruction reactions drain, a combat-phase check discards
+  remaining abilities and rolls, then the scheduler advances through the
+  ordered flow. Because Bombardment is a pre-combat phase, wiping defenders
+  there still allows commitment and Space Cannon Defense; losing the last unit
+  during `GROUND_COMBAT` ends combat immediately because no phase follows.
+  Before entering or repeating a combat phase, both sides must already have
+  participants. See `tests/abilities/claire-gibson.test.ts`,
+  `tests/abilities/claire-gibson+indoctrination.test.ts`, and
+  `tests/surfaces.test.ts`.
 
 - **Unlimited-use repair is the only thing that makes the state graph
   cyclic.** Without it, combat state decreases monotonically (units are

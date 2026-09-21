@@ -17,12 +17,13 @@ describe.forEachSide('EIDOLON + RAID_FORMATION', () => {
       },
       defender: {
         faction: 'NAAZ_ROKHA_ALLIANCE',
-        units: { MECH: 2 },
+        units: { CRUISER: 1, MECH: 2 },
       },
     })
 
-    // 3 destroyers AFB 9x2 = 6 dice, 0 fighters = all hits excess
-    // Eidolon mechs are ships but have lost sustain — not valid targets
+    // The cruiser admits the defender to combat, then Eidolon transforms.
+    // 3 destroyers AFB 9x2 = 6 dice, 0 fighters = all hits excess.
+    // Eidolon mechs are ships but have lost sustain — not valid targets.
     t.advanceToTiming('BEFORE_ASSIGN_HITS', 2, 'AFB')
 
     expect(t.abilityLog('RAID_FORMATION')).not.toHaveLength(0)
