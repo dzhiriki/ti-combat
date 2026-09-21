@@ -8,6 +8,7 @@ import { clsx } from 'clsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { CombatOutcome, SurvivorSide } from '@/combat'
+import { CombatSideState } from '@/combat/combat-side-state/combat-side-state'
 import {
   AbilitiesPanel,
   type AbilityFilterMode,
@@ -232,14 +233,8 @@ export function CombatSimulator({
   }, [stateData])
 
   const participatingTypes = useMemo(() => {
-    const key =
-      combatMode === 'GROUND'
-        ? 'groundCombatParticipating'
-        : 'spaceCombatParticipating'
-    const read = (side: 'attacker' | 'defender'): string[] => {
-      const list = abilities[side]['SETTINGS']?.[key]
-      return Array.isArray(list) ? (list as string[]) : []
-    }
+    const read = (side: 'attacker' | 'defender'): string[] =>
+      CombatSideState.getParticipationOptionTypes(stateData[side], combatMode)
     return { attacker: read('attacker'), defender: read('defender') }
     // oxlint-disable-next-line react/exhaustive-deps
   }, [stateData])

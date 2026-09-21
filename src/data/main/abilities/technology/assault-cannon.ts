@@ -22,9 +22,9 @@ export const assaultCannon: Ability<Params> = {
     uses: Infinity,
     targetPriority: declareParam<UnitList>({
       default: [],
-      source: 'nonFighterShips',
+      source: 'SHIPS',
       side: 'opponent',
-      filter: { combatMode: 'SPACE' },
+      filter: { combatMode: 'SPACE', exclude: ['FIGHTER'] },
     }),
   },
   headerUI: 'isEnabled',

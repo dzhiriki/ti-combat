@@ -23,10 +23,10 @@ const rollDiceAbility: Ability = {
     {
       timing: 'START_OF_COMBAT_ROUND',
       call: ctx => {
-        const validTargets = ctx.api.opponent.participating.getUnitTypes()
+        const unitPriority = ctx.api.opponent.participating.getUnitTypes()
         ctx.rollDice([[5, 1]], (branchCtx, hits) => {
           if (hits[0] > 0) {
-            branchCtx.api.opponent.addHits(hits[0], validTargets)
+            branchCtx.api.opponent.addHits(hits[0], unitPriority)
           }
         })
       },
@@ -43,7 +43,7 @@ const rollDiceTwoGroupsAbility: Ability = {
     {
       timing: 'START_OF_COMBAT_ROUND',
       call: ctx => {
-        const validTargets = ctx.api.opponent.participating.getUnitTypes()
+        const unitPriority = ctx.api.opponent.participating.getUnitTypes()
         ctx.rollDice(
           [
             [5, 1],
@@ -52,7 +52,7 @@ const rollDiceTwoGroupsAbility: Ability = {
           (branchCtx, hits) => {
             const total = hits[0] + hits[1]
             if (total > 0) {
-              branchCtx.api.opponent.addHits(total, validTargets)
+              branchCtx.api.opponent.addHits(total, unitPriority)
             }
           },
         )
@@ -115,11 +115,11 @@ const deterministicHitAbility: Ability = {
     {
       timing: 'START_OF_COMBAT_ROUND',
       call: ctx => {
-        const validTargets = ctx.api.opponent.participating.getUnitTypes()
+        const unitPriority = ctx.api.opponent.participating.getUnitTypes()
         ctx.rollDice([[1, 1]], (branchCtx, hits) => {
           // Always [1] — 100% hit on value 1
           expect(hits).toEqual([1])
-          branchCtx.api.opponent.addHits(1, validTargets)
+          branchCtx.api.opponent.addHits(1, unitPriority)
         })
       },
     },

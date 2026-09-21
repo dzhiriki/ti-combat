@@ -36,4 +36,30 @@ describe('SPACE_CANNON_DEFENSE + SUSTAIN_DAMAGE', () => {
     expect(t.attacker.units.MECH).toHaveLength(1)
     expect(t.attacker.units.MECH![0].isDamaged).toBeFalsy()
   })
+
+  it('uses the defender outgoing priority as the eligibility list', () => {
+    const t = combatTest({
+      mode: 'GROUND',
+      attacker: {
+        faction: 'SARDAKK_NORR',
+        units: { MECH: 1, INFANTRY: 1 },
+      },
+      defender: {
+        faction: 'ARBOREC',
+        units: { PDS: 1, INFANTRY: 1 },
+        abilities: {
+          SPACE_CANNON_DEFENSE: {
+            customPriority: true,
+            unitPriority: [['INFANTRY']],
+            disableSustainDamage: true,
+          },
+        },
+      },
+    })
+
+    t.advanceTo('GROUND_COMBAT', { attacker: 1 })
+
+    expect(t.attacker.units.INFANTRY).toBeUndefined()
+    expect(t.attacker.units.MECH).toHaveLength(1)
+  })
 })

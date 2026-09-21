@@ -41,7 +41,6 @@ export type {
   ParamFilter,
   RegisteredAbility,
   RuntimeAbilityList,
-  SettingsParams,
   SyncSortSpec,
   SyncSourceConfig,
   UnitListMode,

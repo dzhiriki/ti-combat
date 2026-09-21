@@ -1,8 +1,10 @@
+import type { UnitCategory } from '@/constants/units'
+import type { UnitBaseType } from '@/types'
+
 import type { ParamLimit } from './param-limit'
 import type {
   Ability,
   ParamFilter,
-  SettingsParams,
   SyncSortSpec,
   SyncSourceConfig,
 } from './types'
@@ -11,12 +13,9 @@ export type { ParamLimit } from './param-limit'
 
 const DECLARED_PARAM = Symbol('declaredParam')
 
-interface DeclaredParamOptions<
-  T,
-  K extends keyof SettingsParams = keyof SettingsParams,
-> {
+interface DeclaredParamOptions<T> {
   default: T
-  source?: K
+  source?: UnitCategory | readonly UnitCategory[]
   side?: 'own' | 'opponent'
   sort?: SyncSortSpec
   /** For `UnitList<V>` params, the value used when reconcile adds a new
@@ -26,7 +25,7 @@ interface DeclaredParamOptions<
    *  parent is present, falling back to this only when there is no
    *  parent. Omit for order-mode lists (single-element tuples). */
   defaultItemValue?: unknown
-  compute?: (value: SettingsParams[K]) => T
+  compute?: (value: UnitBaseType[]) => T
   /** Variant-list filter. Same shape as `getUnitVariantsOptions`'s filter
    *  argument — reconcile applies it to the synced valid list, and
    *  `getUnitVariantsOptions(paramKey)` reuses it to render the matching UI
@@ -50,11 +49,11 @@ interface DeclaredParamOptions<
 export interface DeclaredParamValue<T> {
   [DECLARED_PARAM]: true
   default: T
-  source?: keyof SettingsParams
+  source?: UnitCategory | readonly UnitCategory[]
   side: 'own' | 'opponent'
   sort: SyncSortSpec
   defaultItemValue?: unknown
-  compute?: (value: SettingsParams[keyof SettingsParams]) => T
+  compute?: (value: UnitBaseType[]) => T
   filter?: ParamFilter
   /** Per-variant cap for `UnitList<number, V>` params.
    *  - `'UNIT_LIMIT'` caps at `UNIT_LIMITS[baseType]`.
@@ -69,13 +68,10 @@ export interface DeclaredParamValue<T> {
 }
 
 /**
- * Mark a param as synced from a SETTINGS group.
+ * Mark a param as synced from one or more unit categories.
  * Returns `T` at the type level so `params` matches the `Params` generic.
  */
-export function declareParam<
-  T,
-  K extends keyof SettingsParams = keyof SettingsParams,
->(options: DeclaredParamOptions<T, K>): T {
+export function declareParam<T>(options: DeclaredParamOptions<T>): T {
   return {
     [DECLARED_PARAM]: true,
     default: options.default,
@@ -133,7 +129,7 @@ export function extractSyncSources(
     if (isDeclaredParam(value) && value.source) {
       result.push({
         key,
-        group: value.source,
+        source: value.source,
         side: value.side,
         sort: value.sort,
         defaultItemValue: value.defaultItemValue,

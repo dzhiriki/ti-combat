@@ -24,7 +24,7 @@ export const salvageOperations: Ability<Params> = {
     uses: 1,
     shipPriority: declareParam({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       filter: { combatMode: 'SPACE', includeOnlyBaseTypes: true },
     }),
     _destroyedShipTypes: [],

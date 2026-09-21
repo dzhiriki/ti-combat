@@ -22,7 +22,7 @@ export const dimensionalSplicer: Ability<Params> = {
     uses: Infinity,
     targetPriority: declareParam<UnitList>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'opponent',
       filter: { combatMode: 'SPACE' },
     }),

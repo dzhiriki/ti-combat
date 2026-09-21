@@ -16,7 +16,7 @@ export const lastDispatch: Ability<Params> = {
     uses: Infinity,
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'opponent',
       sort: 'worth-desc',
       defaultItemValue: true,

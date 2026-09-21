@@ -23,7 +23,7 @@ export const viscountUnlenn: Ability<Params> = {
     uses: 1,
     unitType: declareParam<UnitType>({
       default: 'FIGHTER',
-      source: 'ships',
+      source: 'SHIPS',
       filter: {
         excludeSubtypeSource: ['VISCOUNT_UNLENN'],
         combatMode: 'SPACE',

@@ -13,7 +13,6 @@ import {
 } from './phases/apply-rerolls'
 import { collapseSideOutcomes } from './phases/collapse-side-outcomes'
 import type { Bucket, PreSplit, SideBuckets } from './pre-split'
-import { sortValidTargetsByPriority } from './sort-valid-targets'
 import type {
   CollectedDice,
   FlatSource,
@@ -30,11 +29,7 @@ interface FastModeInput {
   dice: CollectedDice
   preSplit: PreSplit
   modifiers: Modifier[]
-  validTargets: { attacker: UnitType[]; defender: UnitType[] }
-  priorityList: {
-    attacker: UnitType[] | undefined
-    defender: UnitType[] | undefined
-  }
+  unitAbilityPriority?: { attacker: UnitType[]; defender: UnitType[] }
   meta: MetaPhase
   /** True for a self-targeting roll (Proxima self-bomb): flip reroll specs
    *  so "reroll misses" becomes "reroll hits" against the firer's own dice. */
@@ -57,10 +52,10 @@ interface FastModeInput {
  * then collapse to bucket totals before the cross product. Branches with
  * identical bucket totals merge so the final cross product stays small.
  *
- * Rest-bucket hits land in the side's primary HitPool (with the
- * landing-side's default validTargets). Each siphon bucket's hit count
- * is fed to its spec's `transform(count)` and the result is appended as
- * an additional HitPool on the landing side.
+ * Rest-bucket unit-ability hits use the landing pool's resolved priority for
+ * both eligibility and assignment order. Combat hits remain in the primary
+ * unrestricted pool. Each siphon bucket's hit count is fed to its spec's
+ * `transform(count)` and appended as an additional HitPool.
  */
 export function runFastMode(input: FastModeInput): DiceMathBranch[] {
   const sides = (['attacker', 'defender'] as const).map(firingSide => {
@@ -96,16 +91,18 @@ export function runFastMode(input: FastModeInput): DiceMathBranch[] {
       emitPools(
         aOutcome,
         input.preSplit[sides[0].firingSide],
-        input.validTargets[input.preSplit[sides[0].firingSide].landingSide],
-        input.priorityList[input.preSplit[sides[0].firingSide].landingSide],
+        input.unitAbilityPriority?.[
+          input.preSplit[sides[0].firingSide].landingSide
+        ],
         input.meta,
         pools,
       )
       emitPools(
         dOutcome,
         input.preSplit[sides[1].firingSide],
-        input.validTargets[input.preSplit[sides[1].firingSide].landingSide],
-        input.priorityList[input.preSplit[sides[1].firingSide].landingSide],
+        input.unitAbilityPriority?.[
+          input.preSplit[sides[1].firingSide].landingSide
+        ],
         input.meta,
         pools,
       )
@@ -267,8 +264,7 @@ function bucketPmf(
 function emitPools(
   outcome: SideOutcome,
   side: SideBuckets,
-  validTargets: UnitType[],
-  priorityList: UnitType[] | undefined,
+  unitAbilityPriority: UnitType[] | undefined,
   meta: MetaPhase,
   pools: Record<CombatSide, PendingHitPool>,
 ): void {
@@ -285,11 +281,11 @@ function emitPools(
         base: entry.base,
         unitPriority: entry.unitPriority,
       })
-    } else if (validTargets.length > 0) {
+    } else if (unitAbilityPriority !== undefined) {
       pool.custom.push({
         key: meta,
         base: hits,
-        unitPriority: sortValidTargetsByPriority(validTargets, priorityList),
+        unitPriority: [...unitAbilityPriority],
       })
     } else {
       pool.base += hits

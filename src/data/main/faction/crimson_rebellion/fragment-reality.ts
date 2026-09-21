@@ -24,7 +24,7 @@ export const fragmentReality: Ability<Params> = {
     uses: Infinity,
     ships: declareParam({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       defaultItemValue: 0,
       filter: { combatMode: 'SPACE', includeOnlyBaseTypes: true },
       limit: 'EXTRA',

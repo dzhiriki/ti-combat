@@ -28,7 +28,7 @@ export const strikeWingAlphaII: Ability<Params> = {
     uses: Infinity,
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       side: 'opponent',
       defaultItemValue: true,
       sort: 'worth-desc',

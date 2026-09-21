@@ -21,7 +21,7 @@ export const watchfulOjz: Ability<Params> = {
     uses: Infinity,
     shipConfig: declareParam<UnitList<number>>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
       defaultItemValue: 0,
       filter: { combatMode: 'SPACE' },
       limit: 'IN_COMBAT',

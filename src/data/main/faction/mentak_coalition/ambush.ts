@@ -22,7 +22,7 @@ export const ambush: Ability<Params> = {
     uses: 1,
     attackerPriority: declareParam({
       default: [] as UnitList<boolean>,
-      source: 'ships',
+      source: 'SHIPS',
       side: 'own',
       sort: 'worth-desc',
       defaultItemValue: true,

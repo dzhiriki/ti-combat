@@ -821,13 +821,20 @@ export class CombatSetup {
       attacker: {},
       defender: {},
     }
+    // Reconciliation writes derived option metadata onto the supplied side
+    // state. Defaults must use the live unit data for limits, but serialization
+    // must not replace the UI's metadata with categories from disabled defaults.
+    const serializationState = {
+      attacker: { ...this._stateData.attacker },
+      defender: { ...this._stateData.defender },
+    }
     initializeAbilityDefaults(freshAbilities, this._sideRegistered)
     reconcileAbilitiesConfig(
       freshAbilities,
       this._sideRegistered,
       this._combatMode,
       undefined,
-      this._stateData,
+      serializationState,
       this._lookups,
     )
 

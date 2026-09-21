@@ -75,6 +75,10 @@ function innerMeta(phase: MetaPhase[]): MetaPhase {
   return phase[phase.length - 1]
 }
 
+function opponentOf(side: CombatSide): CombatSide {
+  return side === 'attacker' ? 'defender' : 'attacker'
+}
+
 /** Extract `UnitType[]` keys from a `UnitList<V>` tuple-array, dropping
  *  entries whose value slot is explicitly `false` (checkbox-mode "off").
  *  Number-mode entries are kept regardless of count — sortUnitsByPriority
@@ -957,22 +961,27 @@ export class CombatState {
 
     const meta = innerMeta(phase)
 
-    // validTargets uses SETTINGS, which BEFORE_UNIT_ABILITY_ROLL abilities
-    // (e.g. WAYLAY) may have just modified — compute here,
-    // after they ran. Regular combat rolls leave it empty so hit assignment
-    // uses the fast tail-slice path.
-    const validTargets = ctx.isUnitAbility
-      ? {
-          attacker: CombatSideState.getValidTargetsForPhase(
-            data.attacker,
-            meta,
-          ),
-          defender: CombatSideState.getValidTargetsForPhase(
-            data.defender,
-            meta,
-          ),
-        }
-      : { attacker: [], defender: [] }
+    // BEFORE_UNIT_ABILITY_ROLL abilities (e.g. WAYLAY) may have just changed
+    // their producing side's priority, so resolve it only now. The result is
+    // keyed by the raw landing pool (the natural opponent); self-targeted
+    // pools are swapped later with their priority intact.
+    const unitAbilityPriority = ctx.isUnitAbility
+      ? ({ attacker: [], defender: [] } as Record<CombatSide, UnitType[]>)
+      : undefined
+    if (unitAbilityPriority) {
+      for (const firingSide of ctx.firing) {
+        const rawLandingSide = opponentOf(firingSide)
+        const targetSide = ctx.selfTarget ? firingSide : rawLandingSide
+        unitAbilityPriority[rawLandingSide] =
+          CombatSideState.getUnitAbilityPriority(
+            data[firingSide],
+            data[targetSide],
+            meta as UnitAbilityMeta,
+            ctx.abilitiesOverride,
+          )
+      }
+      ctx.unitAbilityPriority = unitAbilityPriority
+    }
 
     let modifiers: readonly import('../dice-math/types').ModifierDecl[] =
       ctx.modifiers ?? []
@@ -1022,19 +1031,6 @@ export class CombatState {
           }
         : undefined
 
-    const priorityList = {
-      attacker: CombatSideState.getPhasePriorityList(
-        data.attacker,
-        data.combatMode,
-        ctx.abilitiesOverride,
-      ),
-      defender: CombatSideState.getPhasePriorityList(
-        data.defender,
-        data.combatMode,
-        ctx.abilitiesOverride,
-      ),
-    }
-
     const { branches, isEmpty } = runDiceMath({
       diceCollection,
       modifiers,
@@ -1042,8 +1038,7 @@ export class CombatState {
       firing: ctx.firing,
       isUnitAbility: ctx.isUnitAbility,
       selfTarget: ctx.selfTarget,
-      validTargets,
-      priorityList,
+      unitAbilityPriority,
       sideData: { attacker: data.attacker, defender: data.defender },
       abilityUses,
       meta,
@@ -1171,20 +1166,9 @@ export class CombatState {
       // Thundarian-style cancels clear `hitPool` entirely.
       for (const side of ['attacker', 'defender'] as const) {
         const rawPending = branch.pendingHitPool[side]
-        const landingSide = ctx.selfTarget
-          ? side === 'attacker'
-            ? 'defender'
-            : 'attacker'
-          : side
-        const validTargets = ctx.isUnitAbility
-          ? CombatSideState.getValidTargetsForPhase(
-              baseData[landingSide],
-              metaPhase,
-            )
-          : undefined
         const targetFilter: UnitTargetFilter | undefined = ctx.isUnitAbility
           ? {
-              types: validTargets,
+              types: ctx.unitAbilityPriority?.[side] ?? [],
               unitAbility: true,
             }
           : undefined

@@ -17,7 +17,7 @@ describe('declare hooks receive the lookup context', () => {
         )
         return []
       },
-      declareParamChange: (_params, _settings, ctx) => {
+      declareParamChange: (_params, ctx) => {
         seen.push(
           `change:${ctx.this.key}:${ctx.abilities.opponent.all.length > 0}`,
         )

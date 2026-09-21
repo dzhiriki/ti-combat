@@ -28,14 +28,14 @@ export const exotrireme: Ability<Params> = {
     uses: 0,
     sacrificePriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'own',
       defaultItemValue: true,
       filter: { include: ['DREADNOUGHT'], combatMode: 'SPACE' },
     }),
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'opponent',
       sort: 'worth-desc',
       defaultItemValue: true,

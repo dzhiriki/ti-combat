@@ -52,7 +52,7 @@ export const preGalvanized: Ability<Params> = {
     galvanizedUnits: declareParam({
       default: [],
       defaultItemValue: 0,
-      source: 'units',
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       sort: 'normal-desc',
       filter: {
         includeOnlyBaseTypes: true,

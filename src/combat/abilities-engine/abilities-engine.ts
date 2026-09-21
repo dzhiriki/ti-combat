@@ -1483,9 +1483,8 @@ export class AbilitiesEngine {
   ): void {
     const ability = this.abilityForKey(side, targetKey)
     if (!ability?.onParamSet) return
-    // Give onParamSet a mutable merged view. It writes derived fields back
-    // (e.g. ships → nonFighterShips/spaceCombatParticipating). Capture any
-    // mutations via a before/after diff and persist them in liveAbilities
+    // Give onParamSet a mutable merged view. Capture any mutations via a
+    // before/after diff and persist them in liveAbilities
     // so subsequent reads see the derived values.
     const params = { ...CombatSideState.getLiveParams(draft[side], targetKey) }
     const before = { ...params }

@@ -49,14 +49,14 @@ export const divinity: Ability<Params> = {
     uses: 1,
     spaceTargets: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
       side: 'own',
       defaultItemValue: true,
       filter: { combatMode: 'SPACE' },
     }),
     groundTargets: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundCombatParticipating',
+      source: 'GROUND_FORCES',
       side: 'own',
       defaultItemValue: true,
       filter: { combatMode: 'GROUND' },

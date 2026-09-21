@@ -72,21 +72,21 @@ export const lash: Ability<Params> = {
     uses: 1,
     spaceTriggers: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'units',
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       side: 'own',
       defaultItemValue: true,
       filter: { combatMode: 'SPACE', includeNonParticipating: true },
     }),
     groundTriggers: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'units',
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       side: 'own',
       defaultItemValue: true,
       filter: { combatMode: 'GROUND', includeNonParticipating: true },
     }),
     spaceTargetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'units',
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       side: 'opponent',
       sort: 'worth-desc',
       defaultItemValue: true,
@@ -94,7 +94,7 @@ export const lash: Ability<Params> = {
     }),
     groundTargetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'units',
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       side: 'opponent',
       sort: 'worth-desc',
       defaultItemValue: true,

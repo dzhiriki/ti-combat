@@ -24,14 +24,14 @@ export const courageousToTheEnd: Ability<Params> = {
     uses: 1,
     ownPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'own',
       defaultItemValue: true,
       filter: { combatMode: 'SPACE' },
     }),
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'opponent',
       defaultItemValue: true,
       filter: { combatMode: 'SPACE' },

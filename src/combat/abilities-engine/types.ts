@@ -1,3 +1,4 @@
+import type { UnitCategory } from '@/constants/units'
 import type {
   CombatSide,
   DiceGroup,
@@ -45,11 +46,9 @@ export interface ParamFilter {
   includeOnlyAvailable?: boolean
 }
 
-export interface SyncSourceConfig<
-  K extends keyof SettingsParams = keyof SettingsParams,
-> {
+export interface SyncSourceConfig {
   key: string
-  group: K
+  source: UnitCategory | readonly UnitCategory[]
   side: 'own' | 'opponent'
   sort: SyncSortSpec
   /** Default for the value slot when reconcile adds a new tuple entry to a
@@ -57,7 +56,7 @@ export interface SyncSourceConfig<
    *  `DREADNOUGHT` for `DREADNOUGHT:Galvanized`) takes precedence; this
    *  is the fallback. Omit for order-mode lists. */
   defaultItemValue?: unknown
-  compute?: (value: SettingsParams[K]) => unknown
+  compute?: (value: UnitBaseType[]) => unknown
   filter?: ParamFilter
   /** See `declareParam.limit`. Threaded through so reconcile can clamp
    *  stored values to the per-variant max. */
@@ -86,33 +85,14 @@ export interface DeclaredSubtype {
   source?: string
 }
 
-export type SettingsParams = {
-  nonFighterShips: UnitBaseType[]
-  ships: UnitBaseType[]
-  groundForces: UnitBaseType[]
-  structures: UnitBaseType[]
-  units: UnitBaseType[]
-  /** Setup option lists, not runtime participation. */
-  spaceCombatParticipating: UnitBaseType[]
-  groundCombatParticipating: UnitBaseType[]
-  validTargetsSpaceCannonOffense: UnitBaseType[]
-  validTargetsBombardment: UnitBaseType[]
-  validTargetsSpaceCannonDefense: UnitBaseType[]
-  validTargetsAntiFighterBarrage: UnitBaseType[]
-  subtypes: DeclaredSubtype[]
+/** Setup-only category addition declared by an ability. A category value
+ *  copies every current member of that category into `key`. */
+export interface ParamChange {
+  key: UnitCategory
+  value: UnitBaseType | UnitCategory
 }
 
-type ParamChangeKey = Exclude<
-  keyof SettingsParams,
-  'subtypes' | `validTargets${string}`
->
-
-export type ParamChange = {
-  [K in ParamChangeKey]: {
-    key: K
-    value: SettingsParams[K] extends (infer E)[] ? E : SettingsParams[K]
-  }
-}[ParamChangeKey]
+export type UnitCategoryOptions = Record<UnitCategory, UnitBaseType[]>
 
 // Sided context (external API - attacker/defender perspective)
 export interface SidedContext<T> {
@@ -172,13 +152,9 @@ declare global {
     COMMIT_UNITS: void
   }
 
-  /** Per-ability params registry. Each ability file augments this with its
-   *  own `Params` type so `getAbilityConfig(key)` returns the correct shape.
-   *  The returned value is also intersected with `AbilityBaseParams`
-   *  (`isEnabled`, `uses`) by the API signature. */
-  interface AbilityConfigMap {
-    SETTINGS: SettingsParams
-  }
+  /** Per-ability params registry. Ability files augment this interface. */
+  // oxlint-disable-next-line typescript/no-empty-object-type
+  interface AbilityConfigMap {}
 }
 
 export type AbilityTiming = keyof TimingContextMap
@@ -562,13 +538,11 @@ export interface Ability<Params extends Record<string, unknown> = any> {
     value: unknown,
     ctx: AbilityLookupContext,
   ) => (AbilityBaseParams & Params) | void
-  /** Declare param changes (subtypes, group additions) based on ability params.
-   *  `settings` contains the current SETTINGS values (ships, groundForces, etc.) during reconciliation.
+  /** Declare setup-only category additions based on ability params.
    *  `ctx` is a lookup context (`ctx.this` is this ability; `ctx.abilities` the
-   *  registered abilities per side). */
+   *  registered abilities per side). Native categories come from unit stats. */
   declareParamChange?: (
     params: AbilityBaseParams & Params,
-    settings: SettingsParams,
     ctx: AbilityLookupContext,
   ) => ParamChange[]
   /** Declare subtype variants this ability registers. Called during reconcile.

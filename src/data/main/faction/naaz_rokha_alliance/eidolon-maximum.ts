@@ -10,7 +10,7 @@ export const eidolonMaximum: Ability = {
     uses: Infinity,
   },
   headerUI: 'isEnabled',
-  declareParamChange: () => [{ key: 'ships', value: 'MECH' }],
+  declareParamChange: () => [{ key: 'SHIPS', value: 'MECH' }],
   invoke: [
     {
       timing: 'PREPARE',

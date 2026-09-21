@@ -23,7 +23,7 @@ export const fleetPool: Ability<Params> = {
     fleetPool: 8,
     shipPriority: declareParam<UnitList>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
       side: 'own',
       sort: 'worth-desc',
       filter: {

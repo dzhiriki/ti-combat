@@ -29,7 +29,7 @@ export const alarum: Ability<Params> = {
     availableUnits: declareParam<UnitList<number>>({
       default: [] as UnitList<number>,
       defaultItemValue: 0,
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       sort: 'worth-desc',
       filter: {
         combatMode: 'GROUND',

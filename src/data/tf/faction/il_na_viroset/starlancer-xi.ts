@@ -28,8 +28,6 @@ export const starlancerXI: Ability<Params> = {
   },
   readOnly: true,
   headerUI: 'isEnabled',
-  // Native stats provide membership; this declaration exposes setup options.
-  declareParamChange: () => [{ key: 'ships', value: 'MECH' }],
   uiConfig: [
     {
       key: 'anomalies',

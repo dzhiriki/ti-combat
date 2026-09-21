@@ -17,6 +17,10 @@ import type {
   AbilityPassFrame,
   AbilityTiming,
 } from '../abilities-engine'
+import type {
+  DeclaredSubtype,
+  UnitCategoryOptions,
+} from '../abilities-engine/types'
 import type { HitsDist } from '../dice-math/reroll-strategy'
 import type { ModifierDecl } from '../dice-math/types'
 // `PhaseStep` references `CombatState` in its method `fn` signature; the
@@ -151,7 +155,7 @@ export interface ResolvedAbilityRestriction {
 }
 
 /** Resolved form of `UnitAbilityRestrictions`, derived from the raw entries,
- *  current unit composition, and live SETTINGS. */
+ *  current unit composition and category membership. */
 export type ResolvedRestrictionsLayer = Map<
   UnitAbility,
   ResolvedAbilityRestriction
@@ -198,6 +202,9 @@ export interface SideStateData {
   unitCombat?: Record<string, UnitCombatOverrides>
   /** Variant key → shared stats template (may be a factory for subtypes) */
   unitStats: Record<UnitType, UnitStatsEntry>
+  /** Setup option metadata derived from native stats and ability declarations. */
+  unitCategoryOptions?: UnitCategoryOptions
+  declaredSubtypes?: readonly DeclaredSubtype[]
   /** The side's pending hit pool, or undefined when no hits are queued.
    *  At most one pool is alive at a time; abilities that produce
    *  type-restricted hits via `addHits(n, types)` must do so when the
@@ -245,7 +252,7 @@ export interface SideStateData {
   /** Derived O(1) lookup cache for `unitAbilityRestrictions`, rebuilt
    *  lazily on first read after any mutation that could affect
    *  restriction outcomes (entries added/removed, unit composition
-   *  change, SETTINGS live-param change, or cross-side restriction
+   *  change, live-param change, or cross-side restriction
    *  change that affects source-disable cascades). Not serialized;
    *  always derivable from the raw fields. */
   _resolvedRestrictions?: ResolvedRestrictions
@@ -307,9 +314,10 @@ export type PendingStep = PhaseStep | PhaseStepGroup
 
 /** Group context for a dice-roll group (combat or unit-ability).
  *  Seeded by the group builder with invariant params; `_collectDice`
- *  populates `diceCollection` / `unitIndex` / `validTargets`; BEFORE
- *  timing abilities read/mutate the collection via the SideApi (no direct
- *  pool access); `_rollDice` hands the collection to the math kernel. */
+ *  populates `diceCollection`; BEFORE timing abilities read/mutate the
+ *  collection via the SideApi (no direct pool access); `_rollDice` resolves
+ *  each firing side's unit-ability priority and hands both to the math
+ *  kernel. */
 export interface DiceRollContext {
   hitSource: HitSource
   firing: CombatSide[]
@@ -332,7 +340,10 @@ export interface DiceRollContext {
     attacker: import('../dice-math/types').SideDiceCollection
     defender: import('../dice-math/types').SideDiceCollection
   }
-  validTargets?: { attacker: UnitType[]; defender: UnitType[] }
+  /** Per-raw-landing-side priority for unit-ability hits. The list defines
+   *  both eligibility and assignment order. For self-targeted rolls the
+   *  raw pool is later swapped, carrying this priority to the firing side. */
+  unitAbilityPriority?: { attacker: UnitType[]; defender: UnitType[] }
   /** Per-landing-side marginal of main base hits, captured by
    *  `_branchesFromMathKernel` after the math kernel runs. Read at
    *  AFTER_DICE_ROLL_STEP by abilities that gate on the realized roll's

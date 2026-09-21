@@ -30,13 +30,13 @@ import type {
   CombatStateData,
   HitPool,
   HitSource,
-  MetaPhase,
   ResolvedRestrictions,
   ResolvedRestrictionsLayer,
   ResolvedRestrictionScope,
   RestrictionEntry,
   SideAbilitiesConfig,
   SideStateData,
+  UnitAbilityMeta,
   UnitAbilityRestrictions,
   UnitTargetFilter,
 } from '../combat-state/types'
@@ -59,7 +59,6 @@ import {
   matchesVariantSuperset,
   parseVariantId,
 } from '../utils/unit-variant'
-import { getSettingsValidTargets } from './get-settings-valid-targets'
 
 /** Shared empty destroyed record to avoid per-call {} allocation */
 const EMPTY_DESTROYED: Record<string, UnitId[]> = {}
@@ -1167,7 +1166,7 @@ export class CombatSideState {
   }
 
   // ==========================================================================
-  // LIVE PARAMS / SETTINGS
+  // LIVE PARAMS
   // ==========================================================================
 
   /** Merge base ability config with any live overlay for this side. */
@@ -1188,12 +1187,30 @@ export class CombatSideState {
     s: SideStateData,
     mode: CombatMode,
   ): UnitBaseType[] {
-    const settings = CombatSideState.getLiveParams(s, 'SETTINGS')
-    if (!settings)
-      return CombatSideState.getActiveBaseTypes(s, { participatingOnly: true })
-    return mode === 'GROUND'
-      ? ((settings.groundCombatParticipating as UnitBaseType[]) ?? [])
-      : ((settings.spaceCombatParticipating as UnitBaseType[]) ?? [])
+    return CombatSideState.getCategoryOptionTypes(
+      s,
+      mode === 'GROUND' ? 'GROUND_FORCES' : 'SHIPS',
+    )
+  }
+
+  static getCategoryOptionTypes(
+    s: SideStateData,
+    source: UnitCategory | readonly UnitCategory[],
+  ): UnitBaseType[] {
+    const categories: readonly UnitCategory[] = Array.isArray(source)
+      ? source
+      : [source]
+    const result: UnitBaseType[] = []
+    for (const category of categories) {
+      const configured = s.unitCategoryOptions?.[category]
+      const types =
+        configured ??
+        UNIT_TYPES.filter(type => isNativeCategory(s, type, category))
+      for (const type of types) {
+        if (!result.includes(type)) result.push(type)
+      }
+    }
+    return result
   }
 
   /** Get all unit types (participating + structures) */
@@ -1225,18 +1242,41 @@ export class CombatSideState {
     return parsePriorityList(unitPriority[key])
   }
 
-  /** Get valid targets from SETTINGS for the given meta. Throws when
-   *  SETTINGS is absent. */
-  static getValidTargetsForPhase(
-    s: SideStateData,
-    meta: MetaPhase,
-  ): UnitBaseType[] {
-    if (meta !== 'AFB') {
-      return CombatSideState.getActiveBaseTypes(s, { participatingOnly: true })
+  /** Resolve one firing side's unit-ability priority. A custom priority on
+   *  the producing ability wins; otherwise the final target side's normal
+   *  UNIT_PRIORITY is inherited. The returned list defines both eligibility
+   *  and assignment order. */
+  static getUnitAbilityPriority(
+    firing: SideStateData,
+    target: SideStateData,
+    meta: UnitAbilityMeta,
+    abilitiesOverride?: Readonly<AbilitiesOverride>,
+  ): UnitType[] {
+    const abilityKey: keyof AbilityConfigMap =
+      meta === 'AFB'
+        ? 'ANTI_FIGHTER_BARRAGE'
+        : meta === 'BOMBARDMENT'
+          ? 'BOMBARDMENT'
+          : meta === 'SPACE_CANNON_OFFENSE'
+            ? 'SPACE_CANNON_OFFENSE'
+            : 'SPACE_CANNON_DEFENSE'
+    const base = CombatSideState.getLiveParams(firing, abilityKey) ?? {}
+    const scoped = abilitiesOverride?.[abilityKey]
+    const params =
+      scoped !== undefined && typeof scoped !== 'boolean'
+        ? { ...base, ...scoped }
+        : base
+
+    if (params.customPriority === true) {
+      return parsePriorityList(params.unitPriority) ?? []
     }
-    const settings = CombatSideState.getLiveParams(s, 'SETTINGS')
-    if (!settings) throw new Error('No SETTINGS in getValidTargetsForPhase')
-    return getSettingsValidTargets(settings, meta)
+
+    const mode: CombatMode =
+      meta === 'AFB' || meta === 'SPACE_CANNON_OFFENSE' ? 'SPACE' : 'GROUND'
+    return (
+      CombatSideState.getPhasePriorityList(target, mode, abilitiesOverride) ??
+      []
+    )
   }
 
   // ==========================================================================
@@ -1259,8 +1299,7 @@ export class CombatSideState {
       const allowed = new Set<string>(sourceBaseTypes)
       baseTypes = baseTypes.filter(b => allowed.has(b))
     }
-    const settings = CombatSideState.getLiveParams(s, 'SETTINGS')
-    const allDeclaredSubtypes = (settings?.subtypes ?? []) as DeclaredSubtype[]
+    const allDeclaredSubtypes = s.declaredSubtypes ?? []
     let declaredSubtypes = filterDeclaredSubtypes(allDeclaredSubtypes, filter)
 
     const baseSet = new Set<string>(baseTypes)

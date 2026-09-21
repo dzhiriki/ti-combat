@@ -340,7 +340,7 @@ describe('ability selections are snapshots of units', () => {
           key: 'TEST_PARTICIPATION',
           name: 'Selection',
           params: { isEnabled: true, uses: 1 },
-          declareParamChange: () => [{ key: 'ships', value: 'MECH' }],
+          declareParamChange: () => [{ key: 'SHIPS', value: 'MECH' }],
           invoke: [
             {
               timing: 'START_OF_COMBAT',
