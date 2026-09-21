@@ -10,8 +10,6 @@ import {
   type WebData,
   WebDataSchema,
 } from '@/async-ti4/types'
-import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
-import { buildAbilityLookup } from '@/hooks/combat-setup/validation'
 
 function loadFixture(name: string) {
   return WebDataSchema.parse(
@@ -35,7 +33,6 @@ const tfData = loadFixture('twilights-fall-game.json')
 // the fight is.
 const activeData = loadFixture('active-combat.json')
 
-const abilityLookup = buildAbilityLookup(getAllAbilities())
 const locations = listBattleLocations(data)
 
 function locationAt(id: string): BattleLocation {
@@ -45,11 +42,11 @@ function locationAt(id: string): BattleLocation {
 }
 
 function importAt(id: string, attacker: string, defender: string) {
-  return buildImportConfig(
-    data,
-    { location: locationAt(id), attacker, defender },
-    abilityLookup,
-  )
+  return buildImportConfig(data, {
+    location: locationAt(id),
+    attacker,
+    defender,
+  })
 }
 
 describe('parseGameId', () => {
@@ -226,11 +223,11 @@ describe('a game paused mid-combat', () => {
 
   it('imports a side that is in the fight without holding the system', () => {
     const location = listBattleLocations(activeData)[0]
-    const { config } = buildImportConfig(
-      activeData,
-      { location, attacker: 'yellowtf', defender: 'redtf' },
-      abilityLookup,
-    )
+    const { config } = buildImportConfig(activeData, {
+      location,
+      attacker: 'yellowtf',
+      defender: 'redtf',
+    })
     // Yellow holds the space; Red's ships are gone and only its structures on
     // Phlegethon remain, firing space cannon into the battle.
     expect(config.au.CARRIER).toEqual([1, 0])
@@ -331,15 +328,11 @@ describe('buildImportConfig', () => {
   it('warns when AsyncTI4 bumps its data format', () => {
     const doctored = structuredClone(data)
     doctored.versionSchema = 99
-    const { notes } = buildImportConfig(
-      doctored,
-      {
-        location: locationAt('frac4'),
-        attacker: 'cabal',
-        defender: 'deepwrought',
-      },
-      abilityLookup,
-    )
+    const { notes } = buildImportConfig(doctored, {
+      location: locationAt('frac4'),
+      attacker: 'cabal',
+      defender: 'deepwrought',
+    })
     expect(notes.join(' ')).toContain('v99')
     expect(notes.join(' ')).toContain('may be out of date')
   })
@@ -364,15 +357,11 @@ describe('buildImportConfig', () => {
       .find(p => p.faction === 'cabal')!
       .techs!.push('x89_base')
 
-    const { notes } = buildImportConfig(
-      doctored,
-      {
-        location: locationAt('frac4'),
-        attacker: 'cabal',
-        defender: 'deepwrought',
-      },
-      abilityLookup,
-    )
+    const { notes } = buildImportConfig(doctored, {
+      location: locationAt('frac4'),
+      attacker: 'cabal',
+      defender: 'deepwrought',
+    })
     expect(notes).toHaveLength(2)
     expect(notes.join(' ')).toContain('monument')
     expect(notes.join(' ')).toContain(
@@ -390,11 +379,11 @@ describe('commanders', () => {
   ) {
     const doctored = structuredClone(data)
     edit(doctored)
-    return buildImportConfig(
-      doctored,
-      { location: locationAt('104'), attacker, defender },
-      abilityLookup,
-    ).config
+    return buildImportConfig(doctored, {
+      location: locationAt('104'),
+      attacker,
+      defender,
+    }).config
   }
 
   function commanderOf(game: WebData, faction: string) {
@@ -485,11 +474,7 @@ describe('Twilight\u2019s Fall games', () => {
   function tfImport(id: string, attacker: string, defender: string) {
     const location = listBattleLocations(tfData).find(l => l.id === id)
     if (!location) throw new Error(`No location "${id}" in TF fixture`)
-    return buildImportConfig(
-      tfData,
-      { location, attacker, defender },
-      abilityLookup,
-    )
+    return buildImportConfig(tfData, { location, attacker, defender })
   }
 
   it('maps the colour ids upstream uses to the TF faction sheets', () => {

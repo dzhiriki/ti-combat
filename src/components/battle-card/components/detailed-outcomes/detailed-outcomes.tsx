@@ -6,8 +6,9 @@ import { ToggleGroup } from '@/components/ui/toggle-group'
 import { UNIT_SHORT_NAMES } from '@/constants/units'
 import type { UnitBaseType } from '@/types'
 
-import styles from './detailed-outcomes.module.css'
 import { sortSurvivors } from './sort-survivors'
+
+import styles from './detailed-outcomes.module.css'
 
 interface UnitPriority {
   attacker: string[]

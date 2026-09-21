@@ -11,6 +11,7 @@ describe('TF_UPGRADE_STRIKE_WING_ALPHA', () => {
     //   2: 3·0.04·0.8 = 0.096 → 1 remains
     //   3: 0.2^3 = 0.008 → 0 remain
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

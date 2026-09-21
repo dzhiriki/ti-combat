@@ -17,6 +17,7 @@ dist
 .worktrees
 docs/plans
 docs/superpowers
+.superpowers
 .wrangler
 
 # Game ids for `npm run check:asyncti4`. Local because they point at other

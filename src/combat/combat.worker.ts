@@ -1,7 +1,7 @@
 import { prepareSimulationConfig } from '@/hooks/combat-setup'
 import type { SimulationInput } from '@/hooks/combat-setup/types'
 import type {
-  FactionKey,
+  GameSystem,
   UnitBaseType,
   UnitIdList,
   UnitSelection,
@@ -22,7 +22,8 @@ import type {
 import { makeVariantId } from './utils/unit-variant'
 
 function buildSideState(
-  faction: FactionKey,
+  system: GameSystem,
+  faction: string,
   selections: Record<UnitBaseType, UnitSelection>,
   abilities: SideAbilitiesConfig,
   gen: { _nextCode?: number },
@@ -32,13 +33,14 @@ function buildSideState(
     if (v.upgraded) upgradedSet.add(k as UnitBaseType)
   }
   const { units, unitType, unitState, unitStats } = getSimulationUnits(
+    system,
     faction,
     selections,
     gen,
   )
 
   const baseUnitStats: Record<string, UnitStatsEntry> = {
-    ...buildUnitStatsMap(faction, upgradedSet),
+    ...buildUnitStatsMap(system, faction, upgradedSet),
     ...unitStats,
   }
 
@@ -72,6 +74,7 @@ function buildSideState(
 
 self.onmessage = (e: MessageEvent<SimulationInput>) => {
   const {
+    system,
     attackerFaction,
     defenderFaction,
     attackerSelections,
@@ -85,6 +88,7 @@ self.onmessage = (e: MessageEvent<SimulationInput>) => {
     precision?.kind === 'limited' ? 10 ** -precision.digits : undefined
 
   const sideAbilities = prepareSimulationConfig(
+    system,
     abilities,
     attackerFaction,
     defenderFaction,
@@ -93,12 +97,14 @@ self.onmessage = (e: MessageEvent<SimulationInput>) => {
   const gen: { _nextCode?: number } = {}
   const combatState = CombatState.forSimulation(
     buildSideState(
+      system,
       attackerFaction,
       attackerSelections,
       abilities.attacker,
       gen,
     ),
     buildSideState(
+      system,
       defenderFaction,
       defenderSelections,
       abilities.defender,

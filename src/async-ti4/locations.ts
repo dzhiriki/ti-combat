@@ -1,6 +1,6 @@
 import { UNIT_SHORT_NAMES, UNIT_TYPES } from '@/constants/units'
-import factions from '@/data/faction'
 import type { UnitBaseType } from '@/types'
+import { findFaction } from '@/utils/find-faction'
 
 import {
   ENVIRONMENT_BY_TILE,
@@ -84,7 +84,7 @@ function occupants(groups: EntityGroups, owner?: string | null): Occupancy {
 
 export function factionLabel(asyncFactionId: string): string {
   const key = FACTION_BY_ASYNC_ID[asyncFactionId]
-  return key ? factions[key].name : asyncFactionId
+  return (key ? findFaction(key)?.name : undefined) ?? asyncFactionId
 }
 
 /** A planet's printed name. AsyncTI4 keys planets by a squashed identifier,

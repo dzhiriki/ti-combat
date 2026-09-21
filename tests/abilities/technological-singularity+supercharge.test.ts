@@ -12,7 +12,7 @@ describe('TECHNOLOGICAL_SINGULARITY + SUPERCHARGE', () => {
         abilities: {
           TECHNOLOGICAL_SINGULARITY: {
             isEnabled: true,
-            enableAbilityKey: 'SUPERCHARGE',
+            enableAbilityKey: 'NEKRO_SUPERCHARGE',
           },
         },
       },

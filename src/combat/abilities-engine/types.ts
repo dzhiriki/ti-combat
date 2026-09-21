@@ -16,11 +16,8 @@ import type {
   UnitAbilityMeta,
 } from '../combat-state/types'
 import type { Logger } from '../logger'
-import type { AbilitySlot } from './ability-slot'
 import type { SideApi } from './api/ability-api'
 import type { ParamLimit } from './param-limit'
-
-export type { AbilitySlot }
 
 export type SyncSortSpec =
   | 'worth-asc'
@@ -186,14 +183,21 @@ export type AbilityTiming = keyof TimingContextMap
 // ============================================================================
 
 export interface RuntimeAbilityList {
-  /** Flat list of all abilities for this side. */
-  readonly all: readonly Ability[]
-  /** Faction agent abilities (slot === 'AGENT'). */
-  readonly agents: readonly Ability[]
-  /** Faction commander abilities (slot === 'COMMANDER'). */
-  readonly commanders: readonly Ability[]
-  /** Faction promissory abilities (slot === 'PROMISSORY'). */
-  readonly promissories: readonly Ability[]
+  /** Every ability registered for this side, once each. */
+  readonly all: readonly RegisteredAbility[]
+  /** Abilities registered on this side under `slot`, in registration
+   *  order. Cached per slot. */
+  get(slot: string): readonly RegisteredAbility[]
+}
+
+/** What a declare hook or invoke factory may look at: the abilities
+ *  registered on each side and the ability being evaluated.
+ *  `AbilityReadContext` carries both members, so the engine and the UI pass
+ *  their full context; reconcile builds a bare one from the registered
+ *  lists (`createLookups`). */
+export interface AbilityLookupContext {
+  readonly abilities: OwnOpponentContext<RuntimeAbilityList>
+  readonly this: Ability
 }
 
 /** Read-only context for isCallable (no Immer, no mutations) */
@@ -512,7 +516,7 @@ export type AbilitiesOverride = {
     | Partial<AbilityBaseParams & AbilityConfigMap[K]>
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line typescript/no-explicit-any
 export interface Ability<Params extends Record<string, unknown> = any> {
   key: string
   name: string // Display name for UI
@@ -521,7 +525,7 @@ export interface Ability<Params extends Record<string, unknown> = any> {
   icon?: string // Raw SVG string for display next to name
   params: AbilityBaseParams & Params
   paramsSchema?: {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // oxlint-disable-next-line typescript/no-explicit-any
     safeParse: (data: unknown) => { success: boolean; data?: any }
   }
   headerUI?: 'isEnabled' | 'uses' | (string & keyof Params) // Param key to render in header (checkbox for boolean, number input for number)
@@ -536,26 +540,36 @@ export interface Ability<Params extends Record<string, unknown> = any> {
   /** Abilities sharing the same exclusiveGroup are mutually exclusive — enabling one disables others in the group. */
   exclusiveGroup?: string
   /** Called when a user changes a param. Can modify other params in response.
-   *  Receives the params with the new value already applied, the changed key, and value.
+   *  Receives the params with the new value already applied, the changed key,
+   *  the value, and a lookup context (`ctx.this` is this ability; `ctx.abilities`
+   *  the registered abilities per side).
    *  Return modified params or void to keep unchanged. */
   onParamSet?: (
     currentParams: AbilityBaseParams & Params,
     key: string,
     value: unknown,
+    ctx: AbilityLookupContext,
   ) => (AbilityBaseParams & Params) | void
   /** Declare param changes (subtypes, group additions) based on ability params.
-   *  `settings` contains the current SETTINGS values (ships, groundForces, etc.) during reconciliation. */
+   *  `settings` contains the current SETTINGS values (ships, groundForces, etc.) during reconciliation.
+   *  `ctx` is a lookup context (`ctx.this` is this ability; `ctx.abilities` the
+   *  registered abilities per side). */
   declareParamChange?: (
     params: AbilityBaseParams & Params,
     settings: SettingsParams,
+    ctx: AbilityLookupContext,
   ) => ParamChange[]
   /** Declare subtype variants this ability registers. Called during reconcile.
    *  Each entry's `statsFactory` is invoked once at config time to compute the
    *  variant's stats from its parent variant's stats. Subtypes are surfaced in
    *  `getUnitVariantsOptions` and pre-populated into `s.unitStats` at combat
    *  start, so runtime callers (`addSubtype`, `placeUnits` with variant keys)
-   *  don't need to supply factories. */
-  declareSubtype?: (params: AbilityBaseParams & Params) => DeclaredSubtype[]
+   *  don't need to supply factories. `ctx` is a lookup context (`ctx.this` is
+   *  this ability; `ctx.abilities` the registered abilities per side). */
+  declareSubtype?: (
+    params: AbilityBaseParams & Params,
+    ctx: AbilityLookupContext,
+  ) => DeclaredSubtype[]
   /** Pre-sort the unit-sourced invoke entries of this ability before the
    *  engine iterates them. Called with the ability's merged params, a
    *  read-only context, and the list of UnitIds that currently carry this
@@ -583,14 +597,20 @@ export interface Ability<Params extends Record<string, unknown> = any> {
     ids: UnitId[],
     api: SideApi,
   ) => UnitId[]
-  invoke: AbilityInvoke<AbilityBaseParams & Params>[]
+  /** Static list, or a factory of the list given the ability's merged params
+   *  and a lookup context. The engine resolves the factory when it builds a
+   *  side's invoke index and again whenever any param of this ability
+   *  changes (`updateAbilityConfig`). Factories must be cheap and pure.
+   *  Only config abilities may use the factory form — see engine-gotchas. */
+  invoke:
+    | AbilityInvoke<AbilityBaseParams & Params>[]
+    | ((
+        params: AbilityBaseParams & Params,
+        ctx: AbilityLookupContext,
+      ) => AbilityInvoke<AbilityBaseParams & Params>[])
 }
 
-export interface RegisteredAbility {
-  readonly ability: Ability
-  readonly slot: AbilitySlot
-  /** Per-entry sub-header for slots whose cards split into groups the slot
-   *  itself can't express (TF unit upgrades group by unit type). Overrides
-   *  `SLOT_DISPLAY[slot].subcategory`. */
-  readonly subcategory?: string
-}
+/** An ability as the engine sees it: the definition plus the slot the game
+ *  system registered it under. `Ability` alone is for definitions; every
+ *  list the engine, reconcile, or the setup store holds is one of these. */
+export type RegisteredAbility = Ability & { readonly slot: string }

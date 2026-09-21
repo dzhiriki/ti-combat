@@ -2,7 +2,7 @@
 
 ## Test Framework
 
-- **Vitest 4** with globals enabled (`describe`, `it`, `expect` auto-available)
+- **Vitest 5** with globals enabled (`describe`, `it`, `expect` auto-available)
 - Custom matchers and `forEachSide` helpers loaded automatically via setup files
 - Run tests: `npm run test:run` (single run) or `npm run test` (watch mode)
 
@@ -32,9 +32,10 @@ Creates a `CombatTest` instance from a config object. The constructor automatica
 
 ```typescript
 const t = combatTest({
+  system?: 'TI4' | 'TF', // defaults from first non-neutral faction
   mode: 'SPACE' | 'GROUND',
   attacker: {
-    faction: FactionKey,          // e.g. 'ARBOREC', 'SARDAKK_NORR'
+    faction: string,              // e.g. 'ARBOREC', 'SARDAKK_NORR'
     units: { CRUISER: 2 },        // unit type -> count
     upgrades?: ['CRUISER'],       // unit types to use UPGRADED stats
     abilities?: {                 // ability configs
@@ -45,6 +46,11 @@ const t = combatTest({
   defender: { /* same structure */ },
 })
 ```
+
+`combatTest` infers the system only as a test-authoring convenience (all-neutral
+setups default to TI4). For Neutral vs Neutral in Twilight's Fall, pass
+`system: 'TF'`. Direct `buildCombatState` callers must always pass
+`system`; both factions must belong to that system.
 
 ### Ability params shorthand
 

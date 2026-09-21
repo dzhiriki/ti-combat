@@ -17,11 +17,14 @@ import {
   cloneTracker,
   type DicePool,
   type InvokeCollections,
-  type RegisteredAbility,
 } from '../abilities-engine'
 import { AbilityContext } from '../abilities-engine/api/ability-api'
 import { extractDefaults } from '../abilities-engine/declare-param'
-import type { AbilitiesOverride, Ability } from '../abilities-engine/types'
+import type {
+  AbilitiesOverride,
+  Ability,
+  RegisteredAbility,
+} from '../abilities-engine/types'
 import { CombatSideState } from '../combat-side-state/combat-side-state'
 import type {
   DiceMathBranch,
@@ -352,7 +355,7 @@ export class CombatState {
           cfg[ability.key] = { ...extractDefaults(ability) }
         }
       }
-      for (const { ability } of abilities[side]) fill(ability)
+      for (const ability of abilities[side]) fill(ability)
       for (const { ability } of AbilitiesEngine.collectUnitAbilities(
         data,
         side,

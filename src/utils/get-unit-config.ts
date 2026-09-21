@@ -3,7 +3,7 @@ import {
   UNIT_SHORT_NAMES,
   UNIT_TYPES,
 } from '@/constants/units'
-import { type FactionKey, type UnitBaseType } from '@/types'
+import type { GameSystem, UnitBaseType } from '@/types'
 
 import { getFactionUnitConfig } from './get-faction-unit-config'
 
@@ -14,9 +14,10 @@ export interface UnitConfig {
 }
 
 export function getUnitConfig(
-  factionKey: FactionKey,
+  system: GameSystem,
+  factionKey: string,
 ): Record<UnitBaseType, UnitConfig> {
-  const factionUnitConfig = getFactionUnitConfig(factionKey)
+  const factionUnitConfig = getFactionUnitConfig(system, factionKey)
   const result = {} as Record<UnitBaseType, UnitConfig>
 
   for (const unitType of UNIT_TYPES) {

@@ -2,10 +2,10 @@
 
 ## File Structure
 
-Abilities are organized in `src/data/abilities/` by category:
+Data is split by game system: `src/data/main/` (Twilight Imperium 4) and `src/data/tf/` (Twilight's Fall). Each `index.ts` default-exports a complete `GameData` entry point: system metadata, factions, base units, registered and lookup ability pools, slot presentation, and faction/ability lookup methods. Code outside `src/data` reads it through `getGameData(system)` (`src/utils/get-game-data.ts`) and never imports system data files directly. System-specific availability policy is declared when the entry calls `createGameData`. Shared TI4 abilities are organized in `src/data/main/abilities/` by category:
 
 ```
-src/data/abilities/
+src/data/main/abilities/
   general/          — core/unit abilities (SETTINGS, UNIT_PRIORITY, PRE_DAMAGED, PRE_GALVANIZED, SUSTAIN_DAMAGE, PLANETARY_SHIELD, DISABLE_PLANETARY_SHIELD)
   advanced/         — phase/system abilities (ANTI_FIGHTER_BARRAGE, BOMBARDMENT, SPACE_CANNON_OFFENSE/DEFENSE, RETREAT, ABILITY_ORDER, CAPACITY, FLEET_POOL)
   technology/       — tech cards (ASSAULT_CANNON, PLASMA_SCORING, ...)
@@ -15,7 +15,7 @@ src/data/abilities/
   relic/            — relics (LIGHTRAIL_ORDNANCE, METALI_VOID_ARMAMENTS, ...)
 ```
 
-Faction abilities live in `src/data/faction/[faction_name]/` alongside the faction definition.
+Faction abilities live in `src/data/main/faction/[faction_name]/` (TI4) or `src/data/tf/faction/[faction_name]/` (Twilight's Fall) alongside the faction definition. Twilight's Fall shared decks live in `src/data/tf/abilities/` (`ability/`, `genome/`, `paradigm/`, `action-card/`, `unit-upgrade/`); each deck folder has an `index.ts` listing its cards in display order, and `src/data/tf/index.ts` tags each deck with its slot. The generic `cloneAbility(ability, overrides)` exported by `@/combat` copies an ability and gives static invoke entries fresh identities without changing any policy. A TF card that reuses a TI4 implementation is still its own file and uses the wrapper in `src/data/tf/clone-ability.ts`; that wrapper adds TF-specific subtype rekeying and opt-in defaults. Always pass a `TF_`-prefixed `key` of the card's own (`TF_ALTRUISTIC_GENOME`), plus only the fields that differ from the source (TF name, description, or the originating faction icon when the source has none).
 
 Each ability is one file (kebab-case matching the key). File exports a single `Ability` object.
 
@@ -48,7 +48,70 @@ interface Ability<Params extends Record<string, unknown>> {
 }
 ```
 
-There is **no `category`/`subcategory` field**. An ability's category is derived from the registration slot it occupies (which `index.ts` array or faction slot it is added to), surfaced via `SLOT_DISPLAY` — abilities never declare it.
+There is **no `category`/`subcategory` field**. An ability's category is derived from the registration slot it occupies (which `index.ts` array or faction ability group it is added to) — abilities never declare it. Each system owns its `SLOTS` config in `src/data/<system>/ability-slots.ts`; the engine treats faction and slot names as opaque strings. See [Slot config](#slot-config) below.
+
+Everything a faction owns maps onto `FACTION_<NAME>`: an ability group key (the shared `FactionAbilities` runtime shape is `Record<string, Ability[]>`, so `ability` → `FACTION_ABILITY`) and a unit type alike (a dreadnought's `ABILITIES` → `FACTION_DREADNOUGHT`). The system must declare a slot of that name or data resolution throws (for example, Twilight's Fall has no `FACTION_BREAKTHROUGH` slot). Because the two share one namespace, a group named after a unit type renders in that unit's slot; Nekro Virus uses this to file its copied unit abilities next to its own units.
+
+### Slot config
+
+`SLOTS` is a single ordered list that fixes render order, titles, category grouping, and how each slot is filled. `AbilitySlot` is derived from it, so a slot can't be registered against unless it is declared:
+
+```typescript
+export const SLOTS = [
+  { title: 'GENERAL', slot: 'GENERAL' }, // shared deck from index.ts
+  {
+    title: 'FACTION', // category header, items render as sub-headers
+    items: [
+      { title: 'HERO', slot: 'FACTION_HERO', strategy: 'OWN' },
+      { title: 'AGENT', slot: 'FACTION_AGENT', strategy: 'OWN' },
+      // Several slots under one sub-header, sharing its title and order
+      {
+        title: 'UNIT',
+        slot: ['FACTION_CRUISER', 'FACTION_PDS'],
+        strategy: 'OWN',
+      },
+    ],
+  },
+  // The same slot again, from the other side of the table
+  { title: 'AGENT', slot: 'FACTION_AGENT', strategy: 'OTHER' },
+  // Hidden from the NEUTRAL faction
+  {
+    title: 'PROMISSORY',
+    slot: 'FACTION_PROMISSORY',
+    strategy: 'ALL',
+    neutral: false,
+  },
+  { title: 'OTHER', slot: 'OTHER' },
+] as const satisfies readonly SlotEntry[]
+```
+
+Every entry, and every category (whose flags its items inherit), also takes:
+
+| flag      | Default | Meaning                                                                                                           |
+| --------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
+| `neutral` | `true`  | Whether NEUTRAL sees the slot. Neutral is a generic opponent: no research, hand, or notes, so TI4 turns those off |
+| `icon`    | `true`  | Whether cards show their faction icon. Off where the header already names the faction (own agents under FACTION)  |
+
+Neutral eligibility is defined only in the slot config. Fleet Pool is available to Neutral through ADVANCED and defaults to disabled.
+
+| `strategy` | Which of the slot's abilities the selected faction sees                  |
+| ---------- | ------------------------------------------------------------------------ |
+| _none_     | A shared deck: whatever the system's `abilities` record registered there |
+| `OWN`      | The ones it owns                                                         |
+| `OTHER`    | The ones every **other** faction owns                                    |
+| `ALL`      | Every faction's, its own included                                        |
+
+There is one slot per kind of card — all agents are collected into `FACTION_AGENT` — and a slot may appear twice under different strategies. That is how an agent renders under FACTION for the faction holding it and in the shared AGENT list for everyone else, without being registered twice.
+
+### How a faction's abilities are collected
+
+`createGameData` collects each ability once per source into a `CollectedAbility`: the definition plus its registered `slot`, owning faction if any, and optional deployment metadata. `RegisteredAbility` is the definition plus `slot`, the shape used by engine lookups, reconcile, and the setup store. Presentation and eligibility remain in `GameData.slots`; collected abilities carry no `strategy`, `neutral`, or `display` fields.
+
+Shared decks register under slots with no strategy, faction-owned abilities under slots with a strategy; an ability no entry could ever show is a data error and throws. `getAvailableAbilities(side, faction)` walks the collected list in **registration order** and keeps abilities matching at least one slot entry's ownership and Neutral rules. The panel iterates `GameData.slots` in display order, matching available abilities by slot and owner. Category and subcategory titles, icon visibility, and title-based search all come directly from that config.
+
+The one exception is the catch-all: an ability that no entry shows, but that another faction can reach across the table with (an `external` invoke), is appended to the `OTHER` slot with its owner's icon. Systems opt out by not declaring `OTHER` — Twilight's Fall has no such slot.
+
+A group with no `OWN` slot is only shown through its `ALL` pool — that is how a faction's own promissory notes stay out of its FACTION section.
 
 **`params`** — includes `AbilityBaseParams` (`isEnabled: boolean`, `uses: number`) merged with custom `Params`. Example: `params: { isEnabled: false, uses: Infinity, strategy: 'BEST' }`.
 
@@ -135,6 +198,21 @@ invoke: [
 context: 'AFB' // Only during AFB phase
 context: ['BOMBARDMENT', 'SPACE_CANNON_OFFENSE'] // During either phase
 ```
+
+### Factory form
+
+`invoke` may be a function of the ability's merged params and a lookup context. The engine calls it when it builds a side's invoke index and again after any param of the ability changes, so a selector ability registers only what it selected:
+
+```typescript
+invoke: (params, ctx) => {
+  const agent = ctx.abilities.own
+    .get('AGENT')
+    .find(a => a.key === params.agentKey)
+  return agent ? resolveInvokes(agent, params, ctx).map(wrap) : []
+}
+```
+
+Factories must be pure and cheap. Only config abilities may use this form; unit-attached abilities keep the array (see engine-gotchas). Use `resolveInvokes(ability, params, ctx)` from `@/combat` to read another ability's list, and `hasStaticInvokes(ability)` when you need the array itself.
 
 ## Timing System
 
@@ -245,6 +323,23 @@ interface AbilityCallContext {
 
 `own` / `opponent` are relative to the ability's side, not attacker/defender. The call context additionally exposes dice-roll declaration helpers (`declareReroll`, `declareHitPoolTransform`), `transitionTo`, `rollDice`, and `resolveStep`. Its `firing` override likewise accepts ability-relative `OWN` / `OPPONENT` values and maps them to combat sides internally — see `docs/dice-math.md` and the type definitions in `abilities-engine/types.ts`.
 
+### AbilityLookupContext (declare hooks, invoke factories)
+
+`onParamSet`, `declareParamChange`, `declareSubtype`, and factory `invoke` receive a trailing `ctx: AbilityLookupContext`:
+
+```typescript
+interface AbilityLookupContext {
+  readonly abilities: OwnOpponentContext<RuntimeAbilityList> // own / opponent
+  readonly this: Ability // the ability being evaluated
+}
+interface RuntimeAbilityList {
+  readonly all: readonly Ability[]
+  get(slot: string): readonly Ability[] // registration order, cached
+}
+```
+
+`AbilityReadContext` and `AbilityCallContext` carry the same members, so `uiConfig` and invokes use `ctx.abilities.own.get('AGENT')` directly (Ssruu, Nomad's Temporal Command Suite, TF Clever Genome).
+
 ### `getUnit()`
 
 Available on both `AbilityReadContext` and `AbilityCallContext`. Returns the `UnitId` this ability is attached to. Only valid for unit abilities (abilities defined in a unit's `ABILITIES` array). Throws an error if called from a config ability.
@@ -266,7 +361,7 @@ Used in both `isCallable` and `call` contexts. The same `SideApi` class is used 
 `GetUnitsOptions` is `{ includeVariants: boolean }` and is **required** wherever it appears.
 
 ```typescript
-getFaction(): FactionKey
+getFaction(): string
 getCombatMode(): CombatMode  // for hooks that receive only a SideApi (e.g. preventDestroy)
 getUnits(unitType: UnitType, options: GetUnitsOptions): UnitId[]
 hasUnit(unitId: UnitId): boolean
@@ -377,14 +472,14 @@ The call context also offers richer declarations for conditional/reroll/trigger 
 
 ### Category Abilities (technology, action-card, etc.)
 
-1. Create ability file in `src/data/abilities/[category]/`
+1. Create ability file in `src/data/main/abilities/[category]/`
 2. Export ability object
-3. Add import + array entry in `src/data/abilities/[category]/index.ts`
+3. Add import + array entry in `src/data/main/abilities/[category]/index.ts`
 
 Example — adding to technology:
 
 ```typescript
-// src/data/abilities/technology/my-tech.ts
+// src/data/main/abilities/technology/my-tech.ts
 import { type Ability } from '@/combat'
 
 type Params = { isEnabled: boolean }
@@ -394,14 +489,12 @@ export const myTech: Ability<Params> = {
   name: 'My Tech',
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
-  invoke: [
-    /* ... */
-  ],
+  invoke: [/* ... */],
 }
 ```
 
 ```typescript
-// src/data/abilities/technology/index.ts
+// src/data/main/abilities/technology/index.ts
 import { myTech } from './my-tech'
 export default [/* ...existing */ myTech]
 ```
@@ -411,14 +504,14 @@ export default [/* ...existing */ myTech]
 Faction abilities are registered in the faction's `index.ts`:
 
 ```typescript
-// src/data/faction/my_faction/index.ts
+// src/data/main/faction/my_faction/index.ts
 import type { Faction } from '@/types'
 import { myAbility } from './my-ability'
 
 export const my_faction: Faction = {
   name: 'My Faction',
   abilities: {
-    faction: [myAbility], // Only available to this faction
+    ability: [myAbility], // Only available to this faction
     technology: [factionTech], // Faction-specific technology
     unit: [unitAbility], // Unit-attached abilities
     promissory: [promNote], // Available to all factions
@@ -427,13 +520,89 @@ export const my_faction: Faction = {
     hero: [heroAbility], // Available to all factions
     breakthrough: [breakthrough], // Breakthrough abilities
   },
+  units: {/* ... */},
+}
+```
+
+Each group renders in the `FACTION_<KEY>` slot its system declares `OWN`. `promissory`, `agent`, and `commander` are additionally collected across all factions into the shared `ALL` pools available to everyone; `promissory` has no `OWN` slot, so it appears only in that shared pool, never under its owner.
+
+### Twilight's Fall unit upgrades
+
+Each card in `src/data/tf/abilities/unit-upgrade/` is a normal `Ability` object.
+Declare its params, UI, exclusive group, and special invokes directly. Non-mech
+cards use `exclusiveGroup: 'UNIT_UPGRADE_<UNIT_TYPE>'` (the same name as the slot each unit type's cards are registered under); mech cards omit it
+so they stack.
+
+For a fixed stat block, use `createStatsInvoke(unitType, stats)` from
+`@/utils/create-stats-invoke`. It accepts native `UnitStats` and returns only a
+`PREPARE` invoke with `system: true` (stat application never consumes active
+uses, and still runs at zero uses):
+
+```typescript
+invoke: [
+  createStatsInvoke('CARRIER', {
+    COMBAT: [9, 1],
+    CAPACITY: 8,
+    UNIT_ABILITIES: { SUSTAIN_DAMAGE: true },
+    ABILITIES: [sustainDamage],
+  }),
+]
+```
+
+The helper does not attach abilities implicitly: declare both the native unit
+ability flag and its handler when needed. Relative stat changes (Echo of
+Ascension, mech upgrades) use ordinary PREPARE handlers. If a card needs extra
+PREPARE work, call its stats invoke inside that same handler and retain
+`system: true`; do not add a second PREPARE (see Hel-Titan and the war suns).
+
+Stats invokes expose their `unitType` and `stats`, narrowed by `isStatsInvoke`
+from `@/utils/is-stats-invoke`. Janovet uses these to inherit printed upgrade
+abilities without depending on factory metadata or runtime unit modifications.
+
+### Lazy faction data
+
+A faction module exports a `FactionDefinition`. Its `abilities` and any unit base/upgraded `ABILITIES` may be a function of `LazyContext`, resolved once per field by `createGameData`:
+
+```typescript
+export const copyingFaction: FactionDefinition = {
+  name: 'Copying faction',
+  abilities: context => ({
+    technology: [...(context.getFaction('SOURCE').abilities?.technology ?? [])],
+  }),
   units: {
-    /* ... */
+    FLAGSHIP: {
+      BASE: {
+        ABILITIES: context => [...context.getAbilities('FACTION_AGENT')],
+      },
+    },
   },
 }
 ```
 
-`faction` abilities only appear for that faction. `promissory`, `agent`, `commander`, `hero`, and `breakthrough` are collected across all factions and available to everyone.
+The context contains only `getFactionKeys()`, `getFaction(key)`, and
+`getAbilities(slot)`. `resolveFactions` runs once while constructing the system
+and recursively initializes dependencies requested through those lookups,
+regardless of faction declaration order. A lazy faction ability map initializes
+together because its group names are unknown until it returns. Runtime
+`GameData.getFaction` reads the completed roster and `GameData.getAbilities`
+filters the completed catalog; neither performs reconciliation.
+
+Factories in one construction share a context object, separate from runtime
+`GameData`. A reentrant lookup skips the initializer already running and resolves
+the remaining fields, so a flagship can request its own faction's abilities.
+Dependencies must be acyclic; reading an unfinished initializer's own result is
+unsupported. All fields finish before the runtime roster and catalog are returned.
+
+Use the context lookups instead of importing other faction definitions. Nekro is
+a static faction definition; its lazy ability initializer creates fresh copies
+once per system construction. Technological Singularity is a static ability whose
+callbacks look up targets from the current side's runtime abilities and create
+generic unit upgrades when needed.
+
+Nekro's copied faction technologies and flagship abilities come from
+`FACTION_TECHNOLOGY` and `FACTION_FLAGSHIP` slot lookups. Faction-unit stat
+copies use `getFactionKeys()` and `getFaction(key)`: units such as Letani Warrior
+II have no standalone ability for a slot lookup to return.
 
 ### Unit Abilities
 
@@ -442,7 +611,7 @@ Abilities attached to specific units via `ABILITIES` array in unit stats. These 
 Use `ctx.this.key` for the restriction `reason` rather than hardcoding the ability key — it keeps the ability self-contained and rename-safe.
 
 ```typescript
-// src/data/faction/mentak_coalition/fourth-moon.ts
+// src/data/main/faction/mentak_coalition/fourth-moon.ts
 export const fourthMoon: Ability = {
   key: 'FOURTH_MOON',
   name: 'Fourth Moon',

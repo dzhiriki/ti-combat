@@ -1,7 +1,6 @@
 import type { UnitCategory } from '@/constants/units'
 import type {
   CombatSide,
-  FactionKey,
   UnitAbility,
   UnitBaseType,
   UnitIdList,
@@ -148,7 +147,7 @@ export type SideAbilitiesConfig = Record<string, Record<string, unknown>>
 
 /** State data for one side of combat */
 export interface SideStateData {
-  faction: FactionKey
+  faction: string
   /** Participating UnitIds packed into a `UnitIdList` (one UTF-16 char
    *  per UnitId), pre-sorted by combat-mode priority. Highest priority
    *  first, lowest last. `slice(0, -N)` keeps the N highest-priority

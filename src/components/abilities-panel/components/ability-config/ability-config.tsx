@@ -11,6 +11,7 @@ import {
   type AbilityReadContext,
   type CombatMode,
   extractDefaults,
+  withRunningAbility,
 } from '@/combat'
 import type { UIConfigItem } from '@/combat/abilities-engine/types'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -25,6 +26,7 @@ import {
   type OrderListValue,
 } from '../list'
 import { Select } from '../select'
+
 import styles from './ability-config.module.css'
 
 interface AbilityConfigProps {
@@ -64,16 +66,12 @@ export function AbilityConfig({
       const effectiveParams = { ...defaults, ...params }
       // Set the running ability on the shared context so `ctx.this` and any
       // SideApi lookups (e.g. `getUnitVariantsOptions(paramKey)`) resolve to
-      // this ability's spec. uiConfig is synchronous, so the surrounding
-      // try/finally restores the previous value before any other rendering.
-      const ctx = readContext as AbilityReadContext & { ability?: Ability }
-      const prev = ctx.ability
-      ctx.ability = ability
-      try {
-        items = ability.uiConfig(ctx, effectiveParams)
-      } finally {
-        ctx.ability = prev
-      }
+      // this ability's spec. uiConfig is synchronous, so `withRunningAbility`
+      // restores the previous value before any other rendering.
+      const uiConfig = ability.uiConfig
+      items = withRunningAbility(readContext, ability, () =>
+        uiConfig(readContext, effectiveParams),
+      )
     }
     return items?.filter(
       item =>

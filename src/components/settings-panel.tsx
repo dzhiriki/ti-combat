@@ -1,7 +1,10 @@
-import { GearIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons'
+import {
+  GearIcon,
+  QuestionMarkCircledIcon,
+  ReaderIcon,
+} from '@radix-ui/react-icons'
 import { useId } from 'react'
 
-import { AbilitiesDialog } from '@/components/abilities-dialog'
 import { ButtonIcon } from '@/components/ui/button-icon'
 import {
   Dialog,
@@ -13,9 +16,10 @@ import { Input } from '@/components/ui/input'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import type { Settings, Theme } from '@/hooks/use-settings'
 
-import styles from './settings-panel.module.css'
 import { Divider } from './ui/divider'
 import { Tooltip } from './ui/tooltip'
+
+import styles from './settings-panel.module.css'
 
 const themeOptions = [
   { value: 'system' as const, label: 'System' },
@@ -122,7 +126,15 @@ export function SettingsPanel({
           </p>
         </section>
         <div className={styles.section}>
-          <AbilitiesDialog />
+          <a
+            className={styles.abilitiesLink}
+            href="https://github.com/dzhiriki/ti-combat/blob/main/docs/abilities-list.md"
+            rel="noreferrer"
+            target="_blank"
+          >
+            <ReaderIcon className={styles.abilitiesLinkIcon} />
+            View Supported Abilities
+          </a>
         </div>
       </DialogContent>
     </Dialog>

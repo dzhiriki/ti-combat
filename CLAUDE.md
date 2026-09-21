@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Twilight Imperium battle simulator built with React, TypeScript, and Vite. The project uses modern React 19 with the React Compiler enabled for automatic optimization.
+This is a Twilight Imperium battle simulator built with React, TypeScript, and Vite.
 
 ## Development Commands
 
@@ -24,7 +24,7 @@ npm run lint:fix
 # Lint CSS files
 npm run lint:css
 
-# Format code with Prettier
+# Format code with Oxfmt
 npm run format
 
 # Check code formatting without modifying
@@ -42,37 +42,41 @@ npm run preview
 
 ## Tech Stack
 
-- **React 19.2**: Latest React with compiler optimization enabled
-- **TypeScript 5.9**: Strict mode enabled with comprehensive linting rules
-- **Vite 7**: Build tool with Fast Refresh via @vitejs/plugin-react
-- **ESLint 10**: Using flat config format with `defineConfig`/`globalIgnores` API
-- **Prettier 3**: Code formatting with single quotes, 80 char width, no semicolons
+- **React 19.2**: Latest React with Fast Refresh support
+- **TypeScript 7**: Native compiler with strict mode enabled
+- **Vite 8**: Build tool with Fast Refresh via @vitejs/plugin-react
+- **Lightning CSS**: Native CSS transformation and CSS Modules
+- **Oxlint**: Native JavaScript and TypeScript linting
+- **Oxfmt**: High-performance formatting and import sorting
 
 ## Build Configuration
 
 ### TypeScript
 
-- Project uses TypeScript project references (tsconfig.app.json, tsconfig.node.json, tsconfig.profile.json, tsconfig.snapshots.json)
+- Native TypeScript 7 is used directly for builds
 - Strict mode enabled with noUnusedLocals and noUnusedParameters
 - Bundler module resolution
-- Target: ES2024 (app), ES2023 (node)
+- Target: ES2024
 
 ### Vite
 
-- React plugin configured with babel-plugin-react-compiler
-- React Compiler is enabled globally (impacts dev/build performance but optimizes React rendering)
+- React plugin configured with @vitejs/plugin-react
+- Bundled dev mode is enabled for the app and disabled for Vitest
+- Lightning CSS handles CSS transformation and CSS Modules
+- React Compiler is not enabled
 
-### ESLint
+### Oxlint
 
-- Flat config format (eslint.config.js) using ESLint 10 `defineConfig` and `globalIgnores`
-- Extends @eslint/js recommended, typescript-eslint recommended, react-hooks flat recommended, react-refresh vite config
-- Plugins: simple-import-sort, check-file, react-refresh
-- Browser globals configured
+- Configuration is in `.oxlintrc.json`
+- Enforces the migrated ESLint core, TypeScript, and React Hooks rules
+- Browser globals are enabled outside `functions/`
+- Filename and folder conventions are checked by `scripts/check-file-names.mjs`
 - Ignores dist and .worktrees directories
-- Integrated with eslint-config-prettier to disable conflicting formatting rules
 
-### Prettier
+### Oxfmt
 
+- Configuration is in `.oxfmtrc.json`
+- Sorts imports and formats JavaScript, TypeScript, CSS, JSON, Markdown, and HTML
 - Single quotes, no semicolons
 - 80 character line width
 - 2 space indentation

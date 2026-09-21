@@ -23,10 +23,12 @@ import type { Precision } from '@/hooks/use-settings'
 import { useSimulation } from '@/hooks/use-simulation'
 import { useUrlSync } from '@/hooks/use-url-sync'
 import type { CombatSide, UnitBaseType } from '@/types'
+import { getGameData } from '@/utils/get-game-data'
 import { getUnitConfig } from '@/utils/get-unit-config'
 
 import { ButtonIconPlain } from '../ui/button-icon-plain'
 import { Divider } from '../ui/divider'
+
 import styles from './combat-simulator.module.css'
 
 const FILTER_MODE_VALUES: readonly AbilityFilterMode[] = [
@@ -81,7 +83,6 @@ export function CombatSimulator({
     simulationInput,
     serializedConfig,
     loadConfig,
-    allAbilities,
     setSystem,
     setFaction,
     setUnitCount,
@@ -94,7 +95,7 @@ export function CombatSimulator({
   } = useCombatSetup()
 
   const { toast } = useToast()
-  useUrlSync(serializedConfig, loadConfig, allAbilities, toast)
+  useUrlSync(serializedConfig, loadConfig, toast)
 
   const [attackerSheetOpen, setAttackerSheetOpen] = useState(false)
   const [defenderSheetOpen, setDefenderSheetOpen] = useState(false)
@@ -135,33 +136,33 @@ export function CombatSimulator({
     })
 
   const attackerConfig = useMemo(
-    () => getUnitConfig(attackerFaction),
-    [attackerFaction],
+    () => getUnitConfig(system, attackerFaction),
+    [system, attackerFaction],
   )
   const defenderConfig = useMemo(
-    () => getUnitConfig(defenderFaction),
-    [defenderFaction],
+    () => getUnitConfig(system, defenderFaction),
+    [system, defenderFaction],
   )
 
   const attackerAbilities = useMemo(
     () => getAvailableAbilities('attacker'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [attackerFaction],
+    // oxlint-disable-next-line react/exhaustive-deps
+    [system, attackerFaction],
   )
   const defenderAbilities = useMemo(
     () => getAvailableAbilities('defender'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [defenderFaction],
+    // oxlint-disable-next-line react/exhaustive-deps
+    [system, defenderFaction],
   )
 
   const attackerReadContext = useMemo(
     () => getReadContext('attacker'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
     [stateData],
   )
   const defenderReadContext = useMemo(
     () => getReadContext('defender'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
     [stateData],
   )
 
@@ -183,7 +184,7 @@ export function CombatSimulator({
       attacker: flatten(a?.[key]),
       defender: flatten(d?.[key]),
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [stateData])
 
   const participatingTypes = useMemo(() => {
@@ -196,7 +197,7 @@ export function CombatSimulator({
       return Array.isArray(list) ? (list as string[]) : []
     }
     return { attacker: read('attacker'), defender: read('defender') }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [stateData])
 
   const combatResult = useMemo(() => {
@@ -285,6 +286,8 @@ export function CombatSimulator({
         {renderAbilitiesHeader('attacker', 'Attacker Abilities')}
         <AbilitiesPanel
           abilities={attackerAbilities}
+          slots={getGameData(system).slots}
+          factionKey={attackerFaction}
           readContext={attackerReadContext}
           combatMode={combatMode}
           params={abilities.attacker}
@@ -310,6 +313,8 @@ export function CombatSimulator({
         {renderAbilitiesHeader('defender', 'Defender Abilities')}
         <AbilitiesPanel
           abilities={defenderAbilities}
+          slots={getGameData(system).slots}
+          factionKey={defenderFaction}
           readContext={defenderReadContext}
           combatMode={combatMode}
           params={abilities.defender}
@@ -359,9 +364,7 @@ export function CombatSimulator({
           onUnitCountChange={setUnitCount}
           onUpgradeToggle={handleUpgradeToggle}
           onResetUnits={resetUnits}
-          topActions={
-            <ImportDialog allAbilities={allAbilities} onImport={loadConfig} />
-          }
+          topActions={<ImportDialog onImport={loadConfig} />}
           attackerActions={
             <ButtonIcon
               className={clsx(styles.gearButton, 'theme-attacker')}

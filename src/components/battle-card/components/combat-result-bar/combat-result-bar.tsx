@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { CombatOutcome } from '@/combat'
 
 import { DetailedOutcomes } from '../detailed-outcomes'
+
 import styles from './combat-result-bar.module.css'
 
 export interface CombatResult {

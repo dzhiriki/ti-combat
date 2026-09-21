@@ -1,15 +1,18 @@
 import { z } from 'zod/mini'
 
-import { type Ability, extractDefaults } from '@/combat'
+import { extractDefaults, type RegisteredAbility } from '@/combat'
 import { UNIT_LIMITS, UNIT_TYPES } from '@/constants/units'
-import factions from '@/data/faction'
+import type { GameSystem } from '@/types'
+import { GAME_SYSTEMS } from '@/utils/get-game-data'
+import {
+  DEFAULT_GAME_SYSTEM,
+  getGameData,
+  isGameSystem,
+} from '@/utils/get-game-data'
 
 import type { SerializedConfig } from './serialization'
 
-const factionKeys = Object.keys(factions)
-const factionKeySet = new Set<string>(factionKeys)
 const unitTypeSet = new Set<string>(UNIT_TYPES)
-const defaultFaction = factionKeys[0]
 
 const baseAbilitySchema = z.object({
   isEnabled: z.optional(z.boolean()),
@@ -21,8 +24,10 @@ export interface ValidationResult {
   warnings: string[]
 }
 
-export function buildAbilityLookup(abilities: Ability[]): Map<string, Ability> {
-  const map = new Map<string, Ability>()
+export function buildAbilityLookup(
+  abilities: readonly RegisteredAbility[],
+): Map<string, RegisteredAbility> {
+  const map = new Map<string, RegisteredAbility>()
   for (const ability of abilities) {
     if (!map.has(ability.key)) {
       map.set(ability.key, ability)
@@ -31,26 +36,54 @@ export function buildAbilityLookup(abilities: Ability[]): Map<string, Ability> {
   return map
 }
 
+/** Resolve an explicit or legacy serialized system before ability decoding. */
+export function resolveSerializedGameSystem(raw: {
+  g?: unknown
+  af?: unknown
+  df?: unknown
+}): GameSystem {
+  if (isGameSystem(raw.g)) return raw.g
+  if (raw.g !== undefined) return DEFAULT_GAME_SYSTEM
+
+  for (const key of [raw.af, raw.df]) {
+    if (typeof key !== 'string' || key === 'NEUTRAL') continue
+    const inferred = GAME_SYSTEMS.find(system =>
+      Object.hasOwn(getGameData(system).factions, key),
+    )
+    if (inferred) return inferred
+  }
+  return DEFAULT_GAME_SYSTEM
+}
+
 export function validateSerializedConfig(
   raw: SerializedConfig | Record<string, unknown>,
-  abilityLookup: Map<string, Ability>,
 ): ValidationResult {
   const warnings: string[] = []
 
   // Version
   const v = 1 as const
 
-  // Factions
-  let af = String(raw.af ?? '')
-  if (!factionKeySet.has(af)) {
-    warnings.push(`Unknown faction "${af}" reset to default`)
-    af = defaultFaction
+  // Only legacy links (without a system) infer it from factions. An explicit
+  // system is authoritative, including when both sides are Neutral.
+  const system = resolveSerializedGameSystem(raw)
+  if (raw.g !== undefined && !isGameSystem(raw.g)) {
+    warnings.push(`Invalid game system reset to ${DEFAULT_GAME_SYSTEM}`)
   }
-  let df = String(raw.df ?? '')
-  if (!factionKeySet.has(df)) {
-    warnings.push(`Unknown faction "${df}" reset to default`)
-    df = defaultFaction
+  const abilityLookup = buildAbilityLookup(getGameData(system).allAbilities)
+
+  // Factions must belong to the selected system. Validate after inference so
+  // an unknown legacy attacker doesn't hide a valid TF defender.
+  const factions = getGameData(system).factions
+  const validateFaction = (rawKey: unknown): string => {
+    const key = String(rawKey ?? '')
+    if (Object.hasOwn(factions, key)) return key
+    warnings.push(
+      `Faction "${key}" is not available in ${system}, reset to default`,
+    )
+    return getGameData(system).defaultFaction
   }
+  const af = validateFaction(raw.af)
+  const df = validateFaction(raw.df)
 
   // Combat mode
   let m: 'S' | 'G' = 'S'
@@ -69,7 +102,7 @@ export function validateSerializedConfig(
   const da = validateAbilities(raw.da, abilityLookup, warnings)
 
   return {
-    config: { v, af, df, m, au, du, aa, da } as SerializedConfig,
+    config: { v, g: system, af, df, m, au, du, aa, da },
     warnings,
   }
 }
@@ -99,7 +132,7 @@ function validateUnits(
 
 function validateAbilities(
   raw: unknown,
-  abilityLookup: Map<string, Ability>,
+  abilityLookup: Map<string, RegisteredAbility>,
   warnings: string[],
 ): Record<string, Record<string, unknown>> {
   const result: Record<string, Record<string, unknown>> = {}
@@ -140,7 +173,7 @@ function validateAbilities(
 }
 
 function mergeWithDefaults(
-  ability: Ability,
+  ability: RegisteredAbility,
   params: Record<string, unknown>,
 ): Record<string, unknown> {
   const defaults = extractDefaults(ability)

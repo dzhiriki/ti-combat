@@ -134,6 +134,7 @@ describe('ctx.rollDice API', () => {
   it('single-die rollDice produces outcomes summing to probability 1', () => {
     // Attacker has 2 destroyers; defender has 2 destroyers + the ability.
     const combatState = buildCombatState({
+      system: 'TI4',
       mode: 'SPACE',
       attacker: { faction: 'ARBOREC', units: { DESTROYER: 2 } },
       defender: {
@@ -154,6 +155,7 @@ describe('ctx.rollDice API', () => {
 
   it('two-group rollDice produces correct Cartesian outcomes', () => {
     const combatState = buildCombatState({
+      system: 'TI4',
       mode: 'SPACE',
       attacker: { faction: 'ARBOREC', units: { DESTROYER: 2 } },
       defender: {
@@ -171,6 +173,7 @@ describe('ctx.rollDice API', () => {
 
   it('empty dice fast path runs callback once and does not branch', () => {
     const combatState = buildCombatState({
+      system: 'TI4',
       mode: 'SPACE',
       attacker: {
         faction: 'ARBOREC',
@@ -191,6 +194,7 @@ describe('ctx.rollDice API', () => {
 
   it('single-outcome (deterministic hit) fast path applies effect without branching', () => {
     const combatState = buildCombatState({
+      system: 'TI4',
       mode: 'SPACE',
       attacker: { faction: 'ARBOREC', units: { DESTROYER: 2 } },
       defender: {
@@ -219,6 +223,7 @@ describe('ctx.rollDice API', () => {
     // Defender has chain ability on AFTER_DESTROY which rolls another die.
     // On that second hit, an attacker cruiser is destroyed in retaliation.
     const combatState = buildCombatState({
+      system: 'TI4',
       mode: 'SPACE',
       attacker: {
         faction: 'ARBOREC',
@@ -240,6 +245,7 @@ describe('ctx.rollDice API', () => {
 
   it('branching abilities on both sides produces Cartesian outcomes', () => {
     const combatState = buildCombatState({
+      system: 'TI4',
       mode: 'SPACE',
       attacker: {
         faction: 'ARBOREC',

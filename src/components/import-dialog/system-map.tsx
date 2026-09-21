@@ -11,7 +11,7 @@ import {
   layoutPositions,
 } from '@/async-ti4/map-layout'
 import { FACTION_BY_ASYNC_ID } from '@/async-ti4/mappings'
-import factions from '@/data/faction'
+import { findFaction } from '@/utils/find-faction'
 import { namespaceSvgIds } from '@/utils/namespace-svg-ids'
 
 import styles from './system-map.module.css'
@@ -129,7 +129,7 @@ export function SystemMap({
           const summary = summaries.get(cell.position)
           const holder = summary?.space?.faction
           const factionKey = holder ? FACTION_BY_ASYNC_ID[holder] : undefined
-          const icon = factionKey ? factions[factionKey].icon : undefined
+          const icon = factionKey ? findFaction(factionKey)?.icon : undefined
           const selected = selectedTile === cell.position
           const style = {
             left: `${((cell.col - layout.minCol) * COL_PITCH * 100) / layout.width}%`,

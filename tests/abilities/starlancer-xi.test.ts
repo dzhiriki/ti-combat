@@ -9,6 +9,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_STARLANCER_XI', () => {
   it('mechs roll in space combat alongside ships', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',
@@ -27,6 +28,7 @@ describe('TF_STARLANCER_XI', () => {
 
   it('applies +1 per anomaly to the mech rolls only', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',
@@ -49,6 +51,7 @@ describe('TF_STARLANCER_XI', () => {
     // Sustain disabled so pure assignment order is observable: the fighter
     // (front of the worth-asc list) soaks before the mech.
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',
@@ -68,6 +71,7 @@ describe('TF_STARLANCER_XI', () => {
 
   it('dragging MECH to the front sacrifices mechs in space first', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',
@@ -93,6 +97,7 @@ describe('TF_STARLANCER_XI', () => {
 
   it('with no ships fielded, the mechs stay on the ground — no space combat', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: { faction: 'AVARICE_REX', units: { CRUISER: 1 } },
       defender: { faction: 'IL_NA_VIROSET', units: { MECH: 2 } },
@@ -108,6 +113,7 @@ describe('TF_STARLANCER_XI', () => {
 
   it('combat ends when the last ship dies — ground mechs do not hold the space area', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',
@@ -132,6 +138,7 @@ describe('TF_STARLANCER_XI', () => {
 
   it('space-area mechs keep the combat going after the last ship dies — and can win', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',
@@ -161,6 +168,7 @@ describe('TF_STARLANCER_XI', () => {
 
   it('preserve strategies give up the space mechs first — the ground pool survives', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',
@@ -190,6 +198,7 @@ describe('TF_STARLANCER_XI', () => {
 
   it('win-in-space gives up the ground mechs first — the fight goes on', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',
@@ -215,6 +224,7 @@ describe('TF_STARLANCER_XI', () => {
 
   it('the no-sustain strategy keeps mechs from spending their sustain in space', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',

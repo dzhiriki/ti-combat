@@ -2,16 +2,17 @@ import { describe, expect, it } from 'vitest'
 
 import { combatTest } from '../utils/combat-test'
 
-// Cloak reuses Solar Flare's implementation (key SOLAR_FLARE), so it blocks the
+// Cloak reuses Solar Flare's implementation under its own key, so it blocks the
 // opponent's Space Cannon Offense against your ships.
-describe('SOLAR_FLARE', () => {
+describe('TF_CLOAK', () => {
   it('Cloak blocks opponent Space Cannon Offense in Twilight’s Fall', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
         units: { CRUISER: 2 },
-        abilities: { SOLAR_FLARE: true },
+        abilities: { TF_CLOAK: true },
       },
       defender: { faction: 'AVARICE_REX', units: { PDS: 1, CRUISER: 1 } },
     })

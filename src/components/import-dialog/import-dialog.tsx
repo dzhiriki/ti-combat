@@ -14,7 +14,6 @@ import {
   parseGameId,
   type WebData,
 } from '@/async-ti4'
-import type { Ability } from '@/combat'
 import { useToast } from '@/components/toast'
 import { ButtonIcon } from '@/components/ui/button-icon'
 import {
@@ -31,25 +30,19 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
-import { buildAbilityLookup } from '@/hooks/combat-setup/validation'
 
-import styles from './import-dialog.module.css'
 import { SystemMap } from './system-map'
 
+import styles from './import-dialog.module.css'
+
 interface ImportDialogProps {
-  allAbilities: Ability[]
   onImport: (config: SerializedConfig) => void
 }
 
 /** Pull a battle straight out of a live AsyncTI4 game: the units standing in a
  *  chosen system or planet, plus each side's researched technologies. */
-export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
+export function ImportDialog({ onImport }: ImportDialogProps) {
   const { toast } = useToast()
-  const abilityLookup = useMemo(
-    () => buildAbilityLookup(allAbilities),
-    [allAbilities],
-  )
-
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -175,11 +168,11 @@ export function ImportDialog({ allAbilities, onImport }: ImportDialogProps) {
   function handleImport(): void {
     if (!game || !location) return
     try {
-      const { config, notes } = buildImportConfig(
-        game,
-        { location, attacker, defender },
-        abilityLookup,
-      )
+      const { config, notes } = buildImportConfig(game, {
+        location,
+        attacker,
+        defender,
+      })
       onImport(config)
       setOpen(false)
       if (notes.length > 0) toast(notes.join('; '))

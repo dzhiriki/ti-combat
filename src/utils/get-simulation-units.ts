@@ -1,7 +1,7 @@
 import { nextUnitIds } from '@/combat'
 import { UNIT_TYPES } from '@/constants/units'
 import type {
-  FactionKey,
+  GameSystem,
   UnitBaseType,
   UnitIdList,
   UnitSelection,
@@ -17,7 +17,8 @@ import { getFactionUnitConfig } from './get-faction-unit-config'
  * Returns a packed UnitIdList and stats maps keyed by variant key (base type only at creation).
  */
 export function getSimulationUnits(
-  faction: FactionKey,
+  system: GameSystem,
+  faction: string,
   selections: Record<UnitBaseType, UnitSelection>,
   gen: { _nextCode?: number },
 ): {
@@ -26,7 +27,7 @@ export function getSimulationUnits(
   unitState: Record<string, UnitState>
   unitStats: Record<string, UnitStats>
 } {
-  const factionConfig = getFactionUnitConfig(faction)
+  const factionConfig = getFactionUnitConfig(system, faction)
   let units = ''
   const unitType: Record<string, UnitType> = {}
   const unitState: Record<string, UnitState> = {}
@@ -76,10 +77,11 @@ export function getSimulationUnits(
  * with correct (unmodified) stats.
  */
 export function buildUnitStatsMap(
-  faction: FactionKey,
+  system: GameSystem,
+  faction: string,
   upgrades?: ReadonlySet<UnitBaseType>,
 ): Record<string, UnitStats> {
-  const factionConfig = getFactionUnitConfig(faction)
+  const factionConfig = getFactionUnitConfig(system, faction)
   const result: Record<string, UnitStats> = {}
 
   for (const unitType of UNIT_TYPES) {

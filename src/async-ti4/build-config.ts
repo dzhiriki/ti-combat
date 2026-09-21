@@ -1,8 +1,13 @@
-import type { Ability } from '@/combat'
+import type { RegisteredAbility } from '@/combat'
 import { UNIT_LIMITS } from '@/constants/units'
-import factions from '@/data/faction'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
-import type { FactionKey, UnitBaseType, UnitList } from '@/types'
+import {
+  buildAbilityLookup,
+  resolveSerializedGameSystem,
+} from '@/hooks/combat-setup/validation'
+import type { UnitBaseType, UnitList } from '@/types'
+import { findFaction } from '@/utils/find-faction'
+import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
 
 import { AsyncTi4Error } from './fetch-game'
 import { entitiesAt, factionLabel } from './locations'
@@ -38,7 +43,7 @@ export interface ImportResult {
 type UnitCounts = Partial<Record<UnitBaseType, number>>
 
 interface SideData {
-  faction: FactionKey
+  faction: string
   units: Record<string, [number, 0 | 1]>
   abilities: Record<string, Record<string, unknown>>
 }
@@ -120,7 +125,7 @@ function hasUnlockedCommander(player: AsyncPlayer | undefined): boolean {
 function commanderAbilityKey(asyncFactionId: string): string | undefined {
   const factionKey = FACTION_BY_ASYNC_ID[asyncFactionId]
   return factionKey
-    ? factions[factionKey]?.abilities?.commander?.[0]?.key
+    ? findFaction(factionKey)?.abilities?.commander?.[0]?.key
     : undefined
 }
 
@@ -170,7 +175,7 @@ function buildSide(
   data: WebData,
   location: BattleLocation,
   asyncFactionId: string,
-  abilityLookup: Map<string, Ability>,
+  abilityLookup: Map<string, RegisteredAbility>,
   notes: Set<string>,
 ): SideData {
   const faction = FACTION_BY_ASYNC_ID[asyncFactionId]
@@ -298,10 +303,15 @@ function buildSide(
 export function buildImportConfig(
   data: WebData,
   selection: ImportSelection,
-  abilityLookup: Map<string, Ability>,
 ): ImportResult {
   const notes = new Set<string>()
   const { location } = selection
+  // Which system this game runs under is only settled once both sides are
+  // built, so the lookup spans every system; a key shared between systems
+  // resolves to the same card wherever it appears.
+  const abilityLookup = buildAbilityLookup(
+    GAME_SYSTEMS.flatMap(system => getGameData(system).allAbilities),
+  )
 
   // AsyncTI4 is maintained by another project, so treat a schema bump as a
   // hint that these mappings may have gone stale. It is only a warning: most
@@ -345,6 +355,10 @@ export function buildImportConfig(
   return {
     config: {
       v: 1,
+      g: resolveSerializedGameSystem({
+        af: attacker.faction,
+        df: defender.faction,
+      }),
       af: attacker.faction,
       df: defender.faction,
       m: location.mode === 'SPACE' ? 'S' : 'G',

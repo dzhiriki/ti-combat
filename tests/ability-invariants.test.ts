@@ -2,44 +2,51 @@ import { describe, expect, it } from 'vitest'
 
 import {
   type Ability,
-  type AbilityReadContext,
   extractDefaults,
+  hasStaticInvokes,
+  withRunningAbility,
 } from '@/combat'
 import { UNIT_TYPES } from '@/constants/units'
-import factions from '@/data/faction'
 import { CombatSetup } from '@/hooks/combat-setup'
-import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
-import type { FactionKey, GameSystem } from '@/types'
-import { getFactionSystem } from '@/utils/get-faction-system'
+import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
 
 // Static invariants over every registered ability. Each check here enforces a
 // rule that previously lived only in docs/engine-gotchas.md or the ability
 // dev-guide checklist — violations render wrong or silently misfire at
 // runtime, so they belong in CI, not in reviewers' memories.
 
-/** Every ability object reachable by the engine, labeled for error messages.
- *  Deduped by object reference — the same ability registered under several
- *  slots (agents, shared unit abilities) is one entry. */
+/** Every ability reachable by the engine, labeled for error messages.
+ *  Registered entries are per-slot copies of the definitions, so this dedupes
+ *  by key — the same ability registered under several slots (agents, shared
+ *  unit abilities) or reachable from a unit definition is one entry. */
 function collectAllAbilities(): Map<Ability, string> {
   const out = new Map<Ability, string>()
-  for (const a of getAllAbilities()) {
-    if (!out.has(a)) out.set(a, a.key)
+  const seen = new Set<string>()
+  const add = (ability: Ability, label: string) => {
+    if (seen.has(ability.key)) return
+    seen.add(ability.key)
+    out.set(ability, label)
   }
-  // getAllAbilities skips unit-attached abilities with no UI — walk the unit
+  for (const system of GAME_SYSTEMS) {
+    for (const ability of getGameData(system).allAbilities) {
+      add(ability, ability.key)
+    }
+  }
+  // GameData lookup pools skip unit-attached abilities with no UI — walk the unit
   // definitions too so engine-level checks cover them.
-  for (const [factionKey, faction] of Object.entries(factions)) {
-    if (!faction) continue
+  for (const [factionKey, faction] of [
+    ...Object.entries(getGameData('TI4').factions),
+    ...Object.entries(getGameData('TF').factions),
+  ]) {
     for (const unitDef of Object.values(faction.units)) {
       if (!unitDef) continue
       for (const stats of [unitDef.BASE, unitDef.UPGRADED]) {
         if (!stats) continue
         for (const a of stats.ABILITIES ?? []) {
-          if (!out.has(a)) out.set(a, `${factionKey} ${a.key}`)
+          add(a, `${factionKey} ${a.key}`)
         }
         const deploy = stats.UNIT_ABILITIES?.DEPLOY
-        if (deploy && !out.has(deploy)) {
-          out.set(deploy, `${factionKey} ${deploy.key}`)
-        }
+        if (deploy) add(deploy, `${factionKey} ${deploy.key}`)
       }
     }
   }
@@ -53,8 +60,13 @@ describe('engine invariants', () => {
     // Guarded invokes with mutually exclusive isCallable are a legitimate
     // pattern (Ssruu wraps every agent's invokes), but two UNGUARDED invokes
     // sharing a timing means the second can never fire.
+    // Factory invokes are resolved per params and produce fresh wrapper
+    // objects, so neither rule can be checked statically; they return the
+    // selected target's invokes, which are checked here on the target
+    // itself.
     const violations: string[] = []
     for (const [ability, label] of collectAllAbilities()) {
+      if (!hasStaticInvokes(ability)) continue
       const unguarded = new Set<string>()
       for (const inv of ability.invoke) {
         if (inv.isCallable) continue
@@ -73,9 +85,14 @@ describe('engine invariants', () => {
     // Invoke dedup is by object identity: two abilities sharing an invoke
     // object fire only once between them. Re-keyed clones must clone their
     // invokes too (see TF_MEDDLE in engine-gotchas.md).
+    // Factory invokes are resolved per params and produce fresh wrapper
+    // objects, so neither rule can be checked statically; they return the
+    // selected target's invokes, which are checked here on the target
+    // itself.
     const violations: string[] = []
     const owner = new Map<object, string>()
     for (const [ability, label] of collectAllAbilities()) {
+      if (!hasStaticInvokes(ability)) continue
       for (const inv of ability.invoke) {
         const prev = owner.get(inv)
         if (prev !== undefined && prev !== label) {
@@ -84,6 +101,27 @@ describe('engine invariants', () => {
           )
         }
         owner.set(inv, label)
+      }
+    }
+    expect(violations).toEqual([])
+  })
+
+  it('no unit-attached ability uses the factory invoke form', () => {
+    // The no-unit external fallback and the OTHER-slot detection cannot
+    // evaluate a factory without a side context (engine-gotchas.md).
+    const violations: string[] = []
+    for (const faction of [
+      ...Object.values(getGameData('TI4').factions),
+      ...Object.values(getGameData('TF').factions),
+    ]) {
+      for (const unitDef of Object.values(faction.units)) {
+        if (!unitDef) continue
+        for (const stats of [unitDef.BASE, unitDef.UPGRADED]) {
+          for (const a of stats?.ABILITIES ?? []) {
+            if (!hasStaticInvokes(a))
+              violations.push(`${faction.name} ${a.key}`)
+          }
+        }
       }
     }
     expect(violations).toEqual([])
@@ -114,21 +152,11 @@ interface DisplayedEntry {
 }
 
 function collectDisplayed(): DisplayedEntry[] {
-  const bySystem: Record<GameSystem, FactionKey[]> = {
-    TI4: [],
-    TWILIGHTS_FALL: [],
-  }
-  for (const key of Object.keys(factions) as FactionKey[]) {
-    bySystem[getFactionSystem(key)].push(key)
-  }
-
-  const seen = new Set<Ability>()
+  const seen = new Set<string>()
   const out: DisplayedEntry[] = []
 
-  for (const [system, keys] of Object.entries(bySystem) as [
-    GameSystem,
-    FactionKey[],
-  ][]) {
+  for (const system of GAME_SYSTEMS) {
+    const keys = Object.keys(getGameData(system).factions)
     const setup = new CombatSetup()
     setup.setSystem(system)
     for (const side of ['attacker', 'defender'] as const) {
@@ -141,12 +169,11 @@ function collectDisplayed(): DisplayedEntry[] {
       setup.setFaction('attacker', factionKey)
       setup.setFaction('defender', factionKey)
       for (const side of ['attacker', 'defender'] as const) {
-        for (const reg of setup.getAvailableAbilities(side)) {
-          const ability = reg.ability
-          if (seen.has(ability)) continue
+        for (const ability of setup.getAvailableAbilities(side)) {
+          if (seen.has(ability.key)) continue
           // Same predicate the panel's hasUI filter applies.
           if (!ability.headerUI && !ability.uiConfig) continue
-          seen.add(ability)
+          seen.add(ability.key)
 
           const defaults = extractDefaults(ability)
           const params = {
@@ -155,16 +182,11 @@ function collectDisplayed(): DisplayedEntry[] {
           }
           let items: unknown
           if (typeof ability.uiConfig === 'function') {
-            const ctx = setup.getReadContext(side) as AbilityReadContext & {
-              ability?: Ability
-            }
-            const prev = ctx.ability
-            ctx.ability = ability
-            try {
-              items = ability.uiConfig(ctx, params)
-            } finally {
-              ctx.ability = prev
-            }
+            const ctx = setup.getReadContext(side)
+            const uiConfig = ability.uiConfig
+            items = withRunningAbility(ctx, ability, () =>
+              uiConfig(ctx, params),
+            )
           } else {
             items = ability.uiConfig
           }

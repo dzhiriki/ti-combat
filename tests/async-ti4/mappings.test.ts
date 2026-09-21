@@ -13,9 +13,8 @@ import {
 import { PLANET_NAMES } from '@/async-ti4/planet-names'
 import { WebDataSchema } from '@/async-ti4/types'
 import { UNIT_TYPES } from '@/constants/units'
-import technology from '@/data/abilities/technology'
-import factions from '@/data/faction'
-import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
+import { factionSlot } from '@/utils/faction-slot'
+import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
 
 // These tables are the seam with a project we don't control, and every value
 // on the right-hand side is one of our own keys. Renaming an ability or a
@@ -32,8 +31,11 @@ const ti4Data = loadFixture('ti4-game.json')
 const tfData = loadFixture('twilights-fall-game.json')
 const activeData = loadFixture('active-combat.json')
 
-const abilityKeys = new Set(getAllAbilities().map(a => a.key))
-const factionKeys = new Set(Object.keys(factions))
+const gameData = GAME_SYSTEMS.map(system => getGameData(system))
+const abilityKeys = new Set(
+  gameData.flatMap(d => d.allAbilities.map(a => a.key)),
+)
+const factionKeys = new Set(gameData.flatMap(d => Object.keys(d.factions)))
 const unitTypes = new Set<string>(UNIT_TYPES)
 
 describe('AsyncTI4 mapping tables', () => {
@@ -73,9 +75,11 @@ describe('AsyncTI4 mapping tables', () => {
       ),
     )
     const modelled = [
-      ...technology.map(a => a.key),
-      ...Object.values(factions).flatMap(f =>
-        (f.abilities?.technology ?? []).map(a => a.key),
+      ...gameData.flatMap(d =>
+        [
+          ...d.getAbilities('TECHNOLOGY'),
+          ...d.getAbilities(factionSlot('technology')),
+        ].map(a => a.key),
       ),
     ]
     expect([...new Set(modelled)].filter(k => !mapped.has(k))).toEqual([])

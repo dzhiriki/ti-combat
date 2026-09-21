@@ -1,9 +1,10 @@
 import { isDeepEqual } from 'remeda'
 
-import type { UnitBaseType, UnitSelection } from '@/types'
+import type { GameSystem, UnitBaseType, UnitSelection } from '@/types'
 
 export interface SerializedConfig {
   v: 1
+  g: GameSystem
   af: string
   df: string
   m: 'S' | 'G'

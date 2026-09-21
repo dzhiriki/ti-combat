@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { type Ability, declareParam, type SideStateData } from '@/combat'
+import {
+  type Ability,
+  declareParam,
+  type RegisteredAbility,
+  type SideStateData,
+} from '@/combat'
 import type { DeclaredSubtype } from '@/combat/abilities-engine/types'
 import { CombatSideState } from '@/combat/combat-side-state/combat-side-state'
-import { settings as settingsAbility } from '@/data/abilities/general/settings'
+import { settings as settingsAbility } from '@/data/main'
 import { reconcileAbilitiesConfig } from '@/hooks/combat-setup/reconcile'
 import type { UnitList } from '@/types'
 
@@ -148,9 +153,12 @@ describe('declareParam source — participating flag', () => {
       },
       defender: { SETTINGS: {} },
     }
+    // Bare definitions, registered under one slot for the reconcile pass.
+    const register = (list: Ability[]): RegisteredAbility[] =>
+      list.map(ability => ({ ...ability, slot: 'OTHER' }))
     const abilities = {
-      attacker: [settingsAbility, declarer, consumer] as Ability[],
-      defender: [settingsAbility] as Ability[],
+      attacker: register([settingsAbility, declarer, consumer]),
+      defender: register([settingsAbility]),
     }
     reconcileAbilitiesConfig(config, abilities, 'SPACE')
     return (config.attacker.TEST_CONSUMER.items as UnitList<number>).map(

@@ -2,9 +2,8 @@ import { useCallback, useMemo, useReducer, useState } from 'react'
 
 import type { CombatMode } from '@/combat'
 import { CombatSetup } from '@/hooks/combat-setup'
-import { getAllAbilities } from '@/hooks/combat-setup/get-available-abilities'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
-import type { CombatSide, FactionKey, GameSystem, UnitBaseType } from '@/types'
+import type { CombatSide, GameSystem, UnitBaseType } from '@/types'
 
 export function useCombatSetup() {
   const [setup] = useState(() => new CombatSetup())
@@ -19,7 +18,7 @@ export function useCombatSetup() {
   )
 
   const setFaction = useCallback(
-    (side: CombatSide, faction: FactionKey) => {
+    (side: CombatSide, faction: string) => {
       setup.setFaction(side, faction)
       forceRender()
     },
@@ -93,17 +92,15 @@ export function useCombatSetup() {
   // useSimulation uses this as an effect dependency
   const simulationInput = useMemo(
     () => setup.toSimulationInput(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
     [stateData],
   )
 
   const serializedConfig = useMemo(
     () => setup.toSerializedConfig(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
     [stateData],
   )
-
-  const allAbilities = useMemo(() => getAllAbilities(), [])
 
   return {
     system: setup.system,
@@ -119,7 +116,6 @@ export function useCombatSetup() {
     isUpgraded: setup.isUpgraded.bind(setup),
     simulationInput,
     serializedConfig,
-    allAbilities,
     setSystem,
     setFaction,
     setUnitCount,

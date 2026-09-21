@@ -14,8 +14,18 @@ a check there too.
 
 - **One invoke per (ability, timing).** A second invoke with the same timing
   on one ability is silently skipped. Compose extra work into the single
-  invoke instead (see `onPrepare` in
-  `tf-unit-upgrade/create-tf-unit-upgrade.ts`, added for Hel-Titan).
+  invoke instead (see `src/data/tf/abilities/unit-upgrade/pds/hel-titan.ts`,
+  which calls its stats invoke and restores ground participation in one PREPARE).
+
+- **The engine must never import from `src/data`.** The data barrels
+  (`src/data/main`, `src/data/tf`, `src/data`) evaluate every ability at
+  load time, and abilities import `declareParam` etc. from `@/combat`. An
+  engine module importing a data barrel closes a cycle where the `@/combat`
+  barrel is still mid-evaluation and `declareParam` is `undefined` for the
+  first ability that runs ("declareParam is not a function" on every test
+  file). Helpers the engine needs (`enforceFleetPool`, `collectFreeCargo`)
+  live in `src/combat/abilities-engine/api/` and are imported by the data
+  side, never the reverse.
 
 - **`resolveStep` side overrides are ability-relative.** Pass `OWN` /
   `OPPONENT` in `firing`; `resolveStep` maps them to attacker / defender from
@@ -25,8 +35,24 @@ a check there too.
 - **Invoke dedup is by object identity.** Two abilities sharing the same
   invoke objects (e.g. a shallow-cloned ability with a new key) fire only
   once between them. When re-keying a clone, clone the invokes too:
-  `invoke: original.invoke.map(inv => ({ ...inv }))` (see TF_MEDDLE in
-  `twilights-fall-abilities.ts`).
+  `invoke: original.invoke.map(inv => ({ ...inv }))`. The generic
+  `cloneAbility` in `src/combat/abilities-engine/clone-ability.ts` does this;
+  TF and Nekro both use it.
+
+- **Registered abilities are copies of their definitions.** `RegisteredAbility`
+  is `Ability & { slot }`, and `createGameData` builds registered entries by
+  spreading the definition. Identity-based lookups (`Set<Ability>`, WeakMap
+  caches) therefore never match a registered entry against the unit-definition
+  object it came from — dedupe by `key` instead. Invoke objects are shared by
+  the copy, so invoke-identity dedup is unaffected.
+
+- **TF clones never share a key with their TI4 source.** Every `cloneAbility`
+  call passes its own `TF_<NAME>` key, so a TF session addresses Altruistic
+  Genome as `TF_ALTRUISTIC_GENOME`, not `TELLURIAN`. Anything
+  keyed by the source's literal key breaks for the clone: declared subtypes
+  are stamped with the declaring ability's key, so `cloneAbility` rewrites a
+  self-referencing `excludeSubtypeSource`; in ability code prefer
+  `ctx.this.key` over a literal (see Thundarian's restart log).
 
 - **Unit-linked GENERAL abilities become always-on when no unit definition
   carries them.** `collectAbilityCandidates` runs a config ability
@@ -36,18 +62,28 @@ a check there too.
   never mention it. Gate such abilities with
   `isCallable: (_p, ctx) => ctx.unitSource !== undefined`.
 
+- **`modifyUnitType` shallowly assigns native stats.** Supplying
+  `UNIT_ABILITIES` replaces the whole map; it does not merge individual flags
+  with the existing map. The same applies to `ABILITIES`. Fixed upgrade cards
+  must list their complete unit-ability block (including `{}` when clearing
+  it); relative modifiers must spread the current map when preserving it.
+  `createStatsInvoke` deliberately preserves this behavior (see
+  `tests/engine/create-stats-invoke.test.ts`).
+
 - **Abilities attached to unit stats during PREPARE are too late for their
   own PREPARE invokes.** `modifyUnitType(..., { ABILITIES: [...] })` inside a
   PREPARE cannot add another PREPARE-timed ability for this combat. Do the
   work directly in the attaching ability's PREPARE instead (see the TF war
   sun upgrades stripping Planetary Shield 2RAM-style in
-  `create-tf-unit-upgrade.ts`).
+  `src/data/tf/abilities/unit-upgrade/war-sun/prototype-war-sun.ts`).
 
 - **Finite `uses` bills and gates EVERY non-system invoke — including a
   card's PREPARE.** A stat-upgrade card with a finite-uses active ability
   (TF Exotrireme) must mark its PREPARE `system: true`, or the stat
   application burns a use at PREPARE and stops applying entirely once
-  `uses` reaches 0 (see `create-tf-unit-upgrade.ts`).
+  `uses` reaches 0. `createStatsInvoke` (`src/utils/create-stats-invoke.ts`)
+  marks native stat applications as system invokes; custom PREPARE handlers
+  must retain that flag (see TF Exotrireme and Hel-Titan).
 
 - **System invokes skip dispatch-time `uses` gating.** Invokes on timings
   like `REROLL_DICE_ROLL` (whose billing is deferred to the kernel) fire
@@ -67,10 +103,59 @@ a check there too.
 
 - **One external invoke poisons the rest on non-owner sides.** An ability
   with ANY `external: true` invoke dispatches ONLY its external invokes on a
-  side that doesn't own it (`passesCrossFactionFilter`). A wrapper ability
-  that aggregates invokes from mixed sources (some agent-derived/external,
-  some not) must mark ALL of them external, or the non-external ones
-  silently never fire (see `wrapInvoke` in `tf-genome/clever-genome.ts`).
+  side that doesn't own it (the cross-faction filter inlined in
+  `buildInvokes` / `addAbilityInvokes`, `abilities-engine.ts`). A wrapper
+  ability that aggregates invokes from mixed sources (some agent-derived/
+  external, some not) must mark ALL of them external, or the non-external
+  ones silently never fire (see `wrapInvoke` in `tf-genome/clever-genome.ts`).
+
+- **`invoke` may be a factory, but only for config abilities.**
+  `Ability.invoke` can be `(params, ctx) => AbilityInvoke[]` instead of a
+  static array — the engine calls `resolveInvokes` to resolve it when it
+  builds a side's invoke index and again on every param change to that
+  ability (`updateAbilityConfig` → `hasDynamicInvokes` in `ability-api.ts`),
+  so the list can depend on the ability's own params (see
+  `tests/engine/function-invoke.test.ts`). The no-unit external fallback in
+  `collectAbilityCandidates` and the OTHER-slot construction in
+  `create-game-data.ts` read `ability.invoke` without a side context and treat
+  a factory as "no external invokes", and `removeUnitInvokes`'s
+  per-unit-death sweep skips candidates that fail `hasStaticInvokes` rather
+  than resolving them, since resolving would need per-unit params/ctx it
+  doesn't have on that path — so unit-sourced candidates must keep the array
+  form (`tests/ability-invariants.test.ts` enforces it). Code that reads
+  `ability.invoke` directly as an array (clone-for-rekey copies,
+  PREPARE-invoke extraction for Singularity/Ssruu-style copiers) must guard
+  with `hasStaticInvokes(ability)` first — see the guards in
+  `nekro_virus/index.ts`, `nekro_virus/technological-singularity.ts`,
+  `create-tf-singularity.ts`, `ssruu.ts`, `clever-genome.ts`, and the
+  the generic `cloneAbility`.
+
+- **Factory `invoke` is re-resolved on every param change** of that ability
+  (`updateAbilityConfig`), not only on `isEnabled`/`uses` — `addAbilityInvokes`
+  calls `removeInvokeEntries` and then repopulates that ability's entries,
+  while a dispatch pass may still be iterating that side's invoke
+  collections. Keep factories pure and cheap; never cache by params inside
+  them. `tests/engine/function-invoke.test.ts` (the SWITCHER case) is the
+  only coverage of this resolve-and-splice path today. Reconcile and the
+  engine also don't resolve a factory identically: `reconcileAbilityOrder`
+  (`reconcile.ts`) calls it with `sideConfig[key] ?? ability.params` — the
+  UI config, no live overlay — while the engine (`abilities-engine.ts`)
+  resolves it with the merged base+live params. The two agree before combat
+  starts; a factory that branches on a live-overlay-only value would see
+  different lists in the two places. `updateAbilityConfig` re-resolves the
+  factory BEFORE it runs the ability's `onParamSet`, so a factory must not
+  branch on a value that `onParamSet` derives; key it on the raw param the
+  caller wrote (Ssruu keys on `agentKey`, Clever Genome on `genomeKey`).
+
+- **Lazy dependencies resolve through lookup calls.** A factory receives a
+  `LazyContext` containing only `getFactionKeys()`, `getFaction(key)`, and
+  `getAbilities(slot)`.
+  `resolveFactions` runs once and recursively initializes the requested faction
+  or slot, including lazy dependencies in the same faction. Running initializers
+  are consumed before invocation so reentrant lookups can finish other fields
+  without restarting them. Dependencies must be acyclic. Runtime `GameData`
+  reads only the completed roster and catalog. Nekro uses the context's faction
+  keys and excludes itself from its copy sources.
 
 - **Config abilities resolve before unit-attached abilities within a timing
   pass.** A unit ability's PREPARE cannot pre-empt an ADVANCED phase driver's
@@ -80,13 +165,15 @@ a check there too.
   the flagship, consumed by the capacity driver itself, not an invoke).
 
 - **TF unit-upgrade cards MUST register ahead of the base slots.**
-  `getAvailableAbilities` deliberately returns `[...tfUpgrades, ...base,
-...]`: the cards' PREPARE applies the stat block (capacity, Fighter-II-style
+  The TF `GameData` entry lists their slots before GENERAL/ADVANCED in its
+  `abilities` record (key order is registration order): the cards'
+  PREPARE applies the stat block (capacity, Fighter-II-style
   `FLEET_POOL_COST`) that the ADVANCED drivers' own PREPARE enforcement then
   reads — they are the TF analog of TI4's build-time UPGRADED stats. Re-appending them after `base` silently makes
   Capacity/Fleet Pool enforce against the un-upgraded stats (fighters
   removed despite a fleet-pool fallback). Panel display is unaffected —
-  slots are grouped via SLOT_DISPLAY, not list order.
+  slots are grouped and ordered via the system's `SLOTS` config, not list
+  order.
 
 - **Never multiply a possibly-infinite stat by a unit count without checking
   the count first.** `Infinity * 0 = NaN` poisons every comparison
@@ -124,6 +211,15 @@ a check there too.
   matters when a side fields both an immune unit and a config ability
   adding custom dice for a restricted unit ability.
 
+- **`getAvailableAbilities` returns registration order, not config order.**
+  The list feeds the engine, where order drives invoke resolution within a
+  timing pass, so it walks the collected abilities (shared decks in
+  `index.ts` order, then faction-owned ones) and asks the slot config only
+  _whether_ each is visible. The panel iterates `GameData.slots` in display
+  order and matches abilities by slot and owner; collected abilities carry
+  no presentation or eligibility fields. Reordering the collection to match the config silently moves
+  ADVANCED's phase drivers out of their registration position.
+
 - **`getAvailableAbilities` feeds BOTH the panel and the engine.** Hiding a
   slot removes engine behavior, not just UI. The `ADVANCED` slot holds the
   phase drivers (AFB, Space Cannon, Bombardment, Retreat, Fleet Pool,
@@ -138,6 +234,16 @@ a check there too.
   untouched (see `tests/engine/space-combat-winner-participation.test.ts`).
 
 ## Reconcile and config
+
+- **The session's game system cannot be inferred from its factions.** Neutral
+  exists in both systems; TF Neutral vs Neutral still needs TF genomes and
+  must not acquire TI4 mechanics. Pass `system` through setup, simulation input,
+  and data lookups; serialize it as `g=TI4` or `g=TF`. Only URL validation infers
+  it for legacy links without the field (first recognized non-neutral faction, otherwise
+  TI4); explicit systems validate both factions against their own roster.
+  The `combatTest` shorthand defaults to TI4; every TF test must set
+  `system: 'TF'` explicitly. See
+  `tests/game-system.test.ts` for URL and worker regression coverage.
 
 - **`resetSettingsToBase` intentionally does NOT re-apply
   `declareParamChange`.** The asymmetry with `resetBaseGroups` is
@@ -279,7 +385,10 @@ a check there too.
   when appending**, and remember `unwrapUnitListKeys` decides tuple-ness
   from the FIRST entry.
 
-- **Watch for import cycles between faction modules and shared decks.**
-  E.g. the TF unit-upgrade deck imports card invokes that import Janovet's
-  helper, which reads the deck's configs — compute config-derived constants
-  lazily, never at module-evaluation time (see `faces-of-janovet.ts`).
+- **Inherit printed upgrade stats, not runtime unit stats.** TF Janovet reads
+  the native stat blocks exposed by `createStatsInvoke` through the runtime
+  `UNIT_UPGRADE_<TYPE>` lookups — one slot per unit type (`isStatsInvoke`
+  narrows the tagged entries). Reading
+  `getUnitStats` instead would also copy unrelated PREPARE modifiers. Keep
+  shared text helpers independent of faction/deck modules to avoid import
+  cycles (see `faces-of-janovet.ts` and `janovet-inherits.ts`).

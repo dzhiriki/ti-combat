@@ -1,12 +1,12 @@
-import type { FactionKey, UnitBaseType } from '@/types'
+import type { UnitBaseType } from '@/types'
 
-/** AsyncTI4 faction id → simulator `FactionKey`.
+/** AsyncTI4 faction id → simulator faction key.
  *
  *  AsyncTI4 carries far more factions than this calculator models (Discordant
  *  Stars and a long tail of homebrew); anything absent here is reported as
  *  unmapped rather than guessed at. The Keleres flavours (Argent/Mentak/Xxcha)
  *  are separate ids upstream but share one faction sheet here. */
-export const FACTION_BY_ASYNC_ID: Readonly<Record<string, FactionKey>> = {
+export const FACTION_BY_ASYNC_ID: Readonly<Record<string, string>> = {
   // Base game
   arborec: 'ARBOREC',
   ghost: 'GHOSTS_OF_CREUSS',
@@ -129,17 +129,17 @@ export const ABILITY_BY_TECH: Readonly<
   ps: 'PLASMA_SCORING',
   x89c4: 'X_89_BACTERIAL_WEAPON', // X-89 Bacterial Weapon ΩΩ
   // Faction technologies. Nekro can hold any of these through Technological
-  // Singularity and reuses the same keys, except for Temporal Command Suite —
-  // hence the pair. A side is only given the key its faction actually has.
-  ds: 'DIMENSIONAL_SPLICER', // Ghosts of Creuss
-  ic: 'IMPULSE_CORE', // Yin Brotherhood
-  l4: 'L4_DISRUPTORS', // Barony of Letnev
-  nes: 'NON_EUCLIDEAN_SHIELDING', // Barony of Letnev
-  proxima: 'PROXIMA_TARGETING_VI', // Last Bastion
-  sc: 'SUPERCHARGE', // Naaz-Rokha Alliance
-  so: 'SALVAGE_OPERATIONS', // Mentak Coalition
+  // Singularity under a `NEKRO_`-prefixed copy of the key — hence the pairs.
+  // A side is only given the key its faction actually has.
+  ds: ['DIMENSIONAL_SPLICER', 'NEKRO_DIMENSIONAL_SPLICER'], // Ghosts of Creuss
+  ic: ['IMPULSE_CORE', 'NEKRO_IMPULSE_CORE'], // Yin Brotherhood
+  l4: ['L4_DISRUPTORS', 'NEKRO_L4_DISRUPTORS'], // Barony of Letnev
+  nes: ['NON_EUCLIDEAN_SHIELDING', 'NEKRO_NON_EUCLIDEAN_SHIELDING'], // Barony of Letnev
+  proxima: ['PROXIMA_TARGETING_VI', 'NEKRO_PROXIMA_TARGETING_VI'], // Last Bastion
+  sc: ['SUPERCHARGE', 'NEKRO_SUPERCHARGE'], // Naaz-Rokha Alliance
+  so: ['SALVAGE_OPERATIONS', 'NEKRO_SALVAGE_OPERATIONS'], // Mentak Coalition
   tcs: ['TEMPORAL_COMMAND_SUITE', 'NEKRO_TEMPORAL_COMMAND_SUITE'], // Nomad
-  vpw: 'VALKYRIE_PARTICLE_WEAVE', // Sardakk N'orr
+  vpw: ['VALKYRIE_PARTICLE_WEAVE', 'NEKRO_VALKYRIE_PARTICLE_WEAVE'], // Sardakk N'orr
   // Twilight's Fall shared deck
   'tf-ambush': 'AMBUSH',
   'tf-devotion': 'DEVOTION',

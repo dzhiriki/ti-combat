@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe.forEachSide('TF_SMOTHERING_PRESENCE', () => {
   it('opponent units lose Sustain Damage', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -23,6 +24,7 @@ describe.forEachSide('TF_SMOTHERING_PRESENCE', () => {
 
   it('opponent units lose Space Cannon', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -38,6 +40,7 @@ describe.forEachSide('TF_SMOTHERING_PRESENCE', () => {
 
   it('opponent destroyers lose Anti-Fighter Barrage', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

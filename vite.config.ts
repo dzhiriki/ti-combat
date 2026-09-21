@@ -1,27 +1,13 @@
 /// <reference types="vitest" />
-import fs from 'node:fs'
-
-import react from '@vitejs/plugin-react'
 import { execSync } from 'child_process'
 import path from 'path'
-import remarkGfm from 'remark-gfm'
-import remarkParse from 'remark-parse'
-import { unified } from 'unified'
-import { defineConfig } from 'vite'
 
-const mdParser = unified().use(remarkParse).use(remarkGfm)
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    {
-      name: 'markdown-ast',
-      transform(_code, id) {
-        if (!id.endsWith('.md')) return
-        const content = fs.readFileSync(id, 'utf-8')
-        return `export default ${JSON.stringify(mdParser.parse(content))}`
-      },
-    },
     {
       name: 'html-branch-title',
       apply: 'serve',
@@ -35,35 +21,33 @@ export default defineConfig({
         )
       },
     },
-    react({
-      babel: {
-        plugins: [['babel-plugin-react-compiler']],
-      },
-    }),
+    react(),
   ],
+  experimental: {
+    // Bundling helps browser development but adds overhead to Vitest.
+    bundledDev: process.env.VITEST !== 'true',
+  },
   server: {
     host: true,
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
   css: {
-    modules: {
-      generateScopedName: (name, filename) => {
-        const srcDir = path.resolve(__dirname, 'src')
-        const rel = path
-          .relative(srcDir, filename)
-          .replace(/\.module\.css$/, '')
-          .replace(/[\\/]/g, '-')
-        return `${rel}__${name}`
+    transformer: 'lightningcss',
+    lightningcss: {
+      cssModules: {
+        pattern: '[name]-[hash]__[local]',
       },
     },
   },
   test: {
     globals: true,
     css: true,
+    // Persist transforms locally; avoid the write cost in clean CI runs.
+    fsModuleCache: !process.env.CI,
     testTimeout: 10000,
     setupFiles: [
       'tests/utils/expect.ts',

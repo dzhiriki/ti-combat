@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_CLEVER_GENOME', () => {
   it('copies Splitting Genome: places 2 fighters when the cruiser dies', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -30,6 +31,7 @@ describe('TF_CLEVER_GENOME', () => {
 
   it('copies Mirror Genome: blocks opponent Space Cannon from PREPARE', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -47,6 +49,7 @@ describe('TF_CLEVER_GENOME', () => {
 
   it('does nothing when no genome is selected', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

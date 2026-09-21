@@ -5,6 +5,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_LASH', () => {
   it('destroys an equal-or-lower-cost enemy unit when your unit is destroyed', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -27,6 +28,7 @@ describe('TF_LASH', () => {
 
   it('does not trigger on unchecked own unit types', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -49,6 +51,7 @@ describe('TF_LASH', () => {
 
   it('destroys the first checked type in the target priority order', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -78,6 +81,7 @@ describe('TF_LASH', () => {
 
   it('does not fire when no eligible (cheap enough) target exists', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -97,6 +101,7 @@ describe('TF_LASH', () => {
 
   it("cannot destroy a pricier flagship than Il Na Viroset's Enigma", () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'IL_NA_VIROSET',
@@ -118,6 +123,7 @@ describe('TF_LASH', () => {
 
   it('destroys a Dawncrusher when a carrier of equal cost dies', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',

@@ -6,6 +6,7 @@ import { combatTest } from '../utils/combat-test'
 describe('TF_UPGRADE_JUSTICIAR_RAIL + LIGHTRAIL_ORDNANCE', () => {
   it('only the PDS hits are forced onto non-fighters — dock hits assign normally', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
@@ -35,6 +36,7 @@ describe('TF_UPGRADE_JUSTICIAR_RAIL + LIGHTRAIL_ORDNANCE', () => {
 
   it('with only the Justiciar Rail firing, its hit skips fighters', () => {
     const t = combatTest({
+      system: 'TF',
       mode: 'SPACE',
       attacker: {
         faction: 'AVARICE_REX',
