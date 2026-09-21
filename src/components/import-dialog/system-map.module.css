@@ -1,0 +1,152 @@
+.viewport {
+  /* Scrolls rather than shrinking once the board outgrows the dialog. */
+  margin: var(--space-1) 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.map {
+  position: relative;
+  width: 100%;
+}
+
+/* Two clipped layers: the hex itself paints the outline colour, and `.face`
+   sits inset on top of it. A single clipped element can't show a border —
+   clip-path cuts it away — and the states worth spotting (a contested space,
+   a live combat) need to read as a ring rather than another shade of fill. */
+.hex {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  transition: filter 0.12s ease;
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+.face {
+  position: absolute;
+  inset: 3px;
+
+  /* Muted, not the input-field colour: in dark mode that is 80% of the very
+     colour the dialog is painted in, so every hexagon dissolved into the
+     background and only the icons were left floating. */
+  background: var(--color-background-muted);
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+.hex:hover {
+  filter: brightness(1.2);
+}
+
+.hex:focus-visible {
+  outline: none;
+  filter: brightness(1.35);
+}
+
+.hex_empty {
+  pointer-events: none;
+}
+
+.hex_empty .face {
+  background: var(--color-overlay-medium);
+}
+
+/* An anomaly — nebula, rift, asteroid field, supernova, scar. Hatched rather
+   than tinted, so it reads as different ground without competing with the
+   colours that mark a fight. */
+.hex_anomaly .face {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 3px,
+    var(--color-overlay-bold) 3px 6px
+  );
+}
+
+/* More than one player has ships here — the systems actually worth looking at.
+   The ring alone is thin at this size, so each state tints its face too. */
+.hex_contested {
+  background: var(--color-accent);
+}
+
+.hex_contested .face {
+  background: var(--color-accent-20);
+}
+
+.hex_active {
+  background: hsl(var(--color-amber-500));
+}
+
+.hex_active .face {
+  background: hsl(var(--color-amber-500) / 20%);
+}
+
+/* Filled solid rather than tinted: the defender accent and the amber used for
+   a live combat are close enough in hue that another shade would not read as
+   a different thing. */
+.hex_selected,
+.hex_selected.hex_contested,
+.hex_selected.hex_active {
+  background: var(--color-accent);
+}
+
+.hex_selected .face {
+  background: var(--color-accent);
+}
+
+.icon {
+  /* Positioned so it paints above `.face`, which is. Without this the icon
+     only cleared the face by accident, through the stacking context its own
+     `opacity` created — so raising the opacity to full on a selected or
+     contested system made the icon vanish behind the fill. */
+  position: relative;
+  display: flex;
+  width: 42%;
+  height: 42%;
+  margin-bottom: 18%;
+  opacity: 65%;
+  color: var(--color-text-main);
+}
+
+.icon :global(svg) {
+  width: 100%;
+  height: 100%;
+  fill: currentcolor;
+}
+
+.hex_selected .icon,
+.hex_contested .icon {
+  opacity: 100%;
+}
+
+.hex_selected .icon,
+.hex_selected .count,
+.hex_selected .ground {
+  color: var(--color-background-main);
+}
+
+/* Ships in the space area only. Ground forces are counted in the area list,
+   where a planet holding sixty infantry has room to say so. */
+.count {
+  position: absolute;
+  bottom: 20%;
+  font-family: var(--font-mono);
+  font-size: clamp(8px, 2.4vw, 12px);
+  font-weight: 500;
+  line-height: 1;
+  color: var(--color-text-main);
+}
+
+/* One dot per planet holding ground forces, capped at three. Sits under the
+   ship count, so a hexagon reads top to bottom as space then ground. */
+.ground {
+  position: absolute;
+  bottom: 7%;
+  font-size: clamp(6px, 1.8vw, 9px);
+  letter-spacing: 1px;
+  line-height: 1;
+  color: var(--color-text-muted);
+}
