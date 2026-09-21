@@ -47,6 +47,7 @@ import {
   isNativeCategory,
   participatesInCombat,
 } from '../utils/unit-combat-properties'
+import { getNextPhaseInFlow, isCombatMeta } from './phase-utils'
 import type {
   CombatMode,
   CombatStateData,
@@ -56,6 +57,7 @@ import type {
   PendingStep,
   PhaseStep,
   PhaseStepGroup,
+  PhaseTransitionTarget,
   SideStateData,
   UnitAbilityMeta,
   UnitTargetFilter,
@@ -369,28 +371,28 @@ export class CombatState {
       ...this.getAssignHitsScript(phase),
       {
         kind: 'method',
-        fn: CombatState.prototype._postAssignHits,
+        fn: CombatState.prototype._endCombatPhaseIfSideMissing,
         phase,
       },
     ])
   }
 
-  /** Queue a wipe check after a direct unit-removal effect. */
-  queueCompletionCheck(phase: MetaPhase[]): void {
-    if (this.data.winnerSide !== undefined) return
+  /** Queue a phase-end check after direct participation changes. Destruction
+   *  cascades drain first so reactions can restore a force before the check. */
+  queuePhaseEndCheck(phase: MetaPhase[]): void {
+    if (
+      this.data.winnerSide !== undefined ||
+      !phase.some(meta => isCombatMeta(meta))
+    )
+      return
     const check: PhaseStep = {
       kind: 'method',
-      fn: CombatState.prototype._postUnitMutation,
+      fn: CombatState.prototype._endCombatPhaseIfSideMissing,
       phase,
     }
     const group = this.pendingSteps.at(-1)
-    if (group?.kind === 'group') {
-      // Groups execute from the tail. Run the check after all remaining
-      // destroy reactions, including any nested cascades they create.
-      group.steps.unshift(check)
-    } else {
-      this.pendingSteps.push(check)
-    }
+    if (group?.kind === 'group') group.steps.unshift(check)
+    else this.pendingSteps.push(check)
   }
 
   isFinished(): boolean {
@@ -445,8 +447,8 @@ export class CombatState {
   /**
    * Phase state machine driver: pops and executes steps from
    * `pendingSteps` until one of: (a) a step branches, (b) `pendingSteps`
-   * drains, (c) `isFinished()` becomes true, or (d) `stopAt` matches the
-   * next step. Deterministic runs return `[{ state: this, probability: 1 }]`
+   * drains, (c) the end script finishes, or (d) `stopAt` matches the next
+   * step. Deterministic runs return `[{ state: this, probability: 1 }]`
    * — literally `this`, no allocation.
    *
    * The caller (combat-engine / test harness) owns phase flow — it must
@@ -493,9 +495,8 @@ export class CombatState {
 
   /** Pop the current pending step from the top of the stack. If the top is
    *  a group, pop its innermost step; when the group drains, remove it.
-   *  No-op when the stack is empty — an ability handler may have cleared it
-   *  mid-step (e.g. `syncWinnerSide` cancelling completion after a unit
-   *  placement restored a previously-wiped side). */
+   *  No-op when the stack is empty — an ability handler may have cleared the
+   *  current phase by explicitly transitioning out of combat. */
   private _popTopStep(): void {
     const top = this.pendingSteps[this.pendingSteps.length - 1]
     if (top === undefined) return
@@ -554,7 +555,7 @@ export class CombatState {
           { kind: 'timing', timing: 'AFB_STEP', phase },
           {
             kind: 'method',
-            fn: CombatState.prototype._postAssignHits,
+            fn: CombatState.prototype._endCombatPhaseIfSideMissing,
             phase,
           },
         ]
@@ -564,7 +565,7 @@ export class CombatState {
           { kind: 'timing', timing: 'BOMBARDMENT_STEP', phase },
           {
             kind: 'method',
-            fn: CombatState.prototype._postAssignHits,
+            fn: CombatState.prototype._endCombatPhaseIfSideMissing,
             phase,
           },
         ]
@@ -574,7 +575,7 @@ export class CombatState {
           { kind: 'timing', timing: 'SPACE_CANNON_OFFENSE_STEP', phase },
           {
             kind: 'method',
-            fn: CombatState.prototype._postAssignHits,
+            fn: CombatState.prototype._endCombatPhaseIfSideMissing,
             phase,
           },
           { kind: 'timing', timing: 'CLEANUP', phase },
@@ -585,7 +586,7 @@ export class CombatState {
           { kind: 'timing', timing: 'SPACE_CANNON_DEFENSE_STEP', phase },
           {
             kind: 'method',
-            fn: CombatState.prototype._postAssignHits,
+            fn: CombatState.prototype._endCombatPhaseIfSideMissing,
             phase,
           },
         ]
@@ -607,7 +608,7 @@ export class CombatState {
           { kind: 'timing', timing: 'AFTER_ASSIGN_HITS_STEP', phase },
           {
             kind: 'method',
-            fn: CombatState.prototype._postAssignHits,
+            fn: CombatState.prototype._endCombatPhaseIfSideMissing,
             phase,
           },
           { kind: 'timing', timing: 'RETREAT_STEP', phase },
@@ -696,64 +697,88 @@ export class CombatState {
     d.defender._hitPoolShared = tmpShared
   }
 
-  /** After ASSIGN_HITS completes: trigger completion if either side is
-   *  wiped; otherwise return so the script continues draining. Combat metas
-   *  (SPACE_COMBAT / GROUND_COMBAT / AFB) have further steps queued;
-   *  non-combat metas drain to empty and the engine picks up the transition. */
-  private _postAssignHits(phase: MetaPhase[]): void {
-    // Ground pre-combat steps never own completion: an invasion still commits
-    // units and resolves defensive fire after a bombardment wipe. Space
-    // cannon offense may finish a space battle before its first round.
-    // Nested ability steps inherit their combat parent in the phase stack,
-    // so Harrow/AFB wipes during a combat round complete immediately.
-    const isCombatRound = phase.some(
-      meta => meta === 'SPACE_COMBAT' || meta === 'GROUND_COMBAT',
+  /** Stop the active combat phase once one side has no participants. This
+   *  never decides the winner or jumps to an end sequence: the scheduler
+   *  advances through the ordinary phase flow after round cleanup drains.
+   *  Top-level pre-combat phases are never truncated by participant state. */
+  private _endCombatPhaseIfSideMissing(phase: MetaPhase[]): void {
+    if (
+      this.data.winnerSide !== undefined ||
+      !phase.some(meta => isCombatMeta(meta))
     )
+      return
     const d = this.data
-    if (!isCombatRound && d.combatMode === 'GROUND') return
-    let attackerOut = !CombatSideState.hasParticipatingUnits(d.attacker)
-    let defenderOut = !CombatSideState.hasParticipatingUnits(d.defender)
+    if (
+      CombatSideState.hasParticipatingUnits(d.attacker) &&
+      CombatSideState.hasParticipatingUnits(d.defender)
+    )
+      return
+    this.pendingSteps = []
+    this.pushScript([{ kind: 'timing', timing: 'CLEANUP_ROUND', phase }])
+  }
 
-    // Z-Grav Eidolon joins only at START_OF_COMBAT. If an opposing fleet is
-    // already present, let the battle reach that timing; the mech remains
-    // outside earlier target pools and cannot start a battle by itself.
-    if (!isCombatRound && d.combatMode === 'SPACE') {
-      if (!attackerOut && defenderOut && this._hasPendingEidolon('defender')) {
-        defenderOut = false
-      } else if (
-        attackerOut &&
-        !defenderOut &&
-        this._hasPendingEidolon('attacker')
-      ) {
-        attackerOut = false
-      }
+  /** Return the phase that follows a drained script. Combat phases repeat
+   *  while both sides can participate. If they cannot start, the phase is
+   *  skipped and flow proceeds normally; reaching the end of the flow then
+   *  starts the end-of-combat timings. */
+  public getNextPhase(current: MetaPhase): PhaseTransitionTarget {
+    if (this.data.winnerSide !== undefined) return 'COMPLETE'
+
+    let next: PhaseTransitionTarget = isCombatMeta(current)
+      ? current
+      : getNextPhaseInFlow(current, this.data.combatMode)
+
+    while (
+      next !== 'COMPLETE' &&
+      isCombatMeta(next) &&
+      !this._canStartCombatPhase()
+    ) {
+      next = getNextPhaseInFlow(next, this.data.combatMode)
     }
 
-    let winner: CombatSide | 'draw' | undefined
-    if (attackerOut && defenderOut) winner = 'draw'
-    else if (attackerOut) winner = 'defender'
-    else if (defenderOut) winner = 'attacker'
-
-    if (winner !== undefined) this._triggerCompletion(phase, winner)
+    return next
   }
 
-  private _hasPendingEidolon(side: CombatSide): boolean {
-    const sideData = this.data[side]
-    const params = CombatSideState.getLiveParams(sideData, 'EIDOLON')
-    if (!params || params.isEnabled === false) return false
+  /** Combat phases require participating forces on both sides before their
+   *  script starts. START_OF_COMBAT effects cannot bootstrap that admission. */
+  private _canStartCombatPhase(): boolean {
+    const d = this.data
     return (
-      CombatSideState.getUnits(sideData, 'MECH', {
-        includeVariants: true,
-        surfaceId: this.data.activeSurfaceId,
-      }).length > 0
+      CombatSideState.hasParticipatingUnits(d.attacker) &&
+      CombatSideState.hasParticipatingUnits(d.defender)
     )
   }
 
-  private _postUnitMutation(phase: MetaPhase[]): void {
-    this._postAssignHits(phase)
+  /** Load the timings that run after the phase flow is exhausted. This is a
+   *  normal flow boundary, never an interrupt from hit assignment. */
+  public loadEndScript(current: MetaPhase): void {
+    if (this.data.winnerSide === undefined) {
+      this.data.winnerSide = this._deriveWinner()
+    }
+    const phase = [current]
+    this.pushScript([
+      { kind: 'timing', timing: 'END_OF_COMBAT', phase },
+      { kind: 'timing', timing: 'CLEANUP', phase },
+      {
+        kind: 'method',
+        fn: CombatState.prototype._finish,
+        phase,
+      },
+    ])
   }
 
-  private _setComplete(): void {
+  private _deriveWinner(): CombatSide | 'draw' {
+    const d = this.data
+    const attackerOut = !CombatSideState.hasParticipatingUnits(d.attacker)
+    const defenderOut = !CombatSideState.hasParticipatingUnits(d.defender)
+    if (attackerOut && defenderOut) return 'draw'
+    if (attackerOut) return 'defender'
+    if (defenderOut) return 'attacker'
+    return 'draw'
+  }
+
+  private _finish(): void {
+    this.data.winnerSide = this._deriveWinner()
     returnCommittedFighters(this.data)
     this.resyncParticipating('attacker')
     this.resyncParticipating('defender')
@@ -793,58 +818,14 @@ export class CombatState {
     )
   }
 
-  /** Replace any in-flight pending steps with the completion sequence and
-   *  set `winnerSide` if not already set. The first caller (e.g. an
-   *  ability's `transitionTo` pinning a 'draw') wins — later wipe-checks
-   *  won't overwrite an explicit decision. After this, combat-state owns
-   *  the path to `_setComplete`; the engine and test harness only observe
-   *  via `isFinished`. Stored reversed (pop yields END_OF_COMBAT first). */
-  public _triggerCompletion(
-    phase: MetaPhase[],
-    winner: CombatSide | 'draw',
-  ): void {
-    // Idempotent: once a winner is pinned, the completion sequence is owned
-    // by the first caller. Subsequent unit-state changes (Harrow killing the
-    // last opponent unit, Alarum placing reinforcements) update winnerSide
-    // via `syncWinnerSide` rather than re-pushing the completion script.
+  /** Explicit transitions (retreats and similar effects) pin an outcome and
+   *  leave the normal phase flow. They still run round cleanup before the
+   *  engine reaches the ordinary end-of-combat boundary. */
+  public forceOutcome(phase: MetaPhase[], winner: CombatSide | 'draw'): void {
     if (this.data.winnerSide !== undefined) return
     this.data.winnerSide = winner
     this.pendingSteps = []
-    this.pushScript([
-      { kind: 'timing', timing: 'END_OF_COMBAT', phase },
-      { kind: 'timing', timing: 'CLEANUP_ROUND', phase },
-      { kind: 'timing', timing: 'CLEANUP', phase },
-      {
-        kind: 'method',
-        fn: CombatState.prototype._setComplete,
-        phase,
-      },
-    ])
-  }
-
-  /** Re-derive `winnerSide` from current participating-unit state. No-op
-   *  unless a winner has already been pinned (initial wipe detection is
-   *  owned by `_postAssignHits` → `_triggerCompletion`). Called from
-   *  unit-mutation sites so abilities that destroy or place units during
-   *  the completion sequence keep the outcome correct:
-   *  - A destruction can flip the outcome (e.g. Harrow's bombardment kills
-   *    the last opposing infantry → defender→draw, or →attacker).
-   *  - A placement that restores a wiped side cancels the completion
-   *    entirely: clears `pendingSteps` and `winnerSide` so the engine sees
-   *    an empty stack with `isFinished=false` and loads the next round. */
-  public syncWinnerSide(): void {
-    if (this.data.winnerSide === undefined) return
-    const d = this.data
-    const attackerOut = !CombatSideState.hasParticipatingUnits(d.attacker)
-    const defenderOut = !CombatSideState.hasParticipatingUnits(d.defender)
-    if (!attackerOut && !defenderOut) {
-      this.pendingSteps = []
-      d.winnerSide = undefined
-      return
-    }
-    if (attackerOut && defenderOut) d.winnerSide = 'draw'
-    else if (attackerOut) d.winnerSide = 'defender'
-    else d.winnerSide = 'attacker'
+    this.pushScript([{ kind: 'timing', timing: 'CLEANUP_ROUND', phase }])
   }
 
   public pushScript(entity: PendingStep[]) {
@@ -874,8 +855,6 @@ export class CombatState {
       data.defender,
       trackDestroyed,
     )
-
-    this.syncWinnerSide()
 
     if (!trackDestroyed) return
 
@@ -1328,20 +1307,17 @@ export class CombatState {
    *  and an optional `selfTarget` flag (e.g. `target: 'OWN'` self-damage):
    *  hits are produced against the natural opponent, then `_swapHitPools`
    *  (queued inside the dice-roll group, after AFTER_UNIT_ABILITY_ROLL)
-   *  moves them to the firer. Everything else (BEFORE/AFTER ASSIGN_HITS,
-   *  destroy cascade, completion check) flows through the standard phase
-   *  script. */
+   *  moves them to the firer. Everything else (BEFORE/AFTER ASSIGN_HITS and
+   *  the destroy cascade) flows through the standard phase script. */
   public runUnitAbility(config: {
     meta: UnitAbilityMeta
     firing: CombatSide[]
     outerPhase: MetaPhase[]
     customDice?: { attacker: SideDiceCollection; defender: SideDiceCollection }
     selfTarget?: boolean
-    /** When true, omit the trailing `_postAssignHits` wipe-check. The
-     *  caller will run another step (or steps) whose terminal
-     *  `_postAssignHits` covers the combined result. Used by chained
-     *  `resolveStep` calls that must resolve atomically (Proxima). */
-    deferCompletionCheck?: boolean
+    /** Defer the phase-end participant check to a later paired resolution or
+     *  to the enclosing phase driver. */
+    deferPhaseEndCheck?: boolean
     /** Ability params overrides scoped to this resolution. Stamped onto every
      *  timing step the resolution pushes; consumed by the ability loop. */
     abilitiesOverride?: Readonly<AbilitiesOverride>
@@ -1364,10 +1340,10 @@ export class CombatState {
       }),
       ...this.getAssignHitsScript(phase),
     ]
-    if (!config.deferCompletionCheck) {
+    if (!config.deferPhaseEndCheck) {
       script.push({
         kind: 'method',
-        fn: CombatState.prototype._postAssignHits,
+        fn: CombatState.prototype._endCombatPhaseIfSideMissing,
         phase,
       })
     }

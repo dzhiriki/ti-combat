@@ -338,12 +338,8 @@ export interface AbilityCallContext {
    *                one dice-roll group, each side's hits landing on its
    *                natural opponent. Relative sides are mapped to attacker /
    *                defender within `resolveStep`.
-   *   - `deferCompletionCheck` — when true, omit the post-assign-hits
-   *                wipe-out check at the end of this step. Use to chain
-   *                multiple `resolveStep` calls as one transaction so an
-   *                early wipe in step N can't preempt step N+1 (e.g.
-   *                Proxima's opp-target bomb must not end combat before
-   *                the paired self-target bomb runs).
+   *   - `deferPhaseEndCheck` — defer participant loss detection to a paired
+   *                resolution or the enclosing phase driver.
    *
    *  Composition: multiple `resolveStep` calls in one `call` execute in
    *  reverse call-order (LIFO): the last push sits on top of the script
@@ -354,7 +350,7 @@ export interface AbilityCallContext {
       dice?: DiceGroup[]
       target?: 'OWN' | 'OPPONENT'
       firing?: ('OWN' | 'OPPONENT')[]
-      deferCompletionCheck?: boolean
+      deferPhaseEndCheck?: boolean
       /** Ability params overrides for this resolution only — immutable and
        *  applied over base + live params. Boolean shorthand = `{ isEnabled }`.
        *  e.g. `{ SUSTAIN_DAMAGE: false }` to skip Sustain for this step. */
