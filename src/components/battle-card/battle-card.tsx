@@ -22,6 +22,7 @@ import type {
 } from '@/types'
 import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
 import type { UnitConfig } from '@/utils/get-unit-config'
+import type { UnitTooltipData } from '@/utils/get-unit-tooltips'
 
 import { Divider } from '../ui/divider'
 import {
@@ -67,6 +68,8 @@ interface BattleCardProps {
   defenderSelections: Record<UnitBaseType, UnitSelection>
   attackerConfig: Record<UnitBaseType, UnitConfig>
   defenderConfig: Record<UnitBaseType, UnitConfig>
+  attackerTooltips: Record<UnitBaseType, UnitTooltipData>
+  defenderTooltips: Record<UnitBaseType, UnitTooltipData>
   combatResult: CombatResult | null
   outcomes: CombatOutcome[] | null
   unitPriority: { attacker: string[]; defender: string[] }
@@ -108,6 +111,8 @@ export function BattleCard({
   defenderSelections,
   attackerConfig,
   defenderConfig,
+  attackerTooltips,
+  defenderTooltips,
   combatResult,
   outcomes,
   unitPriority,
@@ -176,6 +181,8 @@ export function BattleCard({
               <UnitRowDual
                 key={unitKey}
                 name={attackerConfig[unitKey].name}
+                attackerTooltip={attackerTooltips[unitKey]}
+                defenderTooltip={defenderTooltips[unitKey]}
                 limit={UNIT_LIMITS[unitKey]}
                 attackerHasUpgrade={attackerConfig[unitKey].hasUpgrade}
                 defenderHasUpgrade={defenderConfig[unitKey].hasUpgrade}

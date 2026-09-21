@@ -1,9 +1,14 @@
+import type { UnitTooltipData } from '@/utils/get-unit-tooltips'
+
 import { UnitControls } from '../unit-controls'
+import { UnitTooltip } from '../unit-tooltip'
 
 import styles from './unit-row-dual.module.css'
 
 interface UnitRowDualProps {
   name: string
+  attackerTooltip: UnitTooltipData
+  defenderTooltip: UnitTooltipData
   limit: number
   attackerHasUpgrade: boolean
   defenderHasUpgrade: boolean
@@ -17,6 +22,8 @@ interface UnitRowDualProps {
 
 export function UnitRowDual({
   name,
+  attackerTooltip,
+  defenderTooltip,
   limit,
   attackerHasUpgrade,
   defenderHasUpgrade,
@@ -38,9 +45,11 @@ export function UnitRowDual({
         onUpgradeToggle={onAttackerUpgradeToggle}
         className="theme-attacker"
       />
-      <span className={styles.unit}>
+      <div className={styles.unit}>
+        <UnitTooltip name={name} data={attackerTooltip} side="attacker" />
         <span className={styles.unitName}>{name}</span>
-      </span>
+        <UnitTooltip name={name} data={defenderTooltip} side="defender" />
+      </div>
       <UnitControls
         count={defender.count}
         upgraded={defender.upgraded}

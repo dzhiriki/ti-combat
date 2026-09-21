@@ -1,5 +1,6 @@
 import vuilraithCabalIcon from '@/assets/faction/vuilraith_cabal.svg?raw'
 import type { Ability } from '@/combat'
+import { createStatsTransformInvoke } from '@/utils/create-stats-transform-invoke'
 
 export const eidolonTerminus: Ability = {
   key: 'TF_UPGRADE_EIDOLON_TERMINUS',
@@ -10,16 +11,12 @@ export const eidolonTerminus: Ability = {
   headerUI: 'isEnabled',
   // Mech upgrades stack: no exclusiveGroup.
   invoke: [
-    {
-      timing: 'PREPARE',
-      system: true,
-      call: ctx => {
-        const combat = ctx.api.own.getUnitStats('MECH')?.COMBAT
-        if (!combat) return
-        ctx.api.own.modifyUnitType('MECH', {
-          COMBAT: [Math.max(1, combat[0] - 1), combat[1]],
-        })
-      },
-    },
+    createStatsTransformInvoke('MECH', stats => {
+      const combat = stats.COMBAT
+      if (!combat) return {}
+      return {
+        COMBAT: [Math.max(1, combat[0] - 1), combat[1]],
+      }
+    }),
   ],
 }

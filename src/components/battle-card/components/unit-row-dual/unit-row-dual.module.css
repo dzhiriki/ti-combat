@@ -3,15 +3,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-2);
   padding: var(--space-1) 0;
   border-radius: 0.25rem;
   transition: all 0.15s;
 }
 
 .unit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
   min-width: 0;
-  flex-shrink: 0;
   color: var(--color-text-main);
   flex-grow: 1;
   container-type: inline-size;
@@ -24,13 +26,24 @@
   letter-spacing: 0.025em;
   text-transform: uppercase;
   font-family: var(--font-heading);
-  width: 100%;
+  min-width: 0;
+  flex: 1;
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 
-  @container (width < 90px) {
+  @container (width < 140px) {
     font-size: var(--text-xs);
+  }
+}
+
+@media (width < 500px) {
+  .row {
+    gap: var(--space-1);
+  }
+
+  .unit {
+    gap: 0;
   }
 }

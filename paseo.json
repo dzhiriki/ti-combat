@@ -1,0 +1,15 @@
+{
+  "worktree": {
+    "setup": "npm install",
+    "terminals": [
+      { "name": "logs", "command": "bash" },
+      { "name": "shell", "command": "bash" }
+    ]
+  },
+  "scripts": {
+    "dev": {
+      "type": "service",
+      "command": "npm run dev -- --port $PASEO_PORT"
+    }
+  }
+}

@@ -22,8 +22,8 @@ export const universityWarSun: Ability = {
   exclusiveGroup: 'UNIT_UPGRADE_WAR_SUN',
   invoke: [
     {
+      ...statsInvoke,
       timing: 'PREPARE',
-      system: true,
       call: (ctx, params) => {
         statsInvoke.call(ctx, params)
         ctx.api.opponent.setUnitAbilityLost('PLANETARY_SHIELD', ctx.this.key)

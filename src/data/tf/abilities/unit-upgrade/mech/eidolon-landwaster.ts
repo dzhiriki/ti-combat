@@ -1,5 +1,6 @@
 import naazRokhaAllianceIcon from '@/assets/faction/naaz_rokha_alliance.svg?raw'
 import type { Ability } from '@/combat'
+import { createStatsTransformInvoke } from '@/utils/create-stats-transform-invoke'
 
 export const eidolonLandwaster: Ability = {
   key: 'TF_UPGRADE_EIDOLON_LANDWASTER',
@@ -10,16 +11,12 @@ export const eidolonLandwaster: Ability = {
   headerUI: 'isEnabled',
   // Mech upgrades stack: no exclusiveGroup.
   invoke: [
-    {
-      timing: 'PREPARE',
-      system: true,
-      call: ctx => {
-        const combat = ctx.api.own.getUnitStats('MECH')?.COMBAT
-        if (!combat) return
-        ctx.api.own.modifyUnitType('MECH', {
-          COMBAT: [combat[0], (combat[1] ?? 1) + 1],
-        })
-      },
-    },
+    createStatsTransformInvoke('MECH', stats => {
+      const combat = stats.COMBAT
+      if (!combat) return {}
+      return {
+        COMBAT: [combat[0], (combat[1] ?? 1) + 1],
+      }
+    }),
   ],
 }

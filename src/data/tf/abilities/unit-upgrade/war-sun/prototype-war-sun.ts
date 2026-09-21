@@ -22,8 +22,8 @@ export const prototypeWarSun: Ability = {
   exclusiveGroup: 'UNIT_UPGRADE_WAR_SUN',
   invoke: [
     {
+      ...statsInvoke,
       timing: 'PREPARE',
-      system: true,
       // Attaching an ability during PREPARE is too late for its own PREPARE.
       // Strip Planetary Shield directly in this card's stat application.
       call: (ctx, params) => {

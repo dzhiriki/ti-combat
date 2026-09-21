@@ -28,8 +28,8 @@ export const helTitan: Ability = {
   declareParamChange: () => [{ key: 'groundForces', value: 'PDS' }],
   invoke: [
     {
+      ...statsInvoke,
       timing: 'PREPARE',
-      system: true,
       // A single PREPARE must both upgrade the PDS and restore its ground
       // participation after simulation setup resets SETTINGS.
       call: (ctx, params) => {

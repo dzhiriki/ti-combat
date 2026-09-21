@@ -1,5 +1,6 @@
 import nomadIcon from '@/assets/faction/nomad.svg?raw'
 import type { Ability } from '@/combat'
+import { createStatsTransformInvoke } from '@/utils/create-stats-transform-invoke'
 
 // Relative to each faction's own flagship, so applied as adjustments
 // rather than a stat block.
@@ -13,21 +14,13 @@ export const echoOfAscension: Ability = {
   headerUI: 'isEnabled',
   exclusiveGroup: 'UNIT_UPGRADE_FLAGSHIP',
   invoke: [
-    {
-      timing: 'PREPARE',
-      system: true,
-      call: ctx => {
-        const stats = ctx.api.own.getUnitStats('FLAGSHIP')
-        if (!stats?.COMBAT) return
-        ctx.api.own.modifyUnitType('FLAGSHIP', {
-          COMBAT: [
-            Math.max(1, stats.COMBAT[0] - 1),
-            (stats.COMBAT[1] ?? 1) + 1,
-          ],
-          MOVE: (stats.MOVE ?? 0) + 1,
-          CAPACITY: (stats.CAPACITY ?? 0) + 2,
-        })
-      },
-    },
+    createStatsTransformInvoke('FLAGSHIP', stats => {
+      if (!stats.COMBAT) return {}
+      return {
+        COMBAT: [Math.max(1, stats.COMBAT[0] - 1), (stats.COMBAT[1] ?? 1) + 1],
+        MOVE: (stats.MOVE ?? 0) + 1,
+        CAPACITY: (stats.CAPACITY ?? 0) + 2,
+      }
+    }),
   ],
 }

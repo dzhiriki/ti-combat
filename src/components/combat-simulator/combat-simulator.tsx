@@ -24,6 +24,7 @@ import { useUrlSync } from '@/hooks/use-url-sync'
 import type { CombatSide, UnitBaseType } from '@/types'
 import { getGameData } from '@/utils/get-game-data'
 import { getUnitConfig } from '@/utils/get-unit-config'
+import { getUnitTooltips } from '@/utils/get-unit-tooltips'
 
 import { ButtonIconPlain } from '../ui/button-icon-plain'
 import { Divider } from '../ui/divider'
@@ -141,6 +142,34 @@ export function CombatSimulator({
   const defenderConfig = useMemo(
     () => getUnitConfig(system, defenderFaction),
     [system, defenderFaction],
+  )
+
+  // Ability configuration is edited in place; stateData changes on every setup edit.
+  const unitTooltips = useMemo(
+    () => ({
+      attacker: getUnitTooltips({
+        system,
+        faction: attackerFaction,
+        side: 'attacker',
+        selections: attackerSelections,
+        abilities: stateData.attacker.abilities,
+      }),
+      defender: getUnitTooltips({
+        system,
+        faction: defenderFaction,
+        side: 'defender',
+        selections: defenderSelections,
+        abilities: stateData.defender.abilities,
+      }),
+    }),
+    [
+      system,
+      attackerFaction,
+      defenderFaction,
+      attackerSelections,
+      defenderSelections,
+      stateData,
+    ],
   )
 
   const attackerAbilities = useMemo(
@@ -351,6 +380,8 @@ export function CombatSimulator({
           defenderSelections={defenderSelections}
           attackerConfig={attackerConfig}
           defenderConfig={defenderConfig}
+          attackerTooltips={unitTooltips.attacker}
+          defenderTooltips={unitTooltips.defender}
           combatResult={combatResult}
           outcomes={outcomes}
           unitPriority={unitPriority}
