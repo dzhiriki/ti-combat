@@ -86,23 +86,21 @@ describe('surface editor conversion', () => {
     expect(setup.surfaceSelections.defender[PLANET_1].MECH.count).toBe(0)
   })
 
-  it('preserves hidden planets while switching tabs in simplified mode', () => {
-    const setup = new CombatSetup()
-    setup.setUnitCount('defender', 'INFANTRY', 2)
+  it('preserves planet placements while switching full-mode tabs', () => {
+    const setup = new CombatSetup('FULL')
+    setup.setSurfaceUnitCount('defender', PLANET_1, 'INFANTRY', 2)
     setup.addPlanet()
-    setup.setUnitCount('defender', 'INFANTRY', 3)
+    setup.setSurfaceUnitCount('defender', PLANET_2, 'INFANTRY', 3)
     setup.selectPlanet(PLANET_1)
 
     expect(setup.defenderSelections.INFANTRY.count).toBe(2)
-    setup.setEditorMode('FULL')
     expect(setup.surfaceSelections.defender[PLANET_1].INFANTRY.count).toBe(2)
     expect(setup.surfaceSelections.defender[PLANET_2].INFANTRY.count).toBe(3)
   })
 
   it('shares upgrades and enforces unit limits across surfaces', () => {
-    const setup = new CombatSetup()
+    const setup = new CombatSetup('FULL')
     setup.addPlanet()
-    setup.setEditorMode('FULL')
     setup.setSurfaceUnitCount('attacker', PLANET_1, 'MECH', 4)
     setup.setSurfaceUnitCount('attacker', PLANET_2, 'MECH', 4)
     setup.setUpgraded('attacker', 'MECH', true)
@@ -132,9 +130,8 @@ describe('surface editor conversion', () => {
   })
 
   it('roundtrips full placements, planets, and the selected tab', () => {
-    const setup = new CombatSetup()
+    const setup = new CombatSetup('FULL')
     setup.addPlanet()
-    setup.setEditorMode('FULL')
     setup.setSurfaceUnitCount('defender', PLANET_1, 'INFANTRY', 2)
     setup.setSurfaceUnitCount('defender', PLANET_2, 'MECH', 1)
 
@@ -149,14 +146,13 @@ describe('surface editor conversion', () => {
   })
 
   it('retains one planet and removes only empty additional planets', () => {
-    const setup = new CombatSetup()
+    const setup = new CombatSetup('FULL')
     setup.removePlanet(PLANET_1)
     expect(
       setup.surfaces.filter(surface => surface.type === 'PLANET'),
     ).toHaveLength(1)
 
     setup.addPlanet()
-    setup.setEditorMode('FULL')
     setup.setSurfaceUnitCount('attacker', PLANET_2, 'INFANTRY', 1)
     setup.removePlanet(PLANET_2)
     expect(setup.surfaces.some(surface => surface.id === PLANET_2)).toBe(true)
@@ -224,7 +220,7 @@ describe('surface combat behavior', () => {
     expect(t.state.defender.surfaceUnits[PLANET_2]).toHaveLength(0)
   })
 
-  it('continues through commitment after bombardment wipes the planet', () => {
+  it('commits units before ending after a bombardment wipe', () => {
     const t = combatTest({
       mode: 'GROUND',
       surfaces: SURFACES,
@@ -247,9 +243,8 @@ describe('surface combat behavior', () => {
 
     expect(t.state.defender.surfaceUnits[PLANET_2]).toHaveLength(0)
     expect(t.state.attacker.surfaceUnits[PLANET_2]).toHaveLength(1)
-    expect(t.state.winnerSide).toBeUndefined()
-    t.advanceRound()
     expect(t.state.winnerSide).toBe('attacker')
+    expect(t.isFinished()).toBe(true)
   })
 
   it('includes location in state hashes and preserves identity when moving', () => {

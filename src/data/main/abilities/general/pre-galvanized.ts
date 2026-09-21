@@ -89,7 +89,7 @@ export const preGalvanized: Ability<Params> = {
       call: (ctx, params) => {
         for (const [unitType, count] of params.galvanizedUnits) {
           if (count <= 0) continue
-          const ids = ctx.api.own.surface.getUnits(unitType, {
+          const ids = ctx.api.own.system.getUnits(unitType, {
             includeVariants: false,
           })
           const max = Math.min(count, ids.length)

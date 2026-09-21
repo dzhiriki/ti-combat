@@ -38,7 +38,7 @@ export const preDamaged: Ability<Params> = {
       call: (ctx, params) => {
         for (const [unitType, count] of params.damagedUnits) {
           if (count <= 0) continue
-          const ids = ctx.api.own.surface.getUnits(unitType as UnitType, {
+          const ids = ctx.api.own.system.getUnits(unitType as UnitType, {
             includeVariants: false,
           })
           const max = Math.min(count, ids.length)
