@@ -32,8 +32,9 @@ export const cavalry: Ability<Params> = {
     memoria2: false,
     unitType: declareParam<UnitType>({
       default: 'DESTROYER',
-      source: 'nonFighterShips',
+      source: 'SHIPS',
       filter: {
+        exclude: ['FIGHTER'],
         excludeSubtypeSource: ['CAVALRY'],
         combatMode: 'SPACE',
       },

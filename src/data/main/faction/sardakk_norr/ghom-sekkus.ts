@@ -26,7 +26,7 @@ export const ghomSekkus: Ability<Params> = {
     uses: Infinity,
     units: declareParam<UnitList<number>>({
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       sort: 'worth-desc',
       defaultItemValue: 0,
       filter: {

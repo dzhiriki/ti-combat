@@ -30,13 +30,13 @@ export const raiseTheStandard: Ability<Params> = {
     uses: 1,
     spaceUnitPriority: declareParam({
       default: [] as UnitList,
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
       sort: 'worth-desc',
       filter: { includeOnlyBaseTypes: true },
     }),
     groundUnitPriority: declareParam({
       default: [] as UnitList,
-      source: 'groundCombatParticipating',
+      source: 'GROUND_FORCES',
       sort: 'worth-desc',
       filter: { includeOnlyBaseTypes: true },
     }),

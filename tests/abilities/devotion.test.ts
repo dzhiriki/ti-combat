@@ -148,7 +148,7 @@ describe.forEachSide('DEVOTION', () => {
 
     // Defender's UNIT_PRIORITY sacrifices plain CRUISER first. With the bug
     // (addHits widening to base type CRUISER) the plain cruiser would be
-    // destroyed; the fix narrows validTargets to CRUISER:Galvanized so the
+    // destroyed; the fix narrows unitPriority to CRUISER:Galvanized so the
     // plain cruiser is untouched.
     const remaining = t.defender.units.CRUISER ?? []
     const plain = remaining.filter(u => !u.subtypes || u.subtypes.length === 0)

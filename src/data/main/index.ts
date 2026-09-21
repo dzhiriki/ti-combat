@@ -36,4 +36,3 @@ export default gameData
 
 // Engine hooks that live next to the ability they belong to.
 export type { SavedRetreatData } from './abilities/advanced/retreat'
-export { settings } from './abilities/general/settings'

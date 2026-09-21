@@ -29,7 +29,7 @@ export const dameBriar: Ability<Params> = {
     uses: 1,
     spaceUnitType: declareParam<UnitType>({
       default: 'DESTROYER',
-      source: 'units',
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       filter: {
         excludeSubtypes: [GALVANIZED],
         includeNonParticipating: true,
@@ -38,7 +38,7 @@ export const dameBriar: Ability<Params> = {
     }),
     groundUnitType: declareParam<UnitType>({
       default: 'INFANTRY',
-      source: 'units',
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       filter: {
         excludeSubtypes: [GALVANIZED],
         includeNonParticipating: true,

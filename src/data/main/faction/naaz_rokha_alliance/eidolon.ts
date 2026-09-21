@@ -12,7 +12,7 @@ export const eidolon: Ability = {
   },
   headerUI: 'isEnabled',
   readOnly: true,
-  declareParamChange: () => [{ key: 'ships', value: 'MECH' }],
+  declareParamChange: () => [{ key: 'SHIPS', value: 'MECH' }],
   invoke: [
     {
       timing: 'START_OF_COMBAT',

@@ -1,12 +1,22 @@
-import type { Ability } from '@/combat'
+import { type Ability, declareParam } from '@/combat'
+import type { UnitBaseType, UnitList } from '@/types'
+
+type Params = {
+  customPriority: boolean
+  unitPriority: UnitList
+}
 
 declare global {
   interface AbilityConfigMap {
-    ANTI_FIGHTER_BARRAGE: Record<string, never>
+    ANTI_FIGHTER_BARRAGE: Params
   }
 }
 
-export const antiFighterBarrage: Ability = {
+function fighterPriority(types: UnitBaseType[]): UnitList {
+  return types.filter(type => type === 'FIGHTER').map(type => [type])
+}
+
+export const antiFighterBarrage: Ability<Params> = {
   key: 'ANTI_FIGHTER_BARRAGE',
   name: 'Anti-Fighter Barrage',
   description: 'AFB is resolved only when enabled',
@@ -14,6 +24,13 @@ export const antiFighterBarrage: Ability = {
   params: {
     isEnabled: true,
     uses: Infinity,
+    customPriority: true,
+    unitPriority: declareParam<UnitList>({
+      default: [['FIGHTER']],
+      source: 'SHIPS',
+      side: 'opponent',
+      compute: fighterPriority,
+    }),
   },
   headerUI: 'isEnabled',
   invoke: [

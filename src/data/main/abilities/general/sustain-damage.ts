@@ -36,13 +36,13 @@ export const sustainDamage: Ability<Params> = {
     // Actual participation and hit eligibility are checked per unit below.
     spacePriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
       defaultItemValue: true,
       filter: { exclude: ['FIGHTER'], combatMode: 'SPACE' },
     }),
     groundPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       defaultItemValue: true,
       filter: { combatMode: 'GROUND' },
     }),

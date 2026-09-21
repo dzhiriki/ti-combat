@@ -314,15 +314,16 @@ for each bucket on each firing side:
   landing = firingSide's opponent
   if bucket.spec:                                   // ADDITIONAL_HIT_POOL
     pendingHitPool[landing].custom.push(spec.transform(count))  // { base, unitPriority }
-  else if validTargets restrict the landing side:   // unit-ability meta restriction
+  else if this is a unit-ability roll:
     pendingHitPool[landing].custom.push({ key: meta, base: count, unitPriority })
-  else:                                             // unrestricted rest bucket
+  else:                                             // unrestricted combat roll
     pendingHitPool[landing].base += count
 ```
 
-Restricted `unitPriority` comes from `input.validTargets[landingSide]`, sorted
-by the priority list. Unrestricted hits (`base`) take the fast-path during hit
-assignment.
+The resolved `unitPriority` belongs to the firing side and defines both target
+eligibility and assignment order. Unless that unit ability uses a custom
+priority, it inherits the final target side's `UNIT_PRIORITY`. Unrestricted
+combat hits (`base`) take the fast path during assignment.
 
 Final branches collapse on identity:
 `(pendingHitPool, usesDelta, destroyedUnits, pendingEffects)`.
@@ -345,6 +346,6 @@ Effects typically call:
 
 `addHits` is overloaded: `addHits(n)` adds unrestricted hits (drained inline
 when the landing side's pool was empty, otherwise merged into the in-flight
-group's existing `ASSIGN_HITS` step); `addHits(n, validTargets)` adds
-restricted hits and throws if the landing side's pool is non-empty. There is
-no separate `addPendingHits` API.
+group's existing `ASSIGN_HITS` step); `addHits(n, unitPriority)` adds hits
+restricted and ordered by that priority and throws if the landing side's pool
+is non-empty. There is no separate `addPendingHits` API.

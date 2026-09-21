@@ -15,7 +15,7 @@ export const morphwing: Ability = {
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
   exclusiveGroup: 'UNIT_UPGRADE_FIGHTER',
-  declareParamChange: () => [{ key: 'groundForces', value: 'FIGHTER' }],
+  declareParamChange: () => [{ key: 'GROUND_FORCES', value: 'FIGHTER' }],
   invoke: [
     createStatsInvoke('FIGHTER', {
       COST: 0.5,

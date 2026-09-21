@@ -25,14 +25,18 @@ export const impulseCore: Ability<Params> = {
     uses: Infinity,
     sacrificePriority: declareParam({
       default: [] as UnitList<boolean>,
-      source: 'nonFighterShips',
+      source: 'SHIPS',
       side: 'own',
       defaultItemValue: true,
-      filter: { include: ['CRUISER', 'DESTROYER'], combatMode: 'SPACE' },
+      filter: {
+        include: ['CRUISER', 'DESTROYER'],
+        exclude: ['FIGHTER'],
+        combatMode: 'SPACE',
+      },
     }),
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'opponent',
       defaultItemValue: true,
       sort: (a, b) => {

@@ -382,9 +382,10 @@ export class SideApi {
       const declared = this._resolveDeclaredParam(arg)
       const filter = declared?.filter
       const sourceBaseTypes = declared?.source
-        ? (CombatSideState.getLiveParams(this._sideData, 'SETTINGS')?.[
-            declared.source
-          ] as readonly UnitBaseType[] | undefined)
+        ? CombatSideState.getCategoryOptionTypes(
+            this._sideData,
+            declared.source,
+          )
         : undefined
       const items = CombatSideState.getUnitVariantOptions(
         this._sideData,
@@ -653,20 +654,20 @@ export class SideApi {
    *  resolution and requires an empty pool. When no hits are in flight,
    *  schedules their assignment immediately. */
   addHits(hits: number): void
-  addHits(hits: number, validTargets: UnitType[]): void
-  addHits(hits: number, validTargets?: UnitType[]): void {
+  addHits(hits: number, unitPriority: UnitType[]): void
+  addHits(hits: number, unitPriority?: UnitType[]): void {
     const data = this.state
     const wasEmpty =
       data.attacker.hitPool === undefined && data.defender.hitPool === undefined
-    if (validTargets !== undefined && validTargets.length > 0) {
+    if (unitPriority !== undefined && unitPriority.length > 0) {
       if (this._sideData.hitPool !== undefined) {
         throw new Error(
-          'addHits(n, validTargets) requires an empty hit pool on the landing side',
+          'addHits(n, unitPriority) requires an empty hit pool on the landing side',
         )
       }
       const key = this._ctx.ability?.key ?? '__ADDED__'
       CombatSideState.addCustomHits(this._sideData, hits, key, [
-        ...validTargets,
+        ...unitPriority,
       ])
     } else {
       CombatSideState.addHits(this._sideData, hits)

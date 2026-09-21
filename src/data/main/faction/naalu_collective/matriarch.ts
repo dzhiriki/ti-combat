@@ -13,7 +13,7 @@ export const matriarch: Ability = {
     uses: Infinity,
   },
   headerUI: 'isEnabled',
-  declareParamChange: () => [{ key: 'groundForces', value: 'FIGHTER' }],
+  declareParamChange: () => [{ key: 'GROUND_FORCES', value: 'FIGHTER' }],
   invoke: [
     {
       timing: 'COMMIT_UNITS',

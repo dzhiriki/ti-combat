@@ -46,7 +46,8 @@ export const spaceCannonOffense: Ability<Params> = {
     customPriority: false,
     unitPriority: declareParam<UnitList>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
+      side: 'opponent',
     }),
     disableSustainDamage: false,
   },
@@ -55,13 +56,10 @@ export const spaceCannonOffense: Ability<Params> = {
     {
       timing: 'SPACE_CANNON_OFFENSE_STEP',
       call: (ctx, params) => {
-        // Our space cannon hits land on the opponent, so the opponent's own SCO
-        // unit priority governs how it sacrifices units. We pass that as a
-        // resolution-scoped UNIT_PRIORITY override (read by getPhasePriorityList).
-        // If we have Graviton Laser System, patch the target's priority so its
-        // fighters sort last (hits hit non-fighter ships if able).
+        // This side owns the priority for hits it produces. By default it
+        // inherits the target's normal UNIT_PRIORITY; a custom list or an
+        // "if able" effect overrides it only for this resolution.
         const opp = ctx.api.opponent
-        const sc = opp.getAbilityConfig('SPACE_CANNON_OFFENSE')
         // Graviton Laser System and Twilight's Fall's "Converge" action card
         // force ALL of a side's Space Cannon hits onto non-fighter ships if
         // able. (The Justiciar Rail PDS restricts only its own hits — that's a
@@ -72,8 +70,8 @@ export const spaceCannonOffense: Ability<Params> = {
           own.getAbilityConfig('GRAVITON_LASER_SYSTEM')?.isEnabled === true ||
           own.getAbilityConfig('TF_CONVERGE')?.isEnabled === true
 
-        let priority: UnitList | undefined = sc.customPriority
-          ? sc.unitPriority
+        let priority: UnitList | undefined = params.customPriority
+          ? params.unitPriority
           : glsEnabled
             ? (opp.getAbilityConfig('UNIT_PRIORITY').spaceUnitPriority ?? [])
             : undefined
@@ -81,7 +79,11 @@ export const spaceCannonOffense: Ability<Params> = {
         if (glsEnabled && priority) priority = fightersLast(priority)
 
         const override: AbilitiesOverride = {}
-        if (priority) override.UNIT_PRIORITY = { spaceUnitPriority: priority }
+        if (priority)
+          override.SPACE_CANNON_OFFENSE = {
+            customPriority: true,
+            unitPriority: priority,
+          }
         if (params.disableSustainDamage) override.SUSTAIN_DAMAGE = false
 
         ctx.resolveStep('SPACE_CANNON_OFFENSE', {

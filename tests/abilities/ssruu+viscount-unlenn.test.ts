@@ -63,7 +63,7 @@ describe('SSRUU + VISCOUNT_UNLENN', () => {
 
   it('Viscount subtype declared by each ability with distinct source tags', () => {
     // With both agents active and targeting the same ship, VISCOUNT is
-    // declared twice in SETTINGS.subtypes — once by Viscount (source
+    // declared twice in side metadata — once by Viscount (source
     // 'VISCOUNT_UNLENN') and once by Ssruu (source 'SSRUU'). Viscount's UI
     // filters its own declarations via excludeSubtypeSource so Ssruu's entry
     // stays visible, letting the user stack Viscount on Viscount-boosted ships.
@@ -84,10 +84,9 @@ describe('SSRUU + VISCOUNT_UNLENN', () => {
       defender: { faction: 'ARBOREC', units: { CRUISER: 1 } },
     })
 
-    const settings = t.state.attacker.abilities.SETTINGS as {
-      subtypes: { name: string; unitType: string; source?: string }[]
-    }
-    const viscountDecls = settings.subtypes.filter(s => s.name === 'Viscount')
+    const viscountDecls = (t.state.attacker.declaredSubtypes ?? []).filter(
+      subtype => subtype.name === 'Viscount',
+    )
     expect(viscountDecls).toHaveLength(2)
     expect(viscountDecls.map(d => d.source).sort()).toEqual([
       'SSRUU',

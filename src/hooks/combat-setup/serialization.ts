@@ -79,7 +79,6 @@ export function serializeAbilities(
 ): Record<string, Record<string, unknown>> {
   const result: Record<string, Record<string, unknown>> = {}
   for (const [key, params] of Object.entries(config)) {
-    if (key === 'SETTINGS') continue
     const defaults = reconciledDefaults[key]
     if (!defaults) continue
     const diff: Record<string, unknown> = {}

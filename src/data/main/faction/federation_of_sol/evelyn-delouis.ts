@@ -23,7 +23,7 @@ export const evelynDelouis: Ability<Params> = {
     uses: 1,
     unitType: declareParam<UnitType>({
       default: 'INFANTRY',
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       filter: {
         excludeSubtypeSource: ['EVELYN_DELOUIS'],
         combatMode: 'GROUND',

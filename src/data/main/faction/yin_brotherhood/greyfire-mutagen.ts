@@ -24,7 +24,7 @@ export const greyfireMutagen: Ability<Params> = {
     uses: 1,
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       side: 'opponent',
       defaultItemValue: true,
       sort: 'worth-desc',

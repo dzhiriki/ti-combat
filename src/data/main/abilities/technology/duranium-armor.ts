@@ -23,13 +23,13 @@ export const duraniumArmor: Ability<Params> = {
     uses: Infinity,
     spaceRepairPriority: declareParam<UnitList>({
       default: [],
-      source: 'nonFighterShips',
+      source: 'SHIPS',
       sort: 'worth-desc',
-      filter: { combatMode: 'SPACE' },
+      filter: { combatMode: 'SPACE', exclude: ['FIGHTER'] },
     }),
     groundRepairPriority: declareParam<UnitList>({
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       sort: 'worth-desc',
       filter: { combatMode: 'GROUND' },
     }),

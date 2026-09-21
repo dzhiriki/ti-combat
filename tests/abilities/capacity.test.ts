@@ -34,15 +34,17 @@ describe.forEachSide('CAPACITY', () => {
         units: { CARRIER: 1, CRUISER: 1, INFANTRY: 3 },
         abilities: {
           CAPACITY: true,
-          SPACE_CANNON_OFFENSE: {
-            customPriority: true,
-            unitPriority: [['CARRIER'], ['CRUISER'], ['INFANTRY']],
-          },
         },
       },
       defender: {
         faction: 'ARBOREC',
         units: { CRUISER: 1, PDS: 1 },
+        abilities: {
+          SPACE_CANNON_OFFENSE: {
+            customPriority: true,
+            unitPriority: [['CARRIER'], ['CRUISER'], ['INFANTRY']],
+          },
+        },
       },
     })
 

@@ -28,7 +28,6 @@ export {
   type RegisteredAbility,
   resolveInvokes,
   type RuntimeAbilityList,
-  type SettingsParams,
   type SideApi,
   type SyncSortSpec,
   type SyncSourceConfig,

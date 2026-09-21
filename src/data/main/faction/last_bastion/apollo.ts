@@ -26,7 +26,7 @@ export const apollo: Ability<Params> = {
     isEnabled: false,
     uses: 1,
     heroUnit: declareParam<UnitType | null>({
-      source: 'units',
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       default: null,
       filter: {
         includeSubtypes: [GALVANIZED],

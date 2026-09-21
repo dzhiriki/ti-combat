@@ -16,9 +16,11 @@ export const waylay: Ability = {
       timing: 'BEFORE_UNIT_ABILITY_ROLL',
       context: 'AFB',
       call: ctx => {
-        ctx.api.opponent.updateAbilityConfig('SETTINGS', {
-          validTargetsAntiFighterBarrage:
-            ctx.api.opponent.participating.getUnitTypes(),
+        ctx.api.own.updateAbilityConfig('ANTI_FIGHTER_BARRAGE', {
+          customPriority: true,
+          unitPriority:
+            ctx.api.opponent.getAbilityConfig('UNIT_PRIORITY')
+              .spaceUnitPriority ?? [],
         })
       },
     },

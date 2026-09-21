@@ -1,6 +1,11 @@
-import type { Ability } from '@/combat'
+import { type Ability, declareParam } from '@/combat'
+import type { UnitList } from '@/types'
 
-type Params = { disableSustainDamage: boolean }
+type Params = {
+  customPriority: boolean
+  unitPriority: UnitList
+  disableSustainDamage: boolean
+}
 
 declare global {
   interface AbilityConfigMap {
@@ -17,6 +22,12 @@ export const bombardment: Ability<Params> = {
   params: {
     isEnabled: true,
     uses: Infinity,
+    customPriority: false,
+    unitPriority: declareParam<UnitList>({
+      default: [],
+      source: 'GROUND_FORCES',
+      side: 'opponent',
+    }),
     disableSustainDamage: false,
   },
   side: 'attacker',

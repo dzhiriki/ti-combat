@@ -26,14 +26,14 @@ export const spark: Ability<Params> = {
     // Fighters and infantry are excluded as they cannot sustain.
     spaceTargets: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
       side: 'opponent',
       defaultItemValue: true,
       filter: { combatMode: 'SPACE', exclude: ['FIGHTER'] },
     }),
     groundTargets: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundCombatParticipating',
+      source: 'GROUND_FORCES',
       side: 'opponent',
       defaultItemValue: true,
       filter: { combatMode: 'GROUND', exclude: ['INFANTRY'] },

@@ -29,7 +29,7 @@ export const vosHollow: Ability<Params> = {
     uses: 1,
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'opponent',
       defaultItemValue: true,
       filter: { combatMode: 'SPACE' },

@@ -1,6 +1,7 @@
 import type { CombatSide, UnitType } from '@/types'
 
 import type { HitSource, MetaPhase, SideStateData } from '../combat-state/types'
+import { parseVariantId } from '../utils/unit-variant'
 import { type DiceMathBranch, type PendingHitPool } from './branch-accumulator'
 import { collectModifiers } from './collect-modifiers'
 import { runFastMode } from './fast-mode'
@@ -37,17 +38,9 @@ interface DiceMathInput {
    *  script method), but the dice-shape `ADD_DICE_COUNT` suppression and the
    *  reroll-spec flip apply as if the firer is shooting itself. */
   selfTarget?: boolean
-  /** Per-landing-side meta-level target restriction (only set for
-   *  unit-ability rolls). Becomes the `unitPriority` of a custom entry
-   *  attached to the landing side's hit pool, ordered by `priorityList`. */
-  validTargets: { attacker: UnitType[]; defender: UnitType[] }
-  /** Per-landing-side phase-sacrifice priority — variant keys in
-   *  cheapest-first order. Used to sort `validTargets` into the custom
-   *  entry's `unitPriority`. */
-  priorityList: {
-    attacker: UnitType[] | undefined
-    defender: UnitType[] | undefined
-  }
+  /** Per-raw-landing-side priority for unit-ability hits. Each list defines
+   *  both eligibility and assignment order. Undefined for combat rolls. */
+  unitAbilityPriority?: { attacker: UnitType[]; defender: UnitType[] }
   sideData: { attacker: SideStateData; defender: SideStateData }
   /** abilityKey → uses available for conditional modifiers / one-shot decls. */
   abilityUses: Map<string, number>
@@ -167,8 +160,7 @@ export function runDiceMath(input: DiceMathInput): DiceMathResult {
         dice,
         preSplit: split,
         modifiers,
-        validTargets: input.validTargets,
-        priorityList: input.priorityList,
+        unitAbilityPriority: input.unitAbilityPriority,
         meta: input.meta,
         selfTarget,
         collapseThreshold: input.collapseThreshold,
@@ -177,8 +169,7 @@ export function runDiceMath(input: DiceMathInput): DiceMathResult {
         dice,
         preSplit: split,
         modifiers,
-        validTargets: input.validTargets,
-        priorityList: input.priorityList,
+        unitAbilityPriority: input.unitAbilityPriority,
         meta: input.meta,
         selfTarget,
         collapseThreshold: input.collapseThreshold,
@@ -204,10 +195,10 @@ export function runDiceMath(input: DiceMathInput): DiceMathResult {
     selfTarget,
   )
 
-  if (input.meta === 'AFB') {
+  if (input.meta === 'AFB' && input.unitAbilityPriority) {
     branches = applyAfbClamp(
       branches,
-      input.validTargets,
+      input.unitAbilityPriority,
       input.sideData,
       input.skipAfbClampForTarget,
     )
@@ -342,7 +333,7 @@ function markDeclarationUses(
 
 function applyAfbClamp(
   branches: DiceMathBranch[],
-  validTargets: { attacker: UnitType[]; defender: UnitType[] },
+  unitAbilityPriority: { attacker: UnitType[]; defender: UnitType[] },
   sideData: { attacker: SideStateData; defender: SideStateData },
   skipForTarget: { attacker: boolean; defender: boolean } | undefined,
 ): DiceMathBranch[] {
@@ -351,7 +342,7 @@ function applyAfbClamp(
     out,
     'attacker',
     'defender',
-    validTargets,
+    unitAbilityPriority,
     sideData,
     skipForTarget,
   )
@@ -359,7 +350,7 @@ function applyAfbClamp(
     out,
     'defender',
     'attacker',
-    validTargets,
+    unitAbilityPriority,
     sideData,
     skipForTarget,
   )
@@ -370,11 +361,11 @@ function clampForFiringSide(
   branches: DiceMathBranch[],
   firingSide: CombatSide,
   targetSide: CombatSide,
-  validTargets: { attacker: UnitType[]; defender: UnitType[] },
+  unitAbilityPriority: { attacker: UnitType[]; defender: UnitType[] },
   sideData: { attacker: SideStateData; defender: SideStateData },
   skipForTarget: { attacker: boolean; defender: boolean } | undefined,
 ): DiceMathBranch[] {
-  if (!isFighterOnlyTargets(validTargets[targetSide])) return branches
+  if (!isFighterOnlyPriority(unitAbilityPriority[targetSide])) return branches
   if (skipForTarget?.[firingSide]) return branches
   const maxFighters = countParticipatingFighters(sideData[targetSide])
   let any = false
@@ -391,8 +382,11 @@ function clampForFiringSide(
   return any ? collapseBranches(branches) : branches
 }
 
-function isFighterOnlyTargets(targets: UnitType[]): boolean {
-  return targets.length === 1 && targets[0] === 'FIGHTER'
+function isFighterOnlyPriority(priority: UnitType[]): boolean {
+  return (
+    priority.length > 0 &&
+    priority.every(type => parseVariantId(type).type === 'FIGHTER')
+  )
 }
 
 function countParticipatingFighters(side: SideStateData): number {

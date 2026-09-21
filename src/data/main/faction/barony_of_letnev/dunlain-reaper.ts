@@ -32,7 +32,7 @@ export const dunlainReaper: Ability<Params> = {
     availableMechs: UNIT_LIMITS.MECH,
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       side: 'own',
       defaultItemValue: true,
       sort: 'worth-asc',

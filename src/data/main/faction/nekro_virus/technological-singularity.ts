@@ -91,18 +91,18 @@ export const technologicalSingularity: Ability<TSParams> = {
     disableMordred: false,
   },
   headerUI: 'isEnabled',
-  declareParamChange: (params, settings, ctx) => {
+  declareParamChange: (params, ctx) => {
     if (!params.isEnabled || params.enableAbilityKey === NONE) return []
     const target = findAbility(ctx, params.enableAbilityKey)
     if (!target?.declareParamChange) return []
     const synth = {
       ...extractDefaults(target),
       [target.headerUI ?? 'isEnabled']: true,
-    } as Parameters<NonNullable<typeof target.declareParamChange>>[0]
-    return target.declareParamChange(synth, settings, {
-      abilities: ctx.abilities,
-      this: target,
-    })
+    }
+    return target.declareParamChange(
+      synth as Parameters<NonNullable<typeof target.declareParamChange>>[0],
+      { abilities: ctx.abilities, this: target },
+    )
   },
   uiConfig: ctx => {
     const disableGroups = buildSelectGroups(

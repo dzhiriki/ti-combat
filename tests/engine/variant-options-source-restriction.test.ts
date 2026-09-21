@@ -3,34 +3,22 @@ import { describe, expect, it } from 'vitest'
 import { type SideStateData } from '@/combat'
 import { CombatSideState } from '@/combat/combat-side-state/combat-side-state'
 
-/** Minimal SideStateData where ships participate (including FIGHTER) but the
- *  SETTINGS group `nonFighterShips` is restricted to non-fighter base types.
- *  Lets us drive `getUnitVariantOptions` with each source group independently. */
+/** Minimal SideStateData where ships participate, including FIGHTER. */
 function makeSide(): SideStateData {
   const ships = ['CRUISER', 'DESTROYER', 'FIGHTER']
-  const nonFighter = ['CRUISER', 'DESTROYER']
   return {
     participatingUnits: [],
     nonParticipatingUnits: [],
     unitType: {},
     unitState: {},
     unitStats: {},
-    abilities: {
-      SETTINGS: {
-        units: ships,
-        spaceCombatParticipating: ships,
-        groundCombatParticipating: [],
-        ships,
-        groundForces: [],
-        nonFighterShips: nonFighter,
-        structures: [],
-        validTargetsSpaceCannonOffense: [],
-        validTargetsBombardment: [],
-        validTargetsSpaceCannonDefense: [],
-        validTargetsAntiFighterBarrage: [],
-        subtypes: [],
-      },
+    abilities: {},
+    unitCategoryOptions: {
+      SHIPS: ships,
+      GROUND_FORCES: [],
+      STRUCTURES: [],
     },
+    declaredSubtypes: [],
     liveAbilities: {},
   } as unknown as SideStateData
 }

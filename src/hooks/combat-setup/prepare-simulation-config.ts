@@ -1,6 +1,7 @@
 import { createLookups } from '@/combat'
 import type { CollectedAbility, CombatSide, GameSystem } from '@/types'
 import { getGameData } from '@/utils/get-game-data'
+import { buildUnitStatsMap } from '@/utils/get-simulation-units'
 
 import type { Ability } from '../../combat/abilities-engine/types'
 import type {
@@ -11,7 +12,6 @@ import {
   clampLimitParams,
   initializeAbilityDefaults,
   reconcileAbilitiesConfig,
-  resetSettingsToBase,
   restoreConsumerParams,
   snapshotConsumerParams,
 } from './reconcile'
@@ -20,7 +20,7 @@ import {
  * Prepare abilities config for simulation.
  *
  * Runs the full reconcile pipeline (snapshot user params → reconcile →
- * restore user selections → reset SETTINGS to base), producing a config
+ * restore user selections), producing a config
  * ready for AbilitiesEngine with no further reconciliation needed.
  *
  * Returns the computed abilities so callers can pass them to CombatState
@@ -30,6 +30,7 @@ interface SideAbilitiesData {
   registered: CollectedAbility[]
   unitAbilityKeys: ReadonlySet<string>
   factionOwnedKeys: ReadonlySet<string>
+  metadata: import('./reconcile').SideOptionMetadata
 }
 
 export function prepareSimulationConfig(
@@ -68,13 +69,17 @@ export function prepareSimulationConfig(
   // snapshot/restore must not capture these defaults and overwrite reconciled
   // sync values. Mirrors the UI store's setup (combat-setup.ts).
   initializeAbilityDefaults(config, registered)
-  reconcileAbilitiesConfig(
+  const metadata = reconcileAbilitiesConfig(
     config,
     registered,
     combatMode,
     undefined,
     undefined,
     lookups,
+    {
+      attacker: buildUnitStatsMap(system, attackerFaction),
+      defender: buildUnitStatsMap(system, defenderFaction),
+    },
   )
   restoreConsumerParams(config, registered, savedParams)
   // After restore, sync-source params with declared limits may carry
@@ -82,18 +87,18 @@ export function prepareSimulationConfig(
   // re-expanding the valid list so that order-mode params (single-element
   // tuples) and user-trimmed lists are not affected.
   clampLimitParams(config, registered)
-  resetSettingsToBase(config, registered, lookups)
-
   return {
     attacker: {
       registered: registered.attacker,
       unitAbilityKeys: gameData.getUnitDefinitionAbilityKeys(attackerFaction),
       factionOwnedKeys: gameData.getFactionOwnedAbilityKeys(attackerFaction),
+      metadata: metadata.attacker,
     },
     defender: {
       registered: registered.defender,
       unitAbilityKeys: gameData.getUnitDefinitionAbilityKeys(defenderFaction),
       factionOwnedKeys: gameData.getFactionOwnedAbilityKeys(defenderFaction),
+      metadata: metadata.defender,
     },
   }
 }

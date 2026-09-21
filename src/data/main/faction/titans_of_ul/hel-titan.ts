@@ -10,6 +10,5 @@ export const helTitan: Ability = {
   },
   headerUI: 'isEnabled',
   readOnly: true,
-  declareParamChange: () => [{ key: 'groundForces', value: 'PDS' }],
   invoke: [],
 }

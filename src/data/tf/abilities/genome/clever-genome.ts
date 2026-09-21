@@ -64,13 +64,12 @@ export const cleverGenome: Ability<Params> = {
     }
     return next as typeof params
   },
-  declareParamChange: (params, settings, ctx) => {
+  declareParamChange: (params, ctx) => {
     const genome = findGenome(ctx, params.genomeKey)
     if (!genome?.declareParamChange) return []
     const merged = withGenomeDefaults(genome, params)
     return genome.declareParamChange(
       merged as Parameters<NonNullable<Ability['declareParamChange']>>[0],
-      settings,
       { abilities: ctx.abilities, this: genome },
     )
   },

@@ -22,7 +22,7 @@ export const magenDefenseGrid: Ability<Params> = {
     uses: Infinity,
     targetPriority: declareParam<UnitList>({
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       side: 'opponent',
       filter: { combatMode: 'GROUND' },
     }),

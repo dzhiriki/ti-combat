@@ -31,7 +31,7 @@ export const overwingZeta: Ability<Params> = {
         ['FLAGSHIP', 1],
         ['CRUISER', 2],
       ],
-      source: 'ships',
+      source: 'SHIPS',
       defaultItemValue: 0,
       filter: {
         include: ['FLAGSHIP', 'CRUISER', 'DESTROYER'],

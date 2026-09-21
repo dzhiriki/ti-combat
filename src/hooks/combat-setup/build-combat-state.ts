@@ -2,6 +2,7 @@ import { makeVariantId } from '@/combat'
 import type {
   DeclaredSubtype,
   RegisteredAbility,
+  UnitCategoryOptions,
 } from '@/combat/abilities-engine/types'
 import { SHIPS, STRUCTURES } from '@/constants/units'
 import type {
@@ -83,6 +84,8 @@ function buildSideState(
   side: CombatSide,
   surfaces: SurfaceDefinition[],
   activeSurfaceId: SurfaceId,
+  declaredSubtypes: readonly DeclaredSubtype[],
+  unitCategoryOptions: UnitCategoryOptions,
 ): SideStateData {
   const upgradedSet = new Set(config.upgrades ?? [])
   const placements = createEmptySurfaceSelections(surfaces)
@@ -178,11 +181,6 @@ function buildSideState(
     placementStats,
   )
 
-  const settings = abilities['SETTINGS'] as
-    | { subtypes?: DeclaredSubtype[] }
-    | undefined
-  const declaredSubtypes = settings?.subtypes ?? []
-
   const baseUnitStats: Record<string, UnitStatsEntry> = {
     ...buildUnitStatsMap(system, config.faction, upgradedSet),
     ...unitStats,
@@ -210,6 +208,8 @@ function buildSideState(
       import('@/types').UnitType,
       UnitStatsEntry
     >,
+    declaredSubtypes,
+    unitCategoryOptions,
     abilities,
     liveAbilities: {},
   }
@@ -265,6 +265,8 @@ export function buildCombatState(config: CombatStateConfig): CombatState {
     'attacker',
     surfaces,
     activeSurfaceId,
+    sideAbilities.attacker.metadata.subtypes,
+    sideAbilities.attacker.metadata.categories,
   )
   const defenderSide = buildSideState(
     config.system,
@@ -275,6 +277,8 @@ export function buildCombatState(config: CombatStateConfig): CombatState {
     'defender',
     surfaces,
     activeSurfaceId,
+    sideAbilities.defender.metadata.subtypes,
+    sideAbilities.defender.metadata.categories,
   )
 
   // Stateful clamp pass: with real per-side state now built, clamp IN_COMBAT

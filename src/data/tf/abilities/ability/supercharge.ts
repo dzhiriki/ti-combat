@@ -37,13 +37,13 @@ export const supercharge: Ability<Params> = {
     uses: Infinity,
     spacePriority: declareParam<UnitList>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
       sort: 'worth-desc',
       filter: { combatMode: 'SPACE' },
     }),
     groundPriority: declareParam<UnitList>({
       default: [],
-      source: 'groundCombatParticipating',
+      source: 'GROUND_FORCES',
       sort: 'worth-desc',
       filter: { combatMode: 'GROUND' },
     }),

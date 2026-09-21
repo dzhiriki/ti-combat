@@ -12,8 +12,11 @@ import {
   getSimulationUnitsOnSurfaces,
 } from '@/utils/get-simulation-units'
 
-import type { DeclaredSubtype } from './abilities-engine/types'
 import type { RegisteredAbility } from './abilities-engine/types'
+import type {
+  DeclaredSubtype,
+  UnitCategoryOptions,
+} from './abilities-engine/types'
 import { CombatEngine } from './combat-engine'
 import { CombatState } from './combat-state'
 import type {
@@ -31,6 +34,8 @@ function buildSideState(
   abilities: SideAbilitiesConfig,
   registeredAbilities: readonly RegisteredAbility[],
   gen: { _nextCode?: number },
+  declaredSubtypes: readonly DeclaredSubtype[],
+  unitCategoryOptions: UnitCategoryOptions,
 ): SideStateData {
   const upgradedSet = new Set<import('@/types').UnitBaseType>()
   for (const selections of Object.values(placements)) {
@@ -62,13 +67,8 @@ function buildSideState(
   // so `resolveUnitStats` re-evaluates them lazily against the *current*
   // parent stats. Eager evaluation here would freeze the variant before
   // runtime mutators like Reveal Prototype's `modifyUnitType` upgrade the
-  // base — Viscount on an upgraded Cruiser must reflect the upgrade, not
-  // the unupgraded snapshot from config time. SETTINGS.subtypes is
-  // re-derived by `prepareSimulationConfig` above.
-  const settings = abilities['SETTINGS'] as
-    | { subtypes?: DeclaredSubtype[] }
-    | undefined
-  for (const decl of settings?.subtypes ?? []) {
+  // base — Viscount on an upgraded Cruiser must reflect the upgrade.
+  for (const decl of declaredSubtypes) {
     const variantKey = makeVariantId(decl.unitType, [decl.name])
     if (baseUnitStats[variantKey]) continue
     baseUnitStats[variantKey] = decl.statsFactory
@@ -83,6 +83,8 @@ function buildSideState(
     unitType,
     unitState,
     unitStats: baseUnitStats,
+    declaredSubtypes,
+    unitCategoryOptions,
     abilities,
     liveAbilities: {},
   }
@@ -122,6 +124,8 @@ self.onmessage = (e: MessageEvent<SimulationInput>) => {
       abilities.attacker,
       sideAbilities.attacker.registered,
       gen,
+      sideAbilities.attacker.metadata.subtypes,
+      sideAbilities.attacker.metadata.categories,
     ),
     buildSideState(
       system,
@@ -131,6 +135,8 @@ self.onmessage = (e: MessageEvent<SimulationInput>) => {
       abilities.defender,
       sideAbilities.defender.registered,
       gen,
+      sideAbilities.defender.metadata.subtypes,
+      sideAbilities.defender.metadata.categories,
     ),
     combatMode,
     surfaces,
