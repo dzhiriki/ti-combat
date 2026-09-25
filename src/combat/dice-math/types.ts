@@ -1,3 +1,4 @@
+import type { UnitLocator } from '@/types'
 import type { CombatSide, UnitBaseType, UnitId, UnitType } from '@/types'
 
 import type { AbilityContext } from '../abilities-engine/api/ability-api'
@@ -165,7 +166,7 @@ export interface AdditionalHitPoolDecl {
   /** Source unit types whose hits get siphoned (matched by base type or
    *  variant key against the firing side's sources). */
   units: UnitType[]
-  transform: (count: number) => { base: number; unitPriority: UnitType[] }
+  transform: (count: number) => { base: number; unitPriority: UnitLocator[] }
   wasDeclaration?: boolean
 }
 
@@ -341,7 +342,7 @@ export interface AdditionalHitPoolTargetSpec {
   units: UnitType[]
   /** Called with the total siphoned hit count; returns the custom
    *  sub-pool entry to append to the landing side's hit pool. */
-  transform: (count: number) => { base: number; unitPriority: UnitType[] }
+  transform: (count: number) => { base: number; unitPriority: UnitLocator[] }
 }
 
 export interface RollTriggerTargetSpec {

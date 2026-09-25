@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import type { CombatOutcome, SurfaceSurvivors, SurvivorSide } from '@/combat'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import { UNIT_SHORT_NAMES } from '@/constants/units'
+import type { SurfaceId } from '@/types'
 import type { SurfaceDefinition, UnitBaseType } from '@/types'
 
 import { sortSurvivors } from './sort-survivors'
@@ -146,7 +147,11 @@ function SurfaceSurvivorList({
         <div key={surface.id} className={styles.surfaceGroup}>
           <span className={styles.surfaceLabel}>{surface.name}</span>
           <span>
-            <SurvivorList side={side[surface.id] ?? {}} priority={priority} />
+            <SurvivorList
+              side={side[surface.id] ?? {}}
+              priority={priority}
+              surfaceId={surface.id}
+            />
           </span>
         </div>
       ))}
@@ -158,11 +163,13 @@ function SurfaceSurvivorList({
 function SurvivorList({
   side,
   priority,
+  surfaceId,
 }: {
   side: SurvivorSide
   priority: string[]
+  surfaceId?: SurfaceId
 }) {
-  const entries = sortSurvivors(side, priority)
+  const entries = sortSurvivors(side, priority, surfaceId)
   if (entries.length === 0) {
     return <span className={styles.noSurvivors}>&mdash;</span>
   }

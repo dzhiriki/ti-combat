@@ -24,6 +24,7 @@ export const bombardment: Ability<Params> = {
     uses: Infinity,
     customPriority: false,
     unitPriority: declareParam<UnitList>({
+      scope: 'type',
       default: [],
       source: 'GROUND_FORCES',
       side: 'opponent',

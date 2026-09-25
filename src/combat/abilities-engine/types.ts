@@ -3,6 +3,7 @@ import type {
   CombatSide,
   DiceGroup,
   SurfaceType,
+  SurfaceId,
   UnitBaseType,
   UnitId,
   UnitStats,
@@ -46,7 +47,19 @@ export interface ParamFilter {
   includeOnlyAvailable?: boolean
 }
 
+export type UnitSelectorScope = 'participating' | 'system' | 'type'
+
+export interface UnitOption {
+  label: string
+  value: import('@/types').UnitLocator
+  surfaceId?: SurfaceId
+  surfaceName?: string
+  surfaceOrder?: number
+  max?: number
+}
+
 export interface SyncSourceConfig {
+  scope: UnitSelectorScope
   key: string
   source: UnitCategory | readonly UnitCategory[]
   side: 'own' | 'opponent'
@@ -66,6 +79,8 @@ export interface SyncSourceConfig {
 export interface DeclaredSubtype {
   name: UnitVariantId
   unitType: UnitType
+  /** Setup availability of this subtype; omitted means any eligible surface. */
+  surfaces?: readonly SurfaceId[]
   /** When false, the subtype is registered but treated as inactive: UI
    *  consumers (`getUnitVariantsOptions`) and `declareParam(source: ...)`
    *  reconciliation hide it unless the caller passes
@@ -90,6 +105,8 @@ export interface DeclaredSubtype {
 export interface ParamChange {
   key: UnitCategory
   value: UnitBaseType | UnitCategory
+  /** Setup participation preview; runtime membership still comes from invokes. */
+  scope?: 'active' | 'system' | 'commit'
 }
 
 export type UnitCategoryOptions = Record<UnitCategory, UnitBaseType[]>
@@ -437,7 +454,13 @@ interface UIConfigNumber<
   max?: number
 }
 
-export type SelectItem = { label: string; value: string }
+export type SelectItem = {
+  label: string
+  value: string
+  surfaceId?: SurfaceId
+  surfaceName?: string
+  surfaceOrder?: number
+}
 export type SelectGroup = {
   group: string
   items: { label: string; value: string }[]
@@ -463,6 +486,9 @@ interface UIConfigUnitList<
     value: string
     max?: number
     stable?: boolean
+    surfaceId?: SurfaceId
+    surfaceName?: string
+    surfaceOrder?: number
   }[]
 }
 

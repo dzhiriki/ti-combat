@@ -5,21 +5,15 @@ import {
   type AbilityCallContext,
   type DeclaredSubtype,
   declareParam,
-  parseVariantId,
 } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { UNIT_TYPES } from '@/constants/units'
-import type {
-  UnitBaseType,
-  UnitId,
-  UnitList,
-  UnitStats,
-  UnitType,
-  UnitVariantId,
-} from '@/types'
+import type { SurfaceId, UnitLocator } from '@/types'
+import type { UnitId, UnitList, UnitStats, UnitVariantId } from '@/types'
 import { UnitListNumberSchema } from '@/types'
 
 type Params = {
-  galvanizedUnits: UnitList<number, UnitBaseType>
+  galvanizedUnits: UnitList<number>
   reinforcementTokens: number
 }
 
@@ -50,6 +44,7 @@ export const preGalvanized: Ability<Params> = {
     isEnabled: true,
     uses: Infinity,
     galvanizedUnits: declareParam({
+      scope: 'system',
       default: [],
       defaultItemValue: 0,
       source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
@@ -64,10 +59,22 @@ export const preGalvanized: Ability<Params> = {
     reinforcementTokens: 7,
   },
   declareSubtype: params => {
-    const counts = new Map(params.galvanizedUnits)
-    return UNIT_TYPES.map(unitType =>
-      declareGalvanizeUnits(unitType, (counts.get(unitType) ?? 0) > 0),
-    )
+    return UNIT_TYPES.map(unitType => {
+      const selected = params.galvanizedUnits.filter(
+        ([key, count]) =>
+          count > 0 && parseUnitLocator(key).unitType === unitType,
+      )
+      const surfaces = selected.map(([key]) => parseUnitLocator(key).surfaceId)
+      // Unselected types stay declarable everywhere: units galvanized
+      // mid-combat (Raise the Standard) can still be chosen elsewhere.
+      return {
+        ...declareGalvanizeUnits(unitType, selected.length > 0),
+        surfaces:
+          !surfaces.length || surfaces.includes(undefined)
+            ? undefined
+            : (surfaces as SurfaceId[]),
+      }
+    })
   },
   uiConfig: ctx => [
     {
@@ -135,7 +142,7 @@ export function galvanizeUnit(
   const api = ctx.api.own
   const sourceKey = api.getUnitVariantKey(unitId)
   if (!sourceKey) return false
-  if (parseVariantId(sourceKey).subtypes.includes(GALVANIZED)) return false
+  if (parseUnitLocator(sourceKey).subtypes.includes(GALVANIZED)) return false
   if (consumeToken) {
     const tokens =
       api.getAbilityConfig('PRE_GALVANIZED')?.reinforcementTokens ?? 0
@@ -154,12 +161,14 @@ export function galvanizeUnit(
  *  the right stats factory. `participating` controls whether the subtype is
  *  hidden by default (false) or surfaced everywhere (true). */
 export function declareGalvanizeUnits(
-  unitType: UnitType,
+  target: UnitLocator,
   participating: boolean,
 ): DeclaredSubtype {
+  const { unitType, surfaceId } = parseUnitLocator(target)
   return {
     name: GALVANIZED,
     unitType,
+    surfaces: surfaceId === undefined ? undefined : [surfaceId],
     participating,
     statsFactory: galvanizeStats,
   }

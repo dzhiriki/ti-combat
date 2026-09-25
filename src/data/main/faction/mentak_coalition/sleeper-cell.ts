@@ -1,6 +1,7 @@
 import { z } from 'zod/mini'
 
-import { type Ability, declareParam, parseVariantId } from '@/combat'
+import { type Ability, declareParam } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { UNIT_LIMITS } from '@/constants/units'
 import type { UnitBaseType, UnitList } from '@/types'
 import { UnitListNumberSchema } from '@/types'
@@ -41,6 +42,7 @@ export const sleeperCell: Ability<Params> = {
     uses: Infinity,
     isActive: false,
     availableShips: declareParam<UnitList<number, UnitBaseType>>({
+      scope: 'type',
       default: SHIP_LIMITS_DEFAULT,
       source: 'SHIPS',
       sort: 'worth-desc',
@@ -75,7 +77,7 @@ export const sleeperCell: Ability<Params> = {
             ctx.api.own.getUnitVariantKey(id) ??
             ctx.api.opponent.getUnitVariantKey(id)
           if (!variantKey) continue
-          const { type } = parseVariantId(variantKey)
+          const { baseType: type } = parseUnitLocator(variantKey)
           if (ctx.api.own.isUnitTypeCategory(type, 'SHIPS')) return true
         }
         return false
@@ -87,14 +89,14 @@ export const sleeperCell: Ability<Params> = {
         for (const id of ids) {
           const ownKey = ctx.api.own.getUnitVariantKey(id)
           if (ownKey) {
-            const { type } = parseVariantId(ownKey)
+            const { baseType: type } = parseUnitLocator(ownKey)
             if (!ctx.api.own.isUnitTypeCategory(type, 'SHIPS')) continue
             ownDestroyed[type] = (ownDestroyed[type] ?? 0) + 1
             continue
           }
           const oppKey = ctx.api.opponent.getUnitVariantKey(id)
           if (oppKey) {
-            const { type } = parseVariantId(oppKey)
+            const { baseType: type } = parseUnitLocator(oppKey)
             if (!ctx.api.own.isUnitTypeCategory(type, 'SHIPS')) continue
             opponentDestroyed[type] = (opponentDestroyed[type] ?? 0) + 1
           }

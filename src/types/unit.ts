@@ -22,6 +22,11 @@ export type UnitBaseType =
 type UnitVariant = `${UnitBaseType}:${UnitVariantId}`
 export type UnitType = UnitBaseType | UnitVariant
 
+/** An ability selection identifies a variant at a location, never a stat key. */
+export type SurfaceUnitKey = string & { readonly __brand: 'SurfaceUnitKey' }
+/** Plain types remain supported for legacy settings and type-only choices. */
+export type UnitLocator = UnitType | SurfaceUnitKey
+
 // Unit abilities
 interface UnitAbilities {
   SUSTAIN_DAMAGE?: boolean
@@ -111,12 +116,12 @@ export type UnitId = string & { readonly __brand: 'UnitId' }
 export type UnitIdList = string & { readonly __brand: 'UnitIdList' }
 
 /** Unified shape for ability list params that the `<List>` UI component edits.
- *  - `UnitList` (V = never)        → `[UnitType][]`        (order mode)
- *  - `UnitList<boolean>`           → `[UnitType, boolean][]` (checkbox mode)
- *  - `UnitList<number>`            → `[UnitType, number][]`  (number mode)
+ *  - `UnitList` (V = never)        → `[UnitLocator][]`        (order mode)
+ *  - `UnitList<boolean>`           → `[UnitLocator, boolean][]` (checkbox mode)
+ *  - `UnitList<number>`            → `[UnitLocator, number][]`  (number mode)
  *  Override the key type with the second generic for non-unit lists, e.g.
  *  `UnitList<boolean, MetaPhase>` or `UnitList<never, string>`. */
-export type UnitList<V = never, K extends string = UnitType> = [V] extends [
+export type UnitList<V = never, K extends string = UnitLocator> = [V] extends [
   never,
 ]
   ? [K][]

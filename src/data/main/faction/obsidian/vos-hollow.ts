@@ -1,12 +1,8 @@
 import { z } from 'zod/mini'
 
 import obsidianIcon from '@/assets/faction/obsidian.svg?raw'
-import {
-  type Ability,
-  type AbilityReadContext,
-  declareParam,
-  parseVariantId,
-} from '@/combat'
+import { type Ability, type AbilityReadContext, declareParam } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import type { UnitBaseType, UnitId, UnitList } from '@/types'
 import { UnitListBooleanSchema } from '@/types'
 
@@ -43,10 +39,10 @@ export const vosHollow: Ability<Params> = {
       isCallable: (params, ctx, ids) => {
         const ownDestroyedShips = collectOwnDestroyedShipTypes(ctx, ids)
         for (const variantId of ctx.utils.getFlat(params.targetPriority)) {
-          const { type } = parseVariantId(variantId)
+          const { baseType: type } = parseUnitLocator(variantId)
           if (
             ownDestroyedShips.has(type) &&
-            ctx.api.opponent.participating.hasUnitType(type, {
+            ctx.api.opponent.participating.hasUnitType(variantId, {
               includeVariants: false,
             })
           )
@@ -57,16 +53,19 @@ export const vosHollow: Ability<Params> = {
       call: (ctx, params, ids) => {
         const ownDestroyedShips = collectOwnDestroyedShipTypes(ctx, ids)
         for (const variantId of ctx.utils.getFlat(params.targetPriority)) {
-          const { type } = parseVariantId(variantId)
+          const { baseType: type } = parseUnitLocator(variantId)
           if (
             ownDestroyedShips.has(type) &&
-            ctx.api.opponent.participating.hasUnitType(type, {
+            ctx.api.opponent.participating.hasUnitType(variantId, {
               includeVariants: false,
             })
           ) {
-            const [target] = ctx.api.opponent.participating.getUnits(type, {
-              includeVariants: false,
-            })
+            const [target] = ctx.api.opponent.participating.getUnits(
+              variantId,
+              {
+                includeVariants: false,
+              },
+            )
             if (target) ctx.api.opponent.destroyUnits(target)
             return
           }
@@ -93,7 +92,7 @@ function collectOwnDestroyedShipTypes(
   for (const id of destroyedIds) {
     const variantKey = ctx.api.own.getUnitVariantKey(id)
     if (!variantKey) continue
-    const { type } = parseVariantId(variantKey)
+    const { baseType: type } = parseUnitLocator(variantKey)
     if (ctx.api.own.isUnitCategory(id, 'SHIPS')) types.add(type)
   }
   return types

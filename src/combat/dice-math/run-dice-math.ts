@@ -1,7 +1,9 @@
-import type { CombatSide, UnitType } from '@/types'
+import type { UnitLocator } from '@/types'
+import type { CombatSide } from '@/types'
 
 import type { HitSource, MetaPhase, SideStateData } from '../combat-state/types'
-import { parseVariantId } from '../utils/unit-variant'
+import { parseUnitLocator } from '../utils/parse-unit-locator'
+import { matchesUnitLocator } from '../utils/unit-locator'
 import { type DiceMathBranch, type PendingHitPool } from './branch-accumulator'
 import { collectModifiers } from './collect-modifiers'
 import { runFastMode } from './fast-mode'
@@ -40,7 +42,7 @@ interface DiceMathInput {
   selfTarget?: boolean
   /** Per-raw-landing-side priority for unit-ability hits. Each list defines
    *  both eligibility and assignment order. Undefined for combat rolls. */
-  unitAbilityPriority?: { attacker: UnitType[]; defender: UnitType[] }
+  unitAbilityPriority?: { attacker: UnitLocator[]; defender: UnitLocator[] }
   sideData: { attacker: SideStateData; defender: SideStateData }
   /** abilityKey → uses available for conditional modifiers / one-shot decls. */
   abilityUses: Map<string, number>
@@ -333,7 +335,7 @@ function markDeclarationUses(
 
 function applyAfbClamp(
   branches: DiceMathBranch[],
-  unitAbilityPriority: { attacker: UnitType[]; defender: UnitType[] },
+  unitAbilityPriority: { attacker: UnitLocator[]; defender: UnitLocator[] },
   sideData: { attacker: SideStateData; defender: SideStateData },
   skipForTarget: { attacker: boolean; defender: boolean } | undefined,
 ): DiceMathBranch[] {
@@ -361,13 +363,16 @@ function clampForFiringSide(
   branches: DiceMathBranch[],
   firingSide: CombatSide,
   targetSide: CombatSide,
-  unitAbilityPriority: { attacker: UnitType[]; defender: UnitType[] },
+  unitAbilityPriority: { attacker: UnitLocator[]; defender: UnitLocator[] },
   sideData: { attacker: SideStateData; defender: SideStateData },
   skipForTarget: { attacker: boolean; defender: boolean } | undefined,
 ): DiceMathBranch[] {
   if (!isFighterOnlyPriority(unitAbilityPriority[targetSide])) return branches
   if (skipForTarget?.[firingSide]) return branches
-  const maxFighters = countParticipatingFighters(sideData[targetSide])
+  const maxFighters = countParticipatingFighters(
+    sideData[targetSide],
+    unitAbilityPriority[targetSide],
+  )
   let any = false
   for (const b of branches) {
     const clamped = clampFighterHitPool(
@@ -382,19 +387,26 @@ function clampForFiringSide(
   return any ? collapseBranches(branches) : branches
 }
 
-function isFighterOnlyPriority(priority: UnitType[]): boolean {
+function isFighterOnlyPriority(priority: UnitLocator[]): boolean {
   return (
     priority.length > 0 &&
-    priority.every(type => parseVariantId(type).type === 'FIGHTER')
+    priority.every(type => parseUnitLocator(type).baseType === 'FIGHTER')
   )
 }
 
-function countParticipatingFighters(side: SideStateData): number {
+function countParticipatingFighters(
+  side: SideStateData,
+  priority: UnitLocator[],
+): number {
   let n = 0
   for (const id of side.participatingUnits) {
     const t = side.unitType[id]
     if (!t) continue
-    if (t === 'FIGHTER' || t.startsWith('FIGHTER:')) n++
+    if (
+      (t === 'FIGHTER' || t.startsWith('FIGHTER:')) &&
+      priority.some(target => matchesUnitLocator(side, id, target, true))
+    )
+      n++
   }
   return n
 }

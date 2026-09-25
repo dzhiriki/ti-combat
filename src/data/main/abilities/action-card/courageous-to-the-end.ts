@@ -42,38 +42,46 @@ export const courageousToTheEnd: Ability<Params> = {
     {
       timing: 'AFTER_DESTROY',
       isCallable: (params, ctx, ids) => {
-        const ownDestroyedVariants = new Set<string>()
-        for (const id of ids) {
-          const key = ctx.api.own.getUnitVariantKey(id)
-          if (key && ctx.api.own.isUnitCategory(id, 'SHIPS'))
-            ownDestroyedVariants.add(key)
-        }
+        const ownDestroyed = ids.filter(
+          id =>
+            ctx.api.own.getUnitVariantKey(id) &&
+            ctx.api.own.isUnitCategory(id, 'SHIPS'),
+        )
         const ownEnabled = ctx.utils.getFlat(params.ownPriority)
-        if (!ownEnabled.some(v => ownDestroyedVariants.has(v))) return false
+        if (
+          !ownEnabled.some(target =>
+            ownDestroyed.some(id => ctx.api.own.matchesUnitLocator(id, target)),
+          )
+        )
+          return false
 
         const targets = ctx.api.opponent.participating.getAssignHitsTargets(2)
-        const targetEnabled = new Set<string>(
-          ctx.utils.getFlat(params.targetPriority),
-        )
+        const targetEnabled = ctx.utils.getFlat(params.targetPriority)
         return (
           targets.length > 0 &&
           targets.every(targetId =>
-            targetEnabled.has(ctx.api.opponent.getUnitVariantKey(targetId)!),
+            targetEnabled.some(target =>
+              ctx.api.opponent.matchesUnitLocator(targetId, target),
+            ),
           )
         )
       },
       call: (ctx, params, ids) => {
         // Anchor the dice roll on the best (lowest combat value → easiest to
         // hit) destroyed own ship among those matching ownPriority.
-        const ownDestroyedVariants = new Set<string>()
-        for (const id of ids) {
-          const key = ctx.api.own.getUnitVariantKey(id)
-          if (key && ctx.api.own.isUnitCategory(id, 'SHIPS'))
-            ownDestroyedVariants.add(key)
-        }
+        const ownDestroyed = ids.filter(
+          id =>
+            ctx.api.own.getUnitVariantKey(id) &&
+            ctx.api.own.isUnitCategory(id, 'SHIPS'),
+        )
         let combatValue: number | undefined
         for (const variantKey of ctx.utils.getFlat(params.ownPriority)) {
-          if (!ownDestroyedVariants.has(variantKey)) continue
+          if (
+            !ownDestroyed.some(id =>
+              ctx.api.own.matchesUnitLocator(id, variantKey),
+            )
+          )
+            continue
           const stats = ctx.api.own.getUnitStats(variantKey)
           if (!stats?.COMBAT) continue
           const v = stats.COMBAT[0]

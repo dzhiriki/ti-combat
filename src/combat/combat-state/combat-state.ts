@@ -8,6 +8,7 @@ import type {
   UnitBaseType,
   UnitId,
   UnitType,
+  UnitLocator,
 } from '@/types'
 
 import {
@@ -85,14 +86,14 @@ function opponentOf(side: CombatSide): CombatSide {
  *  entries whose value slot is explicitly `false` (checkbox-mode "off").
  *  Number-mode entries are kept regardless of count — sortUnitsByPriority
  *  consumers care about ordering, not magnitude. */
-function unwrapUnitListKeys(raw: unknown): UnitType[] {
-  if (!Array.isArray(raw)) return raw as UnitType[]
-  if (raw.length === 0) return raw as UnitType[]
-  if (!Array.isArray(raw[0])) return raw as UnitType[]
-  const result: UnitType[] = []
+function unwrapUnitListKeys(raw: unknown): UnitLocator[] {
+  if (!Array.isArray(raw)) return raw as UnitLocator[]
+  if (raw.length === 0) return raw as UnitLocator[]
+  if (!Array.isArray(raw[0])) return raw as UnitLocator[]
+  const result: UnitLocator[] = []
   for (const entry of raw as readonly [string, ...unknown[]][]) {
     if (entry.length >= 2 && entry[1] === false) continue
-    result.push(entry[0] as UnitType)
+    result.push(entry[0] as UnitLocator)
   }
   return result
 }
@@ -114,7 +115,10 @@ function sortUnitsAtSetup(data: CombatStateData): void {
           ? liveUP
           : { ...baseUP, ...liveUP }
     ) as
-      | { spaceUnitPriority?: UnitType[]; groundUnitPriority?: UnitType[] }
+      | {
+          spaceUnitPriority?: UnitLocator[]
+          groundUnitPriority?: UnitLocator[]
+        }
       | undefined
 
     const rawList =
@@ -945,7 +949,7 @@ export class CombatState {
     // keyed by the raw landing pool (the natural opponent); self-targeted
     // pools are swapped later with their priority intact.
     const unitAbilityPriority = ctx.isUnitAbility
-      ? ({ attacker: [], defender: [] } as Record<CombatSide, UnitType[]>)
+      ? ({ attacker: [], defender: [] } as Record<CombatSide, UnitLocator[]>)
       : undefined
     if (unitAbilityPriority) {
       for (const firingSide of ctx.firing) {

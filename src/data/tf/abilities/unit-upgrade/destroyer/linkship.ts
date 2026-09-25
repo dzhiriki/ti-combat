@@ -1,8 +1,9 @@
 import ralNelIcon from '@/assets/faction/ral_nel.svg?raw'
 import type { Ability, AbilityReadContext } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { UNIT_WORTH } from '@/constants/units'
 import { janovetInherits } from '@/data/tf/faction/el_nen_janovet/janovet-inherits'
-import type { UnitBaseType, UnitId } from '@/types'
+import type { UnitId } from '@/types'
 import { createStatsInvoke } from '@/utils/create-stats-invoke'
 
 // A target is eligible for Linkship's retreat destroy if it is damaged OR does
@@ -62,7 +63,7 @@ export const linkship: Ability = {
       isCallable: (_params, ctx, unitId) => {
         const key = ctx.api.own.getUnitVariantKey(unitId)
         if (!key) return false
-        const baseType = key.split(':')[0] as UnitBaseType
+        const baseType = parseUnitLocator(key).baseType
         if (baseType !== 'DESTROYER') {
           if (
             baseType !== 'FLAGSHIP' ||

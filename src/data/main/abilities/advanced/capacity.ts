@@ -4,14 +4,14 @@ import {
   type Ability,
   type AbilityCallContext,
   collectFreeCargo,
-  parseVariantId,
 } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { UNIT_TYPES } from '@/constants/units'
 import type { UnitBaseType, UnitList, UnitType } from '@/types'
 import { UnitListSchema } from '@/types'
 
 type Params = {
-  removePriority: UnitList
+  removePriority: UnitList<never, UnitType>
 }
 
 declare global {
@@ -30,7 +30,10 @@ export const capacity: Ability<Params> = {
   params: {
     isEnabled: false,
     uses: Infinity,
-    removePriority: [['FIGHTER'], ['INFANTRY'], ['MECH']] as UnitList,
+    removePriority: [['FIGHTER'], ['INFANTRY'], ['MECH']] as UnitList<
+      never,
+      UnitType
+    >,
   },
   headerUI: 'isEnabled',
   invoke: [
@@ -157,7 +160,7 @@ function enforceCapacity(
   for (const priorityType of removePriority) {
     if (excess <= 0) break
 
-    const { type: baseType } = parseVariantId(priorityType)
+    const { baseType } = parseUnitLocator(priorityType)
     const info = carriedTypes.find(
       c => c.baseType === baseType || c.baseType === priorityType,
     )

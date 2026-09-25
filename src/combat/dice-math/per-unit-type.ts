@@ -1,7 +1,8 @@
+import type { UnitLocator } from '@/types'
 import type { CombatSide, UnitType } from '@/types'
 
 import type { MetaPhase } from '../combat-state/types'
-import { parseVariantId } from '../utils/unit-variant'
+import { parseUnitLocator } from '../utils/parse-unit-locator'
 import type { DiceMathBranch, PendingEffect } from './branch-accumulator'
 import {
   makeEmptyPendingHitPool,
@@ -35,7 +36,7 @@ interface PerUnitTypeInput {
   dice: CollectedDice
   preSplit: PreSplit
   modifiers: Modifier[]
-  unitAbilityPriority?: { attacker: UnitType[]; defender: UnitType[] }
+  unitAbilityPriority?: { attacker: UnitLocator[]; defender: UnitLocator[] }
   meta: MetaPhase
   /** True for a self-targeting roll (Proxima self-bomb): flip reroll specs
    *  so "reroll misses" becomes "reroll hits" against the firer's own dice. */
@@ -789,14 +790,14 @@ function matchedSourcesByUnits(
   // stated as a variant key (e.g. 'FLAGSHIP:Galvanized') or a base type
   // ('FLAGSHIP'); expand each entry to its base type so both forms match.
   const allowedBaseTypes = new Set<UnitType>(
-    units.map(u => parseVariantId(u).type as UnitType),
+    units.map(u => parseUnitLocator(u).baseType as UnitType),
   )
   return sources.filter(s => {
     const key = sourceMap[s]?.variant
     if (key === undefined) return false
     if (units.includes(key)) return true
     if (allowedBaseTypes.has(key)) return true
-    const baseType = parseVariantId(key).type as UnitType
+    const baseType = parseUnitLocator(key).baseType as UnitType
     return units.includes(baseType) || allowedBaseTypes.has(baseType)
   })
 }
@@ -968,7 +969,7 @@ function serializeUses(uses: Map<string, number>): string {
 function emitPools(
   hits: Record<Source, number>,
   side: SideBuckets,
-  unitAbilityPriority: UnitType[] | undefined,
+  unitAbilityPriority: UnitLocator[] | undefined,
   meta: MetaPhase,
   pools: Record<CombatSide, PendingHitPool>,
 ): void {

@@ -1,18 +1,20 @@
 import { z } from 'zod/mini'
 
 import lastBastionIcon from '@/assets/faction/last_bastion.svg?raw'
-import { type Ability, declareParam, parseVariantId } from '@/combat'
+import { type Ability, declareParam } from '@/combat'
 import type { SideApi } from '@/combat/abilities-engine/api/ability-api'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import {
   GALVANIZED,
   galvanizeUnit,
 } from '@/data/main/abilities/general/pre-galvanized'
-import type { UnitBaseType, UnitList, UnitType } from '@/types'
+import type { UnitLocator } from '@/types'
+import type { UnitList } from '@/types'
 import { UnitListSchema } from '@/types'
 
 type Params = {
-  spaceUnitPriority: UnitList<never, UnitBaseType>
-  groundUnitPriority: UnitList<never, UnitBaseType>
+  spaceUnitPriority: UnitList
+  groundUnitPriority: UnitList
 }
 
 export const phoenixStandard: Ability<Params> = {
@@ -32,13 +34,13 @@ export const phoenixStandard: Ability<Params> = {
       default: [],
       source: 'SHIPS',
       sort: 'worth-desc',
-      filter: { includeOnlyBaseTypes: true },
+      filter: { includeOnlyBaseTypes: true, combatMode: 'SPACE' },
     }),
     groundUnitPriority: declareParam({
       default: [],
       source: 'GROUND_FORCES',
       sort: 'worth-desc',
-      filter: { includeOnlyBaseTypes: true },
+      filter: { includeOnlyBaseTypes: true, combatMode: 'GROUND' },
     }),
   },
   headerUI: 'isEnabled',
@@ -87,10 +89,10 @@ export const phoenixStandard: Ability<Params> = {
   ],
 }
 
-function findTarget(api: SideApi, priority: UnitList): UnitType | undefined {
+function findTarget(api: SideApi, priority: UnitList): UnitLocator | undefined {
   for (const [t] of priority) {
-    const type = t as UnitType
-    if (parseVariantId(type).subtypes.includes(GALVANIZED)) continue
+    const type = t
+    if (parseUnitLocator(type).subtypes.includes(GALVANIZED)) continue
     if (
       api.participating.hasUnitType(type, {
         includeVariants: true,

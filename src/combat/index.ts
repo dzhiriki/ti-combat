@@ -32,6 +32,8 @@ export {
   type SyncSortSpec,
   type SyncSourceConfig,
   type UnitListMode,
+  type UnitOption,
+  type UnitSelectorScope,
   type UnitQueryApi,
   type UnitQueryOptions,
   withRunningAbility,
@@ -72,4 +74,12 @@ export {
 export { type LogEntry, Logger } from './logger'
 export type { CombatOutcome, SurfaceSurvivors, SurvivorSide } from './types'
 export { nextUnitIds } from './utils/unit-id'
-export { makeVariantId, parseVariantId } from './utils/unit-variant'
+export { makeVariantId } from './utils/unit-variant'
+
+export {
+  makeUnitLocator,
+  matchesUnitLocator,
+  locatorWithSubtype,
+} from './utils/unit-locator'
+
+export { parseUnitLocator } from './utils/parse-unit-locator'

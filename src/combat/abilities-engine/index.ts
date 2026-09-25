@@ -44,4 +44,6 @@ export type {
   SyncSortSpec,
   SyncSourceConfig,
   UnitListMode,
+  UnitOption,
+  UnitSelectorScope,
 } from './types'

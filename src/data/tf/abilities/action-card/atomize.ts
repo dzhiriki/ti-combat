@@ -1,4 +1,5 @@
 import type { Ability } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import type { UnitId } from '@/types'
 
 // Twilight's Fall action card. When your flagship is destroyed, purge it and
@@ -22,7 +23,7 @@ export const atomize: Ability = {
       isCallable: (_params, ctx, ids) =>
         ids.some(id => {
           const key = ctx.api.own.getUnitVariantKey(id)
-          return key != null && key.split(':')[0] === 'FLAGSHIP'
+          return key != null && parseUnitLocator(key).baseType === 'FLAGSHIP'
         }),
       call: ctx => {
         const opIds: UnitId[] = ctx.api.opponent.system

@@ -6,15 +6,16 @@ import type {
   SideStateData,
   UnitTargetFilter,
 } from '../combat-state/types'
+import { parseUnitLocator } from './parse-unit-locator'
 import { resolveUnitStats } from './resolve-unit-stats'
-import { matchesVariantSuperset, parseVariantId } from './unit-variant'
+import { matchesUnitLocator } from './unit-locator'
 
 export function isNativeCategory(
   side: SideStateData,
   type: UnitType,
   category: UnitCategory,
 ): boolean {
-  const base = parseVariantId(type).type
+  const base = parseUnitLocator(type).baseType
   const categories = resolveUnitStats(side.unitStats, type)?.CATEGORIES
   return categories
     ? categories.includes(category)
@@ -59,9 +60,12 @@ export function matchesTargetFilter(
   if (!filter) return true
   const type = side.unitType[id]
   if (!type) return false
-  if (filter.types && !filter.types.some(t => matchesVariantSuperset(type, t)))
+  if (
+    filter.types &&
+    !filter.types.some(t => matchesUnitLocator(side, id, t, true))
+  )
     return false
-  if (filter.excludeTypes?.some(t => matchesVariantSuperset(type, t)))
+  if (filter.excludeTypes?.some(t => matchesUnitLocator(side, id, t, true)))
     return false
   if (
     filter.unitAbility &&

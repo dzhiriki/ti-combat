@@ -76,7 +76,7 @@ export const supercharge: Ability<Params> = {
         if (target === undefined) return
         const variantKey = ctx.api.own.getUnitVariantKey(target)
         if (!variantKey) return
-        ctx.api.own.applyBonusToResult(2, { singleUnit: variantKey })
+        ctx.api.own.applyBonusToResult(2, { unitId: target })
       },
     },
   ],

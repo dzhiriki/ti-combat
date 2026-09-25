@@ -3,5 +3,6 @@ export {
   getVariantDisplayName,
   makeVariantId,
   matchesVariantSuperset,
-  parseVariantId,
 } from './unit-variant'
+
+export { parseUnitLocator } from './parse-unit-locator'

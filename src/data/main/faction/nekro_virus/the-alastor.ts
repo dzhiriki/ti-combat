@@ -11,7 +11,9 @@ export const theAlastor: Ability = {
     uses: Infinity,
   },
   headerUI: 'isEnabled',
-  declareParamChange: () => [{ key: 'SHIPS', value: 'GROUND_FORCES' }],
+  declareParamChange: () => [
+    { key: 'SHIPS', value: 'GROUND_FORCES', scope: 'system' },
+  ],
   invoke: [
     {
       timing: 'START_OF_COMBAT',

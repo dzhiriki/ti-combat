@@ -80,13 +80,16 @@ export const sustainDamage: Ability<Params> = {
           return false
         }
 
-        const variantId = ctx.api.own.getUnitVariantKey(unitId)!
-
         const isGround = ctx.state.combatMode === 'GROUND'
         const allowedUnits = isGround
           ? params.groundPriority
           : params.spacePriority
-        if (!ctx.utils.getFlat(allowedUnits).includes(variantId)) return false
+        if (
+          !ctx.utils
+            .getFlat(allowedUnits)
+            .some(target => ctx.api.own.matchesUnitLocator(unitId, target))
+        )
+          return false
 
         if (!ctx.api.own.canAssignHitToUnit(unitId)) return false
 

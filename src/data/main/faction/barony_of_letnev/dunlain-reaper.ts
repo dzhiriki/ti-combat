@@ -1,6 +1,7 @@
 import { z } from 'zod/mini'
 
-import { type Ability, declareParam, parseVariantId } from '@/combat'
+import { type Ability, declareParam } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { UNIT_LIMITS } from '@/constants/units'
 import type { UnitList } from '@/types'
 import { UnitListBooleanSchema } from '@/types'
@@ -73,7 +74,7 @@ export const dunlainReaper: Ability<Params> = {
           const variantKey = ctx.api.own.getUnitVariantKey(id)
           return (
             variantKey !== undefined &&
-            parseVariantId(variantKey).type === 'MECH'
+            parseUnitLocator(variantKey).baseType === 'MECH'
           )
         })
       },
@@ -81,7 +82,7 @@ export const dunlainReaper: Ability<Params> = {
         let destroyed = 0
         for (const id of ids) {
           const variantKey = ctx.api.own.getUnitVariantKey(id)
-          if (variantKey && parseVariantId(variantKey).type === 'MECH') {
+          if (variantKey && parseUnitLocator(variantKey).baseType === 'MECH') {
             destroyed += 1
           }
         }

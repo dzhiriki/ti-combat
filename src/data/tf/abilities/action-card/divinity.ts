@@ -112,7 +112,9 @@ export const divinity: Ability<Params> = {
             ? params.groundTargets
             : params.spaceTargets,
         )
-        return targets.includes(variant)
+        return targets.some(target =>
+          ctx.api.own.matchesUnitLocator(saved, target),
+        )
       },
       call: ctx => {
         ctx.api.own.reduceHits(1)

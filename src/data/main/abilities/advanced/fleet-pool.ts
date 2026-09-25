@@ -22,6 +22,7 @@ export const fleetPool: Ability<Params> = {
     uses: Infinity,
     fleetPool: 8,
     shipPriority: declareParam<UnitList>({
+      scope: 'type',
       default: [],
       source: 'SHIPS',
       side: 'own',

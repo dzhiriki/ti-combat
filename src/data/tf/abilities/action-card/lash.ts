@@ -4,7 +4,7 @@ import {
   type CombatMode,
   declareParam,
 } from '@/combat'
-import type { UnitId, UnitList, UnitType } from '@/types'
+import type { UnitId, UnitList, UnitLocator } from '@/types'
 
 type Params = {
   spaceTriggers: UnitList<boolean>
@@ -24,12 +24,16 @@ function modeKeys(mode: CombatMode) {
 function maxTriggeredCost(
   ctx: AbilityReadContext,
   ids: UnitId[],
-  triggers: string[],
+  triggers: UnitLocator[],
 ): number | undefined {
   let max: number | undefined
   for (const id of ids) {
     const key = ctx.api.own.getUnitVariantKey(id)
-    if (!key || !triggers.includes(key)) continue
+    if (
+      !key ||
+      !triggers.some(target => ctx.api.own.matchesUnitLocator(id, target))
+    )
+      continue
     const cost = ctx.api.own.getUnitStats(key)?.COST
     if (typeof cost === 'number' && (max === undefined || cost > max)) {
       max = cost
@@ -42,7 +46,7 @@ function maxTriggeredCost(
  *  living unit and COST ≤ `threshold` wins (Vos Hollow's pattern). */
 function findOpponentTarget(
   ctx: AbilityReadContext,
-  priority: UnitType[],
+  priority: UnitLocator[],
   threshold: number,
 ): UnitId | undefined {
   for (const variant of priority) {
@@ -71,6 +75,7 @@ export const lash: Ability<Params> = {
     isEnabled: false,
     uses: 1,
     spaceTriggers: declareParam<UnitList<boolean>>({
+      scope: 'system',
       default: [],
       source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       side: 'own',
@@ -78,6 +83,7 @@ export const lash: Ability<Params> = {
       filter: { combatMode: 'SPACE', includeNonParticipating: true },
     }),
     groundTriggers: declareParam<UnitList<boolean>>({
+      scope: 'system',
       default: [],
       source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       side: 'own',
@@ -85,6 +91,7 @@ export const lash: Ability<Params> = {
       filter: { combatMode: 'GROUND', includeNonParticipating: true },
     }),
     spaceTargetPriority: declareParam<UnitList<boolean>>({
+      scope: 'system',
       default: [],
       source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       side: 'opponent',
@@ -93,6 +100,7 @@ export const lash: Ability<Params> = {
       filter: { combatMode: 'SPACE', includeNonParticipating: true },
     }),
     groundTargetPriority: declareParam<UnitList<boolean>>({
+      scope: 'system',
       default: [],
       source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       side: 'opponent',

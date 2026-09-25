@@ -20,6 +20,7 @@ export const lastDispatch: Ability<Params> = {
       side: 'opponent',
       sort: 'worth-desc',
       defaultItemValue: true,
+      filter: { combatMode: 'SPACE' },
     }),
   },
   headerUI: 'isEnabled',

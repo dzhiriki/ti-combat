@@ -1,4 +1,5 @@
-import type { CombatSide, UnitType } from '@/types'
+import type { UnitLocator } from '@/types'
+import type { CombatSide } from '@/types'
 
 import type { MetaPhase } from '../combat-state/types'
 import {
@@ -29,7 +30,7 @@ interface FastModeInput {
   dice: CollectedDice
   preSplit: PreSplit
   modifiers: Modifier[]
-  unitAbilityPriority?: { attacker: UnitType[]; defender: UnitType[] }
+  unitAbilityPriority?: { attacker: UnitLocator[]; defender: UnitLocator[] }
   meta: MetaPhase
   /** True for a self-targeting roll (Proxima self-bomb): flip reroll specs
    *  so "reroll misses" becomes "reroll hits" against the firer's own dice. */
@@ -264,7 +265,7 @@ function bucketPmf(
 function emitPools(
   outcome: SideOutcome,
   side: SideBuckets,
-  unitAbilityPriority: UnitType[] | undefined,
+  unitAbilityPriority: UnitLocator[] | undefined,
   meta: MetaPhase,
   pools: Record<CombatSide, PendingHitPool>,
 ): void {

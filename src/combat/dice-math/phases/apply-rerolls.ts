@@ -1,6 +1,6 @@
 import type { UnitType } from '@/types'
 
-import { parseVariantId } from '../../utils/unit-variant'
+import { parseUnitLocator } from '../../utils/parse-unit-locator'
 import type { HitsDist, RerollSide } from '../reroll-strategy'
 import type { FlatSource, RerollTargetSpec, Source } from '../types'
 import { binomial, hitProb } from '../utils/get-dice-distribution'
@@ -54,7 +54,7 @@ function sourceMatches(
   const key = sourceMap[source]?.variant
   if (key === undefined) return false
   if (units.includes(key)) return true
-  return units.includes(parseVariantId(key).type as UnitType)
+  return units.includes(parseUnitLocator(key).baseType as UnitType)
 }
 
 /** Number of dice a spec would reroll on the sources it matches — used to

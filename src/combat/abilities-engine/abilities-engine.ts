@@ -20,8 +20,8 @@ import type {
   SideStateData,
 } from '../combat-state/types'
 import { Logger } from '../logger'
+import { parseUnitLocator } from '../utils/parse-unit-locator'
 import { resolveUnitStats } from '../utils/resolve-unit-stats'
-import { parseVariantId } from '../utils/unit-variant'
 import {
   type AbilityBranch,
   AbilityBranchInterrupt,
@@ -745,7 +745,7 @@ export class AbilitiesEngine {
         if (!key) continue
         const stats = resolveUnitStats(sideState.unitStats, key)
         if (!stats?.ABILITIES) continue
-        const { type: unitType } = parseVariantId(key)
+        const { baseType: unitType } = parseUnitLocator(key)
 
         for (const ability of stats.ABILITIES) {
           entries.push({
@@ -774,7 +774,7 @@ export class AbilitiesEngine {
       const stats = resolveUnitStats(sideState.unitStats, key as UnitType)
       const deploy = stats?.UNIT_ABILITIES?.DEPLOY
       if (!deploy) continue
-      const { type: baseType } = parseVariantId(key as UnitType)
+      const { baseType } = parseUnitLocator(key as UnitType)
       if (seen.has(baseType as UnitBaseType)) continue
       seen.add(baseType as UnitBaseType)
       entries.push({ ability: deploy, unitType: baseType as UnitBaseType })
@@ -1339,7 +1339,7 @@ export class AbilitiesEngine {
     // Add new candidates for the new variant's abilities.
     const stats = resolveUnitStats(sideState.unitStats, variantKey as UnitType)
     if (stats?.ABILITIES) {
-      const { type: baseType } = parseVariantId(variantKey as UnitType)
+      const { baseType } = parseUnitLocator(variantKey as UnitType)
       for (const ability of stats.ABILITIES) {
         if (ability.context && ability.context !== state.combatMode) continue
         affectedKeys.add(ability.key)

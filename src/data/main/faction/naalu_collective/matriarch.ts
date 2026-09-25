@@ -13,7 +13,9 @@ export const matriarch: Ability = {
     uses: Infinity,
   },
   headerUI: 'isEnabled',
-  declareParamChange: () => [{ key: 'GROUND_FORCES', value: 'FIGHTER' }],
+  declareParamChange: () => [
+    { key: 'GROUND_FORCES', value: 'FIGHTER', scope: 'commit' },
+  ],
   invoke: [
     {
       timing: 'COMMIT_UNITS',

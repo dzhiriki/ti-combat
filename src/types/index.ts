@@ -21,6 +21,7 @@ export {
   UnitListBooleanSchema,
   UnitListNumberSchema,
   UnitListSchema,
+  UnitLocatorSchema,
 } from './schemas'
 export type {
   SurfaceDefinition,
@@ -48,5 +49,7 @@ export type {
   UnitStats,
   UnitStatsInput,
   UnitType,
+  UnitLocator,
+  SurfaceUnitKey,
   UnitVariantId,
 } from './unit'

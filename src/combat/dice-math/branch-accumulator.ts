@@ -1,4 +1,5 @@
-import type { CombatSide, UnitId, UnitType } from '@/types'
+import type { UnitLocator } from '@/types'
+import type { CombatSide, UnitId } from '@/types'
 
 import type { SlotId } from './types'
 
@@ -18,7 +19,7 @@ export interface PendingEffect {
  *  abilities feed it via the public API after the dice land. */
 export interface PendingHitPool {
   base: number
-  custom: { key: string; base: number; unitPriority: UnitType[] }[]
+  custom: { key: string; base: number; unitPriority: UnitLocator[] }[]
 }
 
 export interface DiceMathBranch {

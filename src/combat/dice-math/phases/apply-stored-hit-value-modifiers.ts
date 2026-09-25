@@ -1,8 +1,8 @@
 import type { UnitBaseType, UnitType } from '@/types'
 
 import type { HitSource, SideStateData } from '../../combat-state/types'
+import { parseUnitLocator } from '../../utils/parse-unit-locator'
 import { resolveUnitStats } from '../../utils/resolve-unit-stats'
-import { parseVariantId } from '../../utils/unit-variant'
 import type { HitValueModifierDecl, SideDiceCollection } from '../types'
 
 /** Apply stored hit-value modifiers (queued by BEFORE-timing abilities) to
@@ -24,7 +24,7 @@ export function applyStoredHitValueModifiers(
       // CRUISER entry sharing the base bucket. Fall back to the first
       // entry when stats don't disambiguate.
       const variantKey = mod.singleUnit as UnitType
-      const baseType = parseVariantId(variantKey).type as UnitBaseType
+      const baseType = parseUnitLocator(variantKey).baseType as UnitBaseType
       const entries = collection[baseType]
       if (!entries || entries.length === 0) continue
       const stats = resolveUnitStats(unitStats, variantKey)

@@ -5,7 +5,7 @@ import type { UnitId, UnitList, UnitType } from '@/types'
 import { UnitListNumberSchema } from '@/types'
 
 type Params = {
-  availableUnits: UnitList<number>
+  availableUnits: UnitList<number, UnitType>
 }
 
 declare global {
@@ -26,8 +26,9 @@ export const alarum: Ability<Params> = {
   params: {
     isEnabled: false,
     uses: Infinity,
-    availableUnits: declareParam<UnitList<number>>({
-      default: [] as UnitList<number>,
+    availableUnits: declareParam<UnitList<number, UnitType>>({
+      scope: 'type',
+      default: [] as UnitList<number, UnitType>,
       defaultItemValue: 0,
       source: 'GROUND_FORCES',
       sort: 'worth-desc',
@@ -84,9 +85,10 @@ export const alarum: Ability<Params> = {
         }
 
         ctx.api.own.updateAbilityConfig({
-          availableUnits: Array.from(
-            updatedCounts.entries(),
-          ) as UnitList<number>,
+          availableUnits: Array.from(updatedCounts.entries()) as UnitList<
+            number,
+            UnitType
+          >,
         })
 
         ctx.api.own.updateRunState({

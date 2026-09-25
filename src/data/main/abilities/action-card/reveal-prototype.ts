@@ -23,12 +23,14 @@ export const revealPrototype: Ability<Params> = {
     isEnabled: false,
     uses: 1,
     spacePriority: declareParam<UnitList<boolean>>({
+      scope: 'type',
       source: 'SHIPS',
       defaultItemValue: false,
       default: [],
       filter: { includeOnlyBaseTypes: true, combatMode: 'SPACE' },
     }),
     groundPriority: declareParam<UnitList<boolean>>({
+      scope: 'type',
       source: 'GROUND_FORCES',
       defaultItemValue: false,
       default: [],

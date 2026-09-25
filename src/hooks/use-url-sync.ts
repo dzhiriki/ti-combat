@@ -61,7 +61,9 @@ function writeAbilityParams(
 ): void {
   for (const [key, params] of Object.entries(abilities)) {
     for (const [pk, pv] of Object.entries(params)) {
-      parts.push(`${prefix}.${key}.${pk}=${encodeValue(pv)}`)
+      parts.push(
+        `${prefix}.${key}.${pk}=${encodeURIComponent(encodeValue(pv))}`,
+      )
     }
   }
 }

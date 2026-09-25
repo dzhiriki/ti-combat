@@ -7,11 +7,12 @@ import {
   GALVANIZED,
   galvanizeUnit,
 } from '@/data/main/abilities/general/pre-galvanized'
-import type { UnitType } from '@/types'
+import { UnitLocatorSchema } from '@/types'
+import type { UnitLocator } from '@/types'
 
 type Params = {
-  spaceUnitType: UnitType
-  groundUnitType: UnitType
+  spaceUnitType: UnitLocator
+  groundUnitType: UnitLocator
 }
 
 export const dameBriar: Ability<Params> = {
@@ -21,13 +22,14 @@ export const dameBriar: Ability<Params> = {
     "When a player's unit is destroyed: You may exhaust this card to galvanize another of that player's units in the destroyed unit's system.",
   icon: lastBastionIcon,
   paramsSchema: z.object({
-    spaceUnitType: z.string(),
-    groundUnitType: z.string(),
+    spaceUnitType: UnitLocatorSchema,
+    groundUnitType: UnitLocatorSchema,
   }),
   params: {
     isEnabled: false,
     uses: 1,
-    spaceUnitType: declareParam<UnitType>({
+    spaceUnitType: declareParam<UnitLocator>({
+      scope: 'system',
       default: 'DESTROYER',
       source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       filter: {
@@ -36,7 +38,8 @@ export const dameBriar: Ability<Params> = {
         combatMode: 'SPACE',
       },
     }),
-    groundUnitType: declareParam<UnitType>({
+    groundUnitType: declareParam<UnitLocator>({
+      scope: 'system',
       default: 'INFANTRY',
       source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       filter: {

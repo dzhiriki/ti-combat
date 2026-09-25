@@ -10,6 +10,7 @@ import type {
   UnitState,
   UnitStats,
   UnitType,
+  UnitLocator,
   UnitVariantId,
 } from '@/types'
 
@@ -49,10 +50,12 @@ import type {
 import { getDiceOutcomes } from '../../dice-math/utils/get-dice-outcomes'
 import type { Logger } from '../../logger'
 import { canonicalizeUnitState } from '../../utils/canonicalize-unit-state'
+import { parseUnitLocator } from '../../utils/parse-unit-locator'
 import {
   isNativeCategory,
   isUnitCategory,
 } from '../../utils/unit-combat-properties'
+import { matchesUnitLocator } from '../../utils/unit-locator'
 import type {
   AbilitiesEngine,
   AbilityCandidate,
@@ -60,7 +63,7 @@ import type {
 } from '../abilities-engine'
 import type { DeclaredParamValue } from '../declare-param'
 import { isDeclaredParam } from '../declare-param'
-import { resolveVariantLimit } from '../param-limit'
+import type { UnitOption } from '../types'
 import type {
   AbilitiesOverride,
   Ability,
@@ -71,6 +74,7 @@ import type {
   ParamFilter,
   RuntimeAbilityList,
 } from '../types'
+import { resolveUnitOptions } from '../unit-options'
 import { type AbilityUtils, abilityUtils } from './ability-utils'
 import { enforceFleetPool } from './enforce-fleet-pool'
 
@@ -113,17 +117,23 @@ export interface FindUnitsOptions extends FindUnitOptions {
 }
 
 export interface UnitQueryApi {
-  getUnits(unitType: UnitType | undefined, options: UnitQueryOptions): UnitId[]
-  hasUnitType(unitType: UnitType, options: UnitQueryOptions): boolean
+  getUnits(
+    unitType: UnitLocator | undefined,
+    options: UnitQueryOptions,
+  ): UnitId[]
+  hasUnitType(unitType: UnitLocator, options: UnitQueryOptions): boolean
   countUnits(
-    filter: UnitType | UnitType[] | undefined,
+    filter: UnitLocator | UnitLocator[] | undefined,
     options: UnitQueryOptions,
   ): number
   findUnitByPriority(
-    priority: UnitType[],
+    priority: UnitLocator[],
     options: FindUnitOptions,
   ): UnitId | undefined
-  findUnitByPriority(priority: UnitType[], options: FindUnitsOptions): UnitId[]
+  findUnitByPriority(
+    priority: UnitLocator[],
+    options: FindUnitsOptions,
+  ): UnitId[]
   getUnitTypes(): UnitBaseType[]
 }
 
@@ -157,7 +167,7 @@ abstract class ScopedUnitQueryApi implements UnitQueryApi {
   }
 
   getUnits(
-    unitType: UnitType | undefined,
+    unitType: UnitLocator | undefined,
     options: UnitQueryOptions,
   ): UnitId[] {
     return CombatSideState.getUnits(
@@ -167,7 +177,7 @@ abstract class ScopedUnitQueryApi implements UnitQueryApi {
     )
   }
 
-  hasUnitType(unitType: UnitType, options: UnitQueryOptions): boolean {
+  hasUnitType(unitType: UnitLocator, options: UnitQueryOptions): boolean {
     return CombatSideState.hasUnitType(
       this.sideData,
       unitType,
@@ -176,7 +186,7 @@ abstract class ScopedUnitQueryApi implements UnitQueryApi {
   }
 
   countUnits(
-    filter: UnitType | UnitType[] | undefined,
+    filter: UnitLocator | UnitLocator[] | undefined,
     options: UnitQueryOptions,
   ): number {
     return CombatSideState.countUnits(
@@ -187,12 +197,15 @@ abstract class ScopedUnitQueryApi implements UnitQueryApi {
   }
 
   findUnitByPriority(
-    priority: UnitType[],
+    priority: UnitLocator[],
     options: FindUnitOptions,
   ): UnitId | undefined
-  findUnitByPriority(priority: UnitType[], options: FindUnitsOptions): UnitId[]
   findUnitByPriority(
-    priority: UnitType[],
+    priority: UnitLocator[],
+    options: FindUnitsOptions,
+  ): UnitId[]
+  findUnitByPriority(
+    priority: UnitLocator[],
     options: FindUnitOptions | FindUnitsOptions,
   ): UnitId | UnitId[] | undefined {
     return CombatSideState.findUnitByPriority(
@@ -366,47 +379,32 @@ export class SideApi {
     return CombatSideState.getPendingHits(this._sideData, filter)
   }
 
-  getUnitVariantsOptions(filter?: ParamFilter): {
-    label: string
-    value: UnitType
-  }[]
-  getUnitVariantsOptions(paramKey: string): {
-    label: string
-    value: UnitType
-    max?: number
-  }[]
-  getUnitVariantsOptions(arg?: ParamFilter | string) {
+  getUnitVariantsOptions(filter?: ParamFilter): UnitOption[]
+  getUnitVariantsOptions(paramKey: string): UnitOption[]
+  getUnitVariantsOptions(arg?: ParamFilter | string): UnitOption[] {
     if (typeof arg === 'string') {
       const declared = this._resolveDeclaredParam(arg)
-      const filter = declared?.filter
-      const sourceBaseTypes = declared?.source
-        ? CombatSideState.getCategoryOptionTypes(
-            this._sideData,
-            declared.source,
-          )
-        : undefined
-      const items = CombatSideState.getUnitVariantOptions(
-        this._sideData,
-        this.state.combatMode,
-        filter,
-        sourceBaseTypes,
-      )
-      if (!declared?.limit) return items
-      const limit = declared.limit
-      const s = this._sideData
-      const withMax = items.map(item => ({
-        ...item,
-        max: resolveVariantLimit(limit, s, item.value),
-      }))
-      return declared.filter?.includeOnlyAvailable
-        ? withMax.filter(item => item.max > 0)
-        : withMax
+      if (declared?.source)
+        return resolveUnitOptions(
+          this._sideData,
+          { ...this.state, side: this._side },
+          { ...declared, source: declared.source },
+        )
     }
     return CombatSideState.getUnitVariantOptions(
       this._sideData,
       this.state.combatMode,
-      arg,
+      typeof arg === 'string' ? undefined : arg,
     )
+  }
+
+  /** Works for retained metadata on destroyed units as well as living units. */
+  matchesUnitLocator(
+    id: UnitId,
+    target: UnitLocator,
+    includeVariants = false,
+  ): boolean {
+    return matchesUnitLocator(this._sideData, id, target, includeVariants)
   }
 
   /** Look up the wrapped `DeclaredParamValue` for `paramKey` on the running
@@ -424,7 +422,12 @@ export class SideApi {
   }
 
   getUnitStats(unitTypeOrId: string | UnitId) {
-    return CombatSideState.getUnitStats(this._sideData, unitTypeOrId)
+    return CombatSideState.getUnitStats(
+      this._sideData,
+      unitTypeOrId.startsWith('@')
+        ? parseUnitLocator(unitTypeOrId).unitType
+        : unitTypeOrId,
+    )
   }
 
   getUnitVariantKey(unitId: UnitId) {
@@ -653,8 +656,8 @@ export class SideApi {
    *  resolution and requires an empty pool. When no hits are in flight,
    *  schedules their assignment immediately. */
   addHits(hits: number): void
-  addHits(hits: number, unitPriority: UnitType[]): void
-  addHits(hits: number, unitPriority?: UnitType[]): void {
+  addHits(hits: number, unitPriority: UnitLocator[]): void
+  addHits(hits: number, unitPriority?: UnitLocator[]): void {
     const data = this.state
     const wasEmpty =
       data.attacker.hitPool === undefined && data.defender.hitPool === undefined

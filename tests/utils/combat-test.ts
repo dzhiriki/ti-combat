@@ -9,11 +9,11 @@ import {
   type LogEntry,
   Logger,
   type MetaPhase,
-  parseVariantId,
   type PhaseTransitionTarget,
   type SideStateData,
   type StateWithProbability,
 } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import {
   buildCombatState,
   type CombatStateConfig,
@@ -125,7 +125,7 @@ function buildSideView(data: SideStateData): SideView {
     for (const id of pool) {
       const key = unitType[id]
       if (!key) continue
-      const { type, subtypes } = parseVariantId(key)
+      const { baseType: type, subtypes } = parseUnitLocator(key)
       const arr = result[type] ?? (result[type] = [])
       const state = unitState[id]
       const unit: TestUnit = { ...state }
@@ -147,7 +147,7 @@ export function unitsByBaseType(
     for (const id of pool) {
       const key = sideData.unitType[id]
       if (!key) continue
-      const { type } = parseVariantId(key)
+      const { baseType: type } = parseUnitLocator(key)
       const arr = result[type] ?? (result[type] = [])
       arr.push(id as UnitId)
     }

@@ -1,7 +1,7 @@
 import { z } from 'zod/mini'
 
 import { type Ability, type AbilityReadContext, declareParam } from '@/combat'
-import type { UnitId, UnitList, UnitType } from '@/types'
+import type { UnitId, UnitList } from '@/types'
 import { UnitListSchema } from '@/types'
 
 type Params = {
@@ -97,10 +97,9 @@ function findRepairTarget(
     : params.spaceRepairPriority
 
   for (const [variantId] of priority) {
-    for (const unitId of ctx.api.own.participating.getUnits(
-      variantId as UnitType,
-      { includeVariants: false },
-    )) {
+    for (const unitId of ctx.api.own.participating.getUnits(variantId, {
+      includeVariants: false,
+    })) {
       const state = ctx.api.own.getUnitState(unitId)
       if (!state?.isDamaged) continue
       if (state.usedSustainThisRound) continue

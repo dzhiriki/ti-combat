@@ -1,6 +1,7 @@
 import { z } from 'zod/mini'
 
-import { type Ability, type AbilityReadContext, parseVariantId } from '@/combat'
+import { type Ability, type AbilityReadContext } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { GALVANIZED } from '@/data/main/abilities/general/pre-galvanized'
 
 type Params = {
@@ -85,6 +86,6 @@ function countGalvanizedUnits(ctx: AbilityReadContext): number {
     .getUnits(undefined, { includeVariants: true })
     .filter(id => {
       const key = ctx.api.own.getUnitVariantKey(id)
-      return key && parseVariantId(key).subtypes.includes(GALVANIZED)
+      return key && parseUnitLocator(key).subtypes.includes(GALVANIZED)
     }).length
 }

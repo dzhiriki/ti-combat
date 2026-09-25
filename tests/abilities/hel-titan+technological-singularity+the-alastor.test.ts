@@ -5,7 +5,9 @@ import {
   extractDefaults,
   withRunningAbility,
 } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { CombatSetup } from '@/hooks/combat-setup'
+import { DEFAULT_PLANET_ID, SPACE_SURFACE_ID } from '@/types'
 import { getGameData } from '@/utils/get-game-data'
 
 import { combatTest } from '../utils/combat-test'
@@ -19,7 +21,9 @@ type UnitPriorityConfig = {
 
 function priorityKeys(value: unknown): string[] {
   if (!Array.isArray(value)) return []
-  return value.map(entry => (Array.isArray(entry) ? entry[0] : entry))
+  return value.map(
+    entry => parseUnitLocator(Array.isArray(entry) ? entry[0] : entry).unitType,
+  )
 }
 
 describe('HEL_TITAN + TECHNOLOGICAL_SINGULARITY + THE_ALASTOR', () => {
@@ -46,6 +50,8 @@ describe('HEL_TITAN + TECHNOLOGICAL_SINGULARITY + THE_ALASTOR', () => {
     const setup = new CombatSetup('FULL')
     setup.setFaction('attacker', 'NEKRO_VIRUS')
     setup.setCombatMode('GROUND')
+    setup.setSurfaceUnitCount('attacker', SPACE_SURFACE_ID, 'FLAGSHIP', 1)
+    setup.setSurfaceUnitCount('attacker', DEFAULT_PLANET_ID, 'PDS', 1)
     setup.setAbilityParam('attacker', HEL_TITAN, {
       ...setup.abilities.attacker[HEL_TITAN],
       isEnabled: true,
@@ -56,12 +62,16 @@ describe('HEL_TITAN + TECHNOLOGICAL_SINGULARITY + THE_ALASTOR', () => {
     const enabledPriority = setup.abilities.attacker
       .UNIT_PRIORITY as UnitPriorityConfig
 
-    expect(enabledPriority.groundUnitPriority.map(([unit]) => unit)).toContain(
-      'PDS',
-    )
-    expect(enabledPriority.spaceUnitPriority.map(([unit]) => unit)).toContain(
-      'PDS',
-    )
+    expect(
+      enabledPriority.groundUnitPriority.map(
+        ([unit]) => parseUnitLocator(unit).unitType,
+      ),
+    ).toContain('PDS')
+    expect(
+      enabledPriority.spaceUnitPriority.map(
+        ([unit]) => parseUnitLocator(unit).unitType,
+      ),
+    ).toContain('PDS')
 
     const unitPriorityAbility = setup
       .getAvailableAbilities('attacker')
@@ -76,7 +86,11 @@ describe('HEL_TITAN + TECHNOLOGICAL_SINGULARITY + THE_ALASTOR', () => {
     )!
     expect(groundPriorityConfig.type).toBe('unit-list')
     if (groundPriorityConfig.type !== 'unit-list') throw new Error()
-    expect(groundPriorityConfig.items.map(item => item.value)).toContain('PDS')
+    expect(
+      groundPriorityConfig.items.map(
+        item => parseUnitLocator(item.value).unitType,
+      ),
+    ).toContain('PDS')
 
     setup.setAbilityParam('attacker', HEL_TITAN, {
       ...setup.abilities.attacker[HEL_TITAN],
@@ -85,10 +99,14 @@ describe('HEL_TITAN + TECHNOLOGICAL_SINGULARITY + THE_ALASTOR', () => {
     const disabledPriority = setup.abilities.attacker
       .UNIT_PRIORITY as UnitPriorityConfig
     expect(
-      disabledPriority.groundUnitPriority.map(([unit]) => unit),
+      disabledPriority.groundUnitPriority.map(
+        ([unit]) => parseUnitLocator(unit).unitType,
+      ),
     ).not.toContain('PDS')
     expect(
-      disabledPriority.spaceUnitPriority.map(([unit]) => unit),
+      disabledPriority.spaceUnitPriority.map(
+        ([unit]) => parseUnitLocator(unit).unitType,
+      ),
     ).not.toContain('PDS')
   })
 
@@ -115,9 +133,11 @@ describe('HEL_TITAN + TECHNOLOGICAL_SINGULARITY + THE_ALASTOR', () => {
 
     const unitPriority = t.state.attacker.abilities
       .UNIT_PRIORITY as UnitPriorityConfig
-    expect(unitPriority.spaceUnitPriority.map(([unit]) => unit)).toContain(
-      'PDS',
-    )
+    expect(
+      unitPriority.spaceUnitPriority.map(
+        ([unit]) => parseUnitLocator(unit).unitType,
+      ),
+    ).toContain('PDS')
   })
 
   it('feeds target categories into the firing side unit-ability priorities', () => {
@@ -143,6 +163,9 @@ describe('HEL_TITAN + TECHNOLOGICAL_SINGULARITY + THE_ALASTOR', () => {
     setup.setFaction('attacker', 'ARBOREC')
     setup.setFaction('defender', 'NEKRO_VIRUS')
     setup.setCombatMode('SPACE')
+    setup.setSurfaceUnitCount('defender', SPACE_SURFACE_ID, 'FLAGSHIP', 1)
+    setup.setSurfaceUnitCount('defender', DEFAULT_PLANET_ID, 'INFANTRY', 1)
+    setup.setSurfaceUnitCount('defender', DEFAULT_PLANET_ID, 'MECH', 1)
 
     expect(
       priorityKeys(setup.abilities.attacker.SPACE_CANNON_OFFENSE?.unitPriority),

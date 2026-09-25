@@ -1,6 +1,7 @@
 import { z } from 'zod/mini'
 
-import { type Ability, declareParam, parseVariantId } from '@/combat'
+import { type Ability, declareParam } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import type { UnitBaseType, UnitList } from '@/types'
 import { UnitListSchema } from '@/types'
 
@@ -23,6 +24,7 @@ export const salvageOperations: Ability<Params> = {
     isEnabled: false,
     uses: 1,
     shipPriority: declareParam({
+      scope: 'type',
       default: [],
       source: 'SHIPS',
       filter: { combatMode: 'SPACE', includeOnlyBaseTypes: true },
@@ -50,7 +52,7 @@ export const salvageOperations: Ability<Params> = {
             ctx.api.own.getUnitVariantKey(id) ||
             ctx.api.opponent.getUnitVariantKey(id)
           if (!variantKey) continue
-          const { type } = parseVariantId(variantKey)
+          const { baseType: type } = parseUnitLocator(variantKey)
           if (ctx.api.own.isUnitTypeCategory(type, 'SHIPS')) collected.add(type)
         }
         ctx.api.own.updateAbilityConfig({

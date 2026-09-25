@@ -281,6 +281,9 @@ export function buildCombatState(config: CombatStateConfig): CombatState {
     sideAbilities.defender.metadata.categories,
   )
 
+  attackerSide.unitCategoryChanges = sideAbilities.attacker.metadata.changes
+  defenderSide.unitCategoryChanges = sideAbilities.defender.metadata.changes
+
   // Stateful clamp pass: with real per-side state now built, clamp IN_COMBAT
   // and EXTRA values that bypassed the UI hook (e.g. tests that hand-feed
   // over-limit values via `buildCombatState`).
@@ -290,7 +293,13 @@ export function buildCombatState(config: CombatStateConfig): CombatState {
       attacker: sideAbilities.attacker.registered,
       defender: sideAbilities.defender.registered,
     },
-    { attacker: attackerSide, defender: defenderSide },
+    {
+      attacker: attackerSide,
+      defender: defenderSide,
+      surfaces,
+      activeSurfaceId,
+      combatMode: config.mode,
+    },
   )
 
   config.prepareAbilities?.({

@@ -1,8 +1,46 @@
 import { describe, expect, it } from 'vitest'
 
+import { makeUnitLocator } from '@/combat'
+import type { SurfaceId } from '@/types'
+
 import { sortSurvivors } from './sort-survivors'
 
 describe('sortSurvivors', () => {
+  it('uses the selected surface priority when rendering survivors', () => {
+    const p1 = 'planet-1' as SurfaceId
+    const p2 = 'planet-2' as SurfaceId
+    const side = { INFANTRY: [{}], MECH: [{}] }
+    const priority = [
+      makeUnitLocator('INFANTRY', p1),
+      makeUnitLocator('MECH', p2),
+      makeUnitLocator('MECH', p1),
+      makeUnitLocator('INFANTRY', p2),
+    ]
+    expect(sortSurvivors(side, priority, p1).map(entry => entry.base)).toEqual([
+      'MECH',
+      'INFANTRY',
+    ])
+    expect(sortSurvivors(side, priority, p2).map(entry => entry.base)).toEqual([
+      'INFANTRY',
+      'MECH',
+    ])
+  })
+
+  it('ranks a type by its first surface entry in the aggregate view', () => {
+    const p1 = 'planet-1' as SurfaceId
+    const p2 = 'planet-2' as SurfaceId
+    const side = { INFANTRY: [{}], MECH: [{}] }
+    const priority = [
+      makeUnitLocator('INFANTRY', p1),
+      makeUnitLocator('MECH', p1),
+      makeUnitLocator('INFANTRY', p2),
+    ]
+    expect(sortSurvivors(side, priority).map(entry => entry.base)).toEqual([
+      'MECH',
+      'INFANTRY',
+    ])
+  })
+
   it('places a subtyped variant at its own priority slot, not its base type slot', () => {
     // 1 Cruiser, 1 Fighter, 1 Galvanized Fighter; priority: [F, Cr, F:Galvanized]
     const side = {

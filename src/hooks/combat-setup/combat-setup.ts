@@ -825,6 +825,9 @@ export class CombatSetup {
     // state. Defaults must use the live unit data for limits, but serialization
     // must not replace the UI's metadata with categories from disabled defaults.
     const serializationState = {
+      surfaces: this._surfaces,
+      activeSurfaceId: this._stateData.activeSurfaceId,
+      combatMode: this._combatMode,
       attacker: { ...this._stateData.attacker },
       defender: { ...this._stateData.defender },
     }

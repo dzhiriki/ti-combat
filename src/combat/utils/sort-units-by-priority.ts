@@ -1,7 +1,7 @@
-import type { UnitId, UnitIdList, UnitType } from '@/types'
+import type { UnitId, UnitIdList, UnitLocator } from '@/types'
 
 import type { SideStateData } from '../combat-state/types'
-import { parseVariantId } from './unit-variant'
+import { unitLocatorRank } from './unit-locator'
 
 /**
  * Splits `side.participatingUnits` and `side.nonParticipatingUnits`:
@@ -23,22 +23,12 @@ import { parseVariantId } from './unit-variant'
  */
 export function sortUnitsByPriority(
   side: SideStateData,
-  priorityList: readonly UnitType[],
+  priorityList: readonly UnitLocator[],
   participatingUnit: (id: UnitId) => boolean,
 ): void {
-  const rank = new Map<UnitType, number>()
+  const rank = new Map<string, number>()
   for (let i = 0; i < priorityList.length; i++) {
     rank.set(priorityList[i], i)
-  }
-
-  const rankOf = (key: UnitType): number => {
-    const exact = rank.get(key)
-    if (exact !== undefined) return exact
-    const base = parseVariantId(key).type as UnitType
-    const baseRank = rank.get(base)
-    if (baseRank !== undefined) return baseRank
-    // Unranked variants are kept ahead of ranked casualties and die last.
-    return Infinity
   }
 
   const participating: UnitId[] = []
@@ -53,9 +43,15 @@ export function sortUnitsByPriority(
   seed(side.participatingUnits)
   seed(side.nonParticipatingUnits)
 
+  const rankOf = new Map<UnitId, number>()
+  for (const id of participating)
+    rankOf.set(
+      id,
+      unitLocatorRank(rank, side.unitType[id], side.unitSurface[id]),
+    )
   participating.sort((a, b) => {
-    const ra = rankOf(side.unitType[a])
-    const rb = rankOf(side.unitType[b])
+    const ra = rankOf.get(a)!
+    const rb = rankOf.get(b)!
     // Highest rank first so the LOWEST rank (priorityList[0], first to
     // be sacrificed) lands at the tail — tail-slice destroys it first.
     if (ra !== rb) return rb - ra

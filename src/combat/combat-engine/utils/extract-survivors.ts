@@ -2,7 +2,7 @@ import type { UnitIdList } from '@/types'
 
 import type { SideStateData } from '../../combat-state/types'
 import type { SurfaceSurvivors, SurvivorSide } from '../../types'
-import { parseVariantId } from '../../utils/unit-variant'
+import { parseUnitLocator } from '../../utils/parse-unit-locator'
 
 /**
  * Extract survivors from compact state. Includes both participating and
@@ -18,7 +18,7 @@ export function extractSurvivors(sideState: SideStateData): SurvivorSide {
       const key = sideState.unitType[id]
       if (!key) continue
 
-      const { type, subtypes } = parseVariantId(key)
+      const { baseType: type, subtypes } = parseUnitLocator(key)
 
       if (!survivors[type]) {
         survivors[type] = []
@@ -50,7 +50,7 @@ export function extractSurvivorsBySurface(
     for (const id of unitIds) {
       const key = sideState.unitType[id]
       if (!key) continue
-      const { type, subtypes } = parseVariantId(key)
+      const { baseType: type, subtypes } = parseUnitLocator(key)
       const units = survivors[type] ?? (survivors[type] = [])
       const state = sideState.unitState[id]
       units.push({

@@ -1,10 +1,7 @@
-import {
-  type AbilitiesOverride,
-  type Ability,
-  declareParam,
-  parseVariantId,
-} from '@/combat'
-import type { UnitList, UnitType } from '@/types'
+import { type AbilitiesOverride, type Ability, declareParam } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
+import type { UnitLocator } from '@/types'
+import type { UnitList } from '@/types'
 
 type Params = {
   customPriority: boolean
@@ -18,8 +15,7 @@ declare global {
   }
 }
 
-const isMech = ([v]: [UnitType]) =>
-  parseVariantId(v as UnitType).type === 'MECH'
+const isMech = ([v]: [UnitLocator]) => parseUnitLocator(v).baseType === 'MECH'
 
 /** Reorder a priority list so mechs sort first (Converge's defense clause:
  *  Space Cannon Defense hits must be assigned to mechs if able). Mirrors
@@ -39,6 +35,7 @@ export const spaceCannonDefense: Ability<Params> = {
     uses: Infinity,
     customPriority: false,
     unitPriority: declareParam<UnitList>({
+      scope: 'type',
       default: [],
       source: 'GROUND_FORCES',
       side: 'opponent',

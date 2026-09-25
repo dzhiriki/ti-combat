@@ -26,6 +26,7 @@ export const antiFighterBarrage: Ability<Params> = {
     uses: Infinity,
     customPriority: true,
     unitPriority: declareParam<UnitList>({
+      scope: 'type',
       default: [['FIGHTER']],
       source: 'SHIPS',
       side: 'opponent',

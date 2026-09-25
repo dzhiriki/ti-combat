@@ -11,8 +11,8 @@ import {
 
 import { CombatState } from '../combat-state/combat-state'
 import type { CombatStateData, SideStateData } from '../combat-state/types'
+import { parseUnitLocator } from '../utils/parse-unit-locator'
 import { nextUnitIds } from '../utils/unit-id'
-import { parseVariantId } from '../utils/unit-variant'
 import { AbilitiesEngine } from './abilities-engine'
 import type { Ability, AbilityCallContext } from './types'
 
@@ -83,7 +83,7 @@ function unitsByBaseType(
     for (const id of pool) {
       const key = sideData.unitType[id]
       if (!key) continue
-      const { type } = parseVariantId(key)
+      const { baseType: type } = parseUnitLocator(key)
       const arr = result[type] ?? (result[type] = [])
       arr.push(id as UnitId)
     }

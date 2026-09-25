@@ -18,6 +18,8 @@ export const preDamaged: Ability<Params> = {
     isEnabled: true,
     uses: Infinity,
     damagedUnits: declareParam<UnitList<number>>({
+      scope: 'system',
+      defaultItemValue: 0,
       source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       default: [],
       filter: { exclude: ['FIGHTER'], includeOnlyAvailable: true },

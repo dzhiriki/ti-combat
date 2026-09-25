@@ -9,6 +9,7 @@ import type {
   UnitState,
   UnitStats,
   UnitType,
+  UnitLocator,
 } from '@/types'
 import type { SurfaceDefinition, SurfaceId } from '@/types'
 
@@ -93,13 +94,13 @@ export type PhaseMarker = 'START' | 'DICE_ROLL' | 'ASSIGN_HITS' | 'END'
 export interface CustomHitPool {
   key: string
   base: number
-  unitPriority: UnitType[]
+  unitPriority: UnitLocator[]
 }
 
 /** All supplied conditions must match the actual target unit. */
 export interface UnitTargetFilter {
-  types?: readonly UnitType[]
-  excludeTypes?: readonly UnitType[]
+  types?: readonly UnitLocator[]
+  excludeTypes?: readonly UnitLocator[]
   unitAbility?: boolean
 }
 
@@ -204,6 +205,7 @@ export interface SideStateData {
   unitStats: Record<UnitType, UnitStatsEntry>
   /** Setup option metadata derived from native stats and ability declarations. */
   unitCategoryOptions?: UnitCategoryOptions
+  unitCategoryChanges?: readonly import('../abilities-engine/types').ParamChange[]
   declaredSubtypes?: readonly DeclaredSubtype[]
   /** The side's pending hit pool, or undefined when no hits are queued.
    *  At most one pool is alive at a time; abilities that produce
@@ -343,7 +345,7 @@ export interface DiceRollContext {
   /** Per-raw-landing-side priority for unit-ability hits. The list defines
    *  both eligibility and assignment order. For self-targeted rolls the
    *  raw pool is later swapped, carrying this priority to the firing side. */
-  unitAbilityPriority?: { attacker: UnitType[]; defender: UnitType[] }
+  unitAbilityPriority?: { attacker: UnitLocator[]; defender: UnitLocator[] }
   /** Per-landing-side marginal of main base hits, captured by
    *  `_branchesFromMathKernel` after the math kernel runs. Read at
    *  AFTER_DICE_ROLL_STEP by abilities that gate on the realized roll's

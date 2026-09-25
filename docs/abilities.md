@@ -823,3 +823,43 @@ invoke: [
 9. Register in the category's `index.ts` (or faction's `index.ts`)
 10. Write tests (see `docs/testing.md`)
 11. Mark ability as `[x]` in `docs/abilities-list.md`
+
+### Surface-aware unit selectors
+
+`declareParam` defaults to `scope: 'participating'`; omit it for parameters
+selecting participating units. Use `scope: 'system'` for units throughout the
+system, or `scope: 'type'` for type-only choices, reinforcements, and controls
+confined to one surface. `source` still selects categories; `side`, `filter`,
+`sort`, and `limit` still apply.
+
+`getUnitVariantsOptions(paramKey)` and reconciliation use the same resolver.
+Scoped options have a `UnitLocator` key and surface metadata. All eligible types
+are offered even when none are fielded yet, so later placements inherit their
+configured priorities. Participating choices use the active combat surface;
+setup declarations can expose additional surfaces. System choices use every
+legal surface. Explicit availability filters and count limits still apply.
+Reconciliation keeps participating list entries for every surface of the
+param's mode (each planet for `GROUND`), so settings for an unselected planet
+survive planet and mode switches while the control shows only the active one.
+Single choices follow the active surface and keep their unit type when the
+planet changes. Give every participating param a `filter.combatMode`; without
+one, the other mode resolves a different catalog and reconcile resets it.
+Ordered controls stay flat and suffix duplicate names with their surface.
+Independent controls are grouped by surface only when a unit type appears on
+multiple surfaces.
+Otherwise, they stay flat without headings. `IN_COMBAT` limits count the units
+the control offers on that surface, including commitments projected onto the
+active planet; the build-time clamp uses the same caps.
+
+`UnitLocator` accepts legacy `UnitType` values as well as qualified keys from
+`makeUnitLocator(type, surfaceId)`. Unit queries, priority helpers, and
+`SideApi.matchesUnitLocator(id, locator)` respect both parts.
+`parseUnitLocator(locator)` returns `unitType` (decoded variant), `baseType`,
+`subtypes`, and optional `surfaceId` for both qualified and legacy values. Use
+`unitType` for variant/stat work and `locatorWithSubtype(locator, subtype)`
+to retain location in subsequent queries.
+Subtype declarations use plain `unitType` plus optional `surfaces` metadata.
+
+Setup category changes can declare `scope: 'system'` (Alastor) or
+`scope: 'commit'` (Matriarch/Morphwing); the default is the active surface.
+These declarations preview choices and never grant runtime participation.

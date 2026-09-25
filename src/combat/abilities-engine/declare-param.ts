@@ -7,6 +7,7 @@ import type {
   ParamFilter,
   SyncSortSpec,
   SyncSourceConfig,
+  UnitSelectorScope,
 } from './types'
 
 export type { ParamLimit } from './param-limit'
@@ -15,6 +16,8 @@ const DECLARED_PARAM = Symbol('declaredParam')
 
 interface DeclaredParamOptions<T> {
   default: T
+  /** Defaults to participating units; use system or type for other choices. */
+  scope?: UnitSelectorScope
   source?: UnitCategory | readonly UnitCategory[]
   side?: 'own' | 'opponent'
   sort?: SyncSortSpec
@@ -49,6 +52,7 @@ interface DeclaredParamOptions<T> {
 export interface DeclaredParamValue<T> {
   [DECLARED_PARAM]: true
   default: T
+  scope: UnitSelectorScope
   source?: UnitCategory | readonly UnitCategory[]
   side: 'own' | 'opponent'
   sort: SyncSortSpec
@@ -76,6 +80,7 @@ export function declareParam<T>(options: DeclaredParamOptions<T>): T {
     [DECLARED_PARAM]: true,
     default: options.default,
     source: options.source,
+    scope: options.scope ?? 'participating',
     side: options.side ?? 'own',
     sort: options.sort ?? 'worth-asc',
     defaultItemValue: options.defaultItemValue,
@@ -130,6 +135,7 @@ export function extractSyncSources(
       result.push({
         key,
         source: value.source,
+        scope: value.scope,
         side: value.side,
         sort: value.sort,
         defaultItemValue: value.defaultItemValue,

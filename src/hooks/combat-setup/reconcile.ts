@@ -1,8 +1,7 @@
 import {
   type AbilityLookupContext,
-  applyVariantPostFilter,
   createRuntimeAbilityList,
-  filterDeclaredSubtypes,
+  getOpponentSide,
   type OwnOpponentContext,
   resolveInvokes,
   type RuntimeAbilityList,
@@ -22,6 +21,10 @@ import type {
   SyncSourceConfig,
   UnitCategoryOptions,
 } from '@/combat/abilities-engine/types'
+import {
+  resolveUnitOptions,
+  expandLegacyUnitTargets,
+} from '@/combat/abilities-engine/unit-options'
 import type {
   CombatMode,
   CombatStateData,
@@ -29,6 +32,7 @@ import type {
   SideStateData,
   UnitStatsEntry,
 } from '@/combat/combat-state/types'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import {
   UNIT_CATEGORIES,
   UNIT_TYPES,
@@ -37,11 +41,12 @@ import {
 import type { CombatSide, UnitBaseType, UnitIdList, UnitStats } from '@/types'
 
 import {
-  expandWithSubtypes,
   reconcileStringParam,
   reconcileUnitListParam,
-  sortBaseTypes,
 } from './reconcile-helpers'
+
+type OptionState = Pick<CombatStateData, 'attacker' | 'defender'> &
+  Partial<Pick<CombatStateData, 'surfaces' | 'activeSurfaceId' | 'combatMode'>>
 
 type AbilitiesConfig = Record<CombatSide, SideAbilitiesConfig>
 
@@ -52,6 +57,7 @@ export type SideLookups = Record<
 
 export interface SideOptionMetadata {
   categories: UnitCategoryOptions
+  changes: ParamChange[]
   subtypes: DeclaredSubtype[]
 }
 
@@ -106,23 +112,6 @@ function categoryList(
   return result
 }
 
-function buildValidList(
-  config: SyncSourceConfig,
-  own: SideOptionMetadata,
-  opponent: SideOptionMetadata,
-): string[] {
-  const metadata = config.side === 'own' ? own : opponent
-  const subtypes = config.filter?.includeOnlyBaseTypes
-    ? []
-    : filterDeclaredSubtypes(metadata.subtypes, config.filter)
-  const sorted = sortBaseTypes(
-    categoryList(metadata, config.source),
-    config.sort,
-  )
-  const expanded = expandWithSubtypes(sorted, subtypes, config.sort)
-  return applyVariantPostFilter(expanded, config.filter)
-}
-
 export function initializeAbilityDefaults(
   config: AbilitiesConfig,
   abilities: Record<CombatSide, RegisteredAbility[]>,
@@ -140,7 +129,7 @@ export function reconcileAbilitiesConfig(
   abilities: Record<CombatSide, RegisteredAbility[]>,
   combatMode: CombatMode,
   syncSnapshots?: SyncSnapshots,
-  state?: Pick<CombatStateData, 'attacker' | 'defender'>,
+  state?: OptionState,
   lookups?: SideLookups,
   unitStats?: Record<CombatSide, Record<string, UnitStatsEntry>>,
 ): OptionMetadata {
@@ -154,7 +143,14 @@ export function reconcileAbilitiesConfig(
     state,
     unitStats,
   )
-  reconcileSyncAll(config, abilities, metadata, syncSnapshots, state)
+  reconcileSyncAll(
+    config,
+    abilities,
+    metadata,
+    syncSnapshots,
+    state,
+    combatMode,
+  )
 
   const refreshed = collectOptionMetadata(
     config,
@@ -165,7 +161,14 @@ export function reconcileAbilitiesConfig(
   )
   if (!metadataEqual(metadata, refreshed)) {
     metadata = refreshed
-    reconcileSyncAll(config, abilities, metadata, syncSnapshots, state)
+    reconcileSyncAll(
+      config,
+      abilities,
+      metadata,
+      syncSnapshots,
+      state,
+      combatMode,
+    )
   }
 
   applyMetadataToState(state, metadata)
@@ -174,12 +177,13 @@ export function reconcileAbilitiesConfig(
 }
 
 function applyMetadataToState(
-  state: Pick<CombatStateData, 'attacker' | 'defender'> | undefined,
+  state: OptionState | undefined,
   metadata: OptionMetadata,
 ): void {
   if (!state) return
   for (const side of ['attacker', 'defender'] as const) {
     state[side].unitCategoryOptions = metadata[side].categories
+    state[side].unitCategoryChanges = metadata[side].changes
     state[side].declaredSubtypes = metadata[side].subtypes
   }
 }
@@ -193,6 +197,8 @@ function metadataEqual(a: OptionMetadata, b: OptionMetadata): boolean {
       )
         return false
     }
+    if (JSON.stringify(a[side].changes) !== JSON.stringify(b[side].changes))
+      return false
     if (!subtypesEqual(a[side].subtypes, b[side].subtypes)) return false
   }
   return true
@@ -206,7 +212,8 @@ function subtypesEqual(a: DeclaredSubtype[], b: DeclaredSubtype[]): boolean {
       value.name === other.name &&
       value.unitType === other.unitType &&
       value.participating === other.participating &&
-      value.source === other.source
+      value.source === other.source &&
+      JSON.stringify(value.surfaces) === JSON.stringify(other.surfaces)
     )
   })
 }
@@ -274,7 +281,7 @@ function collectOptionMetadata(
   config: AbilitiesConfig,
   abilities: Record<CombatSide, RegisteredAbility[]>,
   lookups: SideLookups,
-  state?: Pick<CombatStateData, 'attacker' | 'defender'>,
+  state?: OptionState,
   stats?: Record<CombatSide, Record<string, UnitStatsEntry>>,
 ): OptionMetadata {
   return Object.fromEntries(
@@ -306,6 +313,7 @@ function collectOptionMetadata(
         side,
         {
           categories,
+          changes,
           subtypes: collectDeclaredSubtypes(
             abilities[side],
             config[side],
@@ -338,7 +346,8 @@ function reconcileSyncAll(
   abilities: Record<CombatSide, RegisteredAbility[]>,
   metadata: OptionMetadata,
   syncSnapshots?: SyncSnapshots,
-  state?: Pick<CombatStateData, 'attacker' | 'defender'>,
+  state?: OptionState,
+  combatMode: CombatMode = 'SPACE',
 ): void {
   for (const side of ['attacker', 'defender'] as const) {
     const opponent = side === 'attacker' ? 'defender' : 'attacker'
@@ -350,6 +359,7 @@ function reconcileSyncAll(
       side,
       syncSnapshots,
       state,
+      combatMode,
     )
   }
 }
@@ -455,13 +465,29 @@ export function collectDeclaredSubtypes(
           existing =>
             existing.source === stamped.source &&
             existing.name === stamped.name &&
-            existing.unitType === stamped.unitType,
+            existing.unitType === stamped.unitType &&
+            JSON.stringify(existing.surfaces) ===
+              JSON.stringify(stamped.surfaces),
         )
       )
         result.push(stamped)
     }
   }
   return result
+}
+
+function sourceSide(side: CombatSide, source: SyncSourceConfig): CombatSide {
+  return source.side === 'own' ? side : getOpponentSide(side)
+}
+
+/** Keep a single choice's unit type when its surface is no longer offered. */
+function relocateUnitTarget(value: string, validList: string[]): string {
+  if (!value.startsWith('@') || validList.includes(value)) return value
+  const { unitType } = parseUnitLocator(value)
+  return (
+    validList.find(option => parseUnitLocator(option).unitType === unitType) ??
+    value
+  )
 }
 
 function reconcileSyncSources(
@@ -471,7 +497,8 @@ function reconcileSyncSources(
   opponent: SideOptionMetadata,
   side: CombatSide,
   syncSnapshots?: SyncSnapshots,
-  state?: Pick<CombatStateData, 'attacker' | 'defender'>,
+  state?: OptionState,
+  combatMode: CombatMode = 'SPACE',
 ): void {
   for (const ability of abilities) {
     const syncSources = extractSyncSources(ability)
@@ -491,45 +518,76 @@ function reconcileSyncSources(
         continue
       }
 
-      let validList = buildValidList(source, own, opponent)
       const currentValue = abilityParams[source.key]
+      const surfaceScoped = source.scope !== 'type'
+      // Simulation preparation can run before placements exist. Qualified
+      // user selections must survive until that context is available.
+      if (surfaceScoped && !state?.surfaces) {
+        const keys = Array.isArray(currentValue)
+          ? currentValue.map(entry =>
+              typeof entry === 'string' ? entry : entry[0],
+            )
+          : [currentValue]
+        if (keys.some(key => typeof key === 'string' && key.startsWith('@')))
+          continue
+      }
+      const targetSide = sourceSide(side, source)
+      const sideData = state?.[targetSide]
+      const optionState = {
+        ...(sideData ?? EMPTY_SIDE_FOR_STATIC),
+        unitCategoryOptions: sourceMetadata.categories,
+        unitCategoryChanges: sourceMetadata.changes,
+        declaredSubtypes: sourceMetadata.subtypes,
+      }
+      const options = resolveUnitOptions(
+        optionState,
+        {
+          combatMode,
+          activeSurfaceId: state?.activeSurfaceId,
+          surfaces: state?.surfaces,
+          side: targetSide,
+          // Lists keep per-surface choices for every planet; a single choice
+          // follows the active surface unless its mode is not being fought.
+          allSurfaces:
+            Array.isArray(currentValue) ||
+            (source.filter?.combatMode ?? combatMode) !== combatMode,
+        },
+        {
+          ...source,
+          limit:
+            sideData || source.limit === 'UNIT_LIMIT'
+              ? source.limit
+              : undefined,
+        },
+      )
+      const validList = options.map(option => option.value)
+      const maxima = new Map(options.map(option => [option.value, option.max]))
+      const maxFor = source.limit
+        ? (key: string) => maxima.get(key as never) ?? Infinity
+        : undefined
       if (Array.isArray(currentValue)) {
-        const targetSide =
-          source.side === 'own'
-            ? side
-            : side === 'attacker'
-              ? 'defender'
-              : 'attacker'
-        const sideData = state?.[targetSide]
-        const maxFor = source.limit
-          ? sideData
-            ? (variantKey: string) =>
-                resolveVariantLimit(
-                  source.limit!,
-                  sideData,
-                  variantKey as never,
-                )
-            : source.limit === 'UNIT_LIMIT'
-              ? (variantKey: string) =>
-                  resolveVariantLimit(
-                    source.limit!,
-                    EMPTY_SIDE_FOR_STATIC,
-                    variantKey as never,
-                  )
-              : undefined
-          : undefined
-        if (source.filter?.includeOnlyAvailable && maxFor)
-          validList = validList.filter(key => maxFor(key) > 0)
+        const expanded =
+          surfaceScoped && sideData
+            ? expandLegacyUnitTargets(currentValue, options, sideData)
+            : currentValue
         abilityParams[source.key] = reconcileUnitListParam(
-          currentValue as ([string] | [string, unknown])[],
+          expanded as ([string] | [string, unknown])[],
           validList,
           source.defaultItemValue,
           maxFor,
         )
         syncSnapshots?.set(`${side}:${ability.key}:${source.key}`, validList)
       } else if (typeof currentValue === 'string') {
+        const expanded =
+          surfaceScoped && sideData
+            ? ((expandLegacyUnitTargets(
+                [currentValue],
+                options,
+                sideData,
+              )[0] as string | undefined) ?? currentValue)
+            : currentValue
         abilityParams[source.key] = reconcileStringParam(
-          currentValue,
+          relocateUnitTarget(expanded, validList),
           validList,
         )
       }
@@ -571,7 +629,7 @@ export function restoreConsumerParams(
 export function clampLimitParams(
   config: AbilitiesConfig,
   abilities: Record<CombatSide, RegisteredAbility[]>,
-  state?: Pick<CombatStateData, 'attacker' | 'defender'>,
+  state?: OptionState,
 ): void {
   for (const side of ['attacker', 'defender'] as const) {
     for (const ability of abilities[side]) {
@@ -584,24 +642,38 @@ export function clampLimitParams(
         if (!source.limit) continue
         const value = abilityParams[source.key]
         if (!Array.isArray(value)) continue
-        const targetSide =
-          source.side === 'own'
-            ? side
-            : side === 'attacker'
-              ? 'defender'
-              : 'attacker'
+        const targetSide = sourceSide(side, source)
         const sideData = state?.[targetSide]
         if (source.limit !== 'UNIT_LIMIT' && !sideData) continue
         const resolverSide = sideData ?? EMPTY_SIDE_FOR_STATIC
+        // Clamp against the caps the controls offered, including projected
+        // commitments; keys outside that catalog keep the physical cap.
+        const maxima = new Map(
+          (sideData && state?.surfaces
+            ? resolveUnitOptions(
+                sideData,
+                {
+                  combatMode: state.combatMode ?? 'SPACE',
+                  activeSurfaceId: state.activeSurfaceId,
+                  surfaces: state.surfaces,
+                  side: targetSide,
+                  allSurfaces: true,
+                },
+                {
+                  ...source,
+                  filter: { ...source.filter, includeOnlyAvailable: false },
+                },
+              )
+            : []
+          ).map(option => [option.value as string, option.max]),
+        )
 
         let changed = false
         const clamped: ([string] | [string, unknown])[] = []
         for (const entry of value as ([string] | [string, unknown])[]) {
-          const max = resolveVariantLimit(
-            source.limit,
-            resolverSide,
-            entry[0] as never,
-          )
+          const max =
+            maxima.get(entry[0]) ??
+            resolveVariantLimit(source.limit, resolverSide, entry[0] as never)
           if (
             source.filter?.includeOnlyAvailable &&
             Number.isFinite(max) &&

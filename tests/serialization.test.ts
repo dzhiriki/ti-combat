@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { CombatSetup } from '@/hooks/combat-setup'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
 import { validateSerializedConfig } from '@/hooks/combat-setup/validation'
@@ -163,7 +164,9 @@ describe('loadConfig', () => {
     setup.loadConfig(config)
     const priority = setup.abilities.defender['UNIT_PRIORITY']
       ?.spaceUnitPriority as ([string] | string)[]
-    const keys = priority.map(e => (typeof e === 'string' ? e : e[0]))
+    const keys = priority.map(
+      e => parseUnitLocator(typeof e === 'string' ? e : e[0]).unitType,
+    )
     // DESTROYER must come before FIGHTER — the URL-loaded order wins.
     expect(keys.indexOf('DESTROYER')).toBeLessThan(keys.indexOf('FIGHTER'))
   })

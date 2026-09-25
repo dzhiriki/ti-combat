@@ -254,9 +254,27 @@ a check there too.
   declarations to derived groups. These groups control setup options only.
 
 - **`declareParam` sourced params sync only at reconcile, and those values
-  survive into the engine run.** A runtime source-list edit does not update
-  dependent priorities. Use the reconciled priorities to order candidates,
+  survive into the engine run.** Include eligible types even when none are
+  fielded yet: later placements need their priority, sustain, and repair
+  settings. Declarations extend the possible surfaces without requiring a
+  fielded host. A runtime source-list edit does not update dependent priorities. Use the reconciled priorities to order candidates,
   and scoped unit queries to determine runtime eligibility.
+
+- **Reconciled participating lists are wider than their controls.**
+  Reconcile resolves list options with `allSurfaces` (every surface of the
+  param's mode), while `getUnitVariantsOptions` shows only the active one. UI
+  edits that rebuild a list from the visible items must merge the hidden
+  entries back (`keepHiddenEntries` in the abilities-panel list) or they
+  silently delete other planets' settings. See
+  `tests/surface-unit-settings.test.ts`.
+
+- **A `null` param default means "nothing chosen" — reconcile never fills
+  it.** Apollo's `heroUnit` relies on this; auto-selecting the first option
+  would designate a hero the player never picked.
+
+- **An empty `DeclaredSubtype.surfaces` hides the subtype everywhere.** Omit
+  the field (`undefined`) for "any eligible surface"; pre-galvanized does so for
+  unselected types so mid-combat Galvanized units stay selectable.
 
 - **Starlancer XI uses native ship and ground-force categories.** It needs
   no other ship to participate on the active surface. Its special combat-end
@@ -296,6 +314,11 @@ a check there too.
   participants. See `tests/abilities/claire-gibson.test.ts`,
   `tests/abilities/claire-gibson+indoctrination.test.ts`, and
   `tests/surfaces.test.ts`.
+
+- **The `[0.0.1]` assignHits fast path compares base types, not locators.**
+  Surface-qualified tiers are equivalent only when they name one surface and
+  every pooled unit stands on it (`fitsFighterFastPath`); Alastor pools span
+  planets, so mixed lists must fall back to `pickTargetsForCustom`.
 
 - **Unlimited-use repair is the only thing that makes the state graph
   cyclic.** Without it, combat state decreases monotonically (units are
@@ -370,6 +393,16 @@ a check there too.
   temporary `_probe.test.ts` (delete it afterwards).
 
 ## UI config and data modules
+
+- **Unit selector keys are not variant/stat keys.** Scoped `declareParam` lists
+  store `UnitLocator` values containing both a variant and a surface. Use scoped
+  unit queries or `matchesUnitLocator` (also valid for destroyed-unit metadata),
+  and use `parseUnitLocator` for both plain and qualified keys. Its `unitType`
+  is the decoded variant; `baseType` and `subtypes` describe that variant, and
+  `surfaceId` carries the optional location. Preserve the surface when adding a
+  subtype with `locatorWithSubtype`. Setup participant
+  options project commitment onto its destination; system options retain the
+  original placement. See `tests/surface-unit-settings.test.ts`.
 
 - **`select` uiConfig item values must be NON-EMPTY strings.** Store the
   param as a string union (`'1' | '2' | '3'`) and `Number()` it at the use
