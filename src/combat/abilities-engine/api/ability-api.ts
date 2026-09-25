@@ -55,7 +55,7 @@ import {
   isNativeCategory,
   isUnitCategory,
 } from '../../utils/unit-combat-properties'
-import { matchesUnitLocator } from '../../utils/unit-locator'
+import { matchesUnitList, matchesUnitLocator } from '../../utils/unit-locator'
 import type {
   AbilitiesEngine,
   AbilityCandidate,
@@ -407,6 +407,18 @@ export class SideApi {
     return matchesUnitLocator(this._sideData, id, target, includeVariants)
   }
 
+  /** Whether the unit matches any enabled entry of a `UnitList` param
+   *  (entries disabled via `false`/`0` are skipped, as in `getFlat`).
+   *  The list is compiled once per list object, so prefer this over
+   *  `getFlat(list).some(...)` in per-unit `isCallable` guards. */
+  matchesUnitList(
+    id: UnitId,
+    list: readonly (readonly [UnitLocator, ...unknown[]])[],
+    includeVariants = false,
+  ): boolean {
+    return matchesUnitList(this._sideData, id, list, includeVariants)
+  }
+
   /** Look up the wrapped `DeclaredParamValue` for `paramKey` on the running
    *  ability. Mirrors reconcile's view so `getUnitVariantsOptions(paramKey)`
    *  can read `filter` and `limit`. Returns undefined when there is no
@@ -453,10 +465,9 @@ export class SideApi {
       'lost',
       ability,
       unitType,
+      // Unit ids resolve their surface lazily in `isRestricted`.
       surfaceId ??
-        (unitType.length === 1
-          ? this._sideData.unitSurface[unitType]
-          : this.state.activeSurfaceId),
+        (unitType.length === 1 ? undefined : this.state.activeSurfaceId),
     )
   }
 
@@ -471,10 +482,9 @@ export class SideApi {
       'cannotBeUsed',
       ability,
       unitType,
+      // Unit ids resolve their surface lazily in `isRestricted`.
       surfaceId ??
-        (unitType.length === 1
-          ? this._sideData.unitSurface[unitType]
-          : this.state.activeSurfaceId),
+        (unitType.length === 1 ? undefined : this.state.activeSurfaceId),
     )
   }
 

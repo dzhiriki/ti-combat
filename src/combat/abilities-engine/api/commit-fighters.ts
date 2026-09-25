@@ -1,4 +1,4 @@
-import type { UnitCombatOverrides, UnitId } from '@/types'
+import type { CombatSide, UnitCombatOverrides, UnitId } from '@/types'
 
 import { CombatSideState } from '../../combat-side-state/combat-side-state'
 import type { CombatStateData } from '../../combat-state/types'
@@ -21,14 +21,18 @@ export function commitFighters(ctx: AbilityCallContext): void {
 }
 
 /** Resolve the committed units' return independently of the ability source.
- *  Runs after END_OF_COMBAT reactions, only when completion was not canceled. */
-export function returnCommittedFighters(state: CombatStateData): void {
-  for (const side of [state.attacker, state.defender]) {
+ *  Runs after END_OF_COMBAT reactions, only when completion was not canceled.
+ *  Returns the sides whose units moved, so callers resync only those. */
+export function returnCommittedFighters(state: CombatStateData): CombatSide[] {
+  const moved: CombatSide[] = []
+  for (const sideKey of ['attacker', 'defender'] as const) {
+    const side = state[sideKey]
     if (!side.unitCombat) continue
     const returning = Object.entries(side.unitCombat).filter(
       ([, grant]) => grant.returnAfterCombat,
     )
     if (!returning.length) continue
+    moved.push(sideKey)
     const overrides = { ...side.unitCombat }
     for (const [id, grant] of returning) {
       CombatSideState.moveUnits(side, [id as UnitId], grant.returnAfterCombat!)
@@ -44,4 +48,5 @@ export function returnCommittedFighters(state: CombatStateData): void {
     side.unitCombat = Object.keys(overrides).length ? overrides : undefined
     side._resolvedRestrictions = undefined
   }
+  return moved
 }

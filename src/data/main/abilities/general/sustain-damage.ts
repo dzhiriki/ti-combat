@@ -74,33 +74,20 @@ export const sustainDamage: Ability<Params> = {
       isCallable: (params, ctx) => {
         const unitId = ctx.getUnit()
         if (ctx.api.own.getPendingHits() <= 0) return false
-        if (!ctx.api.own.isParticipating(unitId)) return false
-
-        if (ctx.api.own.getUnitState(unitId)?.isDamaged) {
-          return false
-        }
+        // Cheapest rejections first: most candidates are already damaged.
+        if (ctx.api.own.getUnitState(unitId)?.isDamaged) return false
 
         const isGround = ctx.state.combatMode === 'GROUND'
         const allowedUnits = isGround
           ? params.groundPriority
           : params.spacePriority
-        if (
-          !ctx.utils
-            .getFlat(allowedUnits)
-            .some(target => ctx.api.own.matchesUnitLocator(unitId, target))
+        // Lost or blocked Sustain Damage is rejected by the engine for every
+        // unit-sourced unit ability, so it is not re-checked here.
+        return (
+          ctx.api.own.matchesUnitList(unitId, allowedUnits) &&
+          ctx.api.own.isParticipating(unitId) &&
+          ctx.api.own.canAssignHitToUnit(unitId)
         )
-          return false
-
-        if (!ctx.api.own.canAssignHitToUnit(unitId)) return false
-
-        if (
-          ctx.api.own.isUnitAbilityLost('SUSTAIN_DAMAGE', unitId) ||
-          ctx.api.own.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', unitId)
-        ) {
-          return false
-        }
-
-        return true
       },
       call: ctx => {
         const unitId = ctx.getUnit()

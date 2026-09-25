@@ -984,30 +984,6 @@ export class AbilitiesEngine {
 
       if (sideTracker.has(entry.trackerKey)) continue
 
-      if (source.type === 'unit' && UNIT_ABILITY_KEYS.has(ability.key)) {
-        const surfaceId = state[side].unitSurface[source.unitId]
-        const unitAbility = ability.key as UnitAbility
-        if (
-          CombatSideState.isRestricted(
-            state,
-            side,
-            'lost',
-            unitAbility,
-            source.unitId,
-            surfaceId,
-          ) ||
-          CombatSideState.isRestricted(
-            state,
-            side,
-            'cannotBeUsed',
-            unitAbility,
-            source.unitId,
-            surfaceId,
-          )
-        )
-          continue
-      }
-
       if (source.type === 'deploy') {
         if (
           CombatSideState.isRestricted(
@@ -1071,6 +1047,33 @@ export class AbilitiesEngine {
         canCall = inv.isCallable(freshParams, ctx, context)
       } else {
         canCall = true
+      }
+
+      // Lost or blocked unit abilities never fire. Checked after the
+      // read-only guard, which rejects most candidates first (e.g. Sustain
+      // Damage without pending hits), to keep the lookup off the hot path.
+      if (
+        canCall &&
+        source.type === 'unit' &&
+        UNIT_ABILITY_KEYS.has(ability.key)
+      ) {
+        const unitAbility = ability.key as UnitAbility
+        canCall = !(
+          CombatSideState.isRestricted(
+            state,
+            side,
+            'lost',
+            unitAbility,
+            source.unitId,
+          ) ||
+          CombatSideState.isRestricted(
+            state,
+            side,
+            'cannotBeUsed',
+            unitAbility,
+            source.unitId,
+          )
+        )
       }
 
       if (canCall) {

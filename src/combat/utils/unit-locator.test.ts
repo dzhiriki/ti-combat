@@ -2,13 +2,20 @@ import { describe, expect, it } from 'vitest'
 
 import { AbilityContext } from '@/combat/abilities-engine/api/ability-api'
 import { buildCombatState } from '@/hooks/combat-setup/build-combat-state'
-import { UnitLocatorSchema, type SurfaceId, type UnitVariantId } from '@/types'
+import {
+  UnitLocatorSchema,
+  type SurfaceId,
+  type UnitLocator,
+  type UnitType,
+  type UnitVariantId,
+} from '@/types'
 
 import { parseUnitLocator } from './parse-unit-locator'
 import {
   isValidUnitLocator,
   locatorWithSubtype,
   makeUnitLocator,
+  matchesUnitList,
   matchesUnitLocator,
   unitLocatorRank,
 } from './unit-locator'
@@ -107,6 +114,40 @@ describe('unit locators', () => {
     expect(matchesUnitLocator(side, 'a', parent, true)).toBe(true)
     expect(matchesUnitLocator(side, 'b', parent, true)).toBe(false)
     expect(matchesUnitLocator(side, 'b', 'MECH', true)).toBe(true)
+  })
+
+  it('matches a unit list like getFlat + matchesUnitLocator', () => {
+    const side = {
+      unitType: {
+        a: VARIANT,
+        b: VARIANT,
+        c: 'CRUISER' as UnitType,
+        d: 'DESTROYER' as UnitType,
+      },
+      unitSurface: { a: P1, b: P2, c: P1, d: P1 },
+    }
+    const list: [UnitLocator, boolean | number][] = [
+      [makeUnitLocator(VARIANT, P1), true],
+      ['CRUISER', true],
+      ['DESTROYER', false],
+      [makeUnitLocator('MECH', P2), 0],
+    ]
+    for (const id of ['a', 'b', 'c', 'd', 'missing']) {
+      for (const includeVariants of [false, true]) {
+        const expected = list.some(
+          ([key, value]) =>
+            value !== false &&
+            value !== 0 &&
+            matchesUnitLocator(side, id, key, includeVariants),
+        )
+        expect(matchesUnitList(side, id, list, includeVariants)).toBe(expected)
+      }
+    }
+    expect(matchesUnitList(side, 'a', list)).toBe(true)
+    expect(matchesUnitList(side, 'b', list)).toBe(false)
+    expect(matchesUnitList(side, 'b', list, true)).toBe(false)
+    expect(matchesUnitList(side, 'b', [['MECH']], true)).toBe(true)
+    expect(matchesUnitList(side, 'd', list)).toBe(false)
   })
 
   it('ranks an exact locator before its surface base and legacy fallback', () => {

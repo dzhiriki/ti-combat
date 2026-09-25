@@ -132,11 +132,8 @@ export const valiantGenome: Ability<Params> = {
 
         const targets = ctx.api.opponent.participating.getAssignHitsTargets(1)
         if (targets.length === 0) return false
-        const targetEnabled = ctx.utils.getFlat(params[targetsKey])
         return targets.every(targetId =>
-          targetEnabled.some(target =>
-            ctx.api.opponent.matchesUnitLocator(targetId, target),
-          ),
+          ctx.api.opponent.matchesUnitList(targetId, params[targetsKey]),
         )
       },
       call: (ctx, params, ids) => {

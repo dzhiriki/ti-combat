@@ -46,6 +46,7 @@ import type {
   SideDiceCollection,
 } from '../dice-math/types'
 import { canonicalizeUnitState } from '../utils/canonicalize-unit-state'
+import { deriveSurfaceUnits } from '../utils/derive-surface-units'
 import { parseUnitLocator } from '../utils/parse-unit-locator'
 import { resolveUnitStats } from '../utils/resolve-unit-stats'
 import {
@@ -592,6 +593,99 @@ function buildResolvedForSide(
   return { cannotBeUsed, lost }
 }
 
+/** Location signature of one id list: '' when every unit is on the active
+ *  surface, `=surface` when all share another one, else each unit's
+ *  surface. Uniform signatures stay valid as units are removed. */
+function surfaceSignature(s: SideStateData, ids: UnitIdList): string {
+  if (ids.length === 0) return ''
+  const first = s.unitSurface[ids[0]]
+  let uniform = true
+  for (const id of ids) {
+    if (s.unitSurface[id] !== first) {
+      uniform = false
+      break
+    }
+  }
+  if (uniform) return first === s._activeSurfaceId ? '' : `=${first}`
+  let list = ''
+  for (const id of ids) list += `${s.unitSurface[id]},`
+  return list
+}
+
+/** Build and cache the location segment of the state hash. */
+function cacheLocationHash(s: SideStateData): string {
+  const participating = surfaceSignature(s, s.participatingUnits)
+  const nonParticipating = surfaceSignature(s, s.nonParticipatingUnits)
+  const location =
+    participating || nonParticipating
+      ? `@${participating}!${nonParticipating}`
+      : ''
+  s._locationHash = location
+  return location
+}
+
+/** `unitState` segment of the state hash: one id char and one damage flag
+ *  per entry, ordered by id. Entries are few, so an inline insertion sort
+ *  beats `Array#sort`. */
+function unitStateHash(s: SideStateData): string {
+  const ids: string[] = []
+  for (const id in s.unitState) {
+    let i = ids.length - 1
+    while (i >= 0 && ids[i] > id) {
+      ids[i + 1] = ids[i]
+      i--
+    }
+    ids[i + 1] = id
+  }
+  let body = ''
+  for (const id of ids) body += s.unitState[id].isDamaged ? `${id}1` : `${id}0`
+  return body
+}
+
+/** After units are only removed: per-unit surface lists (with commas) must
+ *  be rebuilt, uniform signatures still hold. */
+function invalidateLocationHashOnRemoval(s: SideStateData): void {
+  if (s._locationHash?.includes(',')) s._locationHash = undefined
+}
+
+/** `surfaceUnits` once hit assignment has removed participants. Branches
+ *  keep reaching the same survivors, so results are memoized in the table
+ *  shared by every branch of the simulation, keyed by survivor count. An
+ *  entry is reused only for the same id lists and the same `unitSurface`
+ *  object; every writer that replaces `unitSurface` (moves, placement,
+ *  retreat) is also the only one that can add a surface key, so the entry
+ *  is exactly what `deriveSurfaceUnits` would build here. */
+function surfaceUnitsAfterCasualties(
+  s: SideStateData,
+): Record<string, UnitIdList> {
+  const cache = (s._surfaceUnitsCache ??= [])
+  const participating = s.participatingUnits
+  const cached = cache[participating.length]
+  if (
+    cached !== undefined &&
+    cached.unitSurface === s.unitSurface &&
+    cached.participatingUnits === participating &&
+    cached.nonParticipatingUnits === s.nonParticipatingUnits
+  ) {
+    return cached.value
+  }
+  const value = deriveSurfaceUnits(s, s.surfaceUnits)
+  cache[participating.length] = {
+    unitSurface: s.unitSurface,
+    participatingUnits: participating,
+    nonParticipatingUnits: s.nonParticipatingUnits,
+    value,
+  }
+  return value
+}
+
+function matchesRestrictionScope(
+  scope: ResolvedRestrictionScope | undefined,
+  unitType: string,
+): boolean {
+  return scope === 'ALL' || scope?.has(unitType as UnitType | UnitId) === true
+}
+
 /** Lazy accessor — returns the per-side resolved cache, building it on
  *  first read after invalidation. */
 function getResolvedRestrictions(
@@ -649,8 +743,7 @@ function _removeOne(
   }
   // A uniform-location hash remains valid as units are removed: the unit
   // pools in the main hash already identify which units are still alive.
-  if (s._locationHash && !s._locationHash.startsWith('='))
-    s._locationHash = undefined
+  invalidateLocationHashOnRemoval(s)
 }
 
 function addRestrictionEntry(
@@ -794,17 +887,14 @@ export class CombatSideState {
   /** Hash this side's units (participating, non-participating, and
    *  per-unit mutable state) for state deduplication.
    *
-   *  `unitState` is canonicalized: falsy field values are dropped (so
-   *  `{ isDamaged: false }` is equivalent to no entry at all — important
-   *  because CLEANUP_ROUND resets `usedSustainThisRound` to `false`
-   *  rather than deleting it, and we don't want that residual to fork
-   *  the cache from the never-touched starting state). Keys are sorted
-   *  so the same truthy state hashes identically regardless of which
-   *  ability happened to touch each unit first.
-   *
-   *  Phantom entries (a `unitState` key whose UnitId is no longer in
-   *  `participatingUnits` or `nonParticipatingUnits`) are skipped —
-   *  they belong to destroyed units and don't affect future combat.
+   *  Layout: `participating!nonParticipating|state[location][categories]`.
+   *  `state` is one id char plus a `1`/`0` damage flag per `unitState`
+   *  entry, ordered by id, so the same entries hash identically regardless
+   *  of which ability touched each unit first. Entries of destroyed units
+   *  are kept, and an entry without damage still differs from no entry.
+   *  UnitIds sit above ASCII, so the ASCII markers of the optional
+   *  `@location` (`cacheLocationHash`) and `#categories`
+   *  (`unitCombatHash`) segments cannot be mistaken for state.
    *
    *  Convergence across equivalent states ("A damaged" vs "B damaged")
    *  relies on `canonicalizeUnitState` having run. Natural sustain
@@ -818,54 +908,10 @@ export class CombatSideState {
     if (dirty) {
       canonicalizeUnitState(s, dirty)
     }
-    const ids = Object.keys(s.unitState).sort()
-    let body = ''
-    for (const id of ids) {
-      const entry = s.unitState[id as UnitId]
-      const inner = `isDamaged=${entry.isDamaged ?? false}`
-      body += `${id}:${inner},`
-    }
-    let locations = s._locationHash
-    if (locations === undefined) {
-      const firstId = (s.participatingUnits[0] ??
-        s.nonParticipatingUnits[0]) as UnitId | undefined
-      const firstSurface = firstId && s.unitSurface[firstId]
-      let isUniform = firstSurface !== undefined
-      if (isUniform) {
-        for (const id of s.participatingUnits) {
-          if (s.unitSurface[id] !== firstSurface) {
-            isUniform = false
-            break
-          }
-        }
-      }
-      if (isUniform) {
-        for (const id of s.nonParticipatingUnits) {
-          if (s.unitSurface[id] !== firstSurface) {
-            isUniform = false
-            break
-          }
-        }
-      }
-
-      if (firstSurface === undefined) {
-        locations = ''
-      } else if (isUniform && firstSurface === s._activeSurfaceId) {
-        locations = ''
-      } else if (isUniform) {
-        locations = `=${firstSurface}`
-      } else {
-        locations = ''
-        for (const id of s.participatingUnits)
-          locations += `${s.unitSurface[id]},`
-        locations += '!'
-        for (const id of s.nonParticipatingUnits)
-          locations += `${s.unitSurface[id]},`
-      }
-      s._locationHash = locations
-    }
-    const locationPart = locations ? `@${locations}` : ''
-    return `${s.participatingUnits}!${s.nonParticipatingUnits}${locationPart}|${body}#${unitCombatHash(s)}`
+    // Location and category segments are '' in the common case, which
+    // keeps most keys as short as surface-less ones.
+    const location = s._locationHash ?? cacheLocationHash(s)
+    return `${s.participatingUnits}!${s.nonParticipatingUnits}|${unitStateHash(s)}${location}${unitCombatHash(s)}`
   }
 
   /** Hash this side's `liveAbilities`. The initial `abilities` config is
@@ -1394,14 +1440,14 @@ export class CombatSideState {
     surfaceId?: SurfaceId,
   ): boolean {
     if (!state[side].unitAbilityRestrictions) return false
-    if (unitType.length === 1) surfaceId ??= state[side].unitSurface[unitType]
     const resolved = getResolvedRestrictions(state, side)[layer].get(ability)
     if (!resolved) return false
-    const matches = (scope: ResolvedRestrictionScope | undefined) =>
-      scope === 'ALL' || scope?.has(unitType as UnitType | UnitId) === true
+    if (matchesRestrictionScope(resolved.global, unitType)) return true
+    if (!resolved.surfaces) return false
+    if (unitType.length === 1) surfaceId ??= state[side].unitSurface[unitType]
     return (
-      matches(resolved.global) ||
-      (surfaceId !== undefined && matches(resolved.surfaces?.get(surfaceId)))
+      surfaceId !== undefined &&
+      matchesRestrictionScope(resolved.surfaces.get(surfaceId), unitType)
     )
   }
 
@@ -1557,13 +1603,15 @@ export class CombatSideState {
     const oldUnits = s.participatingUnits
     const destroyedIds: UnitId[] = []
     const hasCustom = pool.custom.length > 0
-    let destroyedSuffixStart: number | undefined
 
     if (!hasCustom && !pool.targetFilter) {
       const take = Math.min(mainTotal, oldUnits.length)
       const kept = oldUnits.length - take
       s.participatingUnits = oldUnits.slice(0, kept) as UnitIdList
-      destroyedSuffixStart = kept
+      if (trackDestroyed) {
+        for (let i = kept; i < oldUnits.length; i++)
+          destroyedIds.push(oldUnits[i] as UnitId)
+      }
     } else if (fitsFighterFastPath(s, pool, oldUnits)) {
       // Single-pass fast path for the [0.0.1]-style pattern (custom
       // entry prefers non-FIGHTER, fallback to FIGHTER). Walks the
@@ -1588,12 +1636,12 @@ export class CombatSideState {
         if (isFighterVariant(variantKey)) {
           if (mainRemaining > 0) {
             destroyedMask[i] = 1
-            destroyedIds.push(id)
+            if (trackDestroyed) destroyedIds.push(id)
             mainRemaining--
           }
         } else if (customRemaining > 0) {
           destroyedMask[i] = 1
-          destroyedIds.push(id)
+          if (trackDestroyed) destroyedIds.push(id)
           customRemaining--
         }
       }
@@ -1607,7 +1655,7 @@ export class CombatSideState {
           if (destroyedMask[i]) continue
           const id = oldUnits[i] as UnitId
           destroyedMask[i] = 1
-          destroyedIds.push(id)
+          if (trackDestroyed) destroyedIds.push(id)
           if (mainRemaining > 0) mainRemaining--
           else customRemaining--
         }
@@ -1628,7 +1676,7 @@ export class CombatSideState {
           const idx = working.indexOf(id)
           if (idx === -1) continue
           working.splice(idx, 1)
-          destroyedIds.push(id)
+          if (trackDestroyed) destroyedIds.push(id)
         }
       }
       for (const entry of pool.custom) {
@@ -1644,7 +1692,7 @@ export class CombatSideState {
           const idx = working.indexOf(id)
           if (idx === -1) continue
           working.splice(idx, 1)
-          destroyedIds.push(id)
+          if (trackDestroyed) destroyedIds.push(id)
         }
       }
       s.participatingUnits = working.join('') as UnitIdList
@@ -1653,92 +1701,9 @@ export class CombatSideState {
     s.hitPool = undefined
     s._hitPoolShared = false
 
-    let surfaceUnitsUpdated = false
-    if (
-      destroyedSuffixStart !== undefined &&
-      destroyedSuffixStart < oldUnits.length
-    ) {
-      const exactSurface = s.unitSurface[oldUnits[0]]
-      const allUnitsAreOnExactSurface =
-        exactSurface !== undefined &&
-        s.surfaceUnits[exactSurface]?.length ===
-          oldUnits.length + s.nonParticipatingUnits.length
-      if (allUnitsAreOnExactSurface) {
-        const nextSurfacePool = s.nonParticipatingUnits
-          ? ((s.participatingUnits + s.nonParticipatingUnits) as UnitIdList)
-          : s.participatingUnits
-        const cache = (s._surfaceUnitsCache ??= [])
-        const cached = cache[nextSurfacePool.length]
-        let nextSurfaceUnits = cached?.value
-        if (
-          cached?.surfaceId !== exactSurface ||
-          cached.pool !== nextSurfacePool
-        ) {
-          const value = {
-            ...s.surfaceUnits,
-            [exactSurface!]: nextSurfacePool,
-          }
-          cache[nextSurfacePool.length] = {
-            surfaceId: exactSurface!,
-            pool: nextSurfacePool,
-            value,
-          }
-          nextSurfaceUnits = value
-        }
-        s.surfaceUnits = nextSurfaceUnits!
-        surfaceUnitsUpdated = true
-        if (s._locationHash && !s._locationHash.startsWith('='))
-          s._locationHash = undefined
-      }
-
-      if (!surfaceUnitsUpdated || trackDestroyed) {
-        for (
-          let index = destroyedSuffixStart;
-          index < oldUnits.length;
-          index++
-        ) {
-          destroyedIds.push(oldUnits[index] as UnitId)
-        }
-      }
-    }
-
-    if (!surfaceUnitsUpdated && destroyedIds.length > 0) {
-      const surfaceUnits = { ...s.surfaceUnits }
-      const firstSurface = s.unitSurface[destroyedIds[0]]
-      let oneSurface = firstSurface !== undefined
-      for (let index = 1; index < destroyedIds.length; index++) {
-        if (s.unitSurface[destroyedIds[index]] !== firstSurface) {
-          oneSurface = false
-          break
-        }
-      }
-
-      if (oneSurface && surfaceUnits[firstSurface!] === oldUnits) {
-        // Common single-surface case: hit assignment already produced the
-        // exact survivor pool, so avoid indexing every casualty again.
-        surfaceUnits[firstSurface!] = s.participatingUnits
-        s.surfaceUnits = surfaceUnits
-        if (s._locationHash && !s._locationHash.startsWith('='))
-          s._locationHash = undefined
-      } else {
-        const destroyed = new Set(destroyedIds)
-        const touchedSurfaces = new Set<SurfaceId>()
-        for (const id of destroyedIds) {
-          const surfaceId = s.unitSurface[id]
-          if (surfaceId) touchedSurfaces.add(surfaceId)
-        }
-        for (const surfaceId of touchedSurfaces) {
-          const surfacePool = surfaceUnits[surfaceId] ?? ('' as UnitIdList)
-          let survivors = ''
-          for (const id of surfacePool) {
-            if (!destroyed.has(id as UnitId)) survivors += id
-          }
-          surfaceUnits[surfaceId] = survivors as UnitIdList
-        }
-        s.surfaceUnits = surfaceUnits
-        if (s._locationHash && !s._locationHash.startsWith('='))
-          s._locationHash = undefined
-      }
+    if (s.participatingUnits.length !== oldUnits.length) {
+      s.surfaceUnits = surfaceUnitsAfterCasualties(s)
+      invalidateLocationHashOnRemoval(s)
     }
 
     if (!trackDestroyed) return EMPTY_DESTROYED
@@ -2055,6 +2020,10 @@ export class CombatSideState {
 
       placed[vKey] = newIds
     }
+
+    // Placing nothing leaves the side untouched. Surface keys in particular
+    // may only appear alongside a new `unitSurface` object.
+    if (nextUnitSurface === s.unitSurface) return placed
 
     s.participatingUnits = nextPart
     s.nonParticipatingUnits = nextNon

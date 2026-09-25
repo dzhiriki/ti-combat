@@ -70,14 +70,9 @@ export const exotrireme: Ability<Params> = {
         ) {
           return false
         }
-        const variantKey = ctx.api.own.getUnitVariantKey(ctx.getUnit())
-        return (
-          variantKey !== undefined &&
-          ctx.utils
-            .getFlat(params.sacrificePriority)
-            .some(target =>
-              ctx.api.own.matchesUnitLocator(ctx.getUnit(), target),
-            )
+        return ctx.api.own.matchesUnitList(
+          ctx.getUnit(),
+          params.sacrificePriority,
         )
       },
       call: (ctx, params) => {

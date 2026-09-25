@@ -43,12 +43,7 @@ export const directHit: Ability<Params> = {
           !ctx.api.opponent.isUnitCategory(unitId, 'SHIPS')
         )
           return false
-        const targets = ctx.utils.getFlat(params.targets)
-        if (
-          !targets.some(target =>
-            ctx.api.opponent.matchesUnitLocator(unitId, target),
-          )
-        )
+        if (!ctx.api.opponent.matchesUnitList(unitId, params.targets))
           return false
         const stats = ctx.api.opponent.getUnitStats(unitId)!
         if (stats.DIRECT_HIT_IMMUNE) return false

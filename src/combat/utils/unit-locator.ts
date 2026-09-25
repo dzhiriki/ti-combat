@@ -58,6 +58,9 @@ export function matchesUnitLocator(
   locator: UnitLocator,
   includeVariants = false,
 ): boolean {
+  // A plain variant key is its own unit type: skip parsing on this hot path.
+  if (!includeVariants && !locator.startsWith('@'))
+    return side.unitType[id] === locator
   const { unitType, surfaceId } = parseUnitLocator(locator)
   return matchesParsedLocator(side, id, unitType, surfaceId, includeVariants)
 }
@@ -68,9 +71,70 @@ export function unitLocatorMatcher(
   locator: UnitLocator,
   includeVariants = false,
 ): (id: string) => boolean {
+  if (!includeVariants && !locator.startsWith('@'))
+    return id => side.unitType[id] === locator
   const { unitType, surfaceId } = parseUnitLocator(locator)
   return id =>
     matchesParsedLocator(side, id, unitType, surfaceId, includeVariants)
+}
+
+/** Enabled entries of one `UnitList`, parsed once. */
+interface CompiledUnitList {
+  /** Unqualified keys: exact-variant matches need only a Set lookup. */
+  plain: ReadonlySet<string>
+  /** Surface-qualified entries, parsed. */
+  located: readonly { unitType: UnitType; surfaceId: SurfaceId }[]
+  /** Every entry, parsed, for variant-superset matching. */
+  all: readonly { unitType: UnitType; surfaceId: SurfaceId | undefined }[]
+}
+
+/** Keyed by list identity: ability params replace lists, never mutate them. */
+const compiledUnitLists = new WeakMap<object, CompiledUnitList>()
+
+function compileUnitList(
+  list: readonly (readonly [string, ...unknown[]])[],
+): CompiledUnitList {
+  let compiled = compiledUnitLists.get(list)
+  if (compiled) return compiled
+  const plain = new Set<string>()
+  const located: CompiledUnitList['located'][number][] = []
+  const all: CompiledUnitList['all'][number][] = []
+  for (const entry of list) {
+    // Same enabled-entry rule as `ctx.utils.getFlat`.
+    if (entry.length >= 2 && (entry[1] === false || entry[1] === 0)) continue
+    const { unitType, surfaceId } = parseUnitLocator(entry[0])
+    all.push({ unitType, surfaceId })
+    if (surfaceId === undefined) plain.add(entry[0])
+    else located.push({ unitType, surfaceId })
+  }
+  compiled = { plain, located, all }
+  compiledUnitLists.set(list, compiled)
+  return compiled
+}
+
+/** Whether the unit matches any enabled entry of a `UnitList` — the
+ *  `getFlat(list).some(target => matchesUnitLocator(...))` check, with the
+ *  list compiled once per list object. */
+export function matchesUnitList(
+  side: LocatedSide,
+  id: string,
+  list: readonly (readonly [string, ...unknown[]])[],
+  includeVariants = false,
+): boolean {
+  const compiled = compileUnitList(list)
+  if (includeVariants) {
+    for (const { unitType, surfaceId } of compiled.all) {
+      if (matchesParsedLocator(side, id, unitType, surfaceId, true)) return true
+    }
+    return false
+  }
+  const actual = side.unitType[id]
+  if (actual === undefined) return false
+  if (compiled.plain.has(actual)) return true
+  for (const { unitType, surfaceId } of compiled.located) {
+    if (actual === unitType && side.unitSurface[id] === surfaceId) return true
+  }
+  return false
 }
 
 export function locatorWithSubtype(

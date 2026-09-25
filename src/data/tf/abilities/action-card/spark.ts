@@ -59,17 +59,11 @@ export const spark: Ability<Params> = {
         if (!ctx.api.opponent.hasUnit(unitId)) return false
         const variant = ctx.api.opponent.getUnitVariantKey(unitId)
         if (!variant) return false
-        const targets = ctx.utils.getFlat(
+        const targets =
           ctx.state.combatMode === 'GROUND'
             ? params.groundTargets
-            : params.spaceTargets,
-        )
-        if (
-          !targets.some(target =>
-            ctx.api.opponent.matchesUnitLocator(unitId, target),
-          )
-        )
-          return false
+            : params.spaceTargets
+        if (!ctx.api.opponent.matchesUnitList(unitId, targets)) return false
         return !ctx.api.opponent.getUnitStats(unitId)?.DIRECT_HIT_IMMUNE
       },
       call: (ctx, _params, unitId) => {

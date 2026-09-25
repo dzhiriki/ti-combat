@@ -290,6 +290,20 @@ a check there too.
   Capacity enforcement toggle is off (the toggle governs removal of illegal
   cargo, not how much capacity the ships have).
 
+- **The engine owns lost/cannotBeUsed for unit-sourced unit abilities.**
+  `AbilitiesEngine.tryResolveOne` rejects a unit-sourced invoke whose
+  `ability.key` is in `UNIT_ABILITIES` (SUSTAIN_DAMAGE, AFB, …) after
+  `isCallable` when the source unit's ability is lost or cannotBeUsed,
+  surface scope included. Their guards must not re-check it (see
+  `sustain-damage.ts`); a re-keyed clone outside `UNIT_ABILITIES` must add
+  the check itself. Pinned by
+  `tests/engine/surface-scoped-sustain-restriction.test.ts`.
+
+- **`matchesUnitList` caches by list identity.** `SideApi.matchesUnitList`
+  compiles each `UnitList` object once (WeakMap), so `UnitList` params must
+  be replaced, never mutated in place. A malformed `@` locator throws when
+  the list is first compiled, even if an earlier entry would match.
+
 - **Sustain Damage has per-mode allow-lists.** A unit sustains only if its
   variant is in `SUSTAIN_DAMAGE.spacePriority` / `groundPriority` (sourced
   from `nonFighterShips` / `groundForces`). A unit added to combat outside
@@ -311,7 +325,14 @@ a check there too.
   there still allows commitment and Space Cannon Defense; losing the last unit
   during `GROUND_COMBAT` ends combat immediately because no phase follows.
   Before entering or repeating a combat phase, both sides must already have
-  participants. See `tests/abilities/claire-gibson.test.ts`,
+  participants. After an early phase end or `forceOutcome`,
+  `_loadEndScriptIfFlowExhausted` (queued behind `CLEANUP_ROUND`) applies
+  the scheduler's own `getNextPhase` rule in place, so a finished combat
+  does not cost an extra `advance()`; any non-COMPLETE result is left to the
+  scheduler. It relies on `phase[0]` being the scheduler's current meta
+  (phase stacks run outer to inner and only unit-ability metas nest), and
+  any change to the scheduler's COMPLETE handling
+  (`CombatEngine` / test harness) must be mirrored there. See `tests/abilities/claire-gibson.test.ts`,
   `tests/abilities/claire-gibson+indoctrination.test.ts`, and
   `tests/surfaces.test.ts`.
 
@@ -319,6 +340,40 @@ a check there too.
   Surface-qualified tiers are equivalent only when they name one surface and
   every pooled unit stands on it (`fitsFighterFastPath`); Alastor pools span
   planets, so mixed lists must fall back to `pickTargetsForCustom`.
+
+- **Side state objects must keep one hidden class.** `forSimulation`
+  rebuilds each `SideStateData` with every field present
+  (`withAllSideFields`), and `cloneStateForBranch` spreads it per branch.
+  V8 only bulk-copies a spread when it sees few source shapes; lazily added
+  optional fields (`_locationHash`, `hitPool`, …) arriving in path-dependent
+  order made that spread and every side-data read megamorphic (~40% slower
+  engine). A new `SideStateData` field is a compile error there until listed;
+  never attach ad-hoc properties to side objects, and avoid conditional
+  spreads (`...(x && { x })`) in per-branch literals.
+
+- **`surfaceUnits` is a membership index.** It is the id lists grouped by
+  `unitSurface` (`deriveSurfaceUnits`); pool order carries no meaning and
+  kill order lives only in `participatingUnits`. Hit assignment re-derives
+  it through `_surfaceUnitsCache`, memoized by survivor count and reused
+  only for identical id lists and the same `unitSurface` object. So never
+  mutate `unitSurface` in place, and add a surface key only together with a
+  new `unitSurface` object (which is why `placeUnits` returns early when
+  nothing was placed). Per-surface survivor maps therefore keep setup or
+  move order until the first hit; UI sorting and outcome merging ignore it.
+
+- **`_locationHash` is one signature per id list.** Each list is `''` (all on
+  the active surface), `=surface` (all on another one), or a per-unit list
+  with commas; the field stores the whole segment, `''` or `@p!n`. Removing
+  units keeps uniform signatures valid, so hit assignment only drops hashes
+  containing commas; any membership change (`sortUnitsByPriority`) voids
+  everything but `''`, and moves void it outright.
+
+- **State-hash caches are validated by reference.** `_unitCombatHash` and
+  the `categoryHashes`/`overrideHashes` WeakMaps assume `unitStats` and
+  `unitCombat` are replaced, never mutated in place, on every write.
+  `getUnitsHash` writes ASCII `0`/`1` damage flags and `@`/`#`/`&` markers
+  right after ids, so UnitIds must stay at or above 0x80, and surface ids
+  and variant keys must not contain `!`, `,`, `@`, `#`, `&`, `|` or `+`.
 
 - **Unlimited-use repair is the only thing that makes the state graph
   cyclic.** Without it, combat state decreases monotonically (units are

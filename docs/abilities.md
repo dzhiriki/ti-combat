@@ -398,6 +398,8 @@ hasUnit(unitId: UnitId): boolean
 getPendingHits(filter?: { base?: true; bonus?: true }): number
 canAssignHitToUnit(unitId: UnitId): boolean  // Includes phase and unit-ability hit restrictions
 isParticipating(unitId: UnitId): boolean
+matchesUnitLocator(unitId: UnitId, locator: UnitLocator, includeVariants?: boolean): boolean
+matchesUnitList(unitId: UnitId, list: UnitList, includeVariants?: boolean): boolean  // Any enabled entry; skips false/0 like getFlat
 isUnitCategory(unitId: UnitId, category: UnitCategory): boolean
 isUnitTypeCategory(unitType: UnitType, category: UnitCategory): boolean  // Native categories, for production choices
 getUnitVariantsOptions(filter?: ParamFilter): { label: string, value: string }[]
@@ -853,7 +855,11 @@ active planet; the build-time clamp uses the same caps.
 
 `UnitLocator` accepts legacy `UnitType` values as well as qualified keys from
 `makeUnitLocator(type, surfaceId)`. Unit queries, priority helpers, and
-`SideApi.matchesUnitLocator(id, locator)` respect both parts.
+`SideApi.matchesUnitLocator(id, locator)` respect both parts. For per-unit
+allow-lists use `SideApi.matchesUnitList(id, list)` instead of
+`getFlat(list).some(t => matchesUnitLocator(id, t))`: it skips `false`/`0`
+entries like `getFlat` and compiles each list object once, so never mutate a
+`UnitList` param in place.
 `parseUnitLocator(locator)` returns `unitType` (decoded variant), `baseType`,
 `subtypes`, and optional `surfaceId` for both qualified and legacy values. Use
 `unitType` for variant/stat work and `locatorWithSubtype(locator, subtype)`

@@ -88,7 +88,29 @@ const overrideHashes = new WeakMap<
   string
 >()
 
+/** State-hash segment for native categories and instance grants: '' when
+ *  neither is present, else `#native&explicit`. Cached on the side with
+ *  the two copy-on-write inputs it was built from, so the hot path is two
+ *  reference checks and branch clones share the entry. */
 export function unitCombatHash(side: SideStateData): string {
+  const cached = side._unitCombatHash
+  if (
+    cached !== undefined &&
+    cached.unitStats === side.unitStats &&
+    cached.unitCombat === side.unitCombat
+  ) {
+    return cached.value
+  }
+  const value = buildUnitCombatHash(side)
+  side._unitCombatHash = {
+    unitStats: side.unitStats,
+    unitCombat: side.unitCombat,
+    value,
+  }
+  return value
+}
+
+function buildUnitCombatHash(side: SideStateData): string {
   let native = categoryHashes.get(side.unitStats)
   if (native === undefined) {
     native = Object.keys(side.unitStats)
@@ -105,7 +127,7 @@ export function unitCombatHash(side: SideStateData): string {
     categoryHashes.set(side.unitStats, native)
   }
   const overrides = side.unitCombat
-  if (!overrides) return native
+  if (!overrides) return native ? `#${native}&` : ''
   let explicit = overrideHashes.get(overrides)
   if (explicit === undefined) {
     explicit = Object.keys(overrides)
@@ -114,5 +136,6 @@ export function unitCombatHash(side: SideStateData): string {
       .join(';')
     overrideHashes.set(overrides, explicit)
   }
-  return `${native}|${explicit}`
+  // An empty grant map behaves exactly like none, so both hash as ''.
+  return native || explicit ? `#${native}&${explicit}` : ''
 }

@@ -172,13 +172,26 @@ export type UnitStatsEntry = UnitStats | ((parentStats: UnitStats) => UnitStats)
 /** Ability configuration for one side (key → params). */
 export type SideAbilitiesConfig = Record<string, Record<string, unknown>>
 
+/** `unitCombatHash` result with the input refs it was built from. */
+export interface UnitCombatHashCache {
+  unitStats: SideStateData['unitStats']
+  unitCombat: SideStateData['unitCombat']
+  value: string
+}
+
 /** State data for one side of combat */
 export interface SideStateData {
   faction: string
-  /** Authoritative physical membership. Every living unit appears in exactly
-   *  one surface list. `unitSurface` retains the last location of destroyed
-   *  ids so destroy reactions can still inspect where their source was. */
+  /** Physical membership index: the id lists grouped by `unitSurface`.
+   *  Every living unit appears in exactly one surface list and every
+   *  surface of the combat keeps a key. Pool order carries no meaning (kill
+   *  order lives in `participatingUnits`); writers of the id lists or
+   *  `unitSurface` must keep the membership exact (`deriveSurfaceUnits`
+   *  rebuilds it from scratch). A surface key may only be added together
+   *  with a new `unitSurface` object (`_surfaceUnitsCache` relies on it). */
   surfaceUnits: Record<string, UnitIdList>
+  /** Unit location. Retains the last location of destroyed ids so destroy
+   *  reactions can still inspect where their source was. */
   unitSurface: Record<string, SurfaceId>
   /** Participating UnitIds packed into a `UnitIdList` (one UTF-16 char
    *  per UnitId), pre-sorted by combat-mode priority. Highest priority
@@ -235,18 +248,24 @@ export interface SideStateData {
    *  with another SideStateData; mutations must clone first via
    *  `ensureHitPoolOwned`. */
   _hitPoolShared?: boolean
-  /** Cached physical-location signature used by state hashing. */
+  /** Cached location segment of the state hash: '' when every living unit
+   *  is on the active surface, else `@…`. */
   _locationHash?: string
+  /** Cached category/grant segment of the state hash (`unitCombatHash`),
+   *  valid while both input refs are unchanged. */
+  _unitCombatHash?: UnitCombatHashCache
   /** Calculation target used to omit redundant location data when every
    *  living unit is already on the active surface. */
   _activeSurfaceId?: SurfaceId
-  /** Shared intern table for immutable single-occupied-surface membership
-   *  objects. It avoids allocating the same map in millions of equivalent
-   *  probability branches and has no effect on state identity. */
+  /** `surfaceUnits` after hit assignment, memoized by survivor count and
+   *  shared by every branch of one simulation. Equivalent branches reach the
+   *  same survivors millions of times; an entry is reused only for the same
+   *  id lists and `unitSurface` object. No effect on state identity. */
   _surfaceUnitsCache?: Array<
     | {
-        surfaceId: SurfaceId
-        pool: UnitIdList
+        unitSurface: Record<string, SurfaceId>
+        participatingUnits: UnitIdList
+        nonParticipatingUnits: UnitIdList
         value: Record<string, UnitIdList>
       }
     | undefined

@@ -53,6 +53,7 @@ import type {
   CombatMode,
   CombatStateData,
   DiceRollContext,
+  HitPool,
   HitSource,
   MetaPhase,
   PendingStep,
@@ -80,6 +81,12 @@ function innerMeta(phase: MetaPhase[]): MetaPhase {
 
 function opponentOf(side: CombatSide): CombatSide {
   return side === 'attacker' ? 'defender' : 'attacker'
+}
+
+/** True when the step runs inside SPACE_COMBAT / GROUND_COMBAT. Combat metas
+ *  only ever root a loaded script, so checking the root is enough. */
+function inCombatPhase(phase: MetaPhase[]): boolean {
+  return phase.length > 0 && isCombatMeta(phase[0])
 }
 
 /** Extract `UnitType[]` keys from a `UnitList<V>` tuple-array, dropping
@@ -250,6 +257,8 @@ export class CombatState {
   ): CombatState {
     const instance = Object.create(CombatState.prototype) as CombatState
 
+    attacker = withAllSideFields(attacker)
+    defender = withAllSideFields(defender)
     attacker._activeSurfaceId = activeSurfaceId
     defender._activeSurfaceId = activeSurfaceId
 
@@ -384,11 +393,7 @@ export class CombatState {
   /** Queue a phase-end check after direct participation changes. Destruction
    *  cascades drain first so reactions can restore a force before the check. */
   queuePhaseEndCheck(phase: MetaPhase[]): void {
-    if (
-      this.data.winnerSide !== undefined ||
-      !phase.some(meta => isCombatMeta(meta))
-    )
-      return
+    if (this.data.winnerSide !== undefined || !inCombatPhase(phase)) return
     const check: PhaseStep = {
       kind: 'method',
       fn: CombatState.prototype._endCombatPhaseIfSideMissing,
@@ -702,23 +707,38 @@ export class CombatState {
   }
 
   /** Stop the active combat phase once one side has no participants. This
-   *  never decides the winner or jumps to an end sequence: the scheduler
-   *  advances through the ordinary phase flow after round cleanup drains.
-   *  Top-level pre-combat phases are never truncated by participant state. */
+   *  never decides the winner or jumps to an end sequence: after round
+   *  cleanup drains, the ordinary next-phase decision applies. Top-level
+   *  pre-combat phases are never truncated by participant state. */
   private _endCombatPhaseIfSideMissing(phase: MetaPhase[]): void {
-    if (
-      this.data.winnerSide !== undefined ||
-      !phase.some(meta => isCombatMeta(meta))
-    )
-      return
-    const d = this.data
-    if (
-      CombatSideState.hasParticipatingUnits(d.attacker) &&
-      CombatSideState.hasParticipatingUnits(d.defender)
-    )
-      return
+    if (this.data.winnerSide !== undefined || !inCombatPhase(phase)) return
+    if (this._canStartCombatPhase()) return
     this.pendingSteps = []
-    this.pushScript([{ kind: 'timing', timing: 'CLEANUP_ROUND', phase }])
+    this._pushRoundCleanup(phase)
+  }
+
+  /** Replace the rest of a phase cut short with its round cleanup, followed
+   *  by the in-place end-of-flow check. */
+  private _pushRoundCleanup(phase: MetaPhase[]): void {
+    this.pushScript([
+      { kind: 'timing', timing: 'CLEANUP_ROUND', phase },
+      {
+        kind: 'method',
+        fn: CombatState.prototype._loadEndScriptIfFlowExhausted,
+        phase,
+      },
+    ])
+  }
+
+  /** Queued behind the CLEANUP_ROUND of a phase that ended early. Once
+   *  cleanup has drained, take the scheduler's next-phase decision in place:
+   *  when no phase follows, the end script runs in this same `advance()`
+   *  instead of costing every finished combat a scheduler round trip. Any
+   *  other outcome (cleanup restored a participant) leaves the empty stack to
+   *  the scheduler. The phase root is the scheduler's current meta. */
+  private _loadEndScriptIfFlowExhausted(phase: MetaPhase[]): void {
+    if (this.pendingSteps.length > 0 || phase.length === 0) return
+    if (this.getNextPhase(phase[0]) === 'COMPLETE') this.loadEndScript(phase[0])
   }
 
   /** Return the phase that follows a drained script. Combat phases repeat
@@ -783,9 +803,8 @@ export class CombatState {
 
   private _finish(): void {
     this.data.winnerSide = this._deriveWinner()
-    returnCommittedFighters(this.data)
-    this.resyncParticipating('attacker')
-    this.resyncParticipating('defender')
+    for (const side of returnCommittedFighters(this.data))
+      this.resyncParticipating(side)
     this.data.isFinished = true
   }
 
@@ -829,7 +848,7 @@ export class CombatState {
     if (this.data.winnerSide !== undefined) return
     this.data.winnerSide = winner
     this.pendingSteps = []
-    this.pushScript([{ kind: 'timing', timing: 'CLEANUP_ROUND', phase }])
+    this._pushRoundCleanup(phase)
   }
 
   public pushScript(entity: PendingStep[]) {
@@ -1148,23 +1167,25 @@ export class CombatState {
       // hitPool object reference until the first mutation on each branch.
       // Thundarian-style cancels clear `hitPool` entirely.
       for (const side of ['attacker', 'defender'] as const) {
-        const rawPending = branch.pendingHitPool[side]
+        const pending = branch.pendingHitPool[side]
+        if (pending.base === 0 && pending.custom.length === 0) continue
         const targetFilter: UnitTargetFilter | undefined = ctx.isUnitAbility
           ? {
               types: ctx.unitAbilityPriority?.[side] ?? [],
               unitAbility: true,
             }
           : undefined
-        const pending = rawPending
-        if (pending.base === 0 && pending.custom.length === 0) continue
         const sideData = branchData[side]
         if (sideData.hitPool === undefined) {
-          sideData.hitPool = {
+          // Assigned separately: a conditional spread in the literal would
+          // take V8's slow object-literal path for every combat branch.
+          const pool: HitPool = {
             base: pending.base,
             additional: 0,
             custom: pending.custom.map(c => ({ ...c })),
-            ...(targetFilter && { targetFilter }),
           }
+          if (targetFilter) pool.targetFilter = targetFilter
+          sideData.hitPool = pool
           sideData._hitPoolShared = false
         } else {
           if (sideData._hitPoolShared) {
@@ -1650,13 +1671,48 @@ function collectionToLogShape(collection: SideDiceCollection): DicePool {
 export function cloneStateForBranch(base: CombatStateData): CombatStateData {
   base.attacker._hitPoolShared = true
   base.attacker._unitStateShared = true
-  base.attacker._surfaceUnitsCache ??= []
   base.defender._hitPoolShared = true
   base.defender._unitStateShared = true
-  base.defender._surfaceUnitsCache ??= []
   return {
     ...base,
     attacker: { ...base.attacker },
     defender: { ...base.defender },
   }
+}
+
+/** Copy with every field present, so the root state and all its branch
+ *  clones share one hidden class. Optional fields are otherwise added lazily
+ *  in path-dependent order, and V8 only bulk-copies a spread (see
+ *  `cloneStateForBranch`) when it sees few source shapes. The mapped type
+ *  makes a new `SideStateData` field a compile error until it is listed. */
+function withAllSideFields(s: SideStateData): SideStateData {
+  const side: { [K in keyof Required<SideStateData>]: SideStateData[K] } = {
+    faction: s.faction,
+    surfaceUnits: s.surfaceUnits,
+    unitSurface: s.unitSurface,
+    participatingUnits: s.participatingUnits,
+    nonParticipatingUnits: s.nonParticipatingUnits,
+    unitType: s.unitType,
+    unitState: s.unitState,
+    unitCombat: s.unitCombat,
+    unitStats: s.unitStats,
+    unitCategoryOptions: s.unitCategoryOptions,
+    unitCategoryChanges: s.unitCategoryChanges,
+    declaredSubtypes: s.declaredSubtypes,
+    hitPool: s.hitPool,
+    unitAbilityRestrictions: s.unitAbilityRestrictions,
+    abilities: s.abilities,
+    liveAbilities: s.liveAbilities,
+    _unitStateShared: s._unitStateShared,
+    _needsCanonicalize: s._needsCanonicalize,
+    _hitPoolShared: s._hitPoolShared,
+    _locationHash: s._locationHash,
+    _unitCombatHash: s._unitCombatHash,
+    _activeSurfaceId: s._activeSurfaceId,
+    // Created here so every branch clone shares one memo table.
+    // Always fresh: the memo is scoped to one simulation.
+    _surfaceUnitsCache: [],
+    _resolvedRestrictions: s._resolvedRestrictions,
+  }
+  return side
 }
