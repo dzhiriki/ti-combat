@@ -42,3 +42,32 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:snapshots:run
+
+  bench:
+    name: Performance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history, to find where the branch forked from main
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # main is compared with where it pointed before the push, so a merged PR
+      # or several pushed commits are measured as a whole. Branches and PRs are
+      # compared with their fork point from main, so commits that landed on
+      # main later don't count.
+      - run: |
+          if [ "$GITHUB_REF" = refs/heads/main ]; then
+            base=$BEFORE
+            # Not in the clone after a force push
+            git cat-file -e "$base^{commit}" 2>/dev/null || base=HEAD~1
+          else
+            base=$(git merge-base origin/main HEAD)
+          fi
+          npm run bench -- "$base"
+        env:
+          BEFORE: ${{ github.event.before }}

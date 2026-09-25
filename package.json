@@ -19,7 +19,7 @@
     "test:snapshots": "vitest --no-isolate --pool=threads --config tests/snapshots/vitest.config.ts",
     "test:snapshots:run": "vitest run --no-isolate --pool=threads --config tests/snapshots/vitest.config.ts",
     "test:snapshots:update": "vitest run --config tests/snapshots/vitest.config.ts --update",
-    "profile": "vite-node tests/profile/run.ts",
+    "bench": "node tests/bench/compare.ts",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -65,7 +65,6 @@
     "stylelint-order": "^7.0.1",
     "typescript": "~7.0.2",
     "vite": "^8.3.0",
-    "vite-node": "^6.0.0",
     "vitest": "^5.0.1"
   }
 }
