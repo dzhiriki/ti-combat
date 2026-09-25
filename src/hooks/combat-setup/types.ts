@@ -5,7 +5,7 @@ import type {
   GameSystem,
   SurfaceDefinition,
   SurfaceId,
-  SurfaceUnitSelections,
+  SideUnitPlacements,
 } from '@/types'
 
 export interface SimulationInput {
@@ -14,8 +14,8 @@ export interface SimulationInput {
   defenderFaction: string
   surfaces: SurfaceDefinition[]
   activeSurfaceId: SurfaceId
-  attackerPlacements: SurfaceUnitSelections
-  defenderPlacements: SurfaceUnitSelections
+  attackerPlacements: SideUnitPlacements
+  defenderPlacements: SideUnitPlacements
   combatMode: CombatMode
   abilities: Record<CombatSide, SideAbilitiesConfig>
   /** Optional. When omitted, the simulation runs at full precision (no

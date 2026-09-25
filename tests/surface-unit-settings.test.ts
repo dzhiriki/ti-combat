@@ -32,6 +32,7 @@ import type {
 import { SPACE_SURFACE_ID, UnitListSchema } from '@/types'
 
 import { combatTest } from './utils/combat-test'
+import { getSurfaceUnitIds } from './utils/surface-units'
 
 const SPACE = SPACE_SURFACE_ID
 const P1 = 'planet-1' as SurfaceId
@@ -276,12 +277,12 @@ describe('surface-aware unit settings', () => {
       PRE_GALVANIZED: { galvanizedUnits: [[target('INFANTRY', P2), 1]] },
     })
     expect(
-      [...t.state.attacker.surfaceUnits[P1]].map(
+      [...getSurfaceUnitIds(t.state.attacker, P1)].map(
         id => t.state.attacker.unitType[id],
       ),
     ).toEqual(['INFANTRY'])
     expect(
-      [...t.state.attacker.surfaceUnits[P2]].map(
+      [...getSurfaceUnitIds(t.state.attacker, P2)].map(
         id => t.state.attacker.unitType[id],
       ),
     ).toEqual(['INFANTRY:Galvanized'])
@@ -333,8 +334,8 @@ describe('surface-aware unit settings', () => {
       })
       t.advanceTo('SPACE_COMBAT')
       t.advanceRound({ attacker: 1 })
-      expect(t.state.attacker.surfaceUnits[first]).toHaveLength(0)
-      expect(t.state.attacker.surfaceUnits[second]).toHaveLength(1)
+      expect(getSurfaceUnitIds(t.state.attacker, first)).toHaveLength(0)
+      expect(getSurfaceUnitIds(t.state.attacker, second)).toHaveLength(1)
     },
   )
 
@@ -343,8 +344,8 @@ describe('surface-aware unit settings', () => {
     t.advanceToTiming('START_OF_COMBAT_ROUND', 0, 'SPACE_COMBAT')
     const side = t.state.attacker
     CombatSideState.addCustomHits(side, 1, 'TEST', [target('INFANTRY', P2)])
-    const first = side.surfaceUnits[P1][0] as UnitId
-    const second = side.surfaceUnits[P2][0] as UnitId
+    const first = getSurfaceUnitIds(side, P1)[0] as UnitId
+    const second = getSurfaceUnitIds(side, P2)[0] as UnitId
     expect(CombatSideState.canAssignHitToUnit(side, first)).toBe(false)
     expect(CombatSideState.canAssignHitToUnit(side, second)).toBe(true)
     const casualties = CombatSideState.assignHits(side, true)
@@ -376,11 +377,11 @@ describe('surface-aware unit settings', () => {
     t.advanceTo('SPACE_COMBAT')
     t.advanceRound(0)
     expect(
-      t.state.attacker.unitState[t.state.attacker.surfaceUnits[first][0]]
+      t.state.attacker.unitState[getSurfaceUnitIds(t.state.attacker, first)[0]]
         ?.isDamaged,
     ).not.toBe(true)
     expect(
-      t.state.attacker.unitState[t.state.attacker.surfaceUnits[second][0]]
+      t.state.attacker.unitState[getSurfaceUnitIds(t.state.attacker, second)[0]]
         ?.isDamaged,
     ).toBe(true)
   })
@@ -400,11 +401,11 @@ describe('surface-aware unit settings', () => {
     t.advanceTo('SPACE_COMBAT')
     t.advanceRound({ attacker: 1 })
     expect(
-      t.state.attacker.unitState[t.state.attacker.surfaceUnits[P1][0]]
+      t.state.attacker.unitState[getSurfaceUnitIds(t.state.attacker, P1)[0]]
         ?.isDamaged,
     ).not.toBe(true)
     expect(
-      t.state.attacker.unitState[t.state.attacker.surfaceUnits[P2][0]]
+      t.state.attacker.unitState[getSurfaceUnitIds(t.state.attacker, P2)[0]]
         ?.isDamaged,
     ).toBe(true)
   })
@@ -569,10 +570,10 @@ describe('surface-aware unit settings', () => {
     t.advanceTo('SPACE_COMBAT')
     t.advanceRound(0)
     expect(
-      t.state.attacker.unitType[t.state.attacker.surfaceUnits[P1][0]],
+      t.state.attacker.unitType[getSurfaceUnitIds(t.state.attacker, P1)[0]],
     ).toBe('INFANTRY')
     expect(
-      t.state.attacker.unitType[t.state.attacker.surfaceUnits[P2][0]],
+      t.state.attacker.unitType[getSurfaceUnitIds(t.state.attacker, P2)[0]],
     ).toBe('INFANTRY:Cavalry')
   })
 
@@ -708,7 +709,7 @@ describe('surface-aware unit settings', () => {
     const side = t.state.attacker
     // Prefer the infantry nearer the head, so a tail-first walk would miss.
     const [preferred] = [P1, P2]
-      .map(surface => side.surfaceUnits[surface][0] as UnitId)
+      .map(surface => getSurfaceUnitIds(side, surface)[0] as UnitId)
       .sort(
         (a, b) =>
           side.participatingUnits.indexOf(a) -

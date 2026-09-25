@@ -391,10 +391,14 @@ export class SideApi {
           { ...declared, source: declared.source },
         )
     }
-    return CombatSideState.getUnitVariantOptions(
+    return resolveUnitOptions(
       this._sideData,
-      this.state.combatMode,
-      typeof arg === 'string' ? undefined : arg,
+      { ...this.state, side: this._side },
+      {
+        source: this.state.combatMode === 'GROUND' ? 'GROUND_FORCES' : 'SHIPS',
+        scope: 'type',
+        filter: typeof arg === 'string' ? undefined : arg,
+      },
     )
   }
 
@@ -939,10 +943,6 @@ export class SideApi {
    *   - omitted — every variant on the side
    *   - `UnitType` (variant key or base type) — only that variant
    *   - `{ exclude: UnitBaseType[] }` — every variant except those listed
-   *   - `{ singleUnit: UnitType }` — exactly one unit of that variant
-   *     key (split out of the variant's bucket by matching dpu against
-   *     the variant's natural stats; useful for Gravleash-style "1 of
-   *     your ship's rolls")
    *
    *  Idempotent per `(abilityKey, target)`: a second call from the
    *  same ability with the same target is silently dropped.
@@ -953,11 +953,7 @@ export class SideApi {
    */
   applyBonusToResult(
     amount: number,
-    target?:
-      | UnitType
-      | { exclude: UnitBaseType[] }
-      | { singleUnit: UnitType }
-      | { unitId: UnitId },
+    target?: UnitType | { exclude: UnitBaseType[] } | { unitId: UnitId },
   ): void {
     const abilityKey = this._ctx.ability?.key
     if (abilityKey === undefined) {
@@ -976,12 +972,6 @@ export class SideApi {
     const list = (groupCtx.modifiers ??= [])
     const unitType =
       target !== undefined && typeof target === 'string' ? target : undefined
-    const singleUnit =
-      target !== undefined &&
-      typeof target === 'object' &&
-      'singleUnit' in target
-        ? target.singleUnit
-        : undefined
     const unitId =
       typeof target === 'object' && 'unitId' in target
         ? target.unitId
@@ -997,7 +987,6 @@ export class SideApi {
           m.side === this._side &&
           m.abilityKey === abilityKey &&
           m.unitType === unitType &&
-          m.singleUnit === singleUnit &&
           m.unitId === unitId &&
           arraysEqual(m.excludeUnitTypes, excludeUnitTypes),
       )
@@ -1011,7 +1000,6 @@ export class SideApi {
       abilityKey,
       amount: -amount,
       unitType,
-      singleUnit,
       unitId,
       excludeUnitTypes,
       wasDeclaration: this._ctx.isDeclarationInvoke === true,

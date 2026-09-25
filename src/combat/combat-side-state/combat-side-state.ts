@@ -46,7 +46,6 @@ import type {
   SideDiceCollection,
 } from '../dice-math/types'
 import { canonicalizeUnitState } from '../utils/canonicalize-unit-state'
-import { deriveSurfaceUnits } from '../utils/derive-surface-units'
 import { parseUnitLocator } from '../utils/parse-unit-locator'
 import { resolveUnitStats } from '../utils/resolve-unit-stats'
 import {
@@ -57,7 +56,7 @@ import {
 } from '../utils/unit-combat-properties'
 import { nextUnitIds } from '../utils/unit-id'
 import { matchesUnitLocator, unitLocatorMatcher } from '../utils/unit-locator'
-import { getVariantDisplayName, makeVariantId } from '../utils/unit-variant'
+import { makeVariantId } from '../utils/unit-variant'
 
 /** Shared empty destroyed record to avoid per-call {} allocation */
 const EMPTY_DESTROYED: Record<string, UnitId[]> = {}
@@ -648,37 +647,6 @@ function invalidateLocationHashOnRemoval(s: SideStateData): void {
   if (s._locationHash?.includes(',')) s._locationHash = undefined
 }
 
-/** `surfaceUnits` once hit assignment has removed participants. Branches
- *  keep reaching the same survivors, so results are memoized in the table
- *  shared by every branch of the simulation, keyed by survivor count. An
- *  entry is reused only for the same id lists and the same `unitSurface`
- *  object; every writer that replaces `unitSurface` (moves, placement,
- *  retreat) is also the only one that can add a surface key, so the entry
- *  is exactly what `deriveSurfaceUnits` would build here. */
-function surfaceUnitsAfterCasualties(
-  s: SideStateData,
-): Record<string, UnitIdList> {
-  const cache = (s._surfaceUnitsCache ??= [])
-  const participating = s.participatingUnits
-  const cached = cache[participating.length]
-  if (
-    cached !== undefined &&
-    cached.unitSurface === s.unitSurface &&
-    cached.participatingUnits === participating &&
-    cached.nonParticipatingUnits === s.nonParticipatingUnits
-  ) {
-    return cached.value
-  }
-  const value = deriveSurfaceUnits(s, s.surfaceUnits)
-  cache[participating.length] = {
-    unitSurface: s.unitSurface,
-    participatingUnits: participating,
-    nonParticipatingUnits: s.nonParticipatingUnits,
-    value,
-  }
-  return value
-}
-
 function matchesRestrictionScope(
   scope: ResolvedRestrictionScope | undefined,
   unitType: string,
@@ -729,18 +697,6 @@ function _removeOne(
       s.nonParticipatingUnits.slice(nIdx + 1)) as UnitIdList
   }
 
-  const surfaceId = s.unitSurface[unitId]
-  if (surfaceId) {
-    const surfacePool = s.surfaceUnits[surfaceId] ?? ('' as UnitIdList)
-    const idx = surfacePool.indexOf(unitId)
-    if (idx !== -1) {
-      s.surfaceUnits = {
-        ...s.surfaceUnits,
-        [surfaceId]: (surfacePool.slice(0, idx) +
-          surfacePool.slice(idx + 1)) as UnitIdList,
-      }
-    }
-  }
   // A uniform-location hash remains valid as units are removed: the unit
   // pools in the main hash already identify which units are still alive.
   invalidateLocationHashOnRemoval(s)
@@ -1352,79 +1308,6 @@ export class CombatSideState {
   }
 
   // ==========================================================================
-  // VARIANT OPTIONS
-  // ==========================================================================
-
-  static getUnitVariants(
-    s: SideStateData,
-    mode: CombatMode,
-    filter?: ParamFilter,
-    sourceBaseTypes?: readonly UnitBaseType[],
-  ): UnitType[] {
-    let baseTypes = filter?.includeNonParticipating
-      ? CombatSideState.getAllUnitTypes()
-      : CombatSideState.getParticipationOptionTypes(
-          s,
-          filter?.combatMode ?? mode,
-        )
-    if (sourceBaseTypes) {
-      const allowed = new Set<string>(sourceBaseTypes)
-      baseTypes = baseTypes.filter(b => allowed.has(b))
-    }
-    const allDeclaredSubtypes = s.declaredSubtypes ?? []
-    let declaredSubtypes = filterDeclaredSubtypes(allDeclaredSubtypes, filter)
-
-    const baseSet = new Set<string>(baseTypes)
-    const result: UnitType[] = [...baseTypes]
-    const addedSet = new Set<string>(baseTypes)
-    if (filter?.includeOnlyBaseTypes) {
-      declaredSubtypes = []
-    }
-    for (const decl of declaredSubtypes) {
-      const { baseType: type, subtypes: parentSubs } = parseUnitLocator(
-        decl.unitType,
-      )
-      if (!baseSet.has(decl.unitType) && !addedSet.has(decl.unitType)) continue
-      const variantId = makeVariantId(type, [
-        ...parentSubs,
-        decl.name as UnitVariantId,
-      ])
-      if (addedSet.has(variantId)) continue
-      let insertIdx = result.length
-      for (let i = result.length - 1; i >= 0; i--) {
-        if (
-          result[i] === decl.unitType ||
-          result[i].startsWith(decl.unitType + ':')
-        ) {
-          insertIdx = i + 1
-          break
-        }
-      }
-      result.splice(insertIdx, 0, variantId)
-      addedSet.add(variantId)
-    }
-
-    return applyVariantPostFilter(result, filter) as UnitType[]
-  }
-
-  static getUnitVariantOptions(
-    s: SideStateData,
-    mode: CombatMode,
-    filter?: ParamFilter,
-    sourceBaseTypes?: readonly UnitBaseType[],
-  ): { label: string; value: UnitType }[] {
-    return CombatSideState.getUnitVariants(
-      s,
-      mode,
-      filter,
-      sourceBaseTypes,
-    ).map(id => ({
-      label: getVariantDisplayName(id),
-      value: id,
-    }))
-  }
-
-  // ==========================================================================
   // RESTRICTIONS (queries)
   // ==========================================================================
 
@@ -1488,7 +1371,6 @@ export class CombatSideState {
       UnitType,
       readonly [number, number] | null
     >()
-    const restrictionChecked = new Map<string, boolean>()
 
     const walk = (pool: UnitIdList) => {
       for (const id of pool) {
@@ -1504,29 +1386,24 @@ export class CombatSideState {
 
         if (source !== 'COMBAT') {
           const surfaceId = s.unitSurface[id] as SurfaceId
-          const restrictionKey = id
-          let allowed = restrictionChecked.get(restrictionKey)
-          if (allowed === undefined) {
-            allowed = !(
-              CombatSideState.isRestricted(
-                state,
-                side,
-                'lost',
-                source,
-                id,
-                surfaceId,
-              ) ||
-              CombatSideState.isRestricted(
-                state,
-                side,
-                'cannotBeUsed',
-                source,
-                id,
-                surfaceId,
-              )
+          const allowed = !(
+            CombatSideState.isRestricted(
+              state,
+              side,
+              'lost',
+              source,
+              id,
+              surfaceId,
+            ) ||
+            CombatSideState.isRestricted(
+              state,
+              side,
+              'cannotBeUsed',
+              source,
+              id,
+              surfaceId,
             )
-            restrictionChecked.set(restrictionKey, allowed)
-          }
+          )
           if (!allowed) continue
         }
 
@@ -1701,10 +1578,8 @@ export class CombatSideState {
     s.hitPool = undefined
     s._hitPoolShared = false
 
-    if (s.participatingUnits.length !== oldUnits.length) {
-      s.surfaceUnits = surfaceUnitsAfterCasualties(s)
+    if (s.participatingUnits.length !== oldUnits.length)
       invalidateLocationHashOnRemoval(s)
-    }
 
     if (!trackDestroyed) return EMPTY_DESTROYED
 
@@ -1964,7 +1839,6 @@ export class CombatSideState {
     let nextNon = s.nonParticipatingUnits
     let nextUnitType = s.unitType
     let nextUnitSurface = s.unitSurface
-    let destinationUnits = s.surfaceUnits[destination] ?? ('' as UnitIdList)
 
     for (const [variantKey, count] of Object.entries(unitsToAdd)) {
       const vKey = variantKey as UnitType
@@ -2009,7 +1883,6 @@ export class CombatSideState {
       }
       nextUnitType = { ...nextUnitType, ...typeMapAdditions }
       nextUnitSurface = { ...nextUnitSurface, ...surfaceMapAdditions }
-      destinationUnits = (destinationUnits + newIds.join('')) as UnitIdList
 
       // Stats for vKey are pre-populated by buildSideState; if missing
       // (test fixtures bypassing declareSubtype), seed an empty record so
@@ -2021,15 +1894,14 @@ export class CombatSideState {
       placed[vKey] = newIds
     }
 
-    // Placing nothing leaves the side untouched. Surface keys in particular
-    // may only appear alongside a new `unitSurface` object.
+    // Placing nothing leaves the side untouched.
     if (nextUnitSurface === s.unitSurface) return placed
 
     s.participatingUnits = nextPart
     s.nonParticipatingUnits = nextNon
     s.unitType = nextUnitType
     s.unitSurface = nextUnitSurface
-    s.surfaceUnits = { ...s.surfaceUnits, [destination]: destinationUnits }
+
     s._locationHash = undefined
     s._resolvedRestrictions = undefined
 
@@ -2044,21 +1916,11 @@ export class CombatSideState {
     if (unitIds.length === 0) return
     const moving = new Set(unitIds.filter(id => CombatSideState.hasUnit(s, id)))
     if (moving.size === 0) return
-    const surfaceUnits: Record<string, UnitIdList> = {}
-    for (const [surfaceId, pool] of Object.entries(s.surfaceUnits)) {
-      let kept = ''
-      for (const id of pool) if (!moving.has(id as UnitId)) kept += id
-      surfaceUnits[surfaceId] = kept as UnitIdList
-    }
-    let destinationPool: string = surfaceUnits[destination] ?? ''
     const unitSurface = { ...s.unitSurface }
     for (const id of unitIds) {
       if (!moving.has(id)) continue
-      destinationPool += id
       unitSurface[id] = destination
     }
-    surfaceUnits[destination] = destinationPool as UnitIdList
-    s.surfaceUnits = surfaceUnits
     s.unitSurface = unitSurface
     s._locationHash = undefined
   }

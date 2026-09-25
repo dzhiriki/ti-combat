@@ -2,10 +2,7 @@ import { CombatState } from '../combat-state/combat-state'
 import { getInitialMetaPhase, isCombatMeta } from '../combat-state/phase-utils'
 import type { MetaPhase } from '../combat-state/types'
 import type { CombatOutcome } from '../types'
-import {
-  extractSurvivors,
-  extractSurvivorsBySurface,
-} from './utils/extract-survivors'
+import { extractSurvivors } from './utils/extract-survivors'
 import type { OutcomeRecord } from './utils/types'
 
 interface ExpansionResult {
@@ -295,7 +292,10 @@ export class CombatEngine {
     }
 
     if (initialState.isFinished()) {
-      return outcomeRecordToArray(makeLeafOutcome(initialState))
+      return outcomeRecordToArray(
+        makeLeafOutcome(initialState),
+        initialState.data.surfaces,
+      )
     }
     const result = expandNode(initialState, 0, initialMeta)
     if ('cycleTo' in result) return []
@@ -304,7 +304,7 @@ export class CombatEngine {
       console.log('Unique nodes =', nodes)
       console.log('Final nodes =', finalNodes)
     }
-    return outcomeRecordToArray(result.outcomes)
+    return outcomeRecordToArray(result.outcomes, initialState.data.surfaces)
   }
 }
 
@@ -325,17 +325,20 @@ function makeLeafOutcome(state: CombatState): OutcomeRecord {
   return record
 }
 
-function outcomeRecordToArray(record: OutcomeRecord): CombatOutcome[] {
+function outcomeRecordToArray(
+  record: OutcomeRecord,
+  surfaces: CombatState['data']['surfaces'],
+): CombatOutcome[] {
   const results: CombatOutcome[] = []
   for (const [, o] of record) {
-    const attacker = extractSurvivors(o.attackerData)
-    const defender = extractSurvivors(o.defenderData)
+    const attacker = extractSurvivors(o.attackerData, surfaces)
+    const defender = extractSurvivors(o.defenderData, surfaces)
 
     results.push({
-      attacker,
-      defender,
-      attackerSurfaces: extractSurvivorsBySurface(o.attackerData),
-      defenderSurfaces: extractSurvivorsBySurface(o.defenderData),
+      attacker: attacker.aggregate,
+      defender: defender.aggregate,
+      attackerSurfaces: attacker.bySurface,
+      defenderSurfaces: defender.bySurface,
       winner: o.winnerSide,
       probability: o.probability,
     })

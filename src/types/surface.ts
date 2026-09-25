@@ -19,6 +19,14 @@ export type SurfaceUnitSelections = Record<
   Record<UnitBaseType, UnitSelection>
 >
 
+/** Authoritative setup/worker representation. Upgrades apply system-wide. */
+export type SurfaceUnitCounts = Record<string, Record<UnitBaseType, number>>
+
+export interface SideUnitPlacements {
+  counts: SurfaceUnitCounts
+  upgradedTypes: UnitBaseType[]
+}
+
 export const SPACE_SURFACE_ID = 'space' as SurfaceId
 export const DEFAULT_PLANET_ID = 'planet-1' as SurfaceId
 

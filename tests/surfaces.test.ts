@@ -7,6 +7,7 @@ import type { SurfaceDefinition, SurfaceId, UnitId } from '@/types'
 import { SPACE_SURFACE_ID } from '@/types'
 
 import { combatTest } from './utils/combat-test'
+import { getSurfaceUnitIds } from './utils/surface-units'
 
 const PLANET_1 = 'planet-1' as SurfaceId
 const PLANET_2 = 'planet-2' as SurfaceId
@@ -26,11 +27,13 @@ describe('surface editor conversion', () => {
     setup.setUnitCount('defender', 'PDS', 1)
 
     const input = setup.toSimulationInput()!
-    expect(input.attackerPlacements[SPACE_SURFACE_ID].CRUISER.count).toBe(1)
-    expect(input.attackerPlacements[SPACE_SURFACE_ID].INFANTRY.count).toBe(2)
-    expect(input.defenderPlacements[SPACE_SURFACE_ID].DREADNOUGHT.count).toBe(1)
-    expect(input.defenderPlacements[SPACE_SURFACE_ID].INFANTRY.count).toBe(3)
-    expect(input.defenderPlacements[PLANET_1].PDS.count).toBe(1)
+    expect(input.attackerPlacements.counts[SPACE_SURFACE_ID].CRUISER).toBe(1)
+    expect(input.attackerPlacements.counts[SPACE_SURFACE_ID].INFANTRY).toBe(2)
+    expect(input.defenderPlacements.counts[SPACE_SURFACE_ID].DREADNOUGHT).toBe(
+      1,
+    )
+    expect(input.defenderPlacements.counts[SPACE_SURFACE_ID].INFANTRY).toBe(3)
+    expect(input.defenderPlacements.counts[PLANET_1].PDS).toBe(1)
   })
 
   it('places space-capable structures in space during simplified space combat', () => {
@@ -41,17 +44,17 @@ describe('surface editor conversion', () => {
     setup.setUnitCount('defender', 'SPACE_DOCK', 1)
 
     let input = setup.toSimulationInput()!
-    expect(input.attackerPlacements[SPACE_SURFACE_ID].PDS.count).toBe(1)
-    expect(input.defenderPlacements[SPACE_SURFACE_ID].SPACE_DOCK.count).toBe(1)
-    expect(input.attackerPlacements[PLANET_1].PDS.count).toBe(0)
-    expect(input.defenderPlacements[PLANET_1].SPACE_DOCK.count).toBe(0)
+    expect(input.attackerPlacements.counts[SPACE_SURFACE_ID].PDS).toBe(1)
+    expect(input.defenderPlacements.counts[SPACE_SURFACE_ID].SPACE_DOCK).toBe(1)
+    expect(input.attackerPlacements.counts[PLANET_1].PDS).toBe(0)
+    expect(input.defenderPlacements.counts[PLANET_1].SPACE_DOCK).toBe(0)
 
     setup.setCombatMode('GROUND')
     input = setup.toSimulationInput()!
-    expect(input.attackerPlacements[SPACE_SURFACE_ID].PDS.count).toBe(0)
-    expect(input.defenderPlacements[SPACE_SURFACE_ID].SPACE_DOCK.count).toBe(0)
-    expect(input.attackerPlacements[PLANET_1].PDS.count).toBe(1)
-    expect(input.defenderPlacements[PLANET_1].SPACE_DOCK.count).toBe(1)
+    expect(input.attackerPlacements.counts[SPACE_SURFACE_ID].PDS).toBe(0)
+    expect(input.defenderPlacements.counts[SPACE_SURFACE_ID].SPACE_DOCK).toBe(0)
+    expect(input.attackerPlacements.counts[PLANET_1].PDS).toBe(1)
+    expect(input.defenderPlacements.counts[PLANET_1].SPACE_DOCK).toBe(1)
   })
 
   it('places both sides ground forces on the planet for ground combat', () => {
@@ -64,12 +67,14 @@ describe('surface editor conversion', () => {
     setup.setCombatMode('GROUND')
 
     const input = setup.toSimulationInput()!
-    expect(input.attackerPlacements[SPACE_SURFACE_ID].CRUISER.count).toBe(1)
-    expect(input.defenderPlacements[SPACE_SURFACE_ID].DREADNOUGHT.count).toBe(1)
-    expect(input.attackerPlacements[PLANET_1].INFANTRY.count).toBe(2)
-    expect(input.defenderPlacements[PLANET_1].MECH.count).toBe(3)
-    expect(input.attackerPlacements[SPACE_SURFACE_ID].INFANTRY.count).toBe(0)
-    expect(input.defenderPlacements[SPACE_SURFACE_ID].MECH.count).toBe(0)
+    expect(input.attackerPlacements.counts[SPACE_SURFACE_ID].CRUISER).toBe(1)
+    expect(input.defenderPlacements.counts[SPACE_SURFACE_ID].DREADNOUGHT).toBe(
+      1,
+    )
+    expect(input.attackerPlacements.counts[PLANET_1].INFANTRY).toBe(2)
+    expect(input.defenderPlacements.counts[PLANET_1].MECH).toBe(3)
+    expect(input.attackerPlacements.counts[SPACE_SURFACE_ID].INFANTRY).toBe(0)
+    expect(input.defenderPlacements.counts[SPACE_SURFACE_ID].MECH).toBe(0)
 
     expect(setup.surfaceSelections.attacker[PLANET_1].INFANTRY.count).toBe(2)
     expect(setup.surfaceSelections.defender[PLANET_1].MECH.count).toBe(3)
@@ -111,6 +116,22 @@ describe('surface editor conversion', () => {
     ).toBe(4)
     expect(placements[PLANET_1].MECH.upgraded).toBe(true)
     expect(placements[PLANET_2].MECH.upgraded).toBe(true)
+  })
+
+  it('collapses all planets when switching from Full to Simple', () => {
+    const setup = new CombatSetup('FULL')
+    setup.setSurfaceUnitCount('attacker', PLANET_1, 'INFANTRY', 2)
+    setup.addPlanet()
+    setup.setSurfaceUnitCount('attacker', PLANET_2, 'INFANTRY', 3)
+    setup.setUpgraded('attacker', 'MECH', true)
+    setup.setEditorMode('SIMPLIFIED')
+    expect(setup.surfaces).toHaveLength(2)
+    expect(setup.attackerSelections.INFANTRY.count).toBe(5)
+    expect(setup.isUpgraded('attacker', 'MECH')).toBe(true)
+    expect(
+      setup.toSimulationInput()!.attackerPlacements.counts[SPACE_SURFACE_ID]
+        .INFANTRY,
+    ).toBe(5)
   })
 
   it('relocates a faction unit when its placement becomes illegal', () => {
@@ -186,9 +207,11 @@ describe('surface combat behavior', () => {
 
     t.advanceTo('GROUND_COMBAT')
 
-    expect(t.state.attacker.surfaceUnits[SPACE_SURFACE_ID]).toHaveLength(0)
-    expect(t.state.attacker.surfaceUnits[PLANET_1]).toHaveLength(1)
-    expect(t.state.attacker.surfaceUnits[PLANET_2]).toHaveLength(1)
+    expect(getSurfaceUnitIds(t.state.attacker, SPACE_SURFACE_ID)).toHaveLength(
+      0,
+    )
+    expect(getSurfaceUnitIds(t.state.attacker, PLANET_1)).toHaveLength(1)
+    expect(getSurfaceUnitIds(t.state.attacker, PLANET_2)).toHaveLength(1)
     expect(t.state.attacker.participatingUnits).toHaveLength(1)
   })
 
@@ -216,8 +239,8 @@ describe('surface combat behavior', () => {
     t.advanceRound({ attacker: 0, defender: 1 })
 
     expect(t.state.winnerSide).toBe('attacker')
-    expect(t.state.defender.surfaceUnits[PLANET_1]).toHaveLength(1)
-    expect(t.state.defender.surfaceUnits[PLANET_2]).toHaveLength(0)
+    expect(getSurfaceUnitIds(t.state.defender, PLANET_1)).toHaveLength(1)
+    expect(getSurfaceUnitIds(t.state.defender, PLANET_2)).toHaveLength(0)
   })
 
   it('commits units before ending after a bombardment wipe', () => {
@@ -241,8 +264,8 @@ describe('surface combat behavior', () => {
 
     t.advanceTo('GROUND_COMBAT', { attacker: 0, defender: 1 })
 
-    expect(t.state.defender.surfaceUnits[PLANET_2]).toHaveLength(0)
-    expect(t.state.attacker.surfaceUnits[PLANET_2]).toHaveLength(1)
+    expect(getSurfaceUnitIds(t.state.defender, PLANET_2)).toHaveLength(0)
+    expect(getSurfaceUnitIds(t.state.attacker, PLANET_2)).toHaveLength(1)
     expect(t.state.winnerSide).toBe('attacker')
     expect(t.isFinished()).toBe(true)
   })
@@ -266,12 +289,15 @@ describe('surface combat behavior', () => {
     const onPlanet = makeState(PLANET_1)
     expect(inSpace.getHash()).not.toBe(onPlanet.getHash())
 
-    const id = inSpace.data.attacker.surfaceUnits[SPACE_SURFACE_ID][0] as UnitId
+    const id = getSurfaceUnitIds(
+      inSpace.data.attacker,
+      SPACE_SURFACE_ID,
+    )[0] as UnitId
     CombatSideState.modifyUnitState(inSpace.data.attacker, id, {
       isDamaged: true,
     })
     CombatSideState.moveUnits(inSpace.data.attacker, [id], PLANET_2)
-    expect(inSpace.data.attacker.surfaceUnits[PLANET_2]).toBe(id)
+    expect(getSurfaceUnitIds(inSpace.data.attacker, PLANET_2)).toEqual([id])
     expect(inSpace.data.attacker.unitState[id].isDamaged).toBe(true)
   })
 
@@ -288,17 +314,26 @@ describe('surface combat behavior', () => {
       },
       defender: { faction: 'FEDERATION_OF_SOL', units: {} },
     })
-    const id = state.data.attacker.surfaceUnits[SPACE_SURFACE_ID][0] as UnitId
+    const id = getSurfaceUnitIds(
+      state.data.attacker,
+      SPACE_SURFACE_ID,
+    )[0] as UnitId
 
     const moved = cloneStateForBranch(state.data)
     CombatSideState.moveUnits(moved.attacker, [id], PLANET_1)
-    expect(moved.attacker.surfaceUnits[PLANET_1]).toBe(id)
-    expect(state.data.attacker.surfaceUnits[SPACE_SURFACE_ID]).toBe(id)
+    expect(getSurfaceUnitIds(moved.attacker, PLANET_1)).toEqual([id])
+    expect(getSurfaceUnitIds(state.data.attacker, SPACE_SURFACE_ID)).toEqual([
+      id,
+    ])
 
     const casualty = cloneStateForBranch(state.data)
     CombatSideState.removeUnits(casualty.attacker, id)
-    expect(casualty.attacker.surfaceUnits[SPACE_SURFACE_ID]).toHaveLength(0)
-    expect(state.data.attacker.surfaceUnits[SPACE_SURFACE_ID]).toBe(id)
+    expect(getSurfaceUnitIds(casualty.attacker, SPACE_SURFACE_ID)).toHaveLength(
+      0,
+    )
+    expect(getSurfaceUnitIds(state.data.attacker, SPACE_SURFACE_ID)).toEqual([
+      id,
+    ])
   })
 
   it('does not let a remote mech sustain hits for the selected planet', () => {
@@ -324,9 +359,12 @@ describe('surface combat behavior', () => {
     t.advanceTo('GROUND_COMBAT')
     t.advanceRound({ attacker: 0, defender: 1 })
 
-    expect(t.state.defender.surfaceUnits[PLANET_1]).toHaveLength(1)
-    expect(t.state.defender.surfaceUnits[PLANET_2]).toHaveLength(0)
-    const remoteMech = t.state.defender.surfaceUnits[PLANET_1][0] as UnitId
+    expect(getSurfaceUnitIds(t.state.defender, PLANET_1)).toHaveLength(1)
+    expect(getSurfaceUnitIds(t.state.defender, PLANET_2)).toHaveLength(0)
+    const remoteMech = getSurfaceUnitIds(
+      t.state.defender,
+      PLANET_1,
+    )[0] as UnitId
     expect(t.state.defender.unitState[remoteMech]?.isDamaged).not.toBe(true)
   })
 
@@ -353,9 +391,11 @@ describe('surface combat behavior', () => {
 
     t.advanceTo('COMPLETE')
 
-    expect(t.state.attacker.surfaceUnits[SPACE_SURFACE_ID]).toHaveLength(1)
-    expect(t.state.attacker.surfaceUnits[PLANET_1]).toHaveLength(1)
-    expect(t.state.attacker.surfaceUnits[PLANET_2]).toHaveLength(0)
+    expect(getSurfaceUnitIds(t.state.attacker, SPACE_SURFACE_ID)).toHaveLength(
+      1,
+    )
+    expect(getSurfaceUnitIds(t.state.attacker, PLANET_1)).toHaveLength(1)
+    expect(getSurfaceUnitIds(t.state.attacker, PLANET_2)).toHaveLength(0)
   })
 
   it('enforces placement permissions with faction overrides', () => {
@@ -392,7 +432,9 @@ describe('surface combat behavior', () => {
       SPACE_SURFACE_ID,
       saar.data,
     )
-    expect(saar.data.attacker.surfaceUnits[SPACE_SURFACE_ID]).toHaveLength(1)
+    expect(
+      getSurfaceUnitIds(saar.data.attacker, SPACE_SURFACE_ID),
+    ).toHaveLength(1)
   })
 
   it('returns survivors grouped by surface', () => {
@@ -417,6 +459,55 @@ describe('surface combat behavior', () => {
     expect(outcome.winner).toBe('attacker')
     expect(outcome.attackerSurfaces[PLANET_2].INFANTRY).toHaveLength(1)
     expect(outcome.defenderSurfaces[PLANET_1].INFANTRY).toHaveLength(1)
+  })
+})
+
+describe('per-surface outcome probabilities', () => {
+  it('preserves an off-combat planet in every probabilistic outcome', () => {
+    const state = buildCombatState({
+      system: 'TI4',
+      mode: 'GROUND',
+      surfaces: SURFACES,
+      activeSurfaceId: PLANET_2,
+      attacker: {
+        faction: 'FEDERATION_OF_SOL',
+        units: {},
+        placements: { [PLANET_2]: { INFANTRY: 1 } },
+      },
+      defender: {
+        faction: 'FEDERATION_OF_SOL',
+        units: {},
+        placements: {
+          [PLANET_1]: { INFANTRY: 1 },
+          [PLANET_2]: { INFANTRY: 1 },
+        },
+      },
+    })
+    const outcomes = new CombatEngine().simulate(state)
+    expect(outcomes.length).toBeGreaterThan(1)
+    expect(outcomes.reduce((sum, o) => sum + o.probability, 0)).toBeCloseTo(
+      1,
+      10,
+    )
+    expect(
+      outcomes.reduce(
+        (sum, o) =>
+          sum +
+          (o.defenderSurfaces[PLANET_1].INFANTRY?.length === 1
+            ? o.probability
+            : 0),
+        0,
+      ),
+    ).toBeCloseTo(1, 10)
+    for (const outcome of outcomes) {
+      expect(Object.keys(outcome.defenderSurfaces)).toEqual(
+        SURFACES.map(s => s.id),
+      )
+      expect(outcome.defender.INFANTRY?.length).toBe(
+        (outcome.defenderSurfaces[PLANET_1].INFANTRY?.length ?? 0) +
+          (outcome.defenderSurfaces[PLANET_2].INFANTRY?.length ?? 0),
+      )
+    }
   })
 })
 
@@ -452,7 +543,7 @@ describe('multi-surface ability behavior', () => {
     t.advanceTo('GROUND_COMBAT')
     t.advanceRound({ attacker: 2 })
 
-    const remote = t.state.attacker.surfaceUnits[PLANET_1]
+    const remote = getSurfaceUnitIds(t.state.attacker, PLANET_1)
     expect(remote).toHaveLength(3)
     expect(
       [...remote].every(id =>
@@ -481,7 +572,7 @@ describe('multi-surface ability behavior', () => {
         placements: { [PLANET_2]: { INFANTRY: 1 } },
       },
     })
-    const mech = t.state.attacker.surfaceUnits[PLANET_1][0] as UnitId
+    const mech = getSurfaceUnitIds(t.state.attacker, PLANET_1)[0] as UnitId
     t.state.attacker.unitState[mech] = { isDamaged: true }
 
     t.advanceTo('GROUND_COMBAT')
@@ -552,9 +643,11 @@ describe('multi-surface ability behavior', () => {
     t.advanceTo('SPACE_COMBAT')
     t.advanceRound({ attacker: 2 })
 
-    expect(t.state.defender.surfaceUnits[SPACE_SURFACE_ID]).toHaveLength(0)
-    expect(t.state.defender.surfaceUnits[PLANET_1]).toHaveLength(0)
-    expect(t.state.defender.surfaceUnits[PLANET_2]).toHaveLength(0)
+    expect(getSurfaceUnitIds(t.state.defender, SPACE_SURFACE_ID)).toHaveLength(
+      0,
+    )
+    expect(getSurfaceUnitIds(t.state.defender, PLANET_1)).toHaveLength(0)
+    expect(getSurfaceUnitIds(t.state.defender, PLANET_2)).toHaveLength(0)
   })
 
   it('Dame Briar galvanizes a surviving unit on another planet', () => {
@@ -584,7 +677,7 @@ describe('multi-surface ability behavior', () => {
     t.advanceTo('GROUND_COMBAT')
     t.advanceRound({ attacker: 1 })
 
-    const remote = t.state.attacker.surfaceUnits[PLANET_1][0]
+    const remote = getSurfaceUnitIds(t.state.attacker, PLANET_1)[0]
     expect(t.state.attacker.unitType[remote]).toContain('Galvanized')
   })
 
@@ -614,7 +707,7 @@ describe('multi-surface ability behavior', () => {
     t.advanceToTiming('BEFORE_DICE_ROLL', 0, 'GROUND_COMBAT')
 
     expect(t.abilityLog('EVELYN_DELOUIS')).toHaveLength(0)
-    const mech = t.state.attacker.surfaceUnits[PLANET_1][0]
+    const mech = getSurfaceUnitIds(t.state.attacker, PLANET_1)[0]
     expect(t.state.attacker.unitType[mech]).not.toContain('Evelyn')
   })
 
@@ -679,7 +772,7 @@ describe('multi-surface ability behavior', () => {
     t.advanceRound({ attacker: 1, defender: 0 })
 
     expect(t.abilityLog('TF_LASH')).not.toHaveLength(0)
-    expect(t.state.defender.surfaceUnits[PLANET_1]).toHaveLength(0)
+    expect(getSurfaceUnitIds(t.state.defender, PLANET_1)).toHaveLength(0)
   })
 
   it("Moyin's Ashes counts mechs on other planets", () => {
@@ -732,7 +825,7 @@ describe('multi-surface ability behavior', () => {
         placements: { [PLANET_2]: { INFANTRY: 1 } },
       },
     })
-    const mech = t.state.attacker.surfaceUnits[PLANET_1][0] as UnitId
+    const mech = getSurfaceUnitIds(t.state.attacker, PLANET_1)[0] as UnitId
     t.state.attacker.unitState[mech] = { isDamaged: true }
 
     t.advanceToTiming('BEFORE_DICE_ROLL', 0, 'GROUND_COMBAT')

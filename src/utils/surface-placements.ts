@@ -9,6 +9,7 @@ import type {
   CombatSide,
   SurfaceDefinition,
   SurfaceId,
+  SurfaceUnitCounts,
   SurfaceType,
   SurfaceUnitSelections,
   UnitBaseType,
@@ -23,14 +24,6 @@ export function createEmptyUnitSelections(): Record<
   return Object.fromEntries(
     UNIT_TYPES.map(type => [type, { count: 0, upgraded: false }]),
   ) as Record<UnitBaseType, UnitSelection>
-}
-
-export function createEmptySurfaceSelections(
-  surfaces: readonly SurfaceDefinition[],
-): SurfaceUnitSelections {
-  return Object.fromEntries(
-    surfaces.map(surface => [surface.id, createEmptyUnitSelections()]),
-  )
 }
 
 export function allowedSurfaceTypes(
@@ -65,62 +58,70 @@ export function defaultSurfaceId(
   return destination.id
 }
 
-export function collapseVisibleSurfaces(
-  placements: SurfaceUnitSelections,
-  spaceId: SurfaceId,
-  planetId: SurfaceId,
+export function createEmptySurfaceCounts(
+  surfaces: readonly SurfaceDefinition[],
+): SurfaceUnitCounts {
+  return Object.fromEntries(
+    surfaces.map(surface => [
+      surface.id,
+      Object.fromEntries(UNIT_TYPES.map(type => [type, 0])),
+    ]),
+  ) as SurfaceUnitCounts
+}
+
+export function materializeSurfaceSelections(
+  counts: SurfaceUnitCounts,
+  upgrades: ReadonlySet<UnitBaseType>,
+): SurfaceUnitSelections {
+  return Object.fromEntries(
+    Object.entries(counts).map(([surfaceId, byType]) => [
+      surfaceId,
+      Object.fromEntries(
+        UNIT_TYPES.map(type => [
+          type,
+          { count: byType[type] ?? 0, upgraded: upgrades.has(type) },
+        ]),
+      ),
+    ]),
+  ) as SurfaceUnitSelections
+}
+
+export function collapseSurfaceCounts(
+  counts: SurfaceUnitCounts,
+  upgrades: ReadonlySet<UnitBaseType>,
+  surfaces: readonly SurfaceId[],
 ): Record<UnitBaseType, UnitSelection> {
   const result = createEmptyUnitSelections()
-  for (const surfaceId of [spaceId, planetId]) {
-    const surface = placements[surfaceId]
-    if (!surface) continue
-    for (const type of UNIT_TYPES) {
-      result[type].count += surface[type]?.count ?? 0
-      result[type].upgraded ||= surface[type]?.upgraded ?? false
-    }
+  for (const type of UNIT_TYPES) result[type].upgraded = upgrades.has(type)
+  for (const surfaceId of surfaces) {
+    const byType = counts[surfaceId]
+    if (!byType) continue
+    for (const type of UNIT_TYPES) result[type].count += byType[type] ?? 0
   }
   return result
 }
 
-export function collapseAllSurfaces(
-  placements: SurfaceUnitSelections,
-): Record<UnitBaseType, UnitSelection> {
-  const result = createEmptyUnitSelections()
-  for (const selections of Object.values(placements)) {
-    for (const type of UNIT_TYPES) {
-      result[type].count += selections[type]?.count ?? 0
-      result[type].upgraded ||= selections[type]?.upgraded ?? false
-    }
-  }
-  return result
-}
-
-export function expandSimplifiedSelections(
-  current: SurfaceUnitSelections,
-  selections: Record<UnitBaseType, UnitSelection>,
+export function expandSimplifiedCounts(
+  current: SurfaceUnitCounts,
+  totals: Record<UnitBaseType, UnitSelection>,
   surfaces: readonly SurfaceDefinition[],
   spaceId: SurfaceId,
   planetId: SurfaceId,
   side: CombatSide,
   stats: Partial<Record<UnitBaseType, UnitStats>>,
   combatMode: 'SPACE' | 'GROUND',
-): SurfaceUnitSelections {
-  const next: SurfaceUnitSelections = {}
+): SurfaceUnitCounts {
+  const next = createEmptySurfaceCounts(surfaces)
   for (const surface of surfaces) {
-    const source = current[surface.id]
-    next[surface.id] = source
-      ? (Object.fromEntries(
-          UNIT_TYPES.map(type => [type, { ...source[type] }]),
-        ) as Record<UnitBaseType, UnitSelection>)
-      : createEmptyUnitSelections()
+    if (current[surface.id]) next[surface.id] = { ...current[surface.id] }
   }
-
-  next[spaceId] = createEmptyUnitSelections()
-  next[planetId] = createEmptyUnitSelections()
+  next[spaceId] = Object.fromEntries(
+    UNIT_TYPES.map(type => [type, 0]),
+  ) as Record<UnitBaseType, number>
+  next[planetId] = { ...next[spaceId] }
   for (const type of UNIT_TYPES) {
-    const selection = selections[type]
     const allowed = allowedSurfaceTypes(type, stats[type])
-    const preferredSurfaceType: SurfaceType =
+    const preferred: SurfaceType =
       (combatMode === 'SPACE' && allowed.includes('SPACE')) ||
       SHIPS.includes(type)
         ? 'SPACE'
@@ -131,36 +132,30 @@ export function expandSimplifiedSelections(
       side,
       type,
       stats[type],
-      preferredSurfaceType,
+      preferred,
     )
-    next[destination][type] = { ...selection }
-    for (const surface of surfaces) {
-      next[surface.id][type].upgraded = selection.upgraded
-    }
+    next[destination][type] = totals[type].count
   }
   return next
 }
 
-export function normalizeSurfaceSelections(
-  placements: SurfaceUnitSelections,
+export function normalizeSurfaceCounts(
+  counts: SurfaceUnitCounts,
   surfaces: readonly SurfaceDefinition[],
   activePlanetId: SurfaceId,
   side: CombatSide,
   stats: Partial<Record<UnitBaseType, UnitStats>>,
-): SurfaceUnitSelections {
-  const next = createEmptySurfaceSelections(surfaces)
+): SurfaceUnitCounts {
+  const next = createEmptySurfaceCounts(surfaces)
   for (const type of UNIT_TYPES) {
     let remaining = UNIT_LIMITS[type]
-    let upgraded = false
     let displaced = 0
     const allowed = allowedSurfaceTypes(type, stats[type])
     for (const surface of surfaces) {
-      const selection = placements[surface.id]?.[type]
-      if (!selection) continue
-      upgraded ||= selection.upgraded
-      const count = Math.min(Math.max(0, selection.count), remaining)
+      const requested = counts[surface.id]?.[type] ?? 0
+      const count = Math.min(Math.max(0, requested), remaining)
       remaining -= count
-      if (allowed.includes(surface.type)) next[surface.id][type].count += count
+      if (allowed.includes(surface.type)) next[surface.id][type] += count
       else displaced += count
     }
     if (displaced > 0) {
@@ -171,9 +166,8 @@ export function normalizeSurfaceSelections(
         type,
         stats[type],
       )
-      next[destination][type].count += displaced
+      next[destination][type] += displaced
     }
-    for (const surface of surfaces) next[surface.id][type].upgraded = upgraded
   }
   return next
 }

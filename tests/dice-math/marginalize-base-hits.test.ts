@@ -15,7 +15,6 @@ function branch(
       defender: { base: defenderBase, custom: [] },
     },
     usesDelta: new Map(),
-    destroyedUnits: new Set(),
     pendingEffects: [],
   }
 }
@@ -54,7 +53,6 @@ describe('marginalizeBaseHits', () => {
         defender: { base: 0, custom: [] },
       },
       usesDelta: new Map(),
-      destroyedUnits: new Set(),
       pendingEffects: [],
     }
     const zero = branch(5, 0, 0)

@@ -34,8 +34,10 @@ export interface UnitOptionContext {
 
 type OptionSpec = Pick<
   SyncSourceConfig,
-  'source' | 'sort' | 'filter' | 'scope' | 'limit'
->
+  'source' | 'filter' | 'scope' | 'limit'
+> & {
+  sort?: SyncSourceConfig['sort']
+}
 
 /** The same candidates and caps drive reconciliation and UI controls. */
 export function resolveUnitOptions(
@@ -44,8 +46,10 @@ export function resolveUnitOptions(
   spec: OptionSpec,
 ): UnitOption[] {
   const mode = spec.filter?.combatMode ?? context.combatMode
-  const types = CombatSideState.getCategoryOptionTypes(s, spec.source)
-  const sorted = sortBaseTypes(types, spec.sort)
+  const types = spec.filter?.includeNonParticipating
+    ? CombatSideState.getAllUnitTypes()
+    : CombatSideState.getCategoryOptionTypes(s, spec.source)
+  const sorted = sortBaseTypes(types, spec.sort ?? 'normal-asc')
   const subtypes = spec.filter?.includeOnlyBaseTypes
     ? []
     : filterDeclaredSubtypes(s.declaredSubtypes ?? [], spec.filter)

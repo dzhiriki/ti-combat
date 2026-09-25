@@ -1,5 +1,3 @@
-import type { UnitId } from '@/types'
-
 import type {
   DiceMathBranch,
   PendingEffect,
@@ -8,7 +6,7 @@ import type {
 
 /**
  * Merge branches whose `pendingHitPool`, `usesDelta`, and
- * `destroyedUnits` collapse to the same identity key. Probabilities sum.
+ * `pendingEffects` collapse to the same identity key. Probabilities sum.
  *
  * pendingEffects MUST match when keys match — they're derived purely
  * from the key components, so a mismatch is a kernel bug. We assert
@@ -24,7 +22,6 @@ export function collapseBranches(branches: DiceMathBranch[]): DiceMathBranch[] {
         probability: acc.probability,
         pendingHitPool: acc.pendingHitPool,
         usesDelta: acc.usesDelta,
-        destroyedUnits: acc.destroyedUnits,
         pendingEffects: acc.pendingEffects,
       })
       continue
@@ -43,9 +40,8 @@ function identityKey(acc: DiceMathBranch): string {
   const a = serializePool(acc.pendingHitPool.attacker)
   const d = serializePool(acc.pendingHitPool.defender)
   const u = serializeUsesDelta(acc.usesDelta)
-  const z = serializeDestroyed(acc.destroyedUnits)
   const e = serializeEffects(acc.pendingEffects)
-  return `${a}|${d}|${u}|${z}|${e}`
+  return `${a}|${d}|${u}|${e}`
 }
 
 function serializeEffects(effects: PendingEffect[]): string {
@@ -68,10 +64,6 @@ function serializePool(pool: PendingHitPool): string {
 function serializeUsesDelta(map: Map<string, number>): string {
   const keys = Array.from(map.keys()).sort()
   return keys.map(k => `${k}=${map.get(k)!}`).join(',')
-}
-
-function serializeDestroyed(set: Set<UnitId>): string {
-  return Array.from(set).sort().join('')
 }
 
 function effectsMatch(

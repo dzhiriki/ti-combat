@@ -12,7 +12,7 @@ function makeSide(units: Record<string, UnitType>): SideStateData {
     faction: 'sol' as never,
     participatingUnits: Object.keys(units).join('') as UnitIdList,
     nonParticipatingUnits: '' as UnitIdList,
-    surfaceUnits: { space: Object.keys(units).join('') as UnitIdList },
+
     unitSurface: Object.fromEntries(
       Object.keys(units).map(id => [id, 'space']),
     ) as SideStateData['unitSurface'],
@@ -65,7 +65,7 @@ describe('reconcileAbilitiesConfig — IN_COMBAT clamps tuple values', () => {
       }),
       defender: makeSide({}),
     }
-    reconcileAbilitiesConfig(config, abilities, 'SPACE', undefined, state)
+    reconcileAbilitiesConfig(config, abilities, 'SPACE', state)
     const list = config.attacker.TEST_LIMIT.list as [string, number][]
     expect(list.find(([k]) => k === 'CRUISER')?.[1]).toBe(2)
   })
@@ -89,7 +89,7 @@ describe('reconcileAbilitiesConfig — IN_COMBAT clamps tuple values', () => {
       }),
       defender: makeSide({}),
     }
-    reconcileAbilitiesConfig(config, abilities, 'SPACE', undefined, state)
+    reconcileAbilitiesConfig(config, abilities, 'SPACE', state)
     const list = config.attacker.TEST_LIMIT.list as [string, number][]
     expect(list.find(([k]) => k === 'CRUISER')?.[1]).toBe(1)
   })

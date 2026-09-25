@@ -1,94 +1,9 @@
 import { prepareSimulationConfig } from '@/hooks/combat-setup'
-import { applyAbilityPlacementOverrides } from '@/hooks/combat-setup/ability-placement'
+import { buildSideState } from '@/hooks/combat-setup/build-side-state'
 import type { SimulationInput } from '@/hooks/combat-setup/types'
-import type {
-  GameSystem,
-  SurfaceDefinition,
-  SurfaceUnitSelections,
-  UnitIdList,
-} from '@/types'
-import {
-  buildUnitStatsMap,
-  getSimulationUnitsOnSurfaces,
-} from '@/utils/get-simulation-units'
 
-import type { RegisteredAbility } from './abilities-engine/types'
-import type {
-  DeclaredSubtype,
-  UnitCategoryOptions,
-} from './abilities-engine/types'
 import { CombatEngine } from './combat-engine'
 import { CombatState } from './combat-state'
-import type {
-  SideAbilitiesConfig,
-  SideStateData,
-  UnitStatsEntry,
-} from './combat-state/types'
-import { makeVariantId } from './utils/unit-variant'
-
-function buildSideState(
-  system: GameSystem,
-  faction: string,
-  placements: SurfaceUnitSelections,
-  surfaces: readonly SurfaceDefinition[],
-  abilities: SideAbilitiesConfig,
-  registeredAbilities: readonly RegisteredAbility[],
-  gen: { _nextCode?: number },
-  declaredSubtypes: readonly DeclaredSubtype[],
-  unitCategoryOptions: UnitCategoryOptions,
-): SideStateData {
-  const upgradedSet = new Set<import('@/types').UnitBaseType>()
-  for (const selections of Object.values(placements)) {
-    for (const [k, v] of Object.entries(selections)) {
-      if (v.upgraded) upgradedSet.add(k as import('@/types').UnitBaseType)
-    }
-  }
-  const placementStats = applyAbilityPlacementOverrides(
-    buildUnitStatsMap(system, faction, upgradedSet),
-    registeredAbilities,
-    abilities,
-  )
-  const { units, unitType, unitState, unitStats, surfaceUnits, unitSurface } =
-    getSimulationUnitsOnSurfaces(
-      system,
-      faction,
-      placements,
-      surfaces,
-      gen,
-      placementStats,
-    )
-
-  const baseUnitStats: Record<string, UnitStatsEntry> = {
-    ...buildUnitStatsMap(system, faction, upgradedSet),
-    ...unitStats,
-  }
-
-  // Register variant-key entries from declared subtypes as factory functions
-  // so `resolveUnitStats` re-evaluates them lazily against the *current*
-  // parent stats. Eager evaluation here would freeze the variant before
-  // runtime mutators like Reveal Prototype's `modifyUnitType` upgrade the
-  // base — Viscount on an upgraded Cruiser must reflect the upgrade.
-  for (const decl of declaredSubtypes) {
-    const variantKey = makeVariantId(decl.unitType, [decl.name])
-    if (baseUnitStats[variantKey]) continue
-    baseUnitStats[variantKey] = decl.statsFactory
-  }
-
-  return {
-    faction,
-    participatingUnits: units,
-    nonParticipatingUnits: '' as UnitIdList,
-    surfaceUnits,
-    unitSurface,
-    unitType,
-    unitState,
-    unitStats: baseUnitStats,
-    declaredSubtypes,
-    unitCategoryOptions,
-    abilities,
-    liveAbilities: {},
-  }
-}
 
 self.onmessage = (e: MessageEvent<SimulationInput>) => {
   const {
@@ -113,6 +28,13 @@ self.onmessage = (e: MessageEvent<SimulationInput>) => {
     attackerFaction,
     defenderFaction,
     combatMode,
+    undefined,
+    {
+      surfaces,
+      activeSurfaceId,
+      attacker: attackerPlacements,
+      defender: defenderPlacements,
+    },
   )
   const gen: { _nextCode?: number } = {}
   const combatState = CombatState.forSimulation(

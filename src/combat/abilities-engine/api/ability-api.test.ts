@@ -29,7 +29,7 @@ function makeSide(): SideStateData {
     faction: 'FEDERATION_OF_SOL',
     participatingUnits: '' as UnitIdList,
     nonParticipatingUnits: '' as UnitIdList,
-    surfaceUnits: { space: '' as UnitIdList },
+
     unitSurface: {},
     unitType: {},
     unitState: {},
@@ -93,11 +93,6 @@ describe('SideApi unit query scopes', () => {
 
     side.participatingUnits = `${cruiserId}${infantryId}` as UnitIdList
     side.nonParticipatingUnits = `${pdsId}${mechId}${destroyerId}` as UnitIdList
-    side.surfaceUnits = {
-      [SPACE_SURFACE_ID]: `${cruiserId}${destroyerId}` as UnitIdList,
-      [DEFAULT_PLANET_ID]: `${infantryId}${pdsId}` as UnitIdList,
-      [secondPlanetId]: `${mechId}` as UnitIdList,
-    }
     side.unitSurface = {
       [cruiserId]: SPACE_SURFACE_ID,
       [infantryId]: DEFAULT_PLANET_ID,
@@ -174,10 +169,6 @@ describe('SideApi unit ability restriction scopes', () => {
     const planetPds = 'b' as UnitId
     const side = cs.data.attacker
     side.nonParticipatingUnits = `${spacePds}${planetPds}` as UnitIdList
-    side.surfaceUnits = {
-      [SPACE_SURFACE_ID]: `${spacePds}` as UnitIdList,
-      [DEFAULT_PLANET_ID]: `${planetPds}` as UnitIdList,
-    }
     side.unitSurface = {
       [spacePds]: SPACE_SURFACE_ID,
       [planetPds]: DEFAULT_PLANET_ID,

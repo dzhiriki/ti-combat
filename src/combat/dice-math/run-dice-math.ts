@@ -129,20 +129,10 @@ export function runDiceMath(input: DiceMathInput): DiceMathResult {
     else hvDefender.push(m)
   }
   if (hvAttacker.length > 0) {
-    applyStoredHitValueModifiers(
-      dice.attacker,
-      hvAttacker,
-      input.sideData.attacker.unitStats,
-      input.hitSource,
-    )
+    applyStoredHitValueModifiers(dice.attacker, hvAttacker)
   }
   if (hvDefender.length > 0) {
-    applyStoredHitValueModifiers(
-      dice.defender,
-      hvDefender,
-      input.sideData.defender.unitStats,
-      input.hitSource,
-    )
+    applyStoredHitValueModifiers(dice.defender, hvDefender)
   }
 
   if (input.isUnitAbility) {

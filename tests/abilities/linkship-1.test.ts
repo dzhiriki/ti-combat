@@ -4,6 +4,7 @@ import { SPACE_SURFACE_ID } from '@/types'
 import { getGameData } from '@/utils/get-game-data'
 
 import { combatTest } from '../utils/combat-test'
+import { getSurfaceUnitIds } from '../utils/surface-units'
 
 describe('Linkship registration', () => {
   it('exposes one ability with both unit texts in its tooltip', () => {
@@ -132,7 +133,7 @@ describe.forEachSide('LINKSHIP I', () => {
     t.advanceTo('SPACE_COMBAT')
     const pool = t.dicePool()
     const pdsInSpace = [
-      ...t.state.defender.surfaceUnits[SPACE_SURFACE_ID],
+      ...getSurfaceUnitIds(t.state.defender, SPACE_SURFACE_ID),
     ].filter(id => t.state.defender.unitType[id] === 'PDS')
 
     expect(pdsInSpace).toHaveLength(1)

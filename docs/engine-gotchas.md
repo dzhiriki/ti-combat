@@ -351,15 +351,12 @@ a check there too.
   never attach ad-hoc properties to side objects, and avoid conditional
   spreads (`...(x && { x })`) in per-branch literals.
 
-- **`surfaceUnits` is a membership index.** It is the id lists grouped by
-  `unitSurface` (`deriveSurfaceUnits`); pool order carries no meaning and
-  kill order lives only in `participatingUnits`. Hit assignment re-derives
-  it through `_surfaceUnitsCache`, memoized by survivor count and reused
-  only for identical id lists and the same `unitSurface` object. So never
-  mutate `unitSurface` in place, and add a surface key only together with a
-  new `unitSurface` object (which is why `placeUnits` returns early when
-  nothing was placed). Per-surface survivor maps therefore keep setup or
-  move order until the first hit; UI sorting and outcome merging ignore it.
+- **Surface membership is derived from the two packed unit pools and
+  `unitSurface`.** Keep location metadata for destroyed IDs because reactions
+  can inspect their former surface. Commitment scans the living pools; final
+  survivor extraction groups living IDs by surface in one pass. Never mutate
+  `unitSurface` in place because branches share it until a movement or
+  placement clones it.
 
 - **`_locationHash` is one signature per id list.** Each list is `''` (all on
   the active surface), `=surface` (all on another one), or a per-unit list

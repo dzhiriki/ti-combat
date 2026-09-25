@@ -18,8 +18,7 @@ import { unitLocatorRank } from './unit-locator'
  * priority list contains only the base (e.g. `CRUISER` ranks
  * `CRUISER:Cavalry` too).
  *
- * Replaces both packed id lists. Physical membership (`side.surfaceUnits`,
- * `side.unitSurface`) and `side.unitType` are not modified.
+ * Replaces both packed id lists without changing locations or unit types.
  */
 export function sortUnitsByPriority(
   side: SideStateData,

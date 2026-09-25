@@ -27,7 +27,9 @@ export type {
   SurfaceDefinition,
   SurfaceId,
   SurfaceType,
+  SurfaceUnitCounts,
   SurfaceUnitSelections,
+  SideUnitPlacements,
   UnitSelection,
 } from './surface'
 export {

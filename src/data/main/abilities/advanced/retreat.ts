@@ -108,17 +108,15 @@ export function restoreRetreatedUnits(
   sideState.unitType = { ...sideState.unitType, ...restoredTypes }
 
   const unitSurface = { ...sideState.unitSurface }
-  const surfaceUnits = { ...sideState.surfaceUnits }
+
   for (const id of restoredIds) {
     const unitId = id as UnitId
     const surfaceId = saved.savedUnitSurfaces?.[unitId]
     if (!surfaceId) continue
     unitSurface[unitId] = surfaceId
-    surfaceUnits[surfaceId] = ((surfaceUnits[surfaceId] ?? '') +
-      unitId) as UnitIdList
   }
   sideState.unitSurface = unitSurface
-  sideState.surfaceUnits = surfaceUnits
+
   sideState._locationHash = undefined
 
   sideState.unitState = { ...sideState.unitState }

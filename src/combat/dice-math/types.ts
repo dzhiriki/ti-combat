@@ -27,10 +27,6 @@ export interface HitValueModifierDecl {
   amount: number
   unitType?: string
   excludeUnitTypes?: string[]
-  /** When set, the modifier applies to exactly one unit of this variant
-   *  (split out of the variant's bucket). Used by abilities like
-   *  Gravleash Maneuvers that target a single ship. */
-  singleUnit?: string
   unitId?: string
   /** True when the source invoke was flagged `declaration: true` — the
    *  dispatch-time `uses` decrement was deferred; the kernel must bill

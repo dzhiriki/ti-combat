@@ -14,7 +14,7 @@ function makeSide(units: Record<UnitId, UnitType>): SideStateData {
     faction: 'sol' as never,
     participatingUnits: ids.join('') as UnitIdList,
     nonParticipatingUnits: '' as UnitIdList,
-    surfaceUnits: { space: ids.join('') as UnitIdList },
+
     unitSurface,
     unitType: units as Record<string, UnitType>,
     unitState: {},
@@ -64,7 +64,7 @@ describe('resolveVariantLimit', () => {
       faction: 'sol' as never,
       participatingUnits: 'ab' as UnitIdList,
       nonParticipatingUnits: 'cd' as UnitIdList,
-      surfaceUnits: { space: 'abcd' as UnitIdList },
+
       unitSurface: {
         a: 'space',
         b: 'space',

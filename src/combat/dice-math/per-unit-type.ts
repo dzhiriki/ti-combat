@@ -213,7 +213,6 @@ export function runPerUnitTypeMode(input: PerUnitTypeInput): DiceMathBranch[] {
           probability: jointProb,
           pendingHitPool: pools,
           usesDelta: j.usesDelta,
-          destroyedUnits: new Set(),
           pendingEffects: [...a.pendingEffects, ...d.pendingEffects],
         })
       }

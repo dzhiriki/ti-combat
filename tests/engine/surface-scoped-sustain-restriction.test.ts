@@ -6,6 +6,7 @@ import type { SurfaceDefinition, SurfaceId, UnitType } from '@/types'
 import { SPACE_SURFACE_ID } from '@/types'
 
 import { combatTest } from '../utils/combat-test'
+import { getSurfaceUnitIds } from '../utils/surface-units'
 
 /**
  * Engine test: Sustain Damage's guard does not check lost/cannotBeUsed
@@ -102,7 +103,7 @@ function groundCombat(restricted: SurfaceId, layer: (typeof LAYERS)[number]) {
 }
 
 const isDamaged = (t: ReturnType<typeof combatTest>, surface: SurfaceId) => {
-  const id = t.state.attacker.surfaceUnits[surface][0]
+  const id = getSurfaceUnitIds(t.state.attacker, surface)[0]
   return id === undefined ? undefined : !!t.state.attacker.unitState[id]
 }
 
@@ -113,7 +114,7 @@ describe('engine: surface-scoped sustain restriction', () => {
       const t = spaceCombat(P2, layer)
       t.advanceTo('SPACE_COMBAT')
       t.advanceRound({ attacker: 1 })
-      expect(t.state.attacker.surfaceUnits[P2]).toHaveLength(1)
+      expect(getSurfaceUnitIds(t.state.attacker, P2)).toHaveLength(1)
       expect(isDamaged(t, P2)).toBe(false)
       expect(isDamaged(t, P1)).toBe(true)
     },
@@ -136,7 +137,7 @@ describe('engine: surface-scoped sustain restriction', () => {
       const t = groundCombat(P1, layer)
       t.advanceTo('GROUND_COMBAT')
       t.advanceRound({ attacker: 1 })
-      expect(t.state.attacker.surfaceUnits[P1]).toHaveLength(0)
+      expect(getSurfaceUnitIds(t.state.attacker, P1)).toHaveLength(0)
     },
   )
 
@@ -146,7 +147,7 @@ describe('engine: surface-scoped sustain restriction', () => {
       const t = groundCombat(P2, layer)
       t.advanceTo('GROUND_COMBAT')
       t.advanceRound({ attacker: 1 })
-      expect(t.state.attacker.surfaceUnits[P1]).toHaveLength(1)
+      expect(getSurfaceUnitIds(t.state.attacker, P1)).toHaveLength(1)
       expect(isDamaged(t, P1)).toBe(true)
     },
   )

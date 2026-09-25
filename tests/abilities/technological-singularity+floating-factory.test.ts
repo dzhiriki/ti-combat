@@ -5,6 +5,8 @@ import { buildCombatState } from '@/hooks/combat-setup/build-combat-state'
 import { DEFAULT_PLANET_ID, SPACE_SURFACE_ID } from '@/types'
 import { getGameData } from '@/utils/get-game-data'
 
+import { getSurfaceUnitIds } from '../utils/surface-units'
+
 const FLOATING_FACTORY = 'NEKRO_UNIT_CLAN_OF_SAAR_SPACE_DOCK'
 
 describe('TECHNOLOGICAL_SINGULARITY + FLOATING_FACTORY', () => {
@@ -89,7 +91,9 @@ describe('TECHNOLOGICAL_SINGULARITY + FLOATING_FACTORY', () => {
     expect(typeof stats === 'function' ? undefined : stats.NAME).toBe(
       'Floating Factory II',
     )
-    expect(state.data.attacker.surfaceUnits[SPACE_SURFACE_ID]).toHaveLength(6)
+    expect(
+      getSurfaceUnitIds(state.data.attacker, SPACE_SURFACE_ID),
+    ).toHaveLength(6)
   })
 
   it('keeps native Floating Factories and their capacity in space', () => {
@@ -112,6 +116,8 @@ describe('TECHNOLOGICAL_SINGULARITY + FLOATING_FACTORY', () => {
     expect(typeof stats === 'function' ? undefined : stats.NAME).toBe(
       'Floating Factory I',
     )
-    expect(state.data.attacker.surfaceUnits[SPACE_SURFACE_ID]).toHaveLength(5)
+    expect(
+      getSurfaceUnitIds(state.data.attacker, SPACE_SURFACE_ID),
+    ).toHaveLength(5)
   })
 })

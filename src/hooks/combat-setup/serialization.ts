@@ -1,74 +1,47 @@
 import { isDeepEqual } from 'remeda'
 
-import { UNIT_TYPES } from '@/constants/units'
-import type {
-  GameSystem,
-  SurfaceUnitSelections,
-  UnitBaseType,
-  UnitSelection,
-} from '@/types'
+import type { GameSystem, SurfaceUnitCounts, UnitBaseType } from '@/types'
 
 export type SerializedUnits = Record<string, [number, 0 | 1]>
-export type SerializedSurfaceUnits = Record<string, SerializedUnits>
+export type SerializedSurfaceCounts = Record<string, Record<string, number>>
 
-export interface SerializedConfig {
-  v: 1 | 2
+interface SerializedCommon {
   g: GameSystem
   af: string
   df: string
   m: 'S' | 'G'
-  au: SerializedUnits
-  du: SerializedUnits
-  /** v2 surface editor state. Omitted by legacy links. */
-  e?: 'S' | 'F'
-  p?: string[]
-  sp?: string
-  asu?: SerializedSurfaceUnits
-  dsu?: SerializedSurfaceUnits
   aa: Record<string, Record<string, unknown>>
   da: Record<string, Record<string, unknown>>
 }
 
-export function serializeUnits(
-  selections: Record<UnitBaseType, UnitSelection>,
-): Record<string, [number, 0 | 1]> {
-  const result: Record<string, [number, 0 | 1]> = {}
-  for (const [type, sel] of Object.entries(selections)) {
-    if (sel.count > 0) {
-      result[type] = [sel.count, sel.upgraded ? 1 : 0]
-    }
-  }
-  return result
+export interface SerializedV1Config extends SerializedCommon {
+  v: 1
+  au: SerializedUnits
+  du: SerializedUnits
 }
 
-export function serializeSurfaceUnits(
-  placements: SurfaceUnitSelections,
-): SerializedSurfaceUnits {
-  return Object.fromEntries(
-    Object.entries(placements).map(([surfaceId, selections]) => [
-      surfaceId,
-      serializeUnits(selections),
-    ]),
-  )
+export interface SerializedV2Config extends SerializedCommon {
+  v: 2
+  e: 'S' | 'F'
+  p: string[]
+  sp: string
+  asu: SerializedSurfaceCounts
+  dsu: SerializedSurfaceCounts
+  aup: UnitBaseType[]
+  dup: UnitBaseType[]
 }
 
-export function deserializeSurfaceUnits(
-  serialized: SerializedSurfaceUnits | undefined,
-  surfaceIds: readonly string[],
-): SurfaceUnitSelections {
-  const result: SurfaceUnitSelections = {}
-  for (const surfaceId of surfaceIds) {
-    const selections = Object.fromEntries(
-      UNIT_TYPES.map(type => [type, { count: 0, upgraded: false }]),
-    ) as Record<UnitBaseType, UnitSelection>
-    for (const [type, tuple] of Object.entries(serialized?.[surfaceId] ?? {})) {
-      if (!(type in selections)) continue
-      selections[type as UnitBaseType] = {
-        count: tuple[0],
-        upgraded: tuple[1] === 1,
-      }
-    }
-    result[surfaceId] = selections
+export type SerializedConfig = SerializedV1Config | SerializedV2Config
+
+export function serializeSurfaceCounts(
+  counts: SurfaceUnitCounts,
+): SerializedSurfaceCounts {
+  const result: SerializedSurfaceCounts = {}
+  for (const [surfaceId, byType] of Object.entries(counts)) {
+    const present = Object.fromEntries(
+      Object.entries(byType).filter(([, count]) => count > 0),
+    )
+    if (Object.keys(present).length > 0) result[surfaceId] = present
   }
   return result
 }

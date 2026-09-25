@@ -11,6 +11,7 @@ import { getFactionUnitConfig } from '@/utils/get-faction-unit-config'
 import { getGameData } from '@/utils/get-game-data'
 
 import { combatTest } from '../utils/combat-test'
+import { getSurfaceUnitIds } from '../utils/surface-units'
 
 const SURFACES: SurfaceDefinition[] = [
   { id: SPACE_SURFACE_ID, type: 'SPACE', name: 'Space' },
@@ -39,7 +40,9 @@ describe('MINIATURIZATION', () => {
       defender: { faction: 'ARBOREC', units: { CRUISER: 1 } },
     })
 
-    expect(state.data.attacker.surfaceUnits[SPACE_SURFACE_ID]).toHaveLength(3)
+    expect(
+      getSurfaceUnitIds(state.data.attacker, SPACE_SURFACE_ID),
+    ).toHaveLength(3)
     for (const type of ['PDS', 'SPACE_DOCK'] as const) {
       const stats = state.data.attacker.unitStats[type]
       expect(typeof stats).not.toBe('function')

@@ -22,7 +22,7 @@ function buildSide(
     faction: 'ARBOREC',
     participatingUnits: participating.join('') as UnitIdList,
     nonParticipatingUnits: '' as UnitIdList,
-    surfaceUnits: { space: participating.join('') as UnitIdList },
+
     unitSurface: Object.fromEntries(
       participating.map(id => [id, 'space']),
     ) as SideStateData['unitSurface'],
@@ -131,7 +131,7 @@ describe('canonicalizeUnitState', () => {
       faction: 'ARBOREC',
       participatingUnits: [A].join('') as UnitIdList,
       nonParticipatingUnits: [B].join('') as UnitIdList,
-      surfaceUnits: { space: [A, B].join('') as UnitIdList },
+
       unitSurface: {
         [A]: 'space',
         [B]: 'space',

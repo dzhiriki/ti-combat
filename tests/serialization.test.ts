@@ -4,7 +4,10 @@ import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { CombatSetup } from '@/hooks/combat-setup'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
 import { validateSerializedConfig } from '@/hooks/combat-setup/validation'
-import { searchParamsToConfig } from '@/hooks/use-url-sync'
+import {
+  configToSearchString,
+  searchParamsToConfig,
+} from '@/hooks/use-url-sync'
 
 describe('toSerializedConfig', () => {
   it('returns version 2', () => {
@@ -26,8 +29,36 @@ describe('toSerializedConfig', () => {
     setup.setUnitCount('attacker', 'DREADNOUGHT', 3)
     setup.setUpgraded('attacker', 'DREADNOUGHT', true)
     const config = setup.toSerializedConfig()
-    expect(config.au).toEqual({ DREADNOUGHT: [3, 1] })
-    expect(config.du).toEqual({})
+    expect(config.v).toBe(2)
+    if (config.v !== 2) throw new Error('expected v2')
+    expect(config.asu.space).toEqual({ DREADNOUGHT: 3 })
+    expect(config.dsu).toEqual({})
+    expect(config.aup).toContain('DREADNOUGHT')
+  })
+
+  it('round-trips a global upgrade even with zero units of that type', () => {
+    const setup = new CombatSetup('FULL')
+    setup.setUpgraded('attacker', 'CRUISER', true)
+    setup.setSurfaceUnitCount(
+      'attacker',
+      'space' as import('@/types').SurfaceId,
+      'FIGHTER',
+      1,
+    )
+    const config = setup.toSerializedConfig()
+    if (config.v !== 2) throw new Error('expected v2')
+    expect(config.aup).toContain('CRUISER')
+    expect(config.asu.space.CRUISER).toBeUndefined()
+    const restored = new CombatSetup()
+    restored.loadConfig(
+      validateSerializedConfig(
+        searchParamsToConfig(`?${configToSearchString(config)}`),
+      ).config,
+    )
+    expect(restored.isUpgraded('attacker', 'CRUISER')).toBe(true)
+    expect(restored.surfaceSelections.attacker.space.CRUISER.upgraded).toBe(
+      true,
+    )
   })
 
   it('omits abilities at default values', () => {

@@ -50,7 +50,7 @@ function buildSide(
     faction,
     participatingUnits: participatingUnits as UnitIdList,
     nonParticipatingUnits: '' as UnitIdList,
-    surfaceUnits: { space: participatingUnits as UnitIdList },
+
     unitSurface,
     unitType,
     unitState: {},
@@ -66,7 +66,7 @@ const emptySide = (
   faction,
   participatingUnits: '' as UnitIdList,
   nonParticipatingUnits: '' as UnitIdList,
-  surfaceUnits: { space: '' as UnitIdList },
+
   unitSurface: {},
   unitType: {},
   unitState: {},

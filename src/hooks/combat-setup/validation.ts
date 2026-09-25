@@ -56,8 +56,9 @@ export function resolveSerializedGameSystem(raw: {
 }
 
 export function validateSerializedConfig(
-  raw: SerializedConfig | Record<string, unknown>,
+  source: SerializedConfig | Record<string, unknown>,
 ): ValidationResult {
+  const raw = source as Record<string, unknown>
   const warnings: string[] = []
 
   // Version
@@ -93,10 +94,6 @@ export function validateSerializedConfig(
     warnings.push('Invalid combat mode reset to Space')
   }
 
-  // Units
-  const au = validateUnits(raw.au, warnings)
-  const du = validateUnits(raw.du, warnings)
-
   const planetIds =
     v === 2 && Array.isArray(raw.p)
       ? [...new Set(raw.p.filter(isPlanetId))]
@@ -110,30 +107,40 @@ export function validateSerializedConfig(
   const validSurfaceIds = new Set(['space', ...planetIds])
   const asu =
     v === 2
-      ? validateSurfaceUnits(raw.asu, validSurfaceIds, warnings)
+      ? validateSurfaceCounts(raw.asu, validSurfaceIds, warnings)
       : undefined
   const dsu =
     v === 2
-      ? validateSurfaceUnits(raw.dsu, validSurfaceIds, warnings)
+      ? validateSurfaceCounts(raw.dsu, validSurfaceIds, warnings)
       : undefined
+  const aup = v === 2 ? validateUpgrades(raw.aup, warnings) : undefined
+  const dup = v === 2 ? validateUpgrades(raw.dup, warnings) : undefined
 
   // Abilities
   const aa = validateAbilities(raw.aa, abilityLookup, warnings)
   const da = validateAbilities(raw.da, abilityLookup, warnings)
 
+  const common = { g: system, af, df, m, aa, da }
   return {
-    config: {
-      v,
-      g: system,
-      af,
-      df,
-      m,
-      au,
-      du,
-      ...(v === 2 && { e, p: planetIds, sp, asu, dsu }),
-      aa,
-      da,
-    },
+    config:
+      v === 1
+        ? {
+            ...common,
+            v,
+            au: validateUnits(raw.au, warnings),
+            du: validateUnits(raw.du, warnings),
+          }
+        : {
+            ...common,
+            v,
+            e,
+            p: planetIds,
+            sp,
+            asu: asu!,
+            dsu: dsu!,
+            aup: aup!,
+            dup: dup!,
+          },
     warnings,
   }
 }
@@ -142,14 +149,13 @@ function isPlanetId(value: unknown): value is string {
   return typeof value === 'string' && /^planet-[1-9]\d*$/.test(value)
 }
 
-function validateSurfaceUnits(
+function validateSurfaceCounts(
   raw: unknown,
   validSurfaceIds: ReadonlySet<string>,
   warnings: string[],
-): NonNullable<SerializedConfig['asu']> {
-  const result: NonNullable<SerializedConfig['asu']> = {}
+): Record<string, Record<string, number>> {
+  const result: Record<string, Record<string, number>> = {}
   if (typeof raw !== 'object' || raw === null) return result
-  for (const surfaceId of validSurfaceIds) result[surfaceId] = {}
   const remaining = { ...UNIT_LIMITS }
   for (const [surfaceId, units] of Object.entries(
     raw as Record<string, unknown>,
@@ -158,17 +164,38 @@ function validateSurfaceUnits(
       warnings.push(`Unknown surface "${surfaceId}" ignored`)
       continue
     }
-    const validated = validateUnits(units, warnings)
-    const kept: typeof validated = {}
-    for (const [type, [count, upgraded]] of Object.entries(validated)) {
+    if (typeof units !== 'object' || units === null) continue
+    for (const [type, value] of Object.entries(
+      units as Record<string, unknown>,
+    )) {
+      if (!unitTypeSet.has(type)) {
+        warnings.push(`Unknown unit type "${type}" ignored`)
+        continue
+      }
       const unitType = type as keyof typeof UNIT_LIMITS
-      const allowed = Math.min(count, remaining[unitType])
-      remaining[unitType] -= allowed
-      if (allowed > 0) kept[type] = [allowed, upgraded]
+      const count = Math.min(
+        Math.max(0, Math.floor(Number(value) || 0)),
+        remaining[unitType],
+      )
+      remaining[unitType] -= count
+      if (count > 0) (result[surfaceId] ??= {})[type] = count
     }
-    result[surfaceId] = kept
   }
   return result
+}
+
+function validateUpgrades(
+  raw: unknown,
+  warnings: string[],
+): import('@/types').UnitBaseType[] {
+  if (!Array.isArray(raw)) return []
+  const result = new Set<import('@/types').UnitBaseType>()
+  for (const type of raw) {
+    if (!unitTypeSet.has(type))
+      warnings.push(`Unknown unit type "${type}" ignored`)
+    else result.add(type as import('@/types').UnitBaseType)
+  }
+  return [...result]
 }
 
 function validateUnits(

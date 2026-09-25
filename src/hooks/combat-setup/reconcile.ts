@@ -85,7 +85,7 @@ const EMPTY_SIDE_FOR_STATIC: SideStateData = {
   faction: 'sol' as never,
   participatingUnits: '' as UnitIdList,
   nonParticipatingUnits: '' as UnitIdList,
-  surfaceUnits: {},
+
   unitSurface: {},
   unitType: {},
   unitState: {},
@@ -93,8 +93,6 @@ const EMPTY_SIDE_FOR_STATIC: SideStateData = {
   abilities: {},
   liveAbilities: {},
 }
-
-export type SyncSnapshots = Map<string, string[]>
 
 function categoryList(
   metadata: SideOptionMetadata,
@@ -128,10 +126,10 @@ export function reconcileAbilitiesConfig(
   config: AbilitiesConfig,
   abilities: Record<CombatSide, RegisteredAbility[]>,
   combatMode: CombatMode,
-  syncSnapshots?: SyncSnapshots,
   state?: OptionState,
   lookups?: SideLookups,
   unitStats?: Record<CombatSide, Record<string, UnitStatsEntry>>,
+  scopedDefaults = false,
 ): OptionMetadata {
   const resolved = lookups ?? emptyLookups(abilities)
   ensureConsumerDefaults(config, abilities)
@@ -147,9 +145,9 @@ export function reconcileAbilitiesConfig(
     config,
     abilities,
     metadata,
-    syncSnapshots,
     state,
     combatMode,
+    scopedDefaults,
   )
 
   const refreshed = collectOptionMetadata(
@@ -165,9 +163,9 @@ export function reconcileAbilitiesConfig(
       config,
       abilities,
       metadata,
-      syncSnapshots,
       state,
       combatMode,
+      scopedDefaults,
     )
   }
 
@@ -345,9 +343,9 @@ function reconcileSyncAll(
   config: AbilitiesConfig,
   abilities: Record<CombatSide, RegisteredAbility[]>,
   metadata: OptionMetadata,
-  syncSnapshots?: SyncSnapshots,
   state?: OptionState,
   combatMode: CombatMode = 'SPACE',
+  scopedDefaults = false,
 ): void {
   for (const side of ['attacker', 'defender'] as const) {
     const opponent = side === 'attacker' ? 'defender' : 'attacker'
@@ -357,9 +355,9 @@ function reconcileSyncAll(
       metadata[side],
       metadata[opponent],
       side,
-      syncSnapshots,
       state,
       combatMode,
+      scopedDefaults,
     )
   }
 }
@@ -496,9 +494,9 @@ function reconcileSyncSources(
   own: SideOptionMetadata,
   opponent: SideOptionMetadata,
   side: CombatSide,
-  syncSnapshots?: SyncSnapshots,
   state?: OptionState,
   combatMode: CombatMode = 'SPACE',
+  scopedDefaults = false,
 ): void {
   for (const ability of abilities) {
     const syncSources = extractSyncSources(ability)
@@ -519,7 +517,15 @@ function reconcileSyncSources(
       }
 
       const currentValue = abilityParams[source.key]
-      const surfaceScoped = source.scope !== 'type'
+      const surfaceScoped =
+        source.scope !== 'type' &&
+        (scopedDefaults ||
+          (typeof currentValue === 'string'
+            ? currentValue.startsWith('@')
+            : Array.isArray(currentValue) &&
+              currentValue.some(entry =>
+                (typeof entry === 'string' ? entry : entry[0]).startsWith('@'),
+              )))
       // Simulation preparation can run before placements exist. Qualified
       // user selections must survive until that context is available.
       if (surfaceScoped && !state?.surfaces) {
@@ -554,6 +560,7 @@ function reconcileSyncSources(
         },
         {
           ...source,
+          scope: surfaceScoped ? source.scope : 'type',
           limit:
             sideData || source.limit === 'UNIT_LIMIT'
               ? source.limit
@@ -576,7 +583,6 @@ function reconcileSyncSources(
           source.defaultItemValue,
           maxFor,
         )
-        syncSnapshots?.set(`${side}:${ability.key}:${source.key}`, validList)
       } else if (typeof currentValue === 'string') {
         const expanded =
           surfaceScoped && sideData

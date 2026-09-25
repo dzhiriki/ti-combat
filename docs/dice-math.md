@@ -4,8 +4,7 @@ The dice-math kernel turns a populated `SideDiceCollection` (per-variant dice
 entries with unit count, hit value, dice-per-unit) plus a set of
 ability-declared modifiers into a `DiceMathBranch[]` — a finite probability
 distribution over post-roll outcomes. Each branch carries `probability`,
-`pendingHitPool` (per side), ability `usesDelta`, `destroyedUnits`, and
-`pendingEffects`. The kernel is invoked once per dice-roll group and replaces
+`pendingHitPool` (per side), ability `usesDelta`, and `pendingEffects`. The kernel is invoked once per dice-roll group and replaces
 random sampling with exact enumeration.
 
 Source layout: `src/combat/dice-math/`. Entry point: `runDiceMath` in
@@ -93,8 +92,7 @@ The collection is mutated in place by two sub-steps, implemented in
    `ADD_DICE_GROUP` decls are applied in push order so later mods see
    earlier collection state.
 2. `applyStoredHitValueModifiers` — `HIT_VALUE` decls (queued by
-   `applyBonusToResult`) shift `hitValues` per side, splitting `singleUnit`
-   modifiers out of their bucket when needed.
+   `applyBonusToResult`) shift `hitValues` per side.
 
 After Step 1 the collection reflects every BEFORE-timing dice-shape and
 hit-value modification; downstream passes see only the resolved dice and
@@ -326,14 +324,13 @@ priority, it inherits the final target side's `UNIT_PRIORITY`. Unrestricted
 combat hits (`base`) take the fast path during assignment.
 
 Final branches collapse on identity:
-`(pendingHitPool, usesDelta, destroyedUnits, pendingEffects)`.
+`(pendingHitPool, usesDelta, pendingEffects)`.
 
 ## Effect dispatch
 
 `CombatState._branchesFromMathKernel` clones state per branch, applies
 `usesDelta` to `liveAbilities` on the owning sides, merges each side's
-`pendingHitPool` into its `hitPool`, removes any `destroyedUnits` (currently
-never produced by the kernel — the field is future-proofing), then dispatches
+`pendingHitPool` into its `hitPool`, then dispatches
 each `PendingEffect`. For `ROLL_TRIGGER` effects, the dispatcher binds a fresh
 `AbilityContext` to the branch and invokes `decl.effect(payload.count, branchCtx)`.
 

@@ -1,5 +1,12 @@
 import { createLookups } from '@/combat'
-import type { CollectedAbility, CombatSide, GameSystem } from '@/types'
+import type {
+  CollectedAbility,
+  CombatSide,
+  GameSystem,
+  SideUnitPlacements,
+  SurfaceDefinition,
+  SurfaceId,
+} from '@/types'
 import { getGameData } from '@/utils/get-game-data'
 import { buildUnitStatsMap } from '@/utils/get-simulation-units'
 
@@ -8,6 +15,7 @@ import type {
   CombatMode,
   SideAbilitiesConfig,
 } from '../../combat/combat-state/types'
+import { buildSideState } from './build-side-state'
 import {
   clampLimitParams,
   initializeAbilityDefaults,
@@ -40,6 +48,12 @@ export function prepareSimulationConfig(
   defenderFaction: string,
   combatMode: CombatMode,
   customAbilities?: Ability[],
+  placementContext?: {
+    surfaces: readonly SurfaceDefinition[]
+    activeSurfaceId: SurfaceId
+    attacker: SideUnitPlacements
+    defender: SideUnitPlacements
+  },
 ): Record<CombatSide, SideAbilitiesData> {
   const gameData = getGameData(system)
   const custom = customAbilities ?? []
@@ -52,11 +66,19 @@ export function prepareSimulationConfig(
   }))
   const registered: Record<CombatSide, CollectedAbility[]> = {
     attacker: [
-      ...gameData.getAvailableAbilities('attacker', attackerFaction),
+      ...gameData.getAvailableAbilities(
+        'attacker',
+        attackerFaction,
+        new Set(placementContext?.attacker.upgradedTypes ?? []),
+      ),
       ...customRegistered,
     ],
     defender: [
-      ...gameData.getAvailableAbilities('defender', defenderFaction),
+      ...gameData.getAvailableAbilities(
+        'defender',
+        defenderFaction,
+        new Set(placementContext?.defender.upgradedTypes ?? []),
+      ),
       ...customRegistered,
     ],
   }
@@ -69,16 +91,47 @@ export function prepareSimulationConfig(
   // snapshot/restore must not capture these defaults and overwrite reconciled
   // sync values. Mirrors the UI store's setup (combat-setup.ts).
   initializeAbilityDefaults(config, registered)
+  const placementState = placementContext
+    ? (() => {
+        const gen: { _nextCode?: number } = {}
+        return {
+          attacker: buildSideState(
+            system,
+            attackerFaction,
+            placementContext.attacker,
+            placementContext.surfaces,
+            config.attacker,
+            registered.attacker,
+            gen,
+          ),
+          defender: buildSideState(
+            system,
+            defenderFaction,
+            placementContext.defender,
+            placementContext.surfaces,
+            config.defender,
+            registered.defender,
+            gen,
+          ),
+          surfaces: [...placementContext.surfaces],
+          activeSurfaceId: placementContext.activeSurfaceId,
+          combatMode,
+        }
+      })()
+    : undefined
   const metadata = reconcileAbilitiesConfig(
     config,
     registered,
     combatMode,
-    undefined,
-    undefined,
+    placementState,
     lookups,
     {
-      attacker: buildUnitStatsMap(system, attackerFaction),
-      defender: buildUnitStatsMap(system, defenderFaction),
+      attacker:
+        placementState?.attacker.unitStats ??
+        buildUnitStatsMap(system, attackerFaction),
+      defender:
+        placementState?.defender.unitStats ??
+        buildUnitStatsMap(system, defenderFaction),
     },
   )
   restoreConsumerParams(config, registered, savedParams)

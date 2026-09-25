@@ -460,11 +460,10 @@ addHits(hits: number): void                       // Ordinary hits on the landin
 addHits(hits: number, priority: UnitType[]): void  // Type-restricted; throws if the landing side's hitPool is non-empty
 
 // Apply a flat +/- to each combat roll result for this dice-roll group.
-// target omitted = all of this side's dice; { singleUnit } = one unit type;
-// { exclude } = all but the listed base types; unitId selects one actual unit.
+// target omitted = all of this side's dice; { exclude } = all but the listed base types; unitId selects one actual unit.
 applyBonusToResult(
   amount: number,
-  target?: UnitType | { exclude: UnitBaseType[] } | { singleUnit: UnitType }
+  target?: UnitType | { exclude: UnitBaseType[] }
     | { unitId: UnitId },
 ): void
 ```

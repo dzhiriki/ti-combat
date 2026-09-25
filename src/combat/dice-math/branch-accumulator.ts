@@ -1,5 +1,5 @@
 import type { UnitLocator } from '@/types'
-import type { CombatSide, UnitId } from '@/types'
+import type { CombatSide } from '@/types'
 
 import type { SlotId } from './types'
 
@@ -26,7 +26,6 @@ export interface DiceMathBranch {
   probability: number
   pendingHitPool: { attacker: PendingHitPool; defender: PendingHitPool }
   usesDelta: Map<string, number>
-  destroyedUnits: Set<UnitId>
   pendingEffects: PendingEffect[]
 }
 

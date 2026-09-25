@@ -182,14 +182,7 @@ export interface UnitCombatHashCache {
 /** State data for one side of combat */
 export interface SideStateData {
   faction: string
-  /** Physical membership index: the id lists grouped by `unitSurface`.
-   *  Every living unit appears in exactly one surface list and every
-   *  surface of the combat keeps a key. Pool order carries no meaning (kill
-   *  order lives in `participatingUnits`); writers of the id lists or
-   *  `unitSurface` must keep the membership exact (`deriveSurfaceUnits`
-   *  rebuilds it from scratch). A surface key may only be added together
-   *  with a new `unitSurface` object (`_surfaceUnitsCache` relies on it). */
-  surfaceUnits: Record<string, UnitIdList>
+
   /** Unit location. Retains the last location of destroyed ids so destroy
    *  reactions can still inspect where their source was. */
   unitSurface: Record<string, SurfaceId>
@@ -257,19 +250,7 @@ export interface SideStateData {
   /** Calculation target used to omit redundant location data when every
    *  living unit is already on the active surface. */
   _activeSurfaceId?: SurfaceId
-  /** `surfaceUnits` after hit assignment, memoized by survivor count and
-   *  shared by every branch of one simulation. Equivalent branches reach the
-   *  same survivors millions of times; an entry is reused only for the same
-   *  id lists and `unitSurface` object. No effect on state identity. */
-  _surfaceUnitsCache?: Array<
-    | {
-        unitSurface: Record<string, SurfaceId>
-        participatingUnits: UnitIdList
-        nonParticipatingUnits: UnitIdList
-        value: Record<string, UnitIdList>
-      }
-    | undefined
-  >
+
   /** Derived O(1) lookup cache for `unitAbilityRestrictions`, rebuilt
    *  lazily on first read after any mutation that could affect
    *  restriction outcomes (entries added/removed, unit composition

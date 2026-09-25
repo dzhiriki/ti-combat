@@ -7,7 +7,6 @@ import type {
   UnitAbility,
   UnitBaseType,
   UnitId,
-  UnitType,
   UnitLocator,
 } from '@/types'
 
@@ -93,49 +92,18 @@ function inCombatPhase(phase: MetaPhase[]): boolean {
  *  entries whose value slot is explicitly `false` (checkbox-mode "off").
  *  Number-mode entries are kept regardless of count — sortUnitsByPriority
  *  consumers care about ordering, not magnitude. */
-function unwrapUnitListKeys(raw: unknown): UnitLocator[] {
-  if (!Array.isArray(raw)) return raw as UnitLocator[]
-  if (raw.length === 0) return raw as UnitLocator[]
-  if (!Array.isArray(raw[0])) return raw as UnitLocator[]
-  const result: UnitLocator[] = []
-  for (const entry of raw as readonly [string, ...unknown[]][]) {
-    if (entry.length >= 2 && entry[1] === false) continue
-    result.push(entry[0] as UnitLocator)
-  }
-  return result
-}
-
 function sortUnitsAtSetup(data: CombatStateData): void {
-  const mode = data.combatMode
   for (const side of ['attacker', 'defender'] as const) {
-    // Saved and live priority lists control order; membership is derived
-    // independently from native categories and instance grants.
-    const baseSide = data[side].abilities
-    const liveSide = data[side].liveAbilities
-
-    const baseUP = baseSide['UNIT_PRIORITY']
-    const liveUP = liveSide['UNIT_PRIORITY']
-    const unitPriority = (
-      liveUP === undefined
-        ? baseUP
-        : baseUP === undefined
-          ? liveUP
-          : { ...baseUP, ...liveUP }
-    ) as
-      | {
-          spaceUnitPriority?: UnitLocator[]
-          groundUnitPriority?: UnitLocator[]
-        }
-      | undefined
-
-    const rawList =
-      mode === 'GROUND'
-        ? unitPriority?.groundUnitPriority
-        : unitPriority?.spaceUnitPriority
-    const list = rawList ? unwrapUnitListKeys(rawList) : []
-
-    sortUnitsByPriority(data[side], list, id =>
-      participatesInCombat(data[side], id, mode, data.activeSurfaceId),
+    sortUnitsByPriority(
+      data[side],
+      CombatSideState.getPhasePriorityList(data[side], data.combatMode) ?? [],
+      id =>
+        participatesInCombat(
+          data[side],
+          id,
+          data.combatMode,
+          data.activeSurfaceId,
+        ),
     )
   }
 }
@@ -680,9 +648,17 @@ export class CombatState {
 
     const attacker = data.attacker
     const moving: UnitId[] = []
-    for (const id of attacker.surfaceUnits[space.id] ?? '') {
-      if (isNativeCategory(attacker, attacker.unitType[id], 'GROUND_FORCES'))
-        moving.push(id as UnitId)
+    for (const pool of [
+      attacker.participatingUnits,
+      attacker.nonParticipatingUnits,
+    ]) {
+      for (const id of pool) {
+        if (
+          attacker.unitSurface[id] === space.id &&
+          isNativeCategory(attacker, attacker.unitType[id], 'GROUND_FORCES')
+        )
+          moving.push(id as UnitId)
+      }
     }
     CombatSideState.moveUnits(attacker, moving, target.id)
     this.resyncParticipating('attacker')
@@ -811,25 +787,8 @@ export class CombatState {
   /** Rebuild membership from native categories and explicit instance grants. */
   public resyncParticipating(side: CombatSide): void {
     const data = this.data
-    const liveSide = data[side].liveAbilities
-    const baseSide = data[side].abilities
-
-    const liveUP = liveSide['UNIT_PRIORITY']
-    const baseUP = baseSide['UNIT_PRIORITY']
-    const unitPriority =
-      liveUP === undefined
-        ? baseUP
-        : baseUP === undefined
-          ? liveUP
-          : { ...baseUP, ...liveUP }
-    const rawOrderList =
-      unitPriority &&
-      ((data.combatMode === 'GROUND'
-        ? unitPriority.groundUnitPriority
-        : unitPriority.spaceUnitPriority) as unknown)
-    const orderList = rawOrderList
-      ? (unwrapUnitListKeys(rawOrderList) as UnitType[])
-      : []
+    const orderList =
+      CombatSideState.getPhasePriorityList(data[side], data.combatMode) ?? []
 
     sortUnitsByPriority(data[side], orderList, id =>
       participatesInCombat(
@@ -1088,7 +1047,6 @@ export class CombatState {
    *      `addHits` calls in the round triggered `_assignHits` inline via
    *      the `wasEmpty` path — so a Thundarian-style cancel simply
    *      clears `hitPools` instead of tracking a base index.
-   *   4. Removes any `destroyedUnits` from the relevant side.
    *   5. Forks the logger and emits per-branch `DICE_ROLL` / `DICE_HITS`.
    *   6. Dispatches each `PendingEffect` via a freshly-bound `AbilityContext`. */
   private _branchesFromMathKernel(
@@ -1199,15 +1157,6 @@ export class CombatState {
           if (targetFilter) own.targetFilter = targetFilter
           own.base += pending.base
           for (const c of pending.custom) own.custom.push({ ...c })
-        }
-      }
-
-      // Remove any destroyed units (kernel currently never produces these;
-      // future-proofed for effect-driven destruction).
-      if (branch.destroyedUnits.size > 0) {
-        const ids = [...branch.destroyedUnits]
-        for (const side of ['attacker', 'defender'] as const) {
-          CombatSideState.removeUnits(branchData[side], ids)
         }
       }
 
@@ -1688,7 +1637,7 @@ export function cloneStateForBranch(base: CombatStateData): CombatStateData {
 function withAllSideFields(s: SideStateData): SideStateData {
   const side: { [K in keyof Required<SideStateData>]: SideStateData[K] } = {
     faction: s.faction,
-    surfaceUnits: s.surfaceUnits,
+
     unitSurface: s.unitSurface,
     participatingUnits: s.participatingUnits,
     nonParticipatingUnits: s.nonParticipatingUnits,
@@ -1709,9 +1658,7 @@ function withAllSideFields(s: SideStateData): SideStateData {
     _locationHash: s._locationHash,
     _unitCombatHash: s._unitCombatHash,
     _activeSurfaceId: s._activeSurfaceId,
-    // Created here so every branch clone shares one memo table.
-    // Always fresh: the memo is scoped to one simulation.
-    _surfaceUnitsCache: [],
+
     _resolvedRestrictions: s._resolvedRestrictions,
   }
   return side

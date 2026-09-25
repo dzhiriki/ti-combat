@@ -20,20 +20,22 @@ export function configToSearchString(config: SerializedConfig): string {
     `df=${config.df}`,
     `m=${config.m}`,
   ]
-  if (config.v >= 2) {
-    parts.push(`e=${config.e ?? 'S'}`)
-    parts.push(`sp=${config.sp ?? 'planet-1'}`)
-    parts.push(`p=${(config.p ?? ['planet-1']).join(',')}`)
+  if (config.v === 1) {
+    for (const [type, [count, upgraded]] of Object.entries(config.au)) {
+      parts.push(`au.${type}=${count}.${upgraded}`)
+    }
+    for (const [type, [count, upgraded]] of Object.entries(config.du)) {
+      parts.push(`du.${type}=${count}.${upgraded}`)
+    }
+  } else {
+    parts.push(`e=${config.e}`)
+    parts.push(`sp=${config.sp}`)
+    parts.push(`p=${config.p.join(',')}`)
+    parts.push(`aup=${config.aup.join(',')}`)
+    parts.push(`dup=${config.dup.join(',')}`)
+    writeSurfaceCounts(parts, 'asu', config.asu)
+    writeSurfaceCounts(parts, 'dsu', config.dsu)
   }
-
-  for (const [type, [count, upgraded]] of Object.entries(config.au)) {
-    parts.push(`au.${type}=${count}.${upgraded}`)
-  }
-  for (const [type, [count, upgraded]] of Object.entries(config.du)) {
-    parts.push(`du.${type}=${count}.${upgraded}`)
-  }
-  writeSurfaceUnits(parts, 'asu', config.asu)
-  writeSurfaceUnits(parts, 'dsu', config.dsu)
 
   writeAbilityParams(parts, 'aa', config.aa)
   writeAbilityParams(parts, 'da', config.da)
@@ -41,15 +43,14 @@ export function configToSearchString(config: SerializedConfig): string {
   return parts.join('&')
 }
 
-function writeSurfaceUnits(
+function writeSurfaceCounts(
   parts: string[],
   prefix: string,
-  surfaces: SerializedConfig['asu'],
+  surfaces: Record<string, Record<string, number>>,
 ): void {
-  if (!surfaces) return
   for (const [surfaceId, units] of Object.entries(surfaces)) {
-    for (const [type, [count, upgraded]] of Object.entries(units)) {
-      parts.push(`${prefix}.${surfaceId}.${type}=${count}.${upgraded}`)
+    for (const [type, count] of Object.entries(units)) {
+      parts.push(`${prefix}.${surfaceId}.${type}=${count}`)
     }
   }
 }
@@ -114,8 +115,8 @@ export function searchParamsToConfig(search: string): Record<string, unknown> {
   const du: Record<string, [number, 0 | 1]> = {}
   const aa: Record<string, Record<string, unknown>> = {}
   const da: Record<string, Record<string, unknown>> = {}
-  const asu: NonNullable<SerializedConfig['asu']> = {}
-  const dsu: NonNullable<SerializedConfig['dsu']> = {}
+  const asu: Record<string, Record<string, number>> = {}
+  const dsu: Record<string, Record<string, number>> = {}
 
   for (const [key, value] of params) {
     if (key.startsWith('au.')) {
@@ -147,11 +148,7 @@ export function searchParamsToConfig(search: string): Record<string, unknown> {
       if (dotIdx === -1) continue
       const surfaceId = rest.slice(0, dotIdx)
       const type = rest.slice(dotIdx + 1)
-      const [count, upgraded] = value.split('.')
-      ;(target[surfaceId] ??= {})[type] = [
-        Number(count),
-        Number(upgraded) as 0 | 1,
-      ]
+      ;(target[surfaceId] ??= {})[type] = Number(value)
     }
   }
 
@@ -169,6 +166,8 @@ export function searchParamsToConfig(search: string): Record<string, unknown> {
       p: (params.get('p') ?? 'planet-1').split(',').filter(Boolean),
       asu,
       dsu,
+      aup: (params.get('aup') ?? '').split(',').filter(Boolean),
+      dup: (params.get('dup') ?? '').split(',').filter(Boolean),
     }),
     aa,
     da,

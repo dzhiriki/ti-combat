@@ -111,7 +111,6 @@ export function runFastMode(input: FastModeInput): DiceMathBranch[] {
         probability: prob,
         pendingHitPool: pools,
         usesDelta: new Map(),
-        destroyedUnits: new Set(),
         pendingEffects: [],
       })
     }

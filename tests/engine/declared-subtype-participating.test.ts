@@ -7,7 +7,7 @@ import {
   type SideStateData,
 } from '@/combat'
 import type { DeclaredSubtype } from '@/combat/abilities-engine/types'
-import { CombatSideState } from '@/combat/combat-side-state/combat-side-state'
+import { resolveUnitOptions } from '@/combat/abilities-engine/unit-options'
 import { reconcileAbilitiesConfig } from '@/hooks/combat-setup/reconcile'
 import type { UnitList } from '@/types'
 
@@ -55,7 +55,11 @@ describe('getUnitVariantOptions — participating flag', () => {
       ] as unknown as DeclaredSubtype[],
     })
 
-    const opts = CombatSideState.getUnitVariantOptions(side, 'SPACE')
+    const opts = resolveUnitOptions(
+      side,
+      { combatMode: 'SPACE', side: 'attacker' },
+      { source: 'SHIPS', scope: 'type' },
+    )
 
     const values = opts.map(o => o.value)
     expect(values).toContain('CRUISER:Galvanized')
@@ -81,9 +85,15 @@ describe('getUnitVariantOptions — participating flag', () => {
       ] as unknown as DeclaredSubtype[],
     })
 
-    const opts = CombatSideState.getUnitVariantOptions(side, 'SPACE', {
-      includeNonParticipating: true,
-    })
+    const opts = resolveUnitOptions(
+      side,
+      { combatMode: 'SPACE', side: 'attacker' },
+      {
+        source: 'SHIPS',
+        scope: 'type',
+        filter: { includeNonParticipating: true },
+      },
+    )
 
     const values = opts.map(o => o.value)
     expect(values).toContain('CRUISER:Galvanized')

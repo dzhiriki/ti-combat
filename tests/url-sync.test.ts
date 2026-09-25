@@ -136,15 +136,14 @@ describe('URL round-trip', () => {
       e: 'F',
       p: ['planet-1', 'planet-2'],
       sp: 'planet-2',
+      aup: ['INFANTRY'],
+      dup: [],
       asu: {
-        space: { CRUISER: [1, 0] },
-        'planet-1': {},
-        'planet-2': { INFANTRY: [2, 1] },
+        space: { CRUISER: 1 },
+        'planet-2': { INFANTRY: 2 },
       },
       dsu: {
-        space: {},
-        'planet-1': { PDS: [1, 0] },
-        'planet-2': {},
+        'planet-1': { PDS: 1 },
       },
     }
 
@@ -157,8 +156,10 @@ describe('URL round-trip', () => {
       e: 'F',
       p: ['planet-1', 'planet-2'],
       sp: 'planet-2',
-      asu: config.asu,
-      dsu: config.dsu,
+      aup: ['INFANTRY'],
+      dup: [],
+      asu: config.v === 2 ? config.asu : {},
+      dsu: config.v === 2 ? config.dsu : {},
     })
   })
 })

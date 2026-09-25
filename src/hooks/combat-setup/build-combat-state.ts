@@ -1,41 +1,24 @@
-import { makeVariantId } from '@/combat'
-import type {
-  DeclaredSubtype,
-  RegisteredAbility,
-  UnitCategoryOptions,
-} from '@/combat/abilities-engine/types'
 import { SHIPS, STRUCTURES } from '@/constants/units'
 import type {
-  CombatSide,
   GameSystem,
+  SideUnitPlacements,
   SurfaceDefinition,
   SurfaceId,
-  SurfaceUnitSelections,
   UnitBaseType,
-  UnitIdList,
-  UnitStats,
 } from '@/types'
 import {
   createDefaultSurfaces,
   DEFAULT_PLANET_ID,
   SPACE_SURFACE_ID,
 } from '@/types'
-import { getFactionUnitConfig } from '@/utils/get-faction-unit-config'
-import { buildUnitStatsMap } from '@/utils/get-simulation-units'
-import { getSimulationUnitsOnSurfaces } from '@/utils/get-simulation-units'
-import {
-  createEmptySurfaceSelections,
-  defaultSurfaceId,
-} from '@/utils/surface-placements'
+import { createEmptySurfaceCounts } from '@/utils/surface-placements'
 
 import { CombatState } from '../../combat/combat-state/combat-state'
-import type { UnitStatsEntry } from '../../combat/combat-state/types'
 import type {
   CombatMode,
   SideAbilitiesConfig,
-  SideStateData,
 } from '../../combat/combat-state/types'
-import { applyAbilityPlacementOverrides } from './ability-placement'
+import { buildSideState } from './build-side-state'
 import { prepareSimulationConfig } from './prepare-simulation-config'
 import { clampLimitParams } from './reconcile'
 
@@ -75,144 +58,33 @@ export interface CombatStateConfig {
 // BUILDERS
 // ============================================================================
 
-function buildSideState(
-  system: GameSystem,
+function adaptTestPlacements(
   config: SideConfig,
-  abilities: SideAbilitiesConfig,
-  registeredAbilities: readonly RegisteredAbility[],
-  gen: { _nextCode?: number },
-  side: CombatSide,
   surfaces: SurfaceDefinition[],
   activeSurfaceId: SurfaceId,
-  declaredSubtypes: readonly DeclaredSubtype[],
-  unitCategoryOptions: UnitCategoryOptions,
-): SideStateData {
-  const upgradedSet = new Set(config.upgrades ?? [])
-  const placements = createEmptySurfaceSelections(surfaces)
-  const unitStats: Record<string, UnitStats> = {}
-
-  const factionConfig = getFactionUnitConfig(system, config.faction)
-  const placementStats = applyAbilityPlacementOverrides(
-    buildUnitStatsMap(system, config.faction, upgradedSet),
-    registeredAbilities,
-    abilities,
-  )
-
-  const rawPlacements = config.placements
-    ? Object.entries(config.placements).flatMap(([surfaceId, units]) =>
-        Object.entries(units).map(([type, count]) => ({
-          surfaceId: surfaceId as SurfaceId,
-          type,
-          count,
-        })),
-      )
-    : Object.entries(config.units).flatMap(([type, count]) => {
-        const starlancer = config.abilities?.['TF_STARLANCER_XI']
-        const ground =
-          type === 'MECH' &&
-          typeof starlancer === 'object' &&
-          typeof starlancer.mechsOnGround === 'number'
-            ? Math.min(count ?? 0, Math.max(0, starlancer.mechsOnGround))
-            : 0
-        if (ground > 0) {
-          const spaceId = surfaces.find(s => s.type === 'SPACE')!.id
-          const planetId = surfaces.find(s => s.type === 'PLANET')!.id
-          return [
-            { surfaceId: spaceId, type, count: (count ?? 0) - ground },
-            { surfaceId: planetId, type, count: ground },
-          ]
-        }
-        // Flat test shorthand preserves the old combat-pool meaning while
-        // still producing legal locations: ships are in space, structures
-        // are on the first planet, and ground forces start on the active
-        // combat surface. Surface-specific tests use `placements` to exercise
-        // commitment and multi-planet behavior.
-        const surfaceId = SHIPS.includes(type as UnitBaseType)
-          ? surfaces.find(s => s.type === 'SPACE')!.id
-          : STRUCTURES.includes(type as UnitBaseType)
-            ? surfaces.find(s => s.type === 'PLANET')!.id
-            : activeSurfaceId
-        return [{ surfaceId, type, count }]
-      })
-
-  for (const { surfaceId, type, count } of rawPlacements) {
-    const unitType_ = type as UnitBaseType
-    if (!count || count <= 0) continue
-
-    const def = factionConfig[unitType_]
-    if (!def?.BASE) continue
-
-    const upgraded = upgradedSet.has(unitType_)
-    let stats: UnitStats = { ...def.BASE }
-    if (upgraded && def.UPGRADED) {
-      stats = {
-        ...stats,
-        ...def.UPGRADED,
-        UNIT_ABILITIES: {
-          ...stats.UNIT_ABILITIES,
-          ...def.UPGRADED.UNIT_ABILITIES,
-        },
+): SideUnitPlacements {
+  const counts = createEmptySurfaceCounts(surfaces)
+  if (config.placements) {
+    for (const [surfaceId, units] of Object.entries(config.placements)) {
+      const target = counts[surfaceId]
+      if (!target) continue
+      for (const [type, count] of Object.entries(units)) {
+        if (count && Object.hasOwn(target, type))
+          target[type as UnitBaseType] += count
       }
     }
-
-    const destination =
-      surfaceId ??
-      defaultSurfaceId(
-        surfaces,
-        activeSurfaceId,
-        side,
-        unitType_,
-        placementStats[unitType_] ?? stats,
-      )
-    if (!placements[destination]) continue
-    placements[destination][unitType_] = {
-      count: placements[destination][unitType_].count + count,
-      upgraded,
+  } else {
+    for (const [type, count] of Object.entries(config.units)) {
+      if (!count) continue
+      const surfaceId = SHIPS.includes(type as UnitBaseType)
+        ? SPACE_SURFACE_ID
+        : STRUCTURES.includes(type as UnitBaseType)
+          ? surfaces.find(s => s.type === 'PLANET')!.id
+          : activeSurfaceId
+      counts[surfaceId][type as UnitBaseType] += count
     }
-    unitStats[unitType_] = stats
   }
-
-  const built = getSimulationUnitsOnSurfaces(
-    system,
-    config.faction,
-    placements as SurfaceUnitSelections,
-    surfaces,
-    gen,
-    placementStats,
-  )
-
-  const baseUnitStats: Record<string, UnitStatsEntry> = {
-    ...buildUnitStatsMap(system, config.faction, upgradedSet),
-    ...unitStats,
-  }
-
-  // Pre-populate variant stats. Store the factory rather than its eager
-  // result so the variant tracks runtime mutations of its parent (e.g.
-  // Eidolon flipping MECH stats at start of combat) — `resolveUnitStats`
-  // applies the factory lazily on lookup.
-  for (const decl of declaredSubtypes) {
-    const variantKey = makeVariantId(decl.unitType, [decl.name])
-    if (baseUnitStats[variantKey]) continue
-    baseUnitStats[variantKey] = decl.statsFactory
-  }
-
-  return {
-    faction: config.faction,
-    participatingUnits: built.units,
-    nonParticipatingUnits: '' as UnitIdList,
-    surfaceUnits: built.surfaceUnits,
-    unitSurface: built.unitSurface,
-    unitType: built.unitType,
-    unitState: built.unitState,
-    unitStats: baseUnitStats as Record<
-      import('@/types').UnitType,
-      UnitStatsEntry
-    >,
-    declaredSubtypes,
-    unitCategoryOptions,
-    abilities,
-    liveAbilities: {},
-  }
+  return { counts, upgradedTypes: config.upgrades ?? [] }
 }
 
 function buildSideAbilitiesConfig(config: SideConfig): SideAbilitiesConfig {
@@ -246,6 +118,17 @@ export function buildCombatState(config: CombatStateConfig): CombatState {
     defender: buildSideAbilitiesConfig(config.defender),
   }
 
+  const attackerPlacements = adaptTestPlacements(
+    config.attacker,
+    surfaces,
+    activeSurfaceId,
+  )
+  const defenderPlacements = adaptTestPlacements(
+    config.defender,
+    surfaces,
+    activeSurfaceId,
+  )
+
   const sideAbilities = prepareSimulationConfig(
     config.system,
     abilitiesConfig,
@@ -253,30 +136,34 @@ export function buildCombatState(config: CombatStateConfig): CombatState {
     config.defender.faction,
     config.mode,
     config.customAbilities,
+    {
+      surfaces,
+      activeSurfaceId,
+      attacker: attackerPlacements,
+      defender: defenderPlacements,
+    },
   )
 
   const gen: { _nextCode?: number } = {}
   const attackerSide = buildSideState(
     config.system,
-    config.attacker,
+    config.attacker.faction,
+    attackerPlacements,
+    surfaces,
     abilitiesConfig.attacker,
     sideAbilities.attacker.registered,
     gen,
-    'attacker',
-    surfaces,
-    activeSurfaceId,
     sideAbilities.attacker.metadata.subtypes,
     sideAbilities.attacker.metadata.categories,
   )
   const defenderSide = buildSideState(
     config.system,
-    config.defender,
+    config.defender.faction,
+    defenderPlacements,
+    surfaces,
     abilitiesConfig.defender,
     sideAbilities.defender.registered,
     gen,
-    'defender',
-    surfaces,
-    activeSurfaceId,
     sideAbilities.defender.metadata.subtypes,
     sideAbilities.defender.metadata.categories,
   )
