@@ -11,7 +11,6 @@ import type {
   UnitAbility,
   UnitBaseType,
   UnitId,
-  UnitCombatOverrides,
   UnitIdList,
   UnitState,
   UnitStats,
@@ -33,13 +32,11 @@ import type {
   HitSource,
   ResolvedRestrictions,
   ResolvedRestrictionsLayer,
-  ResolvedRestrictionScope,
   RestrictionEntry,
   SideAbilitiesConfig,
   SideStateData,
   UnitAbilityMeta,
   UnitAbilityRestrictions,
-  UnitTargetFilter,
 } from '../combat-state/types'
 import type {
   HitValueModifierDecl,
@@ -51,8 +48,8 @@ import { resolveUnitStats } from '../utils/resolve-unit-stats'
 import {
   isNativeCategory,
   isUnitCategory,
-  matchesTargetFilter,
-  unitCombatHash,
+  isUnitAbilityTarget,
+  unitMetaHash,
 } from '../utils/unit-combat-properties'
 import { nextUnitIds } from '../utils/unit-id'
 import { matchesUnitLocator, unitLocatorMatcher } from '../utils/unit-locator'
@@ -143,19 +140,6 @@ export function applyVariantPostFilter(
   return filtered
 }
 
-/** Merge an ability's base config with its live-overlay config. */
-function mergeConfig(
-  s: SideStateData,
-  key: string,
-): Record<string, unknown> | undefined {
-  const base = s.abilities[key]
-  const live = s.liveAbilities[key]
-  if (base === undefined && live === undefined) return undefined
-  if (live === undefined) return base
-  if (base === undefined) return live
-  return { ...base, ...live }
-}
-
 /** Parse a UnitList (flat or `[type, enabled]` tuples) into a UnitType[]. */
 function parsePriorityList(raw: unknown): UnitLocator[] | undefined {
   if (!Array.isArray(raw)) return undefined
@@ -241,14 +225,14 @@ function pickTargetsForCustom(
   pool: UnitIdList | readonly UnitId[],
   total: number,
   unitPriority: readonly UnitLocator[],
-  targetFilter?: UnitTargetFilter,
+  targets?: readonly UnitLocator[],
 ): UnitId[] {
   if (total <= 0 || pool.length === 0) return []
   const result: UnitId[] = []
-  if (unitPriority.length === 0 && targetFilter) {
+  if (unitPriority.length === 0 && targets) {
     for (let i = pool.length - 1; i >= 0 && result.length < total; i--) {
       const id = pool[i] as UnitId
-      if (matchesTargetFilter(s, id, targetFilter)) result.push(id)
+      if (isUnitAbilityTarget(s, id, targets)) result.push(id)
     }
     return result
   }
@@ -261,8 +245,7 @@ function pickTargetsForCustom(
     )
     for (let i = pool.length - 1; i >= 0 && result.length < total; i--) {
       const id = pool[i] as UnitId
-      if (result.includes(id) || !matchesTargetFilter(s, id, targetFilter))
-        continue
+      if (result.includes(id) || !isUnitAbilityTarget(s, id, targets)) continue
       if (matches(id)) result.push(id)
     }
   }
@@ -389,7 +372,7 @@ function fitsFighterFastPath(
   pool: NonNullable<SideStateData['hitPool']>,
   units: UnitIdList,
 ): boolean {
-  if (pool.custom.length !== 1 || pool.targetFilter) return false
+  if (pool.custom.length !== 1 || pool.unitAbilityTargets) return false
   const { unitPriority } = pool.custom[0]
   const surfaceId = fighterAtBottomSurface(unitPriority)
   return (
@@ -404,11 +387,9 @@ function isSourceDisabled(
   state: CombatStateData,
   reason: string,
   visited: Set<string>,
-  surfaceId?: SurfaceId,
 ): boolean {
-  const visitKey = `${reason}@${surfaceId ?? '*'}`
-  if (visited.has(visitKey)) return false
-  visited.add(visitKey)
+  if (visited.has(reason)) return false
+  visited.add(reason)
 
   const ability = reason as UnitAbility
   for (const side of ['attacker', 'defender'] as const) {
@@ -419,19 +400,11 @@ function isSourceDisabled(
       const entries = restrictions[layer]?.[ability]
       if (!entries || entries.length === 0) continue
 
-      const hasValidEntry = entries.some(e => {
-        if (
-          e.surfaceId !== undefined &&
-          (surfaceId === undefined || e.surfaceId !== surfaceId)
-        )
-          return false
-        return !isSourceDisabled(
-          state,
-          e.reason,
-          visited,
-          e.surfaceId ?? surfaceId,
-        )
-      })
+      // A surface-scoped entry disables its ability only on that surface,
+      // never the ability as a restriction source.
+      const hasValidEntry = entries.some(
+        e => !e.surfaceId && !isSourceDisabled(state, e.reason, visited),
+      )
       if (hasValidEntry) return true
     }
   }
@@ -490,70 +463,36 @@ function buildResolvedForSide(
     ability: UnitAbility,
     entry: RestrictionEntry,
   ) => {
-    let resolved = target.get(ability)
-    if (!resolved) {
-      resolved = {}
-      target.set(ability, resolved)
-    }
-    if (resolved.global === 'ALL') return
-
-    const existing = entry.surfaceId
-      ? resolved.surfaces?.get(entry.surfaceId)
-      : resolved.global
+    const existing = target.get(ability)
     if (existing === 'ALL') return
 
-    const setScope = (value: ResolvedRestrictionScope) => {
-      if (entry.surfaceId) {
-        const surfaces =
-          resolved.surfaces ??
-          (resolved.surfaces = new Map<SurfaceId, ResolvedRestrictionScope>())
-        surfaces.set(entry.surfaceId, value)
-      } else {
-        resolved.global = value
-      }
-    }
-
+    const { unitType, category, surfaceId } = entry
     const immune = immuneByReason.get(entry.reason)
     const isImmune = (baseType: string) =>
       immune !== undefined && immune.has(baseType as UnitBaseType)
 
-    if (!entry.unitType && !entry.category) {
-      if (!immune) {
-        setScope('ALL')
-        return
-      }
-      // Blanket entry with an immune unit type on the side: expand it into
-      // the concrete types present instead of 'ALL', minus the immune ones.
-      const set = existing ?? new Set<UnitType | UnitId>()
-      for (const key of variantKeys) {
-        const baseType = parseUnitLocator(key).baseType
-        if (isImmune(baseType)) continue
-        set.add(key)
-        set.add(baseType as UnitType)
-      }
-      for (const id of unitIds) {
-        if (!isImmune(parseUnitLocator(s.unitType[id]).baseType))
-          set.add(id as UnitId)
-      }
-      setScope(set)
+    // A blanket entry with an immune unit type on the side is expanded into
+    // the concrete types present instead of 'ALL', minus the immune ones.
+    if (!unitType && !category && !immune && !surfaceId) {
+      target.set(ability, 'ALL')
       return
     }
-
     const set = existing ?? new Set<UnitType | UnitId>()
+    target.set(ability, set)
 
-    if (entry.unitType) {
-      if (!isImmune(entry.unitType)) {
-        set.add(entry.unitType as UnitType)
-        // A bare baseType entry also restricts every variant of that type.
-        for (const key of variantKeys) {
-          if (parseUnitLocator(key).baseType === entry.unitType) set.add(key)
-        }
-      }
-    } else if (entry.category) {
+    // A surface-scoped entry restricts only the units standing on that
+    // surface, so it resolves to ids alone (`moveUnits` invalidates).
+    if (!surfaceId) {
+      // A bare baseType entry also restricts every variant of that type.
+      if (unitType && !isImmune(unitType)) set.add(unitType as UnitType)
       for (const key of variantKeys) {
         const baseType = parseUnitLocator(key).baseType
         if (isImmune(baseType)) continue
-        if (isNativeCategory(s, key, entry.category)) {
+        if (
+          unitType
+            ? baseType === unitType
+            : !category || isNativeCategory(s, key, category)
+        ) {
           set.add(key)
           set.add(baseType as UnitType)
         }
@@ -561,17 +500,17 @@ function buildResolvedForSide(
     }
 
     for (const id of unitIds) {
+      if (surfaceId && s.unitSurface[id] !== surfaceId) continue
       const baseType = parseUnitLocator(s.unitType[id]).baseType
       if (isImmune(baseType)) continue
       if (
-        entry.unitType
-          ? baseType === entry.unitType
-          : entry.category && isUnitCategory(s, id, entry.category)
+        unitType
+          ? baseType === unitType
+          : !category || isUnitCategory(s, id, category)
       ) {
         set.add(id as UnitId)
       }
     }
-    setScope(set)
   }
 
   for (const layer of ['lost', 'cannotBeUsed'] as const) {
@@ -582,45 +521,13 @@ function buildResolvedForSide(
       const entries = layerData[ability as UnitAbility]
       if (!entries) continue
       for (const entry of entries) {
-        if (isSourceDisabled(state, entry.reason, new Set(), entry.surfaceId))
-          continue
+        if (isSourceDisabled(state, entry.reason, new Set())) continue
         addToLayer(target, ability as UnitAbility, entry)
       }
     }
   }
 
   return { cannotBeUsed, lost }
-}
-
-/** Location signature of one id list: '' when every unit is on the active
- *  surface, `=surface` when all share another one, else each unit's
- *  surface. Uniform signatures stay valid as units are removed. */
-function surfaceSignature(s: SideStateData, ids: UnitIdList): string {
-  if (ids.length === 0) return ''
-  const first = s.unitSurface[ids[0]]
-  let uniform = true
-  for (const id of ids) {
-    if (s.unitSurface[id] !== first) {
-      uniform = false
-      break
-    }
-  }
-  if (uniform) return first === s._activeSurfaceId ? '' : `=${first}`
-  let list = ''
-  for (const id of ids) list += `${s.unitSurface[id]},`
-  return list
-}
-
-/** Build and cache the location segment of the state hash. */
-function cacheLocationHash(s: SideStateData): string {
-  const participating = surfaceSignature(s, s.participatingUnits)
-  const nonParticipating = surfaceSignature(s, s.nonParticipatingUnits)
-  const location =
-    participating || nonParticipating
-      ? `@${participating}!${nonParticipating}`
-      : ''
-  s._locationHash = location
-  return location
 }
 
 /** `unitState` segment of the state hash: one id char and one damage flag
@@ -641,19 +548,6 @@ function unitStateHash(s: SideStateData): string {
   return body
 }
 
-/** After units are only removed: per-unit surface lists (with commas) must
- *  be rebuilt, uniform signatures still hold. */
-function invalidateLocationHashOnRemoval(s: SideStateData): void {
-  if (s._locationHash?.includes(',')) s._locationHash = undefined
-}
-
-function matchesRestrictionScope(
-  scope: ResolvedRestrictionScope | undefined,
-  unitType: string,
-): boolean {
-  return scope === 'ALL' || scope?.has(unitType as UnitType | UnitId) === true
-}
-
 /** Lazy accessor — returns the per-side resolved cache, building it on
  *  first read after invalidation. */
 function getResolvedRestrictions(
@@ -667,25 +561,7 @@ function getResolvedRestrictions(
   return built
 }
 
-function _removeOne(
-  s: SideStateData,
-  unitTypeOrUnit: UnitBaseType | UnitId,
-): void {
-  let unitId: UnitId
-
-  // UnitId is a single-char packed token; UnitBaseType is a multi-char
-  // tag like "CRUISER". Distinguish by length rather than `typeof`.
-  if (unitTypeOrUnit.length > 1) {
-    const found = CombatSideState.findFirstUnitId(
-      s,
-      unitTypeOrUnit as UnitBaseType,
-    )
-    if (!found) return
-    unitId = found.unitId
-  } else {
-    unitId = unitTypeOrUnit as UnitId
-  }
-
+function _removeOne(s: SideStateData, unitId: UnitId): void {
   const pIdx = s.participatingUnits.indexOf(unitId)
   if (pIdx !== -1) {
     s.participatingUnits = (s.participatingUnits.slice(0, pIdx) +
@@ -696,10 +572,6 @@ function _removeOne(
     s.nonParticipatingUnits = (s.nonParticipatingUnits.slice(0, nIdx) +
       s.nonParticipatingUnits.slice(nIdx + 1)) as UnitIdList
   }
-
-  // A uniform-location hash remains valid as units are removed: the unit
-  // pools in the main hash already identify which units are still alive.
-  invalidateLocationHashOnRemoval(s)
 }
 
 function addRestrictionEntry(
@@ -810,7 +682,7 @@ function removeImmunityEntry(
 }
 
 export interface GetUnitsOptions {
-  includeVariants: boolean
+  includeVariants?: boolean
   participatingOnly?: boolean
   surfaceId?: SurfaceId
 }
@@ -849,8 +721,8 @@ export class CombatSideState {
    *  of which ability touched each unit first. Entries of destroyed units
    *  are kept, and an entry without damage still differs from no entry.
    *  UnitIds sit above ASCII, so the ASCII markers of the optional
-   *  `@location` (`cacheLocationHash`) and `#categories`
-   *  (`unitCombatHash`) segments cannot be mistaken for state.
+   *  `@location` and `#categories` segments (`unitMetaHash`) cannot be
+   *  mistaken for state.
    *
    *  Convergence across equivalent states ("A damaged" vs "B damaged")
    *  relies on `canonicalizeUnitState` having run. Natural sustain
@@ -859,15 +731,12 @@ export class CombatSideState {
    *  `SideApi.resortUnits()` to mark `_needsCanonicalize`. The flush
    *  here catches state read at round-start (cache-key time), where
    *  the BEFORE_ASSIGN_HITS script step hasn't run yet. */
-  static getUnitsHash(s: SideStateData): string {
+  static getUnitsHash(s: SideStateData, activeSurfaceId: SurfaceId): string {
     const dirty = s._needsCanonicalize
     if (dirty) {
       canonicalizeUnitState(s, dirty)
     }
-    // Location and category segments are '' in the common case, which
-    // keeps most keys as short as surface-less ones.
-    const location = s._locationHash ?? cacheLocationHash(s)
-    return `${s.participatingUnits}!${s.nonParticipatingUnits}|${unitStateHash(s)}${location}${unitCombatHash(s)}`
+    return `${s.participatingUnits}!${s.nonParticipatingUnits}|${unitStateHash(s)}${unitMetaHash(s, activeSurfaceId)}`
   }
 
   /** Hash this side's `liveAbilities`. The initial `abilities` config is
@@ -879,8 +748,8 @@ export class CombatSideState {
   }
 
   /** Full identity hash for this side — units + runtime ability overlay. */
-  static getHash(s: SideStateData): string {
-    return `${CombatSideState.getUnitsHash(s)}+${CombatSideState.getAbilitiesHash(s)}`
+  static getHash(s: SideStateData, activeSurfaceId: SurfaceId): string {
+    return `${CombatSideState.getUnitsHash(s, activeSurfaceId)}+${CombatSideState.getAbilitiesHash(s)}`
   }
 
   // ==========================================================================
@@ -890,11 +759,6 @@ export class CombatSideState {
   /** True if the side still holds any participating unit. */
   static hasParticipatingUnits(s: SideStateData): boolean {
     return s.participatingUnits.length > 0
-  }
-
-  /** True if the side has any alive unit (participating or not). */
-  static hasAnyUnits(s: SideStateData): boolean {
-    return s.participatingUnits.length > 0 || s.nonParticipatingUnits.length > 0
   }
 
   /** Check if a specific UnitId is alive on this side. */
@@ -923,26 +787,6 @@ export class CombatSideState {
     return s.unitType[unitId] ?? ''
   }
 
-  /** Find the first (highest-priority) alive UnitId for a base type.
-   *  Participating units are scanned first; non-participating are fallback. */
-  static findFirstUnitId(
-    s: SideStateData,
-    baseType: UnitBaseType,
-  ): { unitId: UnitId; key: UnitType } | undefined {
-    const { participatingUnits, nonParticipatingUnits, unitType } = s
-    for (const id of participatingUnits) {
-      const key = unitType[id]
-      if (parseUnitLocator(key).baseType === baseType)
-        return { unitId: id as UnitId, key }
-    }
-    for (const id of nonParticipatingUnits) {
-      const key = unitType[id]
-      if (parseUnitLocator(key).baseType === baseType)
-        return { unitId: id as UnitId, key }
-    }
-    return undefined
-  }
-
   /** Get all UnitIds for a type, optionally including variants.
    *  Participating ids are returned first (in priority-sort order). */
   static getUnits(
@@ -950,25 +794,19 @@ export class CombatSideState {
     unitType: UnitLocator | undefined,
     options?: GetUnitsOptions,
   ): UnitId[] {
-    const { participatingUnits, nonParticipatingUnits } = s
     const result: UnitId[] = []
     const matches =
       unitType === undefined
         ? () => true
         : unitLocatorMatcher(s, unitType, options?.includeVariants)
-    for (const id of participatingUnits) {
-      if (
-        matches(id) &&
-        (!options?.surfaceId || s.unitSurface[id] === options.surfaceId)
-      )
+    const surfaceId = options?.surfaceId
+    for (const id of s.participatingUnits) {
+      if ((!surfaceId || s.unitSurface[id] === surfaceId) && matches(id))
         result.push(id as UnitId)
     }
     if (options?.participatingOnly) return result
-    for (const id of nonParticipatingUnits) {
-      if (
-        matches(id) &&
-        (!options?.surfaceId || s.unitSurface[id] === options.surfaceId)
-      )
+    for (const id of s.nonParticipatingUnits) {
+      if ((!surfaceId || s.unitSurface[id] === surfaceId) && matches(id))
         result.push(id as UnitId)
     }
     return result
@@ -981,20 +819,7 @@ export class CombatSideState {
     filter?: UnitLocator | UnitLocator[],
     options?: GetUnitsOptions,
   ): number {
-    if (!filter) {
-      const onRequestedSurface = (id: string) =>
-        !options?.surfaceId || s.unitSurface[id] === options.surfaceId
-      let total = 0
-      for (const id of s.participatingUnits) {
-        if (onRequestedSurface(id)) total += 1
-      }
-      if (!options?.participatingOnly) {
-        for (const id of s.nonParticipatingUnits) {
-          if (onRequestedSurface(id)) total += 1
-        }
-      }
-      return total
-    }
+    if (!filter) return CombatSideState.getUnits(s, undefined, options).length
     const filters = typeof filter === 'string' ? [filter] : filter
     let total = 0
     for (const f of filters) {
@@ -1045,48 +870,28 @@ export class CombatSideState {
     return s.unitState[unitId] ?? {}
   }
 
-  static setUnitParticipation(
-    s: SideStateData,
-    ids: readonly UnitId[],
-    participating: boolean | undefined,
-  ): void {
-    const next = { ...s.unitCombat }
-    for (const id of ids) {
-      if (!CombatSideState.hasUnit(s, id)) continue
-      const entry = { ...next[id] }
-      if (participating === undefined) delete entry.participating
-      else entry.participating = participating
-      if (Object.keys(entry).length === 0) delete next[id]
-      else next[id] = entry
-    }
-    s.unitCombat = Object.keys(next).length ? next : undefined
-  }
-
-  static setUnitCategory(
+  /** Grant `category` to the living `ids` (see `SideStateData.unitGrants`). */
+  static grantCategory(
     s: SideStateData,
     ids: readonly UnitId[],
     category: UnitCategory,
-    member: boolean | undefined,
   ): void {
-    const next = { ...s.unitCombat }
+    let next: Record<string, UnitCategory> | undefined
     for (const id of ids) {
-      if (!CombatSideState.hasUnit(s, id)) continue
-      const categories = { ...next[id]?.categories }
-      const entry: UnitCombatOverrides = { ...next[id], categories }
-      if (member === undefined) delete categories[category]
-      else categories[category] = member
-      if (Object.keys(categories).length === 0) delete entry.categories
-      if (Object.keys(entry).length === 0) delete next[id]
-      else next[id] = entry
+      if (!CombatSideState.hasUnit(s, id) || s.unitGrants?.[id] === category)
+        continue
+      next ??= { ...s.unitGrants }
+      next[id] = category
     }
-    s.unitCombat = Object.keys(next).length ? next : undefined
+    if (!next) return
+    s.unitGrants = next
     s._resolvedRestrictions = undefined
   }
 
   static canAssignHitToUnit(s: SideStateData, id: UnitId): boolean {
     const pool = s.hitPool
     if (!pool) return true
-    if (!matchesTargetFilter(s, id, pool.targetFilter)) return false
+    if (!isUnitAbilityTarget(s, id, pool.unitAbilityTargets)) return false
     if (pool.base + pool.additional > 0) return true
     return pool.custom.some(
       entry =>
@@ -1108,32 +913,14 @@ export class CombatSideState {
     return parseUnitLocator(key).baseType as UnitBaseType
   }
 
-  static getUnitSurface(
-    s: SideStateData,
-    unitId: UnitId,
-  ): SurfaceId | undefined {
-    return s.unitSurface[unitId]
-  }
-
   /** Get all active base types (types with at least one alive unit). */
   static getActiveBaseTypes(
     s: SideStateData,
-    options?: Pick<GetUnitsOptions, 'participatingOnly' | 'surfaceId'>,
+    options?: GetUnitsOptions,
   ): UnitBaseType[] {
-    const { participatingUnits, nonParticipatingUnits, unitType } = s
     const types = new Set<UnitBaseType>()
-    for (const id of participatingUnits) {
-      if (options?.surfaceId && s.unitSurface[id] !== options.surfaceId)
-        continue
-      types.add(parseUnitLocator(unitType[id]).baseType as UnitBaseType)
-    }
-    if (!options?.participatingOnly) {
-      for (const id of nonParticipatingUnits) {
-        if (options?.surfaceId && s.unitSurface[id] !== options.surfaceId)
-          continue
-        types.add(parseUnitLocator(unitType[id]).baseType as UnitBaseType)
-      }
-    }
+    for (const id of CombatSideState.getUnits(s, undefined, options))
+      types.add(parseUnitLocator(s.unitType[id]).baseType as UnitBaseType)
     return [...types]
   }
 
@@ -1209,18 +996,6 @@ export class CombatSideState {
     return { ...base, ...live }
   }
 
-  /** Candidate types for setup options, including declared ability effects.
-   *  Runtime membership is available through the scoped unit queries. */
-  static getParticipationOptionTypes(
-    s: SideStateData,
-    mode: CombatMode,
-  ): UnitBaseType[] {
-    return CombatSideState.getCategoryOptionTypes(
-      s,
-      mode === 'GROUND' ? 'GROUND_FORCES' : 'SHIPS',
-    )
-  }
-
   static getCategoryOptionTypes(
     s: SideStateData,
     source: UnitCategory | readonly UnitCategory[],
@@ -1230,7 +1005,7 @@ export class CombatSideState {
       : [source]
     const result: UnitBaseType[] = []
     for (const category of categories) {
-      const configured = s.unitCategoryOptions?.[category]
+      const configured = s.optionMetadata?.categories[category]
       const types =
         configured ??
         UNIT_TYPES.filter(type => isNativeCategory(s, type, category))
@@ -1265,7 +1040,7 @@ export class CombatSideState {
       }
     }
 
-    const unitPriority = mergeConfig(s, 'UNIT_PRIORITY')
+    const unitPriority = CombatSideState.getLiveParams(s, 'UNIT_PRIORITY')
     if (!unitPriority) return undefined
     return parsePriorityList(unitPriority[key])
   }
@@ -1320,17 +1095,29 @@ export class CombatSideState {
     layer: 'lost' | 'cannotBeUsed',
     ability: UnitAbility,
     unitType: string,
-    surfaceId?: SurfaceId,
   ): boolean {
     if (!state[side].unitAbilityRestrictions) return false
     const resolved = getResolvedRestrictions(state, side)[layer].get(ability)
     if (!resolved) return false
-    if (matchesRestrictionScope(resolved.global, unitType)) return true
-    if (!resolved.surfaces) return false
-    if (unitType.length === 1) surfaceId ??= state[side].unitSurface[unitType]
+    return resolved === 'ALL' || resolved.has(unitType as UnitType)
+  }
+
+  /** Lost or cannot be used: the unit (or type) may not use `ability`. */
+  static isUnitAbilityDisabled(
+    state: CombatStateData,
+    side: CombatSide,
+    ability: UnitAbility,
+    unitType: string,
+  ): boolean {
     return (
-      surfaceId !== undefined &&
-      matchesRestrictionScope(resolved.surfaces.get(surfaceId), unitType)
+      CombatSideState.isRestricted(state, side, 'lost', ability, unitType) ||
+      CombatSideState.isRestricted(
+        state,
+        side,
+        'cannotBeUsed',
+        ability,
+        unitType,
+      )
     )
   }
 
@@ -1344,8 +1131,8 @@ export class CombatSideState {
     if (!state[side].unitAbilityRestrictions) return false
     const resolved = getResolvedRestrictions(state, side)
     return (
-      resolved.lost.get(ability)?.global === 'ALL' ||
-      resolved.cannotBeUsed.get(ability)?.global === 'ALL'
+      resolved.lost.get(ability) === 'ALL' ||
+      resolved.cannotBeUsed.get(ability) === 'ALL'
     )
   }
 
@@ -1357,8 +1144,7 @@ export class CombatSideState {
     state: CombatStateData,
     side: CombatSide,
     source: HitSource,
-    allowedUnitTypes?: ReadonlySet<UnitBaseType>,
-    sourceSurfaceIds?: ReadonlySet<SurfaceId>,
+    sourceSurfaceId?: SurfaceId,
     instanceModifiers: readonly HitValueModifierDecl[] = [],
   ): SideDiceCollection {
     const s = state[side]
@@ -1374,38 +1160,15 @@ export class CombatSideState {
 
     const walk = (pool: UnitIdList) => {
       for (const id of pool) {
-        if (
-          sourceSurfaceIds &&
-          !sourceSurfaceIds.has(s.unitSurface[id] as SurfaceId)
-        )
-          continue
+        if (sourceSurfaceId && s.unitSurface[id] !== sourceSurfaceId) continue
         const key = s.unitType[id]
         const { baseType: type } = parseUnitLocator(key)
 
-        if (allowedUnitTypes && !allowedUnitTypes.has(type)) continue
-
-        if (source !== 'COMBAT') {
-          const surfaceId = s.unitSurface[id] as SurfaceId
-          const allowed = !(
-            CombatSideState.isRestricted(
-              state,
-              side,
-              'lost',
-              source,
-              id,
-              surfaceId,
-            ) ||
-            CombatSideState.isRestricted(
-              state,
-              side,
-              'cannotBeUsed',
-              source,
-              id,
-              surfaceId,
-            )
-          )
-          if (!allowed) continue
-        }
+        if (
+          source !== 'COMBAT' &&
+          CombatSideState.isUnitAbilityDisabled(state, side, source, id)
+        )
+          continue
 
         let die = variantStatsCache.get(key)
         if (die === undefined) {
@@ -1481,7 +1244,7 @@ export class CombatSideState {
     const destroyedIds: UnitId[] = []
     const hasCustom = pool.custom.length > 0
 
-    if (!hasCustom && !pool.targetFilter) {
+    if (!hasCustom && !pool.unitAbilityTargets) {
       const take = Math.min(mainTotal, oldUnits.length)
       const kept = oldUnits.length - take
       s.participatingUnits = oldUnits.slice(0, kept) as UnitIdList
@@ -1546,8 +1309,14 @@ export class CombatSideState {
     } else {
       const working = [...oldUnits] as UnitId[]
       if (mainTotal > 0) {
-        const picks = pool.targetFilter
-          ? pickTargetsForCustom(s, working, mainTotal, [], pool.targetFilter)
+        const picks = pool.unitAbilityTargets
+          ? pickTargetsForCustom(
+              s,
+              working,
+              mainTotal,
+              [],
+              pool.unitAbilityTargets,
+            )
           : pickTailTargets(working, mainTotal)
         for (const id of picks) {
           const idx = working.indexOf(id)
@@ -1563,7 +1332,7 @@ export class CombatSideState {
           working,
           entry.base,
           entry.unitPriority,
-          pool.targetFilter,
+          pool.unitAbilityTargets,
         )
         for (const id of picks) {
           const idx = working.indexOf(id)
@@ -1577,9 +1346,6 @@ export class CombatSideState {
 
     s.hitPool = undefined
     s._hitPoolShared = false
-
-    if (s.participatingUnits.length !== oldUnits.length)
-      invalidateLocationHashOnRemoval(s)
 
     if (!trackDestroyed) return EMPTY_DESTROYED
 
@@ -1669,10 +1435,7 @@ export class CombatSideState {
   // ==========================================================================
 
   /** Remove one or more units by UnitId, UnitId[], or base type (first found). */
-  static removeUnits(
-    s: SideStateData,
-    target: UnitBaseType | UnitId | UnitId[],
-  ): void {
+  static removeUnits(s: SideStateData, target: UnitId | UnitId[]): void {
     if (Array.isArray(target)) {
       for (const id of target) _removeOne(s, id)
       return
@@ -1823,13 +1586,14 @@ export class CombatSideState {
    *  sides. */
   static placeUnits(
     s: SideStateData,
-    mode: CombatMode,
+    state: Pick<
+      CombatStateData,
+      '_nextCode' | 'surfaces' | 'combatMode' | 'activeSurfaceId'
+    >,
     unitsToAdd: Partial<Record<UnitType, number>>,
     destination: SurfaceId,
-    gen: Pick<CombatStateData, '_nextCode' | 'surfaces'> &
-      Partial<Pick<CombatStateData, 'activeSurfaceId'>>,
   ): Record<UnitType, UnitId[]> {
-    const destinationSurface = gen.surfaces.find(
+    const destinationSurface = state.surfaces.find(
       surface => surface.id === destination,
     )
     if (!destinationSurface) throw new Error(`Unknown surface: ${destination}`)
@@ -1865,11 +1629,14 @@ export class CombatSideState {
       const allowed = Math.min(count, limit - existing)
       if (allowed <= 0) continue
 
-      const newIds = nextUnitIds(allowed, gen)
+      const newIds = nextUnitIds(allowed, state)
       if (
-        destination ===
-          (gen.activeSurfaceId ?? s._activeSurfaceId ?? destination) &&
-        isNativeCategory(s, vKey, mode === 'SPACE' ? 'SHIPS' : 'GROUND_FORCES')
+        destination === state.activeSurfaceId &&
+        isNativeCategory(
+          s,
+          vKey,
+          state.combatMode === 'SPACE' ? 'SHIPS' : 'GROUND_FORCES',
+        )
       ) {
         nextPart = (nextPart + newIds.join('')) as UnitIdList
       } else {
@@ -1901,8 +1668,6 @@ export class CombatSideState {
     s.nonParticipatingUnits = nextNon
     s.unitType = nextUnitType
     s.unitSurface = nextUnitSurface
-
-    s._locationHash = undefined
     s._resolvedRestrictions = undefined
 
     return placed
@@ -1922,7 +1687,8 @@ export class CombatSideState {
       unitSurface[id] = destination
     }
     s.unitSurface = unitSurface
-    s._locationHash = undefined
+    // Surface-scoped restrictions resolve to the ids standing on the surface.
+    s._resolvedRestrictions = undefined
   }
 
   // ==========================================================================

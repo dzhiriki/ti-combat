@@ -1,5 +1,5 @@
-import { type Ability, declareParam } from '@/combat'
-import type { UnitBaseType, UnitList } from '@/types'
+import type { Ability } from '@/combat'
+import type { UnitList } from '@/types'
 
 type Params = {
   customPriority: boolean
@@ -12,10 +12,6 @@ declare global {
   }
 }
 
-function fighterPriority(types: UnitBaseType[]): UnitList {
-  return types.filter(type => type === 'FIGHTER').map(type => [type])
-}
-
 export const antiFighterBarrage: Ability<Params> = {
   key: 'ANTI_FIGHTER_BARRAGE',
   name: 'Anti-Fighter Barrage',
@@ -24,14 +20,9 @@ export const antiFighterBarrage: Ability<Params> = {
   params: {
     isEnabled: true,
     uses: Infinity,
+    // Waylay turns this off so hits follow the target's space priority.
     customPriority: true,
-    unitPriority: declareParam<UnitList>({
-      scope: 'type',
-      default: [['FIGHTER']],
-      source: 'SHIPS',
-      side: 'opponent',
-      compute: fighterPriority,
-    }),
+    unitPriority: [['FIGHTER']],
   },
   headerUI: 'isEnabled',
   invoke: [

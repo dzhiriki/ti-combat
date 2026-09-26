@@ -1,52 +1,37 @@
-import type { CombatSide, UnitCombatOverrides, UnitId } from '@/types'
+import { type CombatSide, SPACE_SURFACE_ID, type UnitId } from '@/types'
 
 import { CombatSideState } from '../../combat-side-state/combat-side-state'
 import type { CombatStateData } from '../../combat-state/types'
 import type { AbilityCallContext } from '../types'
 
+/** Matriarch/Morphwing: fighters in space join the invasion as ground forces.
+ *  `_commitUnits` lands them on the planet with the native ground forces. */
 export function commitFighters(ctx: AbilityCallContext): void {
-  const space = ctx.api.own.getSpaceSurfaceId()
-  const selected = ctx.api.own.system
+  const fighters = ctx.api.own.system
     .getUnits('FIGHTER', { includeVariants: true })
-    .filter(id => ctx.api.own.getUnitSurface(id) === space)
-  if (!selected.length) return
-  ctx.api.own.setUnitCategory(selected, 'GROUND_FORCES', true)
-  ctx.api.own.moveUnits(selected)
-  ctx.api.own.setUnitParticipation(selected, true)
-  const side = ctx.state[ctx.side]
-  const overrides = { ...side.unitCombat }
-  for (const id of selected)
-    overrides[id] = { ...overrides[id], returnAfterCombat: space }
-  side.unitCombat = overrides
+    .filter(id => ctx.api.own.getUnitSurface(id) === SPACE_SURFACE_ID)
+  ctx.api.own.grantCategory(fighters, 'GROUND_FORCES')
 }
 
-/** Resolve the committed units' return independently of the ability source.
- *  Runs after END_OF_COMBAT reactions, only when completion was not canceled.
- *  Returns the sides whose units moved, so callers resync only those. */
+/** Return committed fighters to space once combat ends, even if their source
+ *  died. Returns the sides whose units moved, so callers resync only those. */
 export function returnCommittedFighters(state: CombatStateData): CombatSide[] {
   const moved: CombatSide[] = []
   for (const sideKey of ['attacker', 'defender'] as const) {
     const side = state[sideKey]
-    if (!side.unitCombat) continue
-    const returning = Object.entries(side.unitCombat).filter(
-      ([, grant]) => grant.returnAfterCombat,
-    )
-    if (!returning.length) continue
-    moved.push(sideKey)
-    const overrides = { ...side.unitCombat }
-    for (const [id, grant] of returning) {
-      CombatSideState.moveUnits(side, [id as UnitId], grant.returnAfterCombat!)
-      const categories = { ...grant.categories }
-      const next: UnitCombatOverrides = { ...grant, categories }
-      delete next.returnAfterCombat
-      delete next.participating
-      delete categories.GROUND_FORCES
-      if (!Object.keys(categories).length) delete next.categories
-      if (!Object.keys(next).length) delete overrides[id]
-      else overrides[id] = next
+    const grants = side.unitGrants
+    if (!grants) continue
+    const next = { ...grants }
+    const returning: UnitId[] = []
+    for (const id in grants) {
+      if (grants[id] !== 'GROUND_FORCES') continue
+      returning.push(id as UnitId)
+      delete next[id]
     }
-    side.unitCombat = Object.keys(overrides).length ? overrides : undefined
-    side._resolvedRestrictions = undefined
+    if (!returning.length) continue
+    side.unitGrants = Object.keys(next).length ? next : undefined
+    CombatSideState.moveUnits(side, returning, SPACE_SURFACE_ID)
+    moved.push(sideKey)
   }
   return moved
 }

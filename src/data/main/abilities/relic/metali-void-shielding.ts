@@ -41,7 +41,6 @@ function findVoidShieldTarget(ctx: AbilityReadContext): UnitId | undefined {
   const target = ctx.api.own.participating.findUnitByPriority(
     ctx.utils.getFlat(priority),
     {
-      includeVariants: false,
       predicate: (_variant, unitId) => {
         if (ctx.api.own.getUnitBaseType(unitId) === 'FIGHTER') return false
         if (!ctx.api.own.canAssignHitToUnit(unitId)) return false

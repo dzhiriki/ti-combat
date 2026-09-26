@@ -9,13 +9,18 @@ import {
 
 function baseConfig(): SerializedConfig {
   return {
-    v: 1,
+    v: 2,
     g: 'TI4',
     af: 'ARBOREC',
     df: 'ARBOREC',
     m: 'S',
-    au: { FIGHTER: [1, 0] },
-    du: { FIGHTER: [1, 0] },
+    e: 'S',
+    p: ['planet-1'],
+    sp: 'planet-1',
+    asu: { space: { FIGHTER: 1 } },
+    dsu: { space: { FIGHTER: 1 } },
+    aup: [],
+    dup: [],
     aa: {},
     da: {},
   }

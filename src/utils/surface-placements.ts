@@ -1,20 +1,19 @@
 import {
   DEFAULT_UNIT_SURFACES,
-  GROUND_FORCES,
   SHIPS,
   UNIT_LIMITS,
   UNIT_TYPES,
 } from '@/constants/units'
-import type {
-  CombatSide,
-  SurfaceDefinition,
-  SurfaceId,
-  SurfaceUnitCounts,
-  SurfaceType,
-  SurfaceUnitSelections,
-  UnitBaseType,
-  UnitSelection,
-  UnitStats,
+import {
+  SPACE_SURFACE_ID,
+  type SurfaceDefinition,
+  type SurfaceId,
+  type SurfaceUnitCounts,
+  type SurfaceType,
+  type SurfaceUnitSelections,
+  type UnitBaseType,
+  type UnitSelection,
+  type UnitStats,
 } from '@/types'
 
 export function createEmptyUnitSelections(): Record<
@@ -33,29 +32,18 @@ export function allowedSurfaceTypes(
   return stats?.ALLOWED_SURFACES ?? DEFAULT_UNIT_SURFACES[type]
 }
 
+/** Where a unit of `type` lands: the `preferred` surface type when allowed,
+ *  else the first allowed one (the active planet for planets). */
 export function defaultSurfaceId(
-  surfaces: readonly SurfaceDefinition[],
   activePlanetId: SurfaceId,
-  side: CombatSide,
   type: UnitBaseType,
   stats?: UnitStats,
-  preferredSurfaceType?: SurfaceType,
+  preferred?: SurfaceType,
 ): SurfaceId {
   const allowed = allowedSurfaceTypes(type, stats)
-  const defaultPreferred: SurfaceType =
-    SHIPS.includes(type) ||
-    (GROUND_FORCES.includes(type) && side === 'attacker')
-      ? 'SPACE'
-      : 'PLANET'
-  const preferred = preferredSurfaceType ?? defaultPreferred
-  const preferredType = allowed.includes(preferred) ? preferred : allowed[0]
-  const active = surfaces.find(s => s.id === activePlanetId)
-  if (preferredType === 'PLANET' && active?.type === 'PLANET') return active.id
-  const destination = surfaces.find(s => s.type === preferredType)
-  if (!destination) {
-    throw new Error(`No legal ${preferredType} surface exists for ${type}`)
-  }
-  return destination.id
+  const target =
+    preferred && allowed.includes(preferred) ? preferred : allowed[0]
+  return target === 'PLANET' ? activePlanetId : SPACE_SURFACE_ID
 }
 
 export function createEmptySurfaceCounts(
@@ -105,9 +93,7 @@ export function expandSimplifiedCounts(
   current: SurfaceUnitCounts,
   totals: Record<UnitBaseType, UnitSelection>,
   surfaces: readonly SurfaceDefinition[],
-  spaceId: SurfaceId,
   planetId: SurfaceId,
-  side: CombatSide,
   stats: Partial<Record<UnitBaseType, UnitStats>>,
   combatMode: 'SPACE' | 'GROUND',
 ): SurfaceUnitCounts {
@@ -115,10 +101,10 @@ export function expandSimplifiedCounts(
   for (const surface of surfaces) {
     if (current[surface.id]) next[surface.id] = { ...current[surface.id] }
   }
-  next[spaceId] = Object.fromEntries(
+  next[SPACE_SURFACE_ID] = Object.fromEntries(
     UNIT_TYPES.map(type => [type, 0]),
   ) as Record<UnitBaseType, number>
-  next[planetId] = { ...next[spaceId] }
+  next[planetId] = { ...next[SPACE_SURFACE_ID] }
   for (const type of UNIT_TYPES) {
     const allowed = allowedSurfaceTypes(type, stats[type])
     const preferred: SurfaceType =
@@ -126,15 +112,8 @@ export function expandSimplifiedCounts(
       SHIPS.includes(type)
         ? 'SPACE'
         : 'PLANET'
-    const destination = defaultSurfaceId(
-      surfaces,
-      planetId,
-      side,
-      type,
-      stats[type],
-      preferred,
-    )
-    next[destination][type] = totals[type].count
+    next[defaultSurfaceId(planetId, type, stats[type], preferred)][type] =
+      totals[type].count
   }
   return next
 }
@@ -143,7 +122,6 @@ export function normalizeSurfaceCounts(
   counts: SurfaceUnitCounts,
   surfaces: readonly SurfaceDefinition[],
   activePlanetId: SurfaceId,
-  side: CombatSide,
   stats: Partial<Record<UnitBaseType, UnitStats>>,
 ): SurfaceUnitCounts {
   const next = createEmptySurfaceCounts(surfaces)
@@ -159,14 +137,8 @@ export function normalizeSurfaceCounts(
       else displaced += count
     }
     if (displaced > 0) {
-      const destination = defaultSurfaceId(
-        surfaces,
-        activePlanetId,
-        side,
-        type,
-        stats[type],
-      )
-      next[destination][type] += displaced
+      next[defaultSurfaceId(activePlanetId, type, stats[type])][type] +=
+        displaced
     }
   }
   return next

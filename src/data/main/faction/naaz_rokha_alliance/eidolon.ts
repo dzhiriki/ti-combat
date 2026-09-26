@@ -1,4 +1,5 @@
 import type { Ability } from '@/combat'
+import { SPACE_SURFACE_ID } from '@/types'
 
 export const eidolon: Ability = {
   key: 'EIDOLON',
@@ -17,8 +18,7 @@ export const eidolon: Ability = {
     {
       timing: 'START_OF_COMBAT',
       isCallable: (_params, ctx) =>
-        ctx.api.own.getUnitSurface(ctx.getUnit()) ===
-        ctx.api.own.getSpaceSurfaceId(),
+        ctx.api.own.getUnitSurface(ctx.getUnit()) === SPACE_SURFACE_ID,
       call: ctx => {
         const stats = ctx.api.own.getUnitStats('MECH')!
         // Modify all mechs to Z-Grav form: combat [8, 2], loses Sustain Damage

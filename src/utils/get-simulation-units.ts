@@ -4,83 +4,59 @@ import type {
   GameSystem,
   SurfaceDefinition,
   SurfaceId,
-  SideUnitPlacements,
+  SurfaceUnitCounts,
   UnitBaseType,
   UnitIdList,
-  UnitState,
   UnitStats,
   UnitType,
 } from '@/types'
 
 import { getFactionUnitConfig } from './get-faction-unit-config'
 
-/** Builds unit instances from the engine's explicit surface representation. */
+/** Builds unit instances from surface placements. `units` is a packed
+ *  UnitIdList — the caller places it into `participatingUnits` and lets
+ *  `CombatState.forSimulation` split out the non-participating tail. The
+ *  shared `gen` carries the post-allocation counter so the caller can store
+ *  it on the parent CombatStateData for runtime placements. */
 export function getSimulationUnitsOnSurfaces(
-  system: GameSystem,
-  faction: string,
-  placements: SideUnitPlacements,
+  counts: SurfaceUnitCounts,
   surfaces: readonly SurfaceDefinition[],
   gen: { _nextCode?: number },
-  placementStats?: Partial<Record<UnitBaseType, UnitStats>>,
-  nativeStats = buildUnitStatsMap(
-    system,
-    faction,
-    new Set(placements.upgradedTypes),
-  ),
+  placementStats: Partial<Record<UnitBaseType, UnitStats>>,
 ): {
   units: UnitIdList
   unitType: Record<string, UnitType>
-  unitState: Record<string, UnitState>
-  unitStats: Record<string, UnitStats>
   unitSurface: Record<string, SurfaceId>
 } {
   const surfacesById = new Map(surfaces.map(surface => [surface.id, surface]))
   let units = ''
   const unitType: Record<string, UnitType> = {}
-  const unitState: Record<string, UnitState> = {}
-  const unitStats: Record<string, UnitStats> = {}
   const unitSurface: Record<string, SurfaceId> = {}
 
-  for (const [surfaceKey, counts] of Object.entries(placements.counts)) {
+  for (const [surfaceKey, byType] of Object.entries(counts)) {
     const surface = surfacesById.get(surfaceKey as SurfaceId)
     if (!surface) throw new Error(`Unknown surface: ${surfaceKey}`)
 
     for (const baseType of UNIT_TYPES) {
-      const count = counts[baseType]
+      const count = byType[baseType]
       if (!count || count <= 0) continue
 
-      const stats = nativeStats[baseType]
+      const stats = placementStats[baseType]
       if (!stats) continue
-      const allowed =
-        placementStats?.[baseType]?.ALLOWED_SURFACES ??
-        stats.ALLOWED_SURFACES ??
-        DEFAULT_UNIT_SURFACES[baseType]
+      const allowed = stats.ALLOWED_SURFACES ?? DEFAULT_UNIT_SURFACES[baseType]
       if (!allowed.includes(surface.type)) {
         throw new Error(`${baseType} cannot be placed on ${surface.type}`)
       }
 
-      const ids = nextUnitIds(count, gen)
-      for (const id of ids) {
+      for (const id of nextUnitIds(count, gen)) {
         units += id
         unitType[id] = baseType as UnitType
         unitSurface[id] = surface.id
       }
-      unitStats[baseType] = stats
     }
   }
 
-  // Returns a packed UnitIdList — the caller places it into
-  // `participatingUnits` and lets `sortUnitsAtSetup` split out the
-  // non-participating tail. The shared `gen` carries the
-  // post-allocation counter so the caller can store it on the parent
-  // CombatStateData for runtime placements.
-  return {
-    units: units as UnitIdList,
-    unitType,
-    unitState,
-    unitStats,
-    unitSurface,
-  }
+  return { units: units as UnitIdList, unitType, unitSurface }
 }
 
 /**

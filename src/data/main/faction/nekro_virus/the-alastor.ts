@@ -19,10 +19,9 @@ export const theAlastor: Ability = {
       timing: 'START_OF_COMBAT',
       call: ctx => {
         const selected = ctx.api.own.system
-          .getUnits(undefined, { includeVariants: true })
+          .getUnits()
           .filter(id => ctx.api.own.isUnitCategory(id, 'GROUND_FORCES'))
-        ctx.api.own.setUnitCategory(selected, 'SHIPS', true)
-        ctx.api.own.setUnitParticipation(selected, true)
+        ctx.api.own.grantCategory(selected, 'SHIPS')
       },
     },
   ],

@@ -44,9 +44,7 @@ export const exotrireme: Ability<Params> = {
     const remaining = new Set(unitIds)
     const result: UnitId[] = []
     for (const variantId of ctx.utils.getFlat(params.sacrificePriority)) {
-      for (const id of ctx.api.own.participating.getUnits(variantId, {
-        includeVariants: false,
-      })) {
+      for (const id of ctx.api.own.participating.getUnits(variantId)) {
         if (remaining.has(id)) {
           result.push(id)
           remaining.delete(id)
@@ -65,7 +63,6 @@ export const exotrireme: Ability<Params> = {
         if (
           ctx.api.opponent.participating.findUnitByPriority(
             ctx.utils.getFlat(params.targetPriority),
-            { includeVariants: false },
           ) === undefined
         ) {
           return false
@@ -79,7 +76,7 @@ export const exotrireme: Ability<Params> = {
         const self = ctx.getUnit()
         const targets = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false, amount: 2 },
+          { amount: 2 },
         )
 
         if (targets.length > 0) ctx.api.opponent.destroyUnits(targets)

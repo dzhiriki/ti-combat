@@ -23,10 +23,10 @@ export function enforceFleetPool(api: SideApi): void {
   // the stats, independent of whether the CAPACITY enforcement toggle is on
   // (the toggle controls removal of illegal cargo, not how much capacity
   // the ships actually have).
-  const allTypes = api.participating.getUnitTypes()
+  const activeTypes = api.participating.getUnitTypes()
 
   let totalCapacity = 0
-  for (const baseType of allTypes) {
+  for (const baseType of activeTypes) {
     const stats = api.getUnitStats(baseType)
     if (!stats || stats.CAPACITY_COST != null) continue
     const cap = stats.CAPACITY
@@ -41,7 +41,7 @@ export function enforceFleetPool(api: SideApi): void {
   // share first (player-optimal: carried units that CAN spill into the
   // fleet pool yield the capacity to the ones that can't).
   let capacityUsedByNonFP = 0
-  for (const baseType of allTypes) {
+  for (const baseType of activeTypes) {
     if (freeCargo.has(baseType)) continue
     const stats = api.getUnitStats(baseType)
     if (
@@ -61,7 +61,6 @@ export function enforceFleetPool(api: SideApi): void {
 
   // Sum fleet pool cost across all units using FLEET_POOL_COST stat
   let totalCost = 0
-  const activeTypes = api.participating.getUnitTypes()
   for (const baseType of activeTypes) {
     const stats = api.getUnitStats(baseType)
     if (typeof stats?.FLEET_POOL_COST !== 'number') continue
@@ -106,15 +105,10 @@ export function enforceFleetPool(api: SideApi): void {
     const stats = api.getUnitStats(type)
     if (typeof stats?.FLEET_POOL_COST !== 'number') continue
     const cost = stats.FLEET_POOL_COST
-    const unitCount = api.participating.countUnits(type as UnitBaseType, {
+    for (const id of api.participating.getUnits(type as UnitBaseType, {
       includeVariants: true,
-    })
-    const toRemove = Math.min(Math.ceil(excess / cost), unitCount)
-    for (let i = 0; i < toRemove; i++) {
-      const id = api.participating.getUnits(type as UnitBaseType, {
-        includeVariants: true,
-      })[0]
-      if (!id) break
+    })) {
+      if (excess <= 0) break
       api.removeUnits(id)
       excess -= cost
     }

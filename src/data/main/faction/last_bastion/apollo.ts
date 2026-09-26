@@ -136,9 +136,7 @@ export const apollo: Ability<Params> = {
       isCallable: params => !!params.heroUnit,
       call: (ctx, params) => {
         const variantId = locatorWithSubtype(params.heroUnit!, HERO)
-        const [unitId] = ctx.api.own.system.getUnits(variantId, {
-          includeVariants: false,
-        })
+        const [unitId] = ctx.api.own.system.getUnits(variantId)
         ctx.api.own.removeSubtype(unitId, HERO)
       },
     },

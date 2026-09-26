@@ -44,7 +44,6 @@ export const gravleashManeuvers: Ability<Params> = {
 
         const target = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.shipPriority),
-          { includeVariants: false },
         )
         if (shipTypeCount <= 0 || target === undefined) return
         const variantKey = ctx.api.own.getUnitVariantKey(target)

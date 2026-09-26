@@ -248,7 +248,11 @@ describe('AFTER_DESTROY triggered by destroyUnits', () => {
         {
           timing: 'START_OF_COMBAT_ROUND',
           call: (ctx: AbilityCallContext) => {
-            ctx.api.opponent.destroyUnits('FIGHTER')
+            ctx.api.opponent.destroyUnits(
+              ctx.api.opponent.system.getUnits('FIGHTER', {
+                includeVariants: true,
+              })[0],
+            )
           },
         },
       ],
@@ -372,7 +376,11 @@ describe('AFTER_DESTROY triggered by destroyUnits', () => {
         {
           timing: 'START_OF_COMBAT_ROUND',
           call: (ctx: AbilityCallContext) => {
-            ctx.api.opponent.destroyUnits('FIGHTER')
+            ctx.api.opponent.destroyUnits(
+              ctx.api.opponent.system.getUnits('FIGHTER', {
+                includeVariants: true,
+              })[0],
+            )
           },
         },
       ],
@@ -390,7 +398,11 @@ describe('AFTER_DESTROY triggered by destroyUnits', () => {
           call: (ctx: AbilityCallContext) => {
             afterDestroyCalls.push('called')
             // From defender's FIGHTER perspective, own = defender side
-            ctx.api.own.destroyUnits('CRUISER')
+            ctx.api.own.destroyUnits(
+              ctx.api.own.system.getUnits('CRUISER', {
+                includeVariants: true,
+              })[0],
+            )
           },
         },
       ],

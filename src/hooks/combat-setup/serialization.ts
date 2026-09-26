@@ -2,26 +2,15 @@ import { isDeepEqual } from 'remeda'
 
 import type { GameSystem, SurfaceUnitCounts, UnitBaseType } from '@/types'
 
-export type SerializedUnits = Record<string, [number, 0 | 1]>
 export type SerializedSurfaceCounts = Record<string, Record<string, number>>
 
-interface SerializedCommon {
+/** Share-link config. Validation converts older (v1) links to this form. */
+export interface SerializedConfig {
+  v: 2
   g: GameSystem
   af: string
   df: string
   m: 'S' | 'G'
-  aa: Record<string, Record<string, unknown>>
-  da: Record<string, Record<string, unknown>>
-}
-
-export interface SerializedV1Config extends SerializedCommon {
-  v: 1
-  au: SerializedUnits
-  du: SerializedUnits
-}
-
-export interface SerializedV2Config extends SerializedCommon {
-  v: 2
   e: 'S' | 'F'
   p: string[]
   sp: string
@@ -29,9 +18,9 @@ export interface SerializedV2Config extends SerializedCommon {
   dsu: SerializedSurfaceCounts
   aup: UnitBaseType[]
   dup: UnitBaseType[]
+  aa: Record<string, Record<string, unknown>>
+  da: Record<string, Record<string, unknown>>
 }
-
-export type SerializedConfig = SerializedV1Config | SerializedV2Config
 
 export function serializeSurfaceCounts(
   counts: SurfaceUnitCounts,

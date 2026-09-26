@@ -54,24 +54,20 @@ export const impulseCore: Ability<Params> = {
       isCallable: (params, ctx) => {
         const sacrifice = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.sacrificePriority),
-          { includeVariants: false },
         )
         if (sacrifice === undefined) return false
         return (
           ctx.api.opponent.participating.findUnitByPriority(
             ctx.utils.getFlat(params.targetPriority),
-            { includeVariants: false },
           ) !== undefined
         )
       },
       call: (ctx, params) => {
         const sacrifice = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.sacrificePriority),
-          { includeVariants: false },
         )
         const target = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false },
         )
         if (!sacrifice || !target) return
 

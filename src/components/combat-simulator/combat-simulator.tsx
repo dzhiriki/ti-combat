@@ -7,7 +7,6 @@ import {
 import { clsx } from 'clsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import type { CombatOutcome, SurvivorSide } from '@/combat'
 import { CombatSideState } from '@/combat/combat-side-state/combat-side-state'
 import {
   AbilitiesPanel,
@@ -189,35 +188,6 @@ export function CombatSimulator({
 
   const { outcomes, isComputing } = useSimulation(inputWithPrecision)
 
-  const displayOutcomes = useMemo(() => {
-    if (!outcomes || editorMode === 'FULL') return outcomes
-    const spaceId = surfaces.find(surface => surface.type === 'SPACE')?.id
-    const visible = [spaceId, selectedPlanetId].filter(
-      (id): id is NonNullable<typeof id> => id !== undefined,
-    )
-    const aggregate = (
-      bySurface: CombatOutcome['attackerSurfaces'],
-      fallback: SurvivorSide,
-    ): SurvivorSide => {
-      if (!bySurface) return fallback
-      const result: SurvivorSide = {}
-      for (const surfaceId of visible) {
-        for (const [type, units] of Object.entries(
-          bySurface[surfaceId] ?? {},
-        )) {
-          if (!units) continue
-          result[type] = [...(result[type] ?? []), ...units]
-        }
-      }
-      return result
-    }
-    return outcomes.map(outcome => ({
-      ...outcome,
-      attacker: aggregate(outcome.attackerSurfaces, outcome.attacker),
-      defender: aggregate(outcome.defenderSurfaces, outcome.defender),
-    }))
-  }, [editorMode, outcomes, selectedPlanetId, surfaces])
-
   const unitPriority = useMemo(() => {
     const key =
       combatMode === 'GROUND' ? 'groundUnitPriority' : 'spaceUnitPriority'
@@ -234,7 +204,10 @@ export function CombatSimulator({
 
   const participatingTypes = useMemo(() => {
     const read = (side: 'attacker' | 'defender'): string[] =>
-      CombatSideState.getParticipationOptionTypes(stateData[side], combatMode)
+      CombatSideState.getCategoryOptionTypes(
+        stateData[side],
+        combatMode === 'GROUND' ? 'GROUND_FORCES' : 'SHIPS',
+      )
     return { attacker: read('attacker'), defender: read('defender') }
     // oxlint-disable-next-line react/exhaustive-deps
   }, [stateData])
@@ -396,7 +369,7 @@ export function CombatSimulator({
           attackerConfig={attackerConfig}
           defenderConfig={defenderConfig}
           combatResult={combatResult}
-          outcomes={displayOutcomes}
+          outcomes={outcomes}
           unitPriority={unitPriority}
           participatingTypes={participatingTypes}
           isComputing={isComputing}

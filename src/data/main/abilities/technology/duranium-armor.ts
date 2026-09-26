@@ -97,9 +97,7 @@ function findRepairTarget(
     : params.spaceRepairPriority
 
   for (const [variantId] of priority) {
-    for (const unitId of ctx.api.own.participating.getUnits(variantId, {
-      includeVariants: false,
-    })) {
+    for (const unitId of ctx.api.own.participating.getUnits(variantId)) {
       const state = ctx.api.own.getUnitState(unitId)
       if (!state?.isDamaged) continue
       if (state.usedSustainThisRound) continue

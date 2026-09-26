@@ -82,10 +82,8 @@ export const proximaTargetingVi: Ability<Params> = {
 
 /** "Galvanized units present" on the active planet. */
 function countGalvanizedUnits(ctx: AbilityReadContext): number {
-  return ctx.api.own.surface
-    .getUnits(undefined, { includeVariants: true })
-    .filter(id => {
-      const key = ctx.api.own.getUnitVariantKey(id)
-      return key && parseUnitLocator(key).subtypes.includes(GALVANIZED)
-    }).length
+  return ctx.api.own.surface.getUnits().filter(id => {
+    const key = ctx.api.own.getUnitVariantKey(id)
+    return key && parseUnitLocator(key).subtypes.includes(GALVANIZED)
+  }).length
 }

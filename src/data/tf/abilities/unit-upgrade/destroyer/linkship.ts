@@ -14,19 +14,14 @@ function isEligible(ctx: AbilityReadContext, id: UnitId): boolean {
   if (!stats?.UNIT_ABILITIES?.SUSTAIN_DAMAGE) return true
   const variantKey = ctx.api.opponent.getUnitVariantKey(id)
   if (!variantKey) return false
-  return (
-    ctx.api.opponent.isUnitAbilityLost('SUSTAIN_DAMAGE', id) ||
-    ctx.api.opponent.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', id)
-  )
+  return ctx.api.opponent.isUnitAbilityDisabled('SUSTAIN_DAMAGE', id)
 }
 
 // The highest-worth eligible opponent ship (the best thing to pick off).
 function bestTarget(ctx: AbilityReadContext): UnitId | undefined {
   let best: UnitId | undefined
   let bestWorth = -1
-  for (const id of ctx.api.opponent.participating.getUnits(undefined, {
-    includeVariants: true,
-  })) {
+  for (const id of ctx.api.opponent.participating.getUnits()) {
     if (!isEligible(ctx, id)) continue
     const baseType = ctx.api.opponent.getUnitBaseType(id)
     const worth = baseType ? (UNIT_WORTH[baseType] ?? 0) : 0

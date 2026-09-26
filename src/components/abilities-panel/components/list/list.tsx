@@ -16,6 +16,7 @@ import { DragHandleDots2Icon, LockClosedIcon } from '@radix-ui/react-icons'
 import { clsx } from 'clsx'
 import { useMemo } from 'react'
 
+import type { SurfaceOptionMeta } from '@/combat/abilities-engine/types'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 
@@ -25,14 +26,11 @@ import { keepHiddenEntries } from './keep-hidden-entries'
 
 import styles from './list.module.css'
 
-export interface ListItem {
+export interface ListItem extends SurfaceOptionMeta {
   label: string
   value: string
   max?: number
   stable?: boolean
-  surfaceId?: string
-  surfaceName?: string
-  surfaceOrder?: number
 }
 
 interface CommonProps {

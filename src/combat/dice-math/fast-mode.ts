@@ -285,7 +285,7 @@ function emitPools(
       pool.custom.push({
         key: meta,
         base: hits,
-        unitPriority: [...unitAbilityPriority],
+        unitPriority: unitAbilityPriority,
       })
     } else {
       pool.base += hits

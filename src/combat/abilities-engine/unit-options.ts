@@ -1,11 +1,12 @@
 import { DEFAULT_UNIT_SURFACES } from '@/constants/units'
-import type {
-  CombatSide,
-  SurfaceDefinition,
-  SurfaceId,
-  UnitBaseType,
-  UnitId,
-  UnitType,
+import {
+  type CombatSide,
+  SPACE_SURFACE_ID,
+  type SurfaceDefinition,
+  type SurfaceId,
+  type UnitBaseType,
+  type UnitId,
+  type UnitType,
 } from '@/types'
 
 import {
@@ -52,7 +53,7 @@ export function resolveUnitOptions(
   const sorted = sortBaseTypes(types, spec.sort ?? 'normal-asc')
   const subtypes = spec.filter?.includeOnlyBaseTypes
     ? []
-    : filterDeclaredSubtypes(s.declaredSubtypes ?? [], spec.filter)
+    : filterDeclaredSubtypes(s.optionMetadata?.subtypes ?? [], spec.filter)
   const variants = applyVariantPostFilter(
     expandWithSubtypes(sorted, subtypes, spec.sort),
     spec.filter,
@@ -97,22 +98,17 @@ export function resolveUnitOptions(
     return result
   }
   const participatingTypes = typesOf(category)
-  const changes = s.unitCategoryChanges ?? []
+  const changes = s.optionMetadata?.changes ?? []
   const matchesChange = (base: UnitBaseType, change: ParamChange) => {
     return (
       change.key === category &&
       (change.value === base ||
-        (change.value in (s.unitCategoryOptions ?? {}) &&
+        (change.value in (s.optionMetadata?.categories ?? {}) &&
           typesOf(
             change.value as 'SHIPS' | 'GROUND_FORCES' | 'STRUCTURES',
           ).includes(base)))
     )
   }
-  const spaceSurfaces = new Set(
-    surfaces
-      .filter(surface => surface.type === 'SPACE')
-      .map(surface => surface.id),
-  )
   const alive = [
     ...s.participatingUnits,
     ...s.nonParticipatingUnits,
@@ -137,12 +133,9 @@ export function resolveUnitOptions(
       add(surface, base, id)
       continue
     }
-    const grant = s.unitCombat?.[id]?.participating
-    if (grant === false) continue
     const participates = participatingTypes.includes(base)
-    if (grant === true || (active.has(surface) && participates))
-      add(surface, base, id)
-    const inSpace = spaceSurfaces.has(surface)
+    if (active.has(surface) && participates) add(surface, base, id)
+    const inSpace = surface === SPACE_SURFACE_ID
     if (
       mode === 'GROUND' &&
       context.side === 'attacker' &&
@@ -213,58 +206,4 @@ export function resolveUnitOptions(
     })
   }
   return items
-}
-
-type UnitTargetEntry = string | readonly [string, ...unknown[]]
-
-const entryKey = (entry: UnitTargetEntry) =>
-  typeof entry === 'string' ? entry : entry[0]
-
-const copyEntry = (entry: UnitTargetEntry): string | [string, ...unknown[]] =>
-  typeof entry === 'string' ? entry : [...entry]
-
-/** Expand legacy settings once, without multiplying a numeric total. */
-export function expandLegacyUnitTargets(
-  current: readonly UnitTargetEntry[],
-  options: readonly UnitOption[],
-  s: SideStateData,
-): (string | [string, ...unknown[]])[] {
-  const qualified = new Set(
-    current.map(entryKey).filter(key => key.startsWith('@')),
-  )
-  return current.flatMap(entry => {
-    const key = entryKey(entry)
-    if (key.startsWith('@')) return [copyEntry(entry)]
-    const candidates = options.filter(option => {
-      const { unitType, surfaceId } = parseUnitLocator(option.value)
-      return (
-        surfaceId !== undefined &&
-        unitType === key &&
-        !qualified.has(option.value)
-      )
-    })
-    if (!candidates.length) return [copyEntry(entry)]
-    const value = typeof entry === 'string' ? undefined : entry[1]
-    if (typeof value !== 'number')
-      return candidates.map(option =>
-        typeof entry === 'string'
-          ? option.value
-          : ([option.value, ...entry.slice(1)] as [string, ...unknown[]]),
-      )
-    // Match the old system query's participating-first traversal.
-    const surfaceOrder = [...s.participatingUnits, ...s.nonParticipatingUnits]
-      .filter(id => s.unitType[id] === key)
-      .map(id => s.unitSurface[id])
-    const ordered = [...candidates].sort((a, b) => {
-      const ai = surfaceOrder.indexOf(a.surfaceId!),
-        bi = surfaceOrder.indexOf(b.surfaceId!)
-      return (ai < 0 ? Infinity : ai) - (bi < 0 ? Infinity : bi)
-    })
-    let remaining = value
-    return ordered.map(option => {
-      const count = Math.min(remaining, option.max ?? Infinity)
-      remaining -= count
-      return [option.value, count] as [string, number]
-    })
-  })
 }

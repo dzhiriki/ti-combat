@@ -1,1 +1,1 @@
-export { UnitControls } from './unit-controls'
+export { UnitControls, type UnitControlsProps } from './unit-controls'

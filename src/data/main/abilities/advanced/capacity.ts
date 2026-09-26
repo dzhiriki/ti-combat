@@ -169,9 +169,7 @@ function enforceCapacity(
     if (!stats || stats.CAPACITY_COST == null) continue
 
     while (excess > 0) {
-      const units = api.surface.getUnits(priorityType, {
-        includeVariants: false,
-      })
+      const units = api.surface.getUnits(priorityType)
       if (units.length === 0) break
       api.removeUnits(units[0])
       excess -= stats.CAPACITY_COST

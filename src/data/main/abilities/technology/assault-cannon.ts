@@ -33,7 +33,7 @@ export const assaultCannon: Ability<Params> = {
       timing: 'START_OF_COMBAT',
       isCallable: (_, ctx) => {
         const nonFighterShips = ctx.api.own.participating
-          .getUnits(undefined, { includeVariants: true })
+          .getUnits()
           .filter(id => ctx.api.own.getUnitBaseType(id) !== 'FIGHTER')
         return nonFighterShips.length >= 3
       },
@@ -41,7 +41,6 @@ export const assaultCannon: Ability<Params> = {
         const target = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
           {
-            includeVariants: false,
             predicate: (_variant, id) =>
               ctx.api.opponent.getUnitBaseType(id) !== 'FIGHTER',
           },

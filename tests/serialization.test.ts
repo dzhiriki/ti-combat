@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
+import { makeUnitLocator } from '@/combat/utils/unit-locator'
 import { CombatSetup } from '@/hooks/combat-setup'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
 import { validateSerializedConfig } from '@/hooks/combat-setup/validation'
@@ -8,6 +9,7 @@ import {
   configToSearchString,
   searchParamsToConfig,
 } from '@/hooks/use-url-sync'
+import { SPACE_SURFACE_ID } from '@/types'
 
 describe('toSerializedConfig', () => {
   it('returns version 2', () => {
@@ -176,9 +178,10 @@ describe('loadConfig', () => {
 
   it('preserves URL-loaded UNIT_PRIORITY order through final reconcile', () => {
     // Reproduces the URL-restore path: spaceUnitPriority arrives as a flat
-    // `string[]` (order-mode lists round-trip without per-key values), and
-    // the reconcile pass that runs after loadConfig must preserve it
-    // instead of clobbering it with the auto-synced default order.
+    // `string[]` of surface-qualified keys (order-mode lists round-trip
+    // without per-key values), and the reconcile pass that runs after
+    // loadConfig must preserve it instead of clobbering it with the
+    // auto-synced default order.
     const setup = new CombatSetup()
     setup.setUnitCount('attacker', 'FIGHTER', 1)
     setup.setUnitCount('attacker', 'DESTROYER', 1)
@@ -189,7 +192,12 @@ describe('loadConfig', () => {
       ...base,
       da: {
         ...base.da,
-        UNIT_PRIORITY: { spaceUnitPriority: ['DESTROYER', 'FIGHTER'] },
+        UNIT_PRIORITY: {
+          spaceUnitPriority: [
+            makeUnitLocator('DESTROYER', SPACE_SURFACE_ID),
+            makeUnitLocator('FIGHTER', SPACE_SURFACE_ID),
+          ],
+        },
       },
     }
     setup.loadConfig(config)
@@ -205,13 +213,18 @@ describe('loadConfig', () => {
   it('resets to default for absent abilities', () => {
     const setup = new CombatSetup()
     const config: SerializedConfig = {
-      v: 1,
+      v: 2,
       g: 'TI4',
       af: setup.attackerFaction,
       df: setup.defenderFaction,
       m: 'S',
-      au: {},
-      du: {},
+      e: 'S',
+      p: ['planet-1'],
+      sp: 'planet-1',
+      asu: {},
+      dsu: {},
+      aup: [],
+      dup: [],
       aa: {},
       da: {},
     }
@@ -221,17 +234,16 @@ describe('loadConfig', () => {
     expect(setup.abilities.attacker['UNIT_PRIORITY']).toBeDefined()
   })
 
-  it('migrates legacy Starlancer ground counts into planet placement', () => {
+  it('loads legacy flat counts as simplified placements', () => {
     const raw = searchParamsToConfig(
-      '?v=1&g=TF&af=IL_NA_VIROSET&df=AVARICE_REX&m=S' +
-        '&au.MECH=2.0&du.CRUISER=1.0' +
-        '&aa.TF_STARLANCER_XI.mechsOnGround=1',
+      '?v=1&g=TI4&af=ARBOREC&df=ARBOREC&m=G&au.INFANTRY=2.1&du.PDS=1.0',
     )
-    const setup = new CombatSetup()
+    const setup = new CombatSetup('FULL')
     setup.loadConfig(validateSerializedConfig(raw).config)
-    setup.setEditorMode('FULL')
 
-    expect(setup.surfaceSelections.attacker.space.MECH.count).toBe(1)
-    expect(setup.surfaceSelections.attacker['planet-1'].MECH.count).toBe(1)
+    expect(setup.editorMode).toBe('SIMPLIFIED')
+    expect(setup.isUpgraded('attacker', 'INFANTRY')).toBe(true)
+    expect(setup.surfaceSelections.attacker['planet-1'].INFANTRY.count).toBe(2)
+    expect(setup.surfaceSelections.defender['planet-1'].PDS.count).toBe(1)
   })
 })

@@ -1,11 +1,7 @@
 import { UNIT_CATEGORIES, type UnitCategory } from '@/constants/units'
-import type { UnitId, UnitType } from '@/types'
+import type { SurfaceId, UnitId, UnitLocator, UnitType } from '@/types'
 
-import type {
-  CombatMode,
-  SideStateData,
-  UnitTargetFilter,
-} from '../combat-state/types'
+import type { CombatMode, SideStateData } from '../combat-state/types'
 import { parseUnitLocator } from './parse-unit-locator'
 import { resolveUnitStats } from './resolve-unit-stats'
 import { matchesUnitLocator } from './unit-locator'
@@ -31,8 +27,7 @@ export function isUnitCategory(
   const type = side.unitType[id]
   if (!type) return false
   return (
-    side.unitCombat?.[id]?.categories?.[category] ??
-    isNativeCategory(side, type, category)
+    side.unitGrants?.[id] === category || isNativeCategory(side, type, category)
   )
 }
 
@@ -42,75 +37,85 @@ export function participatesInCombat(
   mode: CombatMode,
   activeSurfaceId: string,
 ): boolean {
-  const explicit = side.unitCombat?.[id]?.participating
-  if (explicit !== undefined) return explicit
   const type = side.unitType[id]
   if (!type) return false
+  const category = mode === 'SPACE' ? 'SHIPS' : 'GROUND_FORCES'
   return (
-    side.unitSurface[id] === activeSurfaceId &&
-    isNativeCategory(side, type, mode === 'SPACE' ? 'SHIPS' : 'GROUND_FORCES')
+    side.unitGrants?.[id] === category ||
+    (side.unitSurface[id] === activeSurfaceId &&
+      isNativeCategory(side, type, category))
   )
 }
 
-export function matchesTargetFilter(
+/** Whether `id` may take a hit from a pool restricted to `targets`
+ *  (`HitPool.unitAbilityTargets`); any unit may when there are none. */
+export function isUnitAbilityTarget(
   side: SideStateData,
   id: UnitId,
-  filter?: UnitTargetFilter,
+  targets: readonly UnitLocator[] | undefined,
 ): boolean {
-  if (!filter) return true
+  if (!targets) return true
   const type = side.unitType[id]
-  if (!type) return false
-  if (
-    filter.types &&
-    !filter.types.some(t => matchesUnitLocator(side, id, t, true))
+  return (
+    !!type &&
+    targets.some(t => matchesUnitLocator(side, id, t, true)) &&
+    !resolveUnitStats(side.unitStats, type)?.UNIT_ABILITY_HIT_IMMUNE
   )
-    return false
-  if (filter.excludeTypes?.some(t => matchesUnitLocator(side, id, t, true)))
-    return false
-  if (
-    filter.unitAbility &&
-    resolveUnitStats(side.unitStats, type)?.UNIT_ABILITY_HIT_IMMUNE
-  )
-    return false
-  return true
-}
-
-/** Stable signature also distinguishes explicit defaults from inherited ones. */
-export function unitCombatSignature(side: SideStateData, id: string): string {
-  const value = side.unitCombat?.[id]
-  if (!value) return ''
-  return `${value.participating ?? ''}:${value.returnAfterCombat ?? ''}:${JSON.stringify(Object.entries(value.categories ?? {}).sort(([a], [b]) => a.localeCompare(b)))}`
 }
 
 const categoryHashes = new WeakMap<SideStateData['unitStats'], string>()
-const overrideHashes = new WeakMap<
-  NonNullable<SideStateData['unitCombat']>,
-  string
->()
 
-/** State-hash segment for native categories and instance grants: '' when
- *  neither is present, else `#native&explicit`. Cached on the side with
- *  the two copy-on-write inputs it was built from, so the hot path is two
+/** State-hash segment for unit location, native categories and instance
+ *  grants: '' when every unit (destroyed ones included) stands on the active
+ *  surface and none of the others apply. Cached on the side with the
+ *  copy-on-write inputs it was built from, so the hot path is a few
  *  reference checks and branch clones share the entry. */
-export function unitCombatHash(side: SideStateData): string {
-  const cached = side._unitCombatHash
+export function unitMetaHash(
+  side: SideStateData,
+  activeSurfaceId: SurfaceId,
+): string {
+  const cached = side._metaHash
   if (
     cached !== undefined &&
+    cached.unitSurface === side.unitSurface &&
     cached.unitStats === side.unitStats &&
-    cached.unitCombat === side.unitCombat
+    cached.unitGrants === side.unitGrants &&
+    cached.activeSurfaceId === activeSurfaceId
   ) {
     return cached.value
   }
-  const value = buildUnitCombatHash(side)
-  side._unitCombatHash = {
+  const value =
+    locationHash(side.unitSurface, activeSurfaceId) + categoryHash(side)
+  side._metaHash = {
+    unitSurface: side.unitSurface,
     unitStats: side.unitStats,
-    unitCombat: side.unitCombat,
+    unitGrants: side.unitGrants,
+    activeSurfaceId,
     value,
   }
   return value
 }
 
-function buildUnitCombatHash(side: SideStateData): string {
+/** `@surface=ids,…` for every unit off the active surface, else ''. */
+function locationHash(
+  unitSurface: SideStateData['unitSurface'],
+  activeSurfaceId: SurfaceId,
+): string {
+  const bySurface: Record<string, string[]> = {}
+  for (const id in unitSurface) {
+    const surfaceId = unitSurface[id]
+    if (surfaceId !== activeSurfaceId) (bySurface[surfaceId] ??= []).push(id)
+  }
+  let hash = ''
+  for (const surfaceId of Object.keys(bySurface).sort()) {
+    hash += `${surfaceId}=${bySurface[surfaceId].sort().join('')},`
+  }
+  return hash && `@${hash}`
+}
+
+/** `#native&grants` when a stats entry declares categories (or hit
+ *  immunity) or a unit holds a grant, else ''. */
+function categoryHash(side: SideStateData): string {
   let native = categoryHashes.get(side.unitStats)
   if (native === undefined) {
     native = Object.keys(side.unitStats)
@@ -126,16 +131,10 @@ function buildUnitCombatHash(side: SideStateData): string {
       .join(';')
     categoryHashes.set(side.unitStats, native)
   }
-  const overrides = side.unitCombat
-  if (!overrides) return native ? `#${native}&` : ''
-  let explicit = overrideHashes.get(overrides)
-  if (explicit === undefined) {
-    explicit = Object.keys(overrides)
-      .sort()
-      .map(id => `${id}:${unitCombatSignature(side, id)}`)
-      .join(';')
-    overrideHashes.set(overrides, explicit)
+  let grants = ''
+  if (side.unitGrants) {
+    for (const id of Object.keys(side.unitGrants).sort())
+      grants += `${id}${side.unitGrants[id]};`
   }
-  // An empty grant map behaves exactly like none, so both hash as ''.
-  return native || explicit ? `#${native}&${explicit}` : ''
+  return native || grants ? `#${native}&${grants}` : ''
 }

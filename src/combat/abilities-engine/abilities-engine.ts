@@ -26,7 +26,6 @@ import {
   type AbilityBranch,
   AbilityBranchInterrupt,
   AbilityContext,
-  withRunningAbility,
 } from './api/ability-api'
 import { hasStaticInvokes, resolveInvokes } from './resolve-invokes'
 import { createRuntimeAbilityList } from './runtime-ability-list'
@@ -984,28 +983,16 @@ export class AbilitiesEngine {
 
       if (sideTracker.has(entry.trackerKey)) continue
 
-      if (source.type === 'deploy') {
-        if (
-          CombatSideState.isRestricted(
-            state,
-            side,
-            'lost',
-            'DEPLOY',
-            source.unitType,
-          )
+      if (
+        source.type === 'deploy' &&
+        CombatSideState.isUnitAbilityDisabled(
+          state,
+          side,
+          'DEPLOY',
+          source.unitType,
         )
-          continue
-        if (
-          CombatSideState.isRestricted(
-            state,
-            side,
-            'cannotBeUsed',
-            'DEPLOY',
-            source.unitType,
-          )
-        )
-          continue
-      }
+      )
+        continue
 
       const liveOverlay = state[side].liveAbilities[ability.key]
       const override = (
@@ -1057,22 +1044,11 @@ export class AbilitiesEngine {
         source.type === 'unit' &&
         UNIT_ABILITY_KEYS.has(ability.key)
       ) {
-        const unitAbility = ability.key as UnitAbility
-        canCall = !(
-          CombatSideState.isRestricted(
-            state,
-            side,
-            'lost',
-            unitAbility,
-            source.unitId,
-          ) ||
-          CombatSideState.isRestricted(
-            state,
-            side,
-            'cannotBeUsed',
-            unitAbility,
-            source.unitId,
-          )
+        canCall = !CombatSideState.isUnitAbilityDisabled(
+          state,
+          side,
+          ability.key as UnitAbility,
+          source.unitId,
         )
       }
 
@@ -1476,34 +1452,6 @@ export class AbilitiesEngine {
   hasDynamicInvokes(side: CombatSide, key: string): boolean {
     const ability = this.abilityForKey(side, key)
     return ability !== undefined && !hasStaticInvokes(ability)
-  }
-
-  invokeOnParamSet(
-    side: CombatSide,
-    targetKey: string,
-    changedKeys: string[],
-    draft: CombatStateData,
-  ): void {
-    const ability = this.abilityForKey(side, targetKey)
-    if (!ability?.onParamSet) return
-    // Give onParamSet a mutable merged view. Capture any mutations via a
-    // before/after diff and persist them in liveAbilities
-    // so subsequent reads see the derived values.
-    const params = { ...CombatSideState.getLiveParams(draft[side], targetKey) }
-    const before = { ...params }
-    const ctx = this.context(side)
-    withRunningAbility(ctx, ability, () => {
-      for (const key of changedKeys) {
-        ability.onParamSet!(params, key, params[key], ctx)
-      }
-    })
-    let liveEntry: Record<string, unknown> | undefined
-    for (const key of Object.keys(params)) {
-      if (params[key] !== before[key]) {
-        if (!liveEntry) liveEntry = cowLiveAbilityEntry(draft, side, targetKey)
-        liveEntry[key] = params[key]
-      }
-    }
   }
 
   /** Resolve invoke entries for `timing` on `side`, scoped to `phase`.

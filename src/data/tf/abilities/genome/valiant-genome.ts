@@ -130,7 +130,7 @@ export const valiantGenome: Ability<Params> = {
         )
         if (destroyed.length === 0) return false
 
-        const targets = ctx.api.opponent.participating.getAssignHitsTargets(1)
+        const targets = ctx.api.opponent.getAssignHitsTargets(1)
         if (targets.length === 0) return false
         return targets.every(targetId =>
           ctx.api.opponent.matchesUnitList(targetId, params[targetsKey]),
@@ -157,8 +157,7 @@ export const valiantGenome: Ability<Params> = {
 
         ctx.rollDice([[hitValue, 1]], (branchCtx, hits) => {
           if (hits[0] === 0) return
-          const targets =
-            branchCtx.api.opponent.participating.getAssignHitsTargets(hits[0])
+          const targets = branchCtx.api.opponent.getAssignHitsTargets(hits[0])
           branchCtx.api.opponent.destroyUnits(targets)
         })
       },

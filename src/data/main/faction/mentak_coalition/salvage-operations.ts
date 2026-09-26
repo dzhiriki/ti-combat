@@ -64,12 +64,7 @@ export const salvageOperations: Ability<Params> = {
       timing: 'END_OF_COMBAT',
       isCallable: (params, ctx) => {
         if (params._destroyedShipTypes.length === 0) return false
-        if (
-          ctx.api.own.participating.countUnits(undefined, {
-            includeVariants: true,
-          }) === 0
-        )
-          return false
+        if (ctx.api.own.participating.countUnits() === 0) return false
 
         const destroyed = new Set<UnitBaseType>(params._destroyedShipTypes)
         return ctx.utils

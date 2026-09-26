@@ -473,16 +473,18 @@ describe('surface-aware unit settings', () => {
     ).toContain(target('FIGHTER', P1))
   })
 
-  it('expands legacy counts once and preserves custom qualified choices through URL loading', () => {
+  it('preserves custom qualified choices through URL loading', () => {
     const setup = setupWithAlastor()
     setup.setAbilityParam('attacker', 'PRE_GALVANIZED', {
-      galvanizedUnits: [['INFANTRY', 3]],
+      galvanizedUnits: [
+        [target('INFANTRY', SPACE), 2],
+        [target('INFANTRY', P1), 1],
+      ],
     })
     const counts = setup.abilities.attacker.PRE_GALVANIZED.galvanizedUnits as [
       UnitLocator,
       number,
     ][]
-    expect(counts.reduce((sum, [, count]) => sum + count, 0)).toBe(3)
     expect(new Map(counts).get(target('INFANTRY', SPACE))).toBe(2)
     expect(new Map(counts).get(target('INFANTRY', P1))).toBe(1)
     setup.setAbilityParam('attacker', 'UNIT_PRIORITY', {
@@ -748,16 +750,8 @@ describe('surface-aware unit settings', () => {
     ).toEqual([head])
   })
 
-  it('drops removed surfaces and keeps reinforcement choices type-only', () => {
+  it('keeps reinforcement choices type-only', () => {
     const setup = setupWithAlastor()
-    for (const type of ['INFANTRY', 'MECH', 'PDS'] as const)
-      setup.setSurfaceUnitCount('attacker', P2, type, 0)
-    setup.removePlanet(P2)
-    expect(
-      options(setup, 'UNIT_PRIORITY', 'spaceUnitPriority').some(
-        item => item.surfaceId === P2,
-      ),
-    ).toBe(false)
     setup.setFaction('attacker', 'COUNCIL_KELERES')
     expect(
       options(setup, 'OVERWING_ZETA', 'ships').every(

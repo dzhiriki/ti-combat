@@ -165,23 +165,6 @@ describe('surface editor conversion', () => {
     expect(restored.surfaceSelections.defender[PLANET_1].INFANTRY.count).toBe(2)
     expect(restored.surfaceSelections.defender[PLANET_2].MECH.count).toBe(1)
   })
-
-  it('retains one planet and removes only empty additional planets', () => {
-    const setup = new CombatSetup('FULL')
-    setup.removePlanet(PLANET_1)
-    expect(
-      setup.surfaces.filter(surface => surface.type === 'PLANET'),
-    ).toHaveLength(1)
-
-    setup.addPlanet()
-    setup.setSurfaceUnitCount('attacker', PLANET_2, 'INFANTRY', 1)
-    setup.removePlanet(PLANET_2)
-    expect(setup.surfaces.some(surface => surface.id === PLANET_2)).toBe(true)
-
-    setup.setSurfaceUnitCount('attacker', PLANET_2, 'INFANTRY', 0)
-    setup.removePlanet(PLANET_2)
-    expect(setup.surfaces.some(surface => surface.id === PLANET_2)).toBe(false)
-  })
 })
 
 describe('surface combat behavior', () => {
@@ -410,10 +393,9 @@ describe('surface combat behavior', () => {
     expect(() =>
       CombatSideState.placeUnits(
         normal.data.attacker,
-        'SPACE',
+        normal.data,
         { PDS: 1 },
         SPACE_SURFACE_ID,
-        normal.data,
       ),
     ).toThrow('PDS cannot be placed on SPACE')
 
@@ -427,10 +409,9 @@ describe('surface combat behavior', () => {
     })
     CombatSideState.placeUnits(
       saar.data.attacker,
-      'SPACE',
+      saar.data,
       { SPACE_DOCK: 1 },
       SPACE_SURFACE_ID,
-      saar.data,
     )
     expect(
       getSurfaceUnitIds(saar.data.attacker, SPACE_SURFACE_ID),

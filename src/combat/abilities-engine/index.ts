@@ -10,12 +10,7 @@ export {
 export {
   type AbilityBranch,
   AbilityBranchInterrupt,
-  type FindUnitOptions,
-  type FindUnitsOptions,
-  type ParticipatingUnitQueryApi,
   type SideApi,
-  type UnitQueryApi,
-  type UnitQueryOptions,
   withRunningAbility,
 } from './api/ability-api'
 export { abilityUtils } from './api/ability-utils'
@@ -44,6 +39,4 @@ export type {
   SyncSortSpec,
   SyncSourceConfig,
   UnitListMode,
-  UnitOption,
-  UnitSelectorScope,
 } from './types'

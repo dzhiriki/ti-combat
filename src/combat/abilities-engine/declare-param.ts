@@ -1,5 +1,4 @@
 import type { UnitCategory } from '@/constants/units'
-import type { UnitBaseType } from '@/types'
 
 import type { ParamLimit } from './param-limit'
 import type {
@@ -28,7 +27,6 @@ interface DeclaredParamOptions<T> {
    *  parent is present, falling back to this only when there is no
    *  parent. Omit for order-mode lists (single-element tuples). */
   defaultItemValue?: unknown
-  compute?: (value: UnitBaseType[]) => T
   /** Variant-list filter. Same shape as `getUnitVariantsOptions`'s filter
    *  argument — reconcile applies it to the synced valid list, and
    *  `getUnitVariantsOptions(paramKey)` reuses it to render the matching UI
@@ -49,26 +47,13 @@ interface DeclaredParamOptions<T> {
   limit?: ParamLimit
 }
 
-export interface DeclaredParamValue<T> {
+export interface DeclaredParamValue<T> extends Omit<
+  SyncSourceConfig,
+  'key' | 'source'
+> {
   [DECLARED_PARAM]: true
   default: T
-  scope: UnitSelectorScope
-  source?: UnitCategory | readonly UnitCategory[]
-  side: 'own' | 'opponent'
-  sort: SyncSortSpec
-  defaultItemValue?: unknown
-  compute?: (value: UnitBaseType[]) => T
-  filter?: ParamFilter
-  /** Per-variant cap for `UnitList<number, V>` params.
-   *  - `'UNIT_LIMIT'` caps at `UNIT_LIMITS[baseType]`.
-   *  - `'IN_COMBAT'` caps at the count of all units of the same base type on
-   *    the side (participating + non-participating, subtypes pooled with
-   *    their base).
-   *  - `'EXTRA'` caps at the remaining reinforcement headroom
-   *    (`UNIT_LIMITS[baseType] - IN_COMBAT`, never below 0).
-   *  Surfaces in the UI as `items[].max` and clamps stored values during
-   *  reconcile. Ignored for non-`UnitList<number>` shapes. */
-  limit?: ParamLimit
+  source?: SyncSourceConfig['source']
 }
 
 /**
@@ -84,7 +69,6 @@ export function declareParam<T>(options: DeclaredParamOptions<T>): T {
     side: options.side ?? 'own',
     sort: options.sort ?? 'worth-asc',
     defaultItemValue: options.defaultItemValue,
-    compute: options.compute,
     filter: options.filter,
     limit: options.limit,
   } as unknown as T
@@ -139,7 +123,6 @@ export function extractSyncSources(
         side: value.side,
         sort: value.sort,
         defaultItemValue: value.defaultItemValue,
-        compute: value.compute,
         filter: value.filter,
         limit: value.limit,
       })

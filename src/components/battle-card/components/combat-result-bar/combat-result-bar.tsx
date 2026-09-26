@@ -24,7 +24,6 @@ interface CombatResultBarProps {
   outcomes: CombatOutcome[] | null
   unitPriority: UnitPriority
   participatingTypes: UnitPriority
-  showSurfaces?: boolean
   surfaces?: readonly SurfaceDefinition[]
   isComputing?: boolean
 }
@@ -34,7 +33,6 @@ export function CombatResultBar({
   outcomes,
   unitPriority,
   participatingTypes,
-  showSurfaces,
   surfaces,
   isComputing,
 }: CombatResultBarProps) {
@@ -73,7 +71,6 @@ export function CombatResultBar({
           outcomes={outcomes}
           unitPriority={unitPriority}
           participatingTypes={participatingTypes}
-          showSurfaces={showSurfaces}
           surfaces={surfaces}
         />
       )}

@@ -14,7 +14,6 @@ import type {
 import type {
   CombatMode,
   CombatStateData,
-  HitSource,
   MetaPhase,
   UnitAbilityMeta,
 } from '../combat-state/types'
@@ -49,12 +48,16 @@ export interface ParamFilter {
 
 export type UnitSelectorScope = 'participating' | 'system' | 'type'
 
-export interface UnitOption {
-  label: string
-  value: import('@/types').UnitLocator
+/** Location of a surface-qualified option, for grouping and labels. */
+export interface SurfaceOptionMeta {
   surfaceId?: SurfaceId
   surfaceName?: string
   surfaceOrder?: number
+}
+
+export interface UnitOption extends SurfaceOptionMeta {
+  label: string
+  value: import('@/types').UnitLocator
   max?: number
 }
 
@@ -69,7 +72,6 @@ export interface SyncSourceConfig {
    *  `DREADNOUGHT` for `DREADNOUGHT:Galvanized`) takes precedence; this
    *  is the fallback. Omit for order-mode lists. */
   defaultItemValue?: unknown
-  compute?: (value: UnitBaseType[]) => unknown
   filter?: ParamFilter
   /** See `declareParam.limit`. Threaded through so reconcile can clamp
    *  stored values to the per-variant max. */
@@ -106,10 +108,18 @@ export interface ParamChange {
   key: UnitCategory
   value: UnitBaseType | UnitCategory
   /** Setup participation preview; runtime membership still comes from invokes. */
-  scope?: 'active' | 'system' | 'commit'
+  scope?: 'system' | 'commit'
 }
 
 export type UnitCategoryOptions = Record<UnitCategory, UnitBaseType[]>
+
+/** Setup option metadata that reconcile derives from native stats and
+ *  ability declarations. Only option lists (`resolveUnitOptions`) read it. */
+export interface SideOptionMetadata {
+  categories: UnitCategoryOptions
+  changes: ParamChange[]
+  subtypes: DeclaredSubtype[]
+}
 
 // Sided context (external API - attacker/defender perspective)
 export interface SidedContext<T> {
@@ -231,14 +241,6 @@ export interface AbilityReadContext {
   isOwner(): boolean
   /** Phase stack of the current dice-roll group. Throws outside a dice-roll group. */
   readonly currentDiceRollPhase: MetaPhase[]
-  /** Sides firing in the current dice-roll group. Throws outside one. */
-  readonly currentDiceRollFiring: CombatSide[]
-  /** Hit source of the current dice-roll group. Throws outside one. */
-  readonly currentDiceRollHitSource: HitSource
-  /** Whether the current dice-roll group is a Proxima-style self-target roll. Throws outside one. */
-  readonly currentDiceRollSelfTarget: boolean
-  /** Whether the current dice-roll group is a unit-ability roll. Throws outside one. */
-  readonly currentDiceRollIsUnitAbility: boolean
   /** Own/opponent base-hit snapshot for strategy gating at
    *  AFTER_DICE_ROLL_STEP. `own` = hits THIS side produced (landing on the
    *  opponent); `opponent` = hits the other side produced. Totals read
@@ -284,14 +286,6 @@ export interface AbilityCallContext {
   isOwner(): boolean
   /** Phase stack of the current dice-roll group. Throws outside a dice-roll group. */
   readonly currentDiceRollPhase: MetaPhase[]
-  /** Sides firing in the current dice-roll group. Throws outside one. */
-  readonly currentDiceRollFiring: CombatSide[]
-  /** Hit source of the current dice-roll group. Throws outside one. */
-  readonly currentDiceRollHitSource: HitSource
-  /** Whether the current dice-roll group is a Proxima-style self-target roll. Throws outside one. */
-  readonly currentDiceRollSelfTarget: boolean
-  /** Whether the current dice-roll group is a unit-ability roll. Throws outside one. */
-  readonly currentDiceRollIsUnitAbility: boolean
   /** Own/opponent base-hit snapshot for strategy gating at
    *  AFTER_DICE_ROLL_STEP. `own` = hits THIS side produced (landing on the
    *  opponent); `opponent` = hits the other side produced. Totals read
@@ -454,13 +448,7 @@ interface UIConfigNumber<
   max?: number
 }
 
-export type SelectItem = {
-  label: string
-  value: string
-  surfaceId?: SurfaceId
-  surfaceName?: string
-  surfaceOrder?: number
-}
+export type SelectItem = { label: string; value: string } & SurfaceOptionMeta
 export type SelectGroup = {
   group: string
   items: { label: string; value: string }[]
@@ -481,15 +469,12 @@ interface UIConfigUnitList<
   type: 'unit-list'
   mode: UnitListMode
   sortable?: boolean
-  items: {
+  items: ({
     label: string
     value: string
     max?: number
     stable?: boolean
-    surfaceId?: SurfaceId
-    surfaceName?: string
-    surfaceOrder?: number
-  }[]
+  } & SurfaceOptionMeta)[]
 }
 
 export type UIConfigItem<TParams = Record<string, unknown>> =

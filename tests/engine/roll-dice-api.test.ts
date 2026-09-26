@@ -79,7 +79,11 @@ const chainRollDiceAbility: Ability = {
               includeVariants: false,
             })
           ) {
-            branchCtx.api.opponent.destroyUnits('CRUISER')
+            branchCtx.api.opponent.destroyUnits(
+              branchCtx.api.opponent.system.getUnits('CRUISER', {
+                includeVariants: true,
+              })[0],
+            )
           }
         })
       },

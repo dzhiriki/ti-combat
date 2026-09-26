@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 
 import styles from './unit-controls.module.css'
 
-interface UnitControlsProps {
+export interface UnitControlsProps {
   count: number
   upgraded: boolean
   hasUpgrade: boolean

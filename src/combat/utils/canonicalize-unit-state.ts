@@ -2,7 +2,6 @@ import type { UnitId, UnitState, UnitType } from '@/types'
 
 import type { SideStateData } from '../combat-state/types'
 import { stateDestroyScore } from './state-destroy-score'
-import { unitCombatSignature } from './unit-combat-properties'
 
 /**
  * Canonicalize per-variant state assignments by permuting `unitState`
@@ -66,12 +65,10 @@ function splitByPlacement(
 ): void {
   if (ids.length <= 1) return
   const surface = s.unitSurface[ids[0]]
-  const signature = unitCombatSignature(s, ids[0])
+  const grant = s.unitGrants?.[ids[0]]
   if (
     ids.every(
-      id =>
-        s.unitSurface[id] === surface &&
-        unitCombatSignature(s, id) === signature,
+      id => s.unitSurface[id] === surface && s.unitGrants?.[id] === grant,
     )
   ) {
     pools.push(ids)
@@ -79,7 +76,7 @@ function splitByPlacement(
   }
   const groups = new Map<string, UnitId[]>()
   for (const id of ids) {
-    const key = `${s.unitSurface[id] ?? ''}\0${unitCombatSignature(s, id)}`
+    const key = `${s.unitSurface[id] ?? ''}\0${s.unitGrants?.[id] ?? ''}`
     const group = groups.get(key)
     if (group) group.push(id)
     else groups.set(key, [id])

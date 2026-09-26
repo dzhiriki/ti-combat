@@ -11,8 +11,6 @@ export const SHIPS: UnitBaseType[] = [
   'FIGHTER',
 ]
 
-export const NON_FIGHTER_SHIPS = SHIPS.filter(type => type !== 'FIGHTER')
-
 export const GROUND_FORCES: UnitBaseType[] = ['MECH', 'INFANTRY']
 
 export const STRUCTURES: UnitBaseType[] = ['PDS', 'SPACE_DOCK']

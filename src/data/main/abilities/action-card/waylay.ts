@@ -17,10 +17,7 @@ export const waylay: Ability = {
       context: 'AFB',
       call: ctx => {
         ctx.api.own.updateAbilityConfig('ANTI_FIGHTER_BARRAGE', {
-          customPriority: true,
-          unitPriority:
-            ctx.api.opponent.getAbilityConfig('UNIT_PRIORITY')
-              .spaceUnitPriority ?? [],
+          customPriority: false,
         })
       },
     },

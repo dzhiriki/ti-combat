@@ -71,7 +71,6 @@ export const supercharge: Ability<Params> = {
             : params.spacePriority
         const target = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(priority),
-          { includeVariants: false },
         )
         if (target === undefined) return
         const variantKey = ctx.api.own.getUnitVariantKey(target)

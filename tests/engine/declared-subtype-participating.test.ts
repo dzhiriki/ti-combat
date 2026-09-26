@@ -25,12 +25,15 @@ function makeSide(opts: {
     unitState: {},
     unitStats: {},
     abilities: {},
-    unitCategoryOptions: {
-      SHIPS: opts.baseTypes,
-      GROUND_FORCES: opts.baseTypes,
-      STRUCTURES: [],
+    optionMetadata: {
+      categories: {
+        SHIPS: opts.baseTypes,
+        GROUND_FORCES: opts.baseTypes,
+        STRUCTURES: [],
+      },
+      changes: [],
+      subtypes: opts.subtypes,
     },
-    declaredSubtypes: opts.subtypes,
     liveAbilities: {},
   } as unknown as SideStateData
 }
@@ -159,7 +162,10 @@ describe('declareParam source — participating flag', () => {
       attacker: register([declarer, consumer]),
       defender: [],
     }
-    reconcileAbilitiesConfig(config, abilities, 'SPACE')
+    reconcileAbilitiesConfig(config, abilities, 'SPACE', {
+      attacker: makeSide({ baseTypes: [], subtypes: [] }),
+      defender: makeSide({ baseTypes: [], subtypes: [] }),
+    })
     return (config.attacker.TEST_CONSUMER.items as UnitList<number>).map(
       ([k]) => k,
     )

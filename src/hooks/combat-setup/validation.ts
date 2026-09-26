@@ -2,7 +2,7 @@ import { z } from 'zod/mini'
 
 import { extractDefaults, type RegisteredAbility } from '@/combat'
 import { UNIT_LIMITS, UNIT_TYPES } from '@/constants/units'
-import type { GameSystem } from '@/types'
+import type { GameSystem, UnitBaseType } from '@/types'
 import { GAME_SYSTEMS } from '@/utils/get-game-data'
 import {
   DEFAULT_GAME_SYSTEM,
@@ -61,8 +61,8 @@ export function validateSerializedConfig(
   const raw = source as Record<string, unknown>
   const warnings: string[] = []
 
-  // Version
-  const v = raw.v === 2 ? (2 as const) : (1 as const)
+  // Links from before surfaces (v1) carry flat per-side counts.
+  const legacy = raw.v !== 2
 
   // Only legacy links (without a system) infer it from factions. An explicit
   // system is authoritative, including when both sides are Neutral.
@@ -95,52 +95,50 @@ export function validateSerializedConfig(
   }
 
   const planetIds =
-    v === 2 && Array.isArray(raw.p)
+    !legacy && Array.isArray(raw.p)
       ? [...new Set(raw.p.filter(isPlanetId))]
       : ['planet-1']
   if (planetIds.length === 0) planetIds.push('planet-1')
   const sp =
-    v === 2 && typeof raw.sp === 'string' && planetIds.includes(raw.sp)
+    !legacy && typeof raw.sp === 'string' && planetIds.includes(raw.sp)
       ? raw.sp
       : planetIds[0]
-  const e = v === 2 && raw.e === 'F' ? ('F' as const) : ('S' as const)
   const validSurfaceIds = new Set(['space', ...planetIds])
-  const asu =
-    v === 2
-      ? validateSurfaceCounts(raw.asu, validSurfaceIds, warnings)
-      : undefined
-  const dsu =
-    v === 2
-      ? validateSurfaceCounts(raw.dsu, validSurfaceIds, warnings)
-      : undefined
-  const aup = v === 2 ? validateUpgrades(raw.aup, warnings) : undefined
-  const dup = v === 2 ? validateUpgrades(raw.dup, warnings) : undefined
+  // Simplified mode reflows the totals by combat mode, so a legacy link's
+  // flat counts can be listed under any one surface.
+  const units = legacy
+    ? {
+        a: validateLegacyUnits(raw.au, warnings),
+        d: validateLegacyUnits(raw.du, warnings),
+      }
+    : {
+        a: {
+          counts: validateSurfaceCounts(raw.asu, validSurfaceIds, warnings),
+          upgrades: validateUpgrades(raw.aup, warnings),
+        },
+        d: {
+          counts: validateSurfaceCounts(raw.dsu, validSurfaceIds, warnings),
+          upgrades: validateUpgrades(raw.dup, warnings),
+        },
+      }
 
-  // Abilities
-  const aa = validateAbilities(raw.aa, abilityLookup, warnings)
-  const da = validateAbilities(raw.da, abilityLookup, warnings)
-
-  const common = { g: system, af, df, m, aa, da }
   return {
-    config:
-      v === 1
-        ? {
-            ...common,
-            v,
-            au: validateUnits(raw.au, warnings),
-            du: validateUnits(raw.du, warnings),
-          }
-        : {
-            ...common,
-            v,
-            e,
-            p: planetIds,
-            sp,
-            asu: asu!,
-            dsu: dsu!,
-            aup: aup!,
-            dup: dup!,
-          },
+    config: {
+      v: 2,
+      g: system,
+      af,
+      df,
+      m,
+      e: !legacy && raw.e === 'F' ? 'F' : 'S',
+      p: planetIds,
+      sp,
+      asu: units.a.counts,
+      dsu: units.d.counts,
+      aup: units.a.upgrades,
+      dup: units.d.upgrades,
+      aa: validateAbilities(raw.aa, abilityLookup, warnings),
+      da: validateAbilities(raw.da, abilityLookup, warnings),
+    },
     warnings,
   }
 }
@@ -184,26 +182,28 @@ function validateSurfaceCounts(
   return result
 }
 
-function validateUpgrades(
-  raw: unknown,
-  warnings: string[],
-): import('@/types').UnitBaseType[] {
+function validateUpgrades(raw: unknown, warnings: string[]): UnitBaseType[] {
   if (!Array.isArray(raw)) return []
-  const result = new Set<import('@/types').UnitBaseType>()
+  const result = new Set<UnitBaseType>()
   for (const type of raw) {
     if (!unitTypeSet.has(type))
       warnings.push(`Unknown unit type "${type}" ignored`)
-    else result.add(type as import('@/types').UnitBaseType)
+    else result.add(type as UnitBaseType)
   }
   return [...result]
 }
 
-function validateUnits(
+/** v1 `{ TYPE: [count, upgraded] }` → counts listed under space. */
+function validateLegacyUnits(
   raw: unknown,
   warnings: string[],
-): Record<string, [number, 0 | 1]> {
-  const result: Record<string, [number, 0 | 1]> = {}
-  if (typeof raw !== 'object' || raw === null) return result
+): {
+  counts: Record<string, Record<string, number>>
+  upgrades: UnitBaseType[]
+} {
+  const counts: Record<string, number> = {}
+  const upgrades: UnitBaseType[] = []
+  if (typeof raw !== 'object' || raw === null) return { counts: {}, upgrades }
 
   for (const [type, value] of Object.entries(raw as Record<string, unknown>)) {
     if (!unitTypeSet.has(type)) {
@@ -211,14 +211,18 @@ function validateUnits(
       continue
     }
     if (!Array.isArray(value) || value.length < 2) continue
-    const limit = UNIT_LIMITS[type as keyof typeof UNIT_LIMITS] ?? 99
-    const count = Math.min(Math.max(0, Math.floor(Number(value[0]))), limit)
-    const upgraded = value[1] === 1 ? 1 : 0
-    if (count > 0) {
-      result[type] = [count, upgraded as 0 | 1]
-    }
+    const unitType = type as UnitBaseType
+    const count = Math.min(
+      Math.max(0, Math.floor(Number(value[0]))),
+      UNIT_LIMITS[unitType],
+    )
+    if (count > 0) counts[type] = count
+    if (value[1] === 1) upgrades.push(unitType)
   }
-  return result
+  return {
+    counts: Object.keys(counts).length ? { space: counts } : {},
+    upgrades,
+  }
 }
 
 function validateAbilities(

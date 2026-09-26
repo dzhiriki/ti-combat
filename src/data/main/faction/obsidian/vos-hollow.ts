@@ -42,9 +42,7 @@ export const vosHollow: Ability<Params> = {
           const { baseType: type } = parseUnitLocator(variantId)
           if (
             ownDestroyedShips.has(type) &&
-            ctx.api.opponent.participating.hasUnitType(variantId, {
-              includeVariants: false,
-            })
+            ctx.api.opponent.participating.hasUnitType(variantId)
           )
             return true
         }
@@ -56,16 +54,9 @@ export const vosHollow: Ability<Params> = {
           const { baseType: type } = parseUnitLocator(variantId)
           if (
             ownDestroyedShips.has(type) &&
-            ctx.api.opponent.participating.hasUnitType(variantId, {
-              includeVariants: false,
-            })
+            ctx.api.opponent.participating.hasUnitType(variantId)
           ) {
-            const [target] = ctx.api.opponent.participating.getUnits(
-              variantId,
-              {
-                includeVariants: false,
-              },
-            )
+            const [target] = ctx.api.opponent.participating.getUnits(variantId)
             if (target) ctx.api.opponent.destroyUnits(target)
             return
           }
@@ -90,10 +81,8 @@ function collectOwnDestroyedShipTypes(
 ): Set<UnitBaseType> {
   const types = new Set<UnitBaseType>()
   for (const id of destroyedIds) {
-    const variantKey = ctx.api.own.getUnitVariantKey(id)
-    if (!variantKey) continue
-    const { baseType: type } = parseUnitLocator(variantKey)
-    if (ctx.api.own.isUnitCategory(id, 'SHIPS')) types.add(type)
+    const type = ctx.api.own.getUnitBaseType(id)
+    if (type && ctx.api.own.isUnitCategory(id, 'SHIPS')) types.add(type)
   }
   return types
 }

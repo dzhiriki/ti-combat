@@ -1,5 +1,6 @@
 import type { Ability } from '@/combat'
 import { STRUCTURES, UNIT_ABILITIES } from '@/constants/units'
+import { SPACE_SURFACE_ID } from '@/types'
 
 const ALLOWED_SURFACES = ['SPACE', 'PLANET'] as const
 
@@ -22,7 +23,6 @@ export const miniaturization: Ability = {
     {
       timing: 'PREPARE',
       call: ctx => {
-        const space = ctx.api.own.getSpaceSurfaceId()
         for (const structure of STRUCTURES) {
           ctx.api.own.modifyUnitType(structure, {
             ALLOWED_SURFACES,
@@ -33,7 +33,7 @@ export const miniaturization: Ability = {
             unitAbility,
             ctx.this.key,
             'STRUCTURES',
-            space,
+            SPACE_SURFACE_ID,
           )
         }
       },

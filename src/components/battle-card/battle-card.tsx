@@ -20,7 +20,6 @@ import type {
   GameSystem,
   SurfaceDefinition,
   SurfaceId,
-  SurfaceType,
   SurfaceUnitSelections,
   UnitBaseType,
   UnitSelection,
@@ -34,7 +33,7 @@ import {
   CombatResultBar,
 } from './components/combat-result-bar'
 import { FactionSelect } from './components/faction-select'
-import { UnitRowDual } from './components/unit-row-dual'
+import { type SideUnitControls, UnitRowDual } from './components/unit-row-dual'
 
 import styles from './battle-card.module.css'
 
@@ -219,68 +218,32 @@ export function BattleCard({
             <Divider className="theme-defender" />
           </header>
           {visibleItems.map(unitKey => {
-            const surfaceId = surface?.id
+            const controls = (side: CombatSide): SideUnitControls => {
+              const config = (
+                side === 'attacker' ? attackerConfig : defenderConfig
+              )[unitKey]
+              return {
+                ...(side === 'attacker' ? attacker : defender)[unitKey],
+                hasUpgrade: config.hasUpgrade,
+                limit: surface
+                  ? UNIT_LIMITS[unitKey] -
+                    countOnOtherSurfaces(side, surface.id, unitKey)
+                  : UNIT_LIMITS[unitKey],
+                disabled:
+                  !!surface && !config.allowedSurfaces.includes(surface.type),
+                onCountChange: count =>
+                  surface
+                    ? onSurfaceUnitCountChange(side, surface.id, unitKey, count)
+                    : onUnitCountChange(side, unitKey, count),
+                onUpgradeToggle: () => onUpgradeToggle(side, unitKey),
+              }
+            }
             return (
               <UnitRowDual
                 key={unitKey}
                 name={attackerConfig[unitKey].name}
-                limit={UNIT_LIMITS[unitKey]}
-                attackerLimit={
-                  surfaceId
-                    ? UNIT_LIMITS[unitKey] -
-                      countOnOtherSurfaces('attacker', surfaceId, unitKey)
-                    : undefined
-                }
-                defenderLimit={
-                  surfaceId
-                    ? UNIT_LIMITS[unitKey] -
-                      countOnOtherSurfaces('defender', surfaceId, unitKey)
-                    : undefined
-                }
-                attackerDisabled={
-                  surface
-                    ? !attackerConfig[unitKey].allowedSurfaces.includes(
-                        surface.type as SurfaceType,
-                      )
-                    : false
-                }
-                defenderDisabled={
-                  surface
-                    ? !defenderConfig[unitKey].allowedSurfaces.includes(
-                        surface.type as SurfaceType,
-                      )
-                    : false
-                }
-                attackerHasUpgrade={attackerConfig[unitKey].hasUpgrade}
-                defenderHasUpgrade={defenderConfig[unitKey].hasUpgrade}
-                attacker={attacker[unitKey]}
-                defender={defender[unitKey]}
-                onAttackerCountChange={count =>
-                  surfaceId
-                    ? onSurfaceUnitCountChange(
-                        'attacker',
-                        surfaceId,
-                        unitKey,
-                        count,
-                      )
-                    : onUnitCountChange('attacker', unitKey, count)
-                }
-                onAttackerUpgradeToggle={() =>
-                  onUpgradeToggle('attacker', unitKey)
-                }
-                onDefenderCountChange={count =>
-                  surfaceId
-                    ? onSurfaceUnitCountChange(
-                        'defender',
-                        surfaceId,
-                        unitKey,
-                        count,
-                      )
-                    : onUnitCountChange('defender', unitKey, count)
-                }
-                onDefenderUpgradeToggle={() =>
-                  onUpgradeToggle('defender', unitKey)
-                }
+                attacker={controls('attacker')}
+                defender={controls('defender')}
               />
             )
           })}
@@ -392,8 +355,7 @@ export function BattleCard({
         outcomes={outcomes}
         unitPriority={unitPriority}
         participatingTypes={participatingTypes}
-        showSurfaces={editorMode === 'FULL'}
-        surfaces={surfaces}
+        surfaces={editorMode === 'FULL' ? surfaces : undefined}
         isComputing={isComputing}
       />
     </GlassCard>

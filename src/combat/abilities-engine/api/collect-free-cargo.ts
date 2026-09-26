@@ -1,7 +1,7 @@
 import { UNIT_TYPES } from '@/constants/units'
 import type { UnitBaseType } from '@/types'
 
-import type { SideApi, UnitQueryApi } from './ability-api'
+import type { SideApi, UnitQuery } from './ability-api'
 
 /** Carried unit types exempt from capacity because a LIVING unit on the side
  *  carries them free (`UnitStats.FREE_CARGO` — A Strangled Whisper's
@@ -11,7 +11,7 @@ import type { SideApi, UnitQueryApi } from './ability-api'
  *  pool. */
 export function collectFreeCargo(
   api: SideApi,
-  units: UnitQueryApi,
+  units: UnitQuery,
 ): ReadonlySet<UnitBaseType> {
   const free = new Set<UnitBaseType>()
   for (const baseType of UNIT_TYPES) {

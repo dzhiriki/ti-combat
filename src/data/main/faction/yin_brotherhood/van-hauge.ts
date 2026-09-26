@@ -16,12 +16,8 @@ export const vanHauge: Ability = {
       timing: 'WHEN_DESTROY',
       isCallable: (_params, ctx, ids) => ids.includes(ctx.getUnit()),
       call: ctx => {
-        const opIds = ctx.api.opponent.participating.getUnits(undefined, {
-          includeVariants: true,
-        })
-        const ownIds = ctx.api.own.participating.getUnits(undefined, {
-          includeVariants: true,
-        })
+        const opIds = ctx.api.opponent.participating.getUnits()
+        const ownIds = ctx.api.own.participating.getUnits()
 
         ctx.api.opponent.destroyUnits(opIds)
         ctx.api.own.destroyUnits(ownIds)

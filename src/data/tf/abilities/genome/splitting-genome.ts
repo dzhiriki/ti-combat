@@ -1,6 +1,7 @@
 import yinBrotherhoodIcon from '@/assets/faction/yin_brotherhood.svg?raw'
 import type { Ability } from '@/combat'
 import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
+import { SPACE_SURFACE_ID } from '@/types'
 
 // Twilight's Fall genome. After one of your destroyers or cruisers is destroyed,
 // place up to 2 fighters from your reinforcements into that unit's system —
@@ -28,7 +29,7 @@ export const splittingGenome: Ability = {
           return base === 'DESTROYER' || base === 'CRUISER'
         }),
       call: ctx => {
-        ctx.api.own.placeUnits({ FIGHTER: 2 }, ctx.api.own.getSpaceSurfaceId())
+        ctx.api.own.placeUnits({ FIGHTER: 2 }, SPACE_SURFACE_ID)
       },
     },
   ],

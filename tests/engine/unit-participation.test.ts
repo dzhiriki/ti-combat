@@ -65,32 +65,25 @@ describe('individual combat participation and categories', () => {
     ).toContain('MECH')
   })
 
-  it('keeps category changes independent from participation and restores defaults', () => {
+  it('grants a category together with participation in its combat mode', () => {
     const { cs, api } = makeSpace()
-    const [mech] = api.system.getUnits('MECH', { includeVariants: true })
-    const [cruiser] = api.system.getUnits('CRUISER', { includeVariants: true })
-    api.setUnitCategory(mech, 'SHIPS', true)
-    expect(api.isUnitCategory(mech, 'SHIPS')).toBe(true)
+    const [mech, other] = api.system.getUnits('MECH', { includeVariants: true })
     expect(api.isParticipating(mech)).toBe(false)
-    api.setUnitParticipation(mech, true)
-    api.setUnitCategory(mech, 'SHIPS', undefined)
+    api.grantCategory(mech, 'SHIPS')
+    expect(api.isUnitCategory(mech, 'SHIPS')).toBe(true)
     expect(api.isParticipating(mech)).toBe(true)
-    expect(api.isUnitCategory(mech, 'SHIPS')).toBe(false)
     expect(
       api.participating.getUnits('MECH', { includeVariants: true }),
     ).toEqual([mech])
-    api.setUnitParticipation(mech, undefined)
-    expect(api.isParticipating(mech)).toBe(false)
 
-    api.setUnitCategory(cruiser, 'SHIPS', false)
-    expect(api.isParticipating(cruiser)).toBe(true)
-    api.setUnitParticipation(cruiser, false)
-    cs.resyncParticipating('attacker')
-    expect(api.isParticipating(cruiser)).toBe(false)
-    api.setUnitParticipation(cruiser, undefined)
-    expect(api.isParticipating(cruiser)).toBe(true)
-    api.setUnitCategory(cruiser, 'SHIPS', undefined)
-    expect(cs.data.attacker.unitCombat).toBeUndefined()
+    // A category outside the combat mode grants membership only.
+    api.grantCategory(other, 'STRUCTURES')
+    expect(api.isUnitCategory(other, 'STRUCTURES')).toBe(true)
+    expect(api.isParticipating(other)).toBe(false)
+
+    const grants = cs.data.attacker.unitGrants
+    api.grantCategory(mech, 'SHIPS')
+    expect(cs.data.attacker.unitGrants).toBe(grants)
   })
 
   it('preserves an exact selection through placement, movement, and variant changes', () => {
@@ -99,8 +92,7 @@ describe('individual combat participation and categories', () => {
       includeVariants: true,
     })
     api.moveUnits(chosen, DEFAULT_PLANET_ID)
-    api.setUnitCategory(chosen, 'SHIPS', true)
-    api.setUnitParticipation(chosen, true)
+    api.grantCategory(chosen, 'SHIPS')
     const [newMech] = api.placeUnits({ MECH: 1 }).MECH
     const [fighter] = api.placeUnits({ FIGHTER: 1 }).FIGHTER
     api.addSubtype(chosen, 'Test' as UnitVariantId)
@@ -133,10 +125,9 @@ describe('individual combat participation and categories', () => {
     })
     expect(fork.getHash()).not.toBe(originalHash)
     expect(cs.getHash()).toBe(originalHash)
-    branch.setUnitCategory(mech, 'SHIPS', true)
+    branch.grantCategory(mech, 'SHIPS')
     expect(fork.getHash()).not.toBe(originalHash)
     expect(api.isUnitCategory(mech, 'SHIPS')).toBe(false)
-    branch.setUnitParticipation(mech, true)
     expect(api.isParticipating(mech)).toBe(false)
     branch.modifyUnitType('MECH', { CATEGORIES: ['SHIPS', 'GROUND_FORCES'] })
     expect(api.isUnitTypeCategory('MECH', 'SHIPS')).toBe(false)
@@ -144,18 +135,14 @@ describe('individual combat participation and categories', () => {
     expect(cs.getHash()).toBe(originalHash)
   })
 
-  it('does not move damage from a selected mech onto an unselected mech', () => {
+  it('does not move damage from a granted mech onto an ungranted one', () => {
     const { cs, api } = makeSpace()
     const [other, chosen] = api.system
       .getUnits('MECH', { includeVariants: true })
       .sort()
-    api.setUnitParticipation(chosen, true)
+    // Both stay non-participating, so only the grant tells them apart.
+    api.grantCategory(chosen, 'STRUCTURES')
     api.modifyUnitState(chosen, { isDamaged: true })
-    canonicalizeUnitState(cs.data.attacker)
-    expect(api.getUnitState(chosen)?.isDamaged).toBe(true)
-    expect(api.getUnitState(other)?.isDamaged).not.toBe(true)
-    api.setUnitParticipation(other, true)
-    api.setUnitCategory(chosen, 'SHIPS', true)
     canonicalizeUnitState(cs.data.attacker)
     expect(api.getUnitState(chosen)?.isDamaged).toBe(true)
     expect(api.getUnitState(other)?.isDamaged).not.toBe(true)
@@ -166,8 +153,7 @@ describe('individual combat participation and categories', () => {
     const [ship, ground] = api.system.getUnits('MECH', {
       includeVariants: true,
     })
-    api.setUnitParticipation([ship, ground], true)
-    api.setUnitCategory(ship, 'SHIPS', true)
+    api.grantCategory(ship, 'SHIPS')
     api.setUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', 'TEST', 'SHIPS')
     expect(api.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', ship)).toBe(true)
     expect(api.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', ground)).toBe(false)
@@ -179,7 +165,7 @@ describe('individual combat participation and categories', () => {
   it('adds ordinary hits using participant casualty order', () => {
     const { cs, api } = makeSpace()
     const [mech] = api.system.getUnits('MECH', { includeVariants: true })
-    api.setUnitParticipation(mech, true)
+    api.grantCategory(mech, 'SHIPS')
     const fighters = api.placeUnits({ FIGHTER: 2 }).FIGHTER
     cs.data.attacker.hitPool = { base: 1, additional: 0, custom: [] }
     api.addHits(1)
@@ -326,7 +312,7 @@ describe('ability selections are snapshots of units', () => {
     },
   )
 
-  it('Waylay targets all explicitly participating mechs', () => {
+  it('Waylay targets all granted mechs', () => {
     const t = combatTest({
       mode: 'SPACE',
       attacker: { faction: 'ARBOREC', units: { CRUISER: 1, MECH: 2 } },
@@ -346,12 +332,10 @@ describe('ability selections are snapshots of units', () => {
               timing: 'START_OF_COMBAT',
               isCallable: (_params, ctx) => ctx.side === 'attacker',
               call: ctx => {
-                // The lower id would normally sustain first; leave it a non-ship.
-                const mechs = ctx.api.own.system
-                  .getUnits('MECH', { includeVariants: true })
-                  .sort()
-                ctx.api.own.setUnitParticipation(mechs, true)
-                ctx.api.own.setUnitCategory(mechs[1], 'SHIPS', true)
+                const mechs = ctx.api.own.system.getUnits('MECH', {
+                  includeVariants: true,
+                })
+                ctx.api.own.grantCategory(mechs, 'SHIPS')
               },
             },
           ],

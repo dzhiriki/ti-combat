@@ -25,5 +25,6 @@ export const helTitan: Ability = {
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
   exclusiveGroup: 'UNIT_UPGRADE_PDS',
+  declareParamChange: () => [{ key: 'GROUND_FORCES', value: 'PDS' }],
   invoke: [statsInvoke],
 }

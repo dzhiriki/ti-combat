@@ -84,9 +84,9 @@ describe('SSRUU + VISCOUNT_UNLENN', () => {
       defender: { faction: 'ARBOREC', units: { CRUISER: 1 } },
     })
 
-    const viscountDecls = (t.state.attacker.declaredSubtypes ?? []).filter(
-      subtype => subtype.name === 'Viscount',
-    )
+    const viscountDecls = (
+      t.state.attacker.optionMetadata?.subtypes ?? []
+    ).filter(subtype => subtype.name === 'Viscount')
     expect(viscountDecls).toHaveLength(2)
     expect(viscountDecls.map(d => d.source).sort()).toEqual([
       'SSRUU',

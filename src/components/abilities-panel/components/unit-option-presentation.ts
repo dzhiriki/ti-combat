@@ -1,24 +1,32 @@
+import type { SurfaceOptionMeta } from '@/combat/abilities-engine/types'
 import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 
-export interface SurfaceOption {
+export interface SurfaceOption extends SurfaceOptionMeta {
   label: string
   value: string
-  surfaceId?: string
-  surfaceName?: string
-  surfaceOrder?: number
+}
+
+/** The surfaces each `keyOf` value appears on. */
+function surfacesBy<T extends SurfaceOption>(
+  items: readonly T[],
+  keyOf: (item: T) => string,
+): Map<string, Set<string>> {
+  const locations = new Map<string, Set<string>>()
+  for (const item of items) {
+    if (!item.surfaceId) continue
+    const key = keyOf(item)
+    const surfaces = locations.get(key) ?? new Set<string>()
+    surfaces.add(item.surfaceId)
+    locations.set(key, surfaces)
+  }
+  return locations
 }
 
 /** Ordered controls remain one list; qualify only ambiguous labels. */
 export function labelUnitOptions<T extends SurfaceOption>(
   items: readonly T[],
 ): T[] {
-  const locations = new Map<string, Set<string>>()
-  for (const item of items) {
-    if (!item.surfaceId) continue
-    const surfaces = locations.get(item.label) ?? new Set<string>()
-    surfaces.add(item.surfaceId)
-    locations.set(item.label, surfaces)
-  }
+  const locations = surfacesBy(items, item => item.label)
   return items.map(item => ({
     ...item,
     label:
@@ -31,14 +39,10 @@ export function labelUnitOptions<T extends SurfaceOption>(
 export function groupUnitOptions<T extends SurfaceOption>(
   items: readonly T[],
 ): { id: string; label?: string; items: T[] }[] {
-  const locations = new Map<string, Set<string>>()
-  for (const item of items) {
-    if (!item.surfaceId) continue
-    const type = parseUnitLocator(item.value).baseType
-    const surfaces = locations.get(type) ?? new Set<string>()
-    surfaces.add(item.surfaceId)
-    locations.set(type, surfaces)
-  }
+  const locations = surfacesBy(
+    items,
+    item => parseUnitLocator(item.value).baseType,
+  )
   if (![...locations.values()].some(surfaces => surfaces.size > 1))
     return [{ id: '', items: [...items] }]
 

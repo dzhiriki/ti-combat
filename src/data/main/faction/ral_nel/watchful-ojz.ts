@@ -47,12 +47,7 @@ export const watchfulOjz: Ability<Params> = {
           if (toRetreat.length >= 2) break
           if (maxCount <= 0) continue
           let retreatedForType = 0
-          const ids = ctx.api.own.participating.getUnits(
-            variantId as UnitType,
-            {
-              includeVariants: false,
-            },
-          )
+          const ids = ctx.api.own.participating.getUnits(variantId as UnitType)
           for (const id of ids) {
             if (toRetreat.length >= 2) break
             if (retreatedForType >= maxCount) break

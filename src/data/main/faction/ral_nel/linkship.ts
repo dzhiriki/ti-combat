@@ -75,9 +75,7 @@ function getConsumed(api: SideApi): UnitList<number> {
 
 function getStructuresInSpace(api: SideApi): UnitList<number> {
   const counts = new Map<UnitType, number>()
-  for (const id of api.surface.getUnits(undefined, {
-    includeVariants: true,
-  })) {
+  for (const id of api.surface.getUnits()) {
     if (!api.isUnitCategory(id, 'STRUCTURES')) continue
     const unitType = api.getUnitVariantKey(id)
     if (!unitType) continue

@@ -18,9 +18,7 @@ import type {
   CombatMode,
   SideAbilitiesConfig,
 } from '../../combat/combat-state/types'
-import { buildSideState } from './build-side-state'
-import { prepareSimulationConfig } from './prepare-simulation-config'
-import { clampLimitParams } from './reconcile'
+import { prepareSimulation } from './prepare-simulation'
 
 // ============================================================================
 // CONFIG TYPES
@@ -44,7 +42,7 @@ export interface CombatStateConfig {
   attacker: SideConfig
   defender: SideConfig
   customAbilities?: import('../../combat/abilities-engine/types').Ability[]
-  /** Hook invoked after `prepareSimulationConfig` and before
+  /** Hook invoked after `prepareSimulation` and before
    *  `forSimulation`, with mutable per-side registered ability arrays. Test
    *  harnesses use it to shuffle iteration order; production leaves it
    *  unset. */
@@ -109,109 +107,35 @@ export function buildCombatState(config: CombatStateConfig): CombatState {
   const surfaces = config.surfaces ?? createDefaultSurfaces()
   const activeSurfaceId =
     config.mode === 'SPACE'
-      ? (surfaces.find(s => s.type === 'SPACE')?.id ?? SPACE_SURFACE_ID)
+      ? SPACE_SURFACE_ID
       : (config.activeSurfaceId ??
         surfaces.find(s => s.type === 'PLANET')?.id ??
         DEFAULT_PLANET_ID)
-  const abilitiesConfig = {
-    attacker: buildSideAbilitiesConfig(config.attacker),
-    defender: buildSideAbilitiesConfig(config.defender),
-  }
-
-  const attackerPlacements = adaptTestPlacements(
-    config.attacker,
-    surfaces,
-    activeSurfaceId,
-  )
-  const defenderPlacements = adaptTestPlacements(
-    config.defender,
-    surfaces,
-    activeSurfaceId,
-  )
-
-  const sideAbilities = prepareSimulationConfig(
-    config.system,
-    abilitiesConfig,
-    config.attacker.faction,
-    config.defender.faction,
-    config.mode,
-    config.customAbilities,
+  const setup = prepareSimulation(
     {
+      system: config.system,
+      attackerFaction: config.attacker.faction,
+      defenderFaction: config.defender.faction,
       surfaces,
       activeSurfaceId,
-      attacker: attackerPlacements,
-      defender: defenderPlacements,
-    },
-  )
-
-  const gen: { _nextCode?: number } = {}
-  const attackerSide = buildSideState(
-    config.system,
-    config.attacker.faction,
-    attackerPlacements,
-    surfaces,
-    abilitiesConfig.attacker,
-    sideAbilities.attacker.registered,
-    gen,
-    sideAbilities.attacker.metadata.subtypes,
-    sideAbilities.attacker.metadata.categories,
-  )
-  const defenderSide = buildSideState(
-    config.system,
-    config.defender.faction,
-    defenderPlacements,
-    surfaces,
-    abilitiesConfig.defender,
-    sideAbilities.defender.registered,
-    gen,
-    sideAbilities.defender.metadata.subtypes,
-    sideAbilities.defender.metadata.categories,
-  )
-
-  attackerSide.unitCategoryChanges = sideAbilities.attacker.metadata.changes
-  defenderSide.unitCategoryChanges = sideAbilities.defender.metadata.changes
-
-  // Stateful clamp pass: with real per-side state now built, clamp IN_COMBAT
-  // and EXTRA values that bypassed the UI hook (e.g. tests that hand-feed
-  // over-limit values via `buildCombatState`).
-  clampLimitParams(
-    abilitiesConfig,
-    {
-      attacker: sideAbilities.attacker.registered,
-      defender: sideAbilities.defender.registered,
-    },
-    {
-      attacker: attackerSide,
-      defender: defenderSide,
-      surfaces,
-      activeSurfaceId,
+      attackerPlacements: adaptTestPlacements(
+        config.attacker,
+        surfaces,
+        activeSurfaceId,
+      ),
+      defenderPlacements: adaptTestPlacements(
+        config.defender,
+        surfaces,
+        activeSurfaceId,
+      ),
       combatMode: config.mode,
+      abilities: {
+        attacker: buildSideAbilitiesConfig(config.attacker),
+        defender: buildSideAbilitiesConfig(config.defender),
+      },
     },
+    config.customAbilities,
   )
-
-  config.prepareAbilities?.({
-    attacker: sideAbilities.attacker.registered,
-    defender: sideAbilities.defender.registered,
-  })
-
-  return CombatState.forSimulation(
-    attackerSide,
-    defenderSide,
-    config.mode,
-    surfaces,
-    activeSurfaceId,
-    {
-      attacker: sideAbilities.attacker.registered,
-      defender: sideAbilities.defender.registered,
-    },
-    {
-      attacker: sideAbilities.attacker.unitAbilityKeys,
-      defender: sideAbilities.defender.unitAbilityKeys,
-    },
-    {
-      attacker: sideAbilities.attacker.factionOwnedKeys,
-      defender: sideAbilities.defender.factionOwnedKeys,
-    },
-    gen._nextCode,
-  )
+  config.prepareAbilities?.(setup.abilities)
+  return CombatState.forSimulation(setup)
 }

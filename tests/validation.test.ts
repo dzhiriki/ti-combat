@@ -142,13 +142,18 @@ describe('validateSerializedConfig', () => {
     // the global ability directories. They must still be recognized so URL
     // restore doesn't drop them with an "Unknown ability" warning.
     const config: SerializedConfig = {
-      v: 1,
+      v: 2,
       g: 'TI4',
       af: 'BARONY_OF_LETNEV',
       df: 'ARBOREC',
       m: 'S',
-      au: { FIGHTER: [1, 0] },
-      du: { FIGHTER: [1, 0] },
+      e: 'S',
+      p: ['planet-1'],
+      sp: 'planet-1',
+      asu: { space: { FIGHTER: 1 } },
+      dsu: { space: { FIGHTER: 1 } },
+      aup: [],
+      dup: [],
       aa: {
         NON_EUCLIDEAN_SHIELDING: { isEnabled: true },
         GRAVLEASH_MANEUVERS: { isEnabled: true },

@@ -85,7 +85,6 @@ export const spaceCannonOffense: Ability<Params> = {
         if (params.disableSustainDamage) override.SUSTAIN_DAMAGE = false
 
         ctx.resolveStep('SPACE_CANNON_OFFENSE', {
-          deferPhaseEndCheck: true,
           abilitiesOverride:
             Object.keys(override).length > 0 ? override : undefined,
         })

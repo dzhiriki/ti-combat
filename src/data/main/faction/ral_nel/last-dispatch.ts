@@ -31,9 +31,7 @@ export const lastDispatch: Ability<Params> = {
         if (unitId !== ctx.getUnit()) return false
 
         // Check there's at least 1 eligible opponent ship
-        for (const id of ctx.api.opponent.participating.getUnits(undefined, {
-          includeVariants: true,
-        })) {
+        for (const id of ctx.api.opponent.participating.getUnits()) {
           if (isEligibleTarget(ctx, id)) return true
         }
         return false
@@ -70,8 +68,5 @@ function isEligibleTarget(ctx: AbilityReadContext, unitId: UnitId) {
   // Has sustain in stats, but check if it's been restricted (lost/disabled)
   const variantKey = ctx.api.opponent.getUnitVariantKey(unitId)
   if (!variantKey) return false
-  return (
-    ctx.api.opponent.isUnitAbilityLost('SUSTAIN_DAMAGE', unitId) ||
-    ctx.api.opponent.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', unitId)
-  )
+  return ctx.api.opponent.isUnitAbilityDisabled('SUSTAIN_DAMAGE', unitId)
 }

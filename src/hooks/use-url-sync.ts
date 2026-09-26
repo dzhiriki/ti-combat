@@ -19,23 +19,14 @@ export function configToSearchString(config: SerializedConfig): string {
     `af=${config.af}`,
     `df=${config.df}`,
     `m=${config.m}`,
+    `e=${config.e}`,
+    `sp=${config.sp}`,
+    `p=${config.p.join(',')}`,
+    `aup=${config.aup.join(',')}`,
+    `dup=${config.dup.join(',')}`,
   ]
-  if (config.v === 1) {
-    for (const [type, [count, upgraded]] of Object.entries(config.au)) {
-      parts.push(`au.${type}=${count}.${upgraded}`)
-    }
-    for (const [type, [count, upgraded]] of Object.entries(config.du)) {
-      parts.push(`du.${type}=${count}.${upgraded}`)
-    }
-  } else {
-    parts.push(`e=${config.e}`)
-    parts.push(`sp=${config.sp}`)
-    parts.push(`p=${config.p.join(',')}`)
-    parts.push(`aup=${config.aup.join(',')}`)
-    parts.push(`dup=${config.dup.join(',')}`)
-    writeSurfaceCounts(parts, 'asu', config.asu)
-    writeSurfaceCounts(parts, 'dsu', config.dsu)
-  }
+  writeSurfaceCounts(parts, 'asu', config.asu)
+  writeSurfaceCounts(parts, 'dsu', config.dsu)
 
   writeAbilityParams(parts, 'aa', config.aa)
   writeAbilityParams(parts, 'da', config.da)
@@ -182,9 +173,6 @@ function decodeValue(
   // Base params — always known types regardless of ability lookup
   if (paramKey === 'isEnabled') return raw === 'true'
   if (paramKey === 'uses') return raw === 'Inf' ? Infinity : Number(raw)
-  if (ability?.key === 'TF_STARLANCER_XI' && paramKey === 'mechsOnGround') {
-    return Number(raw)
-  }
 
   if (!ability) return raw
 

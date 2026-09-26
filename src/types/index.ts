@@ -38,7 +38,6 @@ export {
   SPACE_SURFACE_ID,
 } from './surface'
 export type {
-  UnitCombatOverrides,
   Unit,
   UnitAbility,
   UnitBaseType,

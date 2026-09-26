@@ -3,13 +3,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CombatOutcome } from '@/combat'
 import { CombatSetup, type SimulationInput } from '@/hooks/combat-setup'
 import { buildCombatState } from '@/hooks/combat-setup/build-combat-state'
-import { prepareSimulationConfig } from '@/hooks/combat-setup/prepare-simulation-config'
+import { prepareSimulation } from '@/hooks/combat-setup/prepare-simulation'
 import { validateSerializedConfig } from '@/hooks/combat-setup/validation'
 import {
   configToSearchString,
   searchParamsToConfig,
 } from '@/hooks/use-url-sync'
-import type { GameSystem } from '@/types'
+import {
+  createDefaultSurfaces,
+  type GameSystem,
+  SPACE_SURFACE_ID,
+} from '@/types'
 import { getFaction } from '@/utils/get-faction'
 import { getFactionUnitConfig } from '@/utils/get-faction-unit-config'
 import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
@@ -142,14 +146,19 @@ describe('explicit game system', () => {
 
   it('rejects mixed-system simulation input before modifying params', () => {
     const abilities = { attacker: {}, defender: {} }
+    const placements = { counts: {}, upgradedTypes: [] }
     expect(() =>
-      prepareSimulationConfig(
-        'TI4',
+      prepareSimulation({
+        system: 'TI4',
+        attackerFaction: 'ARBOREC',
+        defenderFaction: 'AVARICE_REX',
+        surfaces: createDefaultSurfaces(),
+        activeSurfaceId: SPACE_SURFACE_ID,
+        attackerPlacements: placements,
+        defenderPlacements: placements,
+        combatMode: 'SPACE',
         abilities,
-        'ARBOREC',
-        'AVARICE_REX',
-        'SPACE',
-      ),
+      }),
     ).toThrow('Faction "AVARICE_REX" is not available in TI4')
     expect(abilities).toEqual({ attacker: {}, defender: {} })
   })

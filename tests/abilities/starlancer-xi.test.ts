@@ -220,7 +220,7 @@ describe('TF_STARLANCER_XI', () => {
     expect(isUnitCategory(t.state.attacker, placed!, 'GROUND_FORCES')).toBe(
       true,
     )
-    expect(t.state.attacker.unitCombat?.[placed!]).toBeUndefined()
+    expect(t.state.attacker.unitGrants?.[placed!]).toBeUndefined()
     expect(t.dicePool().attacker).toContainDice('MECH', [4, 1])
   })
 

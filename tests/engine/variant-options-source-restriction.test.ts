@@ -13,12 +13,11 @@ function makeSide(): SideStateData {
     unitState: {},
     unitStats: {},
     abilities: {},
-    unitCategoryOptions: {
-      SHIPS: ships,
-      GROUND_FORCES: [],
-      STRUCTURES: [],
+    optionMetadata: {
+      categories: { SHIPS: ships, GROUND_FORCES: [], STRUCTURES: [] },
+      changes: [],
+      subtypes: [],
     },
-    declaredSubtypes: [],
     liveAbilities: {},
   } as unknown as SideStateData
 }

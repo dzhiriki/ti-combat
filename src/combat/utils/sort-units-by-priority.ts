@@ -63,7 +63,4 @@ export function sortUnitsByPriority(
 
   side.participatingUnits = participating.join('') as UnitIdList
   side.nonParticipatingUnits = nonParticipating.join('') as UnitIdList
-  // Location signatures are per id list, so any membership change voids
-  // them — except '' (everything on the active surface).
-  if (side._locationHash) side._locationHash = undefined
 }

@@ -63,14 +63,10 @@ export const viscountUnlenn: Ability<Params> = {
       timing: 'START_OF_COMBAT_ROUND',
       external: true,
       isCallable: (params, ctx) => {
-        return ctx.api.own.participating.hasUnitType(params.unitType, {
-          includeVariants: false,
-        })
+        return ctx.api.own.participating.hasUnitType(params.unitType)
       },
       call: (ctx, params) => {
-        const [unitId] = ctx.api.own.participating.getUnits(params.unitType, {
-          includeVariants: false,
-        })
+        const [unitId] = ctx.api.own.participating.getUnits(params.unitType)
         ctx.api.own.addSubtype(unitId, VISCOUNT)
       },
     },

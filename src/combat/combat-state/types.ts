@@ -3,7 +3,6 @@ import type {
   CombatSide,
   UnitAbility,
   UnitBaseType,
-  UnitCombatOverrides,
   UnitId,
   UnitIdList,
   UnitState,
@@ -18,10 +17,7 @@ import type {
   AbilityPassFrame,
   AbilityTiming,
 } from '../abilities-engine'
-import type {
-  DeclaredSubtype,
-  UnitCategoryOptions,
-} from '../abilities-engine/types'
+import type { SideOptionMetadata } from '../abilities-engine/types'
 import type { HitsDist } from '../dice-math/reroll-strategy'
 import type { ModifierDecl } from '../dice-math/types'
 // `PhaseStep` references `CombatState` in its method `fn` signature; the
@@ -97,26 +93,20 @@ export interface CustomHitPool {
   unitPriority: UnitLocator[]
 }
 
-/** All supplied conditions must match the actual target unit. */
-export interface UnitTargetFilter {
-  types?: readonly UnitLocator[]
-  excludeTypes?: readonly UnitLocator[]
-  unitAbility?: boolean
-}
-
 /** A pool of unassigned hits.
  *  `base` = from dice rolls; `additional` = from abilities.
  *  X-89-style hit doubling only doubles `base`.
- *  `targetFilter`, when present, belongs to the assignment phase and applies
- *  to the main pool and every custom entry. Custom entries additionally carry
- *  their own `unitPriority` and drain after the main pool, in declaration
- *  order. */
+ *  `unitAbilityTargets`, when present, belongs to the assignment phase and
+ *  applies to the main pool and every custom entry. Custom entries
+ *  additionally carry their own `unitPriority` and drain after the main
+ *  pool, in declaration order. */
 export interface HitPool {
   base: number
   additional: number
   custom: CustomHitPool[]
-  /** Eligibility imposed by the current assignment phase. */
-  targetFilter?: UnitTargetFilter
+  /** Set for unit-ability hits: only units matching one of these locators
+   *  and not `UNIT_ABILITY_HIT_IMMUNE` may be assigned them. */
+  unitAbilityTargets?: readonly UnitLocator[]
 }
 
 /** A single restriction entry explaining why an ability is restricted */
@@ -145,21 +135,13 @@ export interface UnitAbilityRestrictions {
   immune?: RestrictionImmunity[]
 }
 
-export type ResolvedRestrictionScope = Set<UnitType | UnitId> | 'ALL'
-
-/** Resolved restrictions for one unit ability. Global restrictions are
- *  checked for every unit; surface restrictions are checked only for units
- *  physically located on that surface. */
-export interface ResolvedAbilityRestriction {
-  global?: ResolvedRestrictionScope
-  surfaces?: Map<SurfaceId, ResolvedRestrictionScope>
-}
-
 /** Resolved form of `UnitAbilityRestrictions`, derived from the raw entries,
- *  current unit composition and category membership. */
+ *  current unit composition, category membership and (for surface-scoped
+ *  entries) unit location. Per layer per ability: either `'ALL'` (blanket)
+ *  or the restricted variant keys, base types and unit ids. */
 export type ResolvedRestrictionsLayer = Map<
   UnitAbility,
-  ResolvedAbilityRestriction
+  Set<UnitType | UnitId> | 'ALL'
 >
 export interface ResolvedRestrictions {
   cannotBeUsed: ResolvedRestrictionsLayer
@@ -172,10 +154,12 @@ export type UnitStatsEntry = UnitStats | ((parentStats: UnitStats) => UnitStats)
 /** Ability configuration for one side (key → params). */
 export type SideAbilitiesConfig = Record<string, Record<string, unknown>>
 
-/** `unitCombatHash` result with the input refs it was built from. */
-export interface UnitCombatHashCache {
+/** `unitMetaHash` result with the inputs it was built from. */
+export interface UnitMetaHashCache {
+  unitSurface: SideStateData['unitSurface']
   unitStats: SideStateData['unitStats']
-  unitCombat: SideStateData['unitCombat']
+  unitGrants: SideStateData['unitGrants']
+  activeSurfaceId: SurfaceId
   value: string
 }
 
@@ -205,14 +189,14 @@ export interface SideStateData {
   unitType: Record<string, UnitType>
   /** UnitId → per-unit mutable state (flat map, sparse — only entries with non-default state) */
   unitState: Record<string, UnitState>
-  /** Sparse, copy-on-write instance grants; retained for destroy reactions. */
-  unitCombat?: Record<string, UnitCombatOverrides>
+  /** Sparse, copy-on-write category grants: the unit counts as a member of
+   *  that category and takes part in its combat mode wherever it stands
+   *  (Alastor's ships, committed fighters). Retained for destroy reactions. */
+  unitGrants?: Readonly<Record<string, UnitCategory>>
   /** Variant key → shared stats template (may be a factory for subtypes) */
   unitStats: Record<UnitType, UnitStatsEntry>
-  /** Setup option metadata derived from native stats and ability declarations. */
-  unitCategoryOptions?: UnitCategoryOptions
-  unitCategoryChanges?: readonly import('../abilities-engine/types').ParamChange[]
-  declaredSubtypes?: readonly DeclaredSubtype[]
+  /** Setup option metadata; only option lists read it. */
+  optionMetadata?: SideOptionMetadata
   /** The side's pending hit pool, or undefined when no hits are queued.
    *  At most one pool is alive at a time; abilities that produce
    *  type-restricted hits via `addHits(n, types)` must do so when the
@@ -241,15 +225,9 @@ export interface SideStateData {
    *  with another SideStateData; mutations must clone first via
    *  `ensureHitPoolOwned`. */
   _hitPoolShared?: boolean
-  /** Cached location segment of the state hash: '' when every living unit
-   *  is on the active surface, else `@…`. */
-  _locationHash?: string
-  /** Cached category/grant segment of the state hash (`unitCombatHash`),
-   *  valid while both input refs are unchanged. */
-  _unitCombatHash?: UnitCombatHashCache
-  /** Calculation target used to omit redundant location data when every
-   *  living unit is already on the active surface. */
-  _activeSurfaceId?: SurfaceId
+  /** Cached location/category/grant segment of the state hash
+   *  (`unitMetaHash`), valid while its copy-on-write inputs are unchanged. */
+  _metaHash?: UnitMetaHashCache
 
   /** Derived O(1) lookup cache for `unitAbilityRestrictions`, rebuilt
    *  lazily on first read after any mutation that could affect
@@ -332,9 +310,8 @@ export interface DiceRollContext {
     attacker: import('../dice-math/types').SideDiceCollection
     defender: import('../dice-math/types').SideDiceCollection
   }
-  allowedUnitTypes?: ReadonlySet<UnitBaseType>
-  /** Restrict dice-producing units to these physical surfaces. */
-  sourceSurfaceIds?: ReadonlySet<SurfaceId>
+  /** Restrict dice-producing units to this physical surface. */
+  sourceSurfaceId?: SurfaceId
   isUnitAbility: boolean
   /** Per-side dice collection in the kernel-native format. Populated by
    *  `_collectDice`; mutated in place by BEFORE-timing API calls. */
@@ -342,10 +319,6 @@ export interface DiceRollContext {
     attacker: import('../dice-math/types').SideDiceCollection
     defender: import('../dice-math/types').SideDiceCollection
   }
-  /** Per-raw-landing-side priority for unit-ability hits. The list defines
-   *  both eligibility and assignment order. For self-targeted rolls the
-   *  raw pool is later swapped, carrying this priority to the firing side. */
-  unitAbilityPriority?: { attacker: UnitLocator[]; defender: UnitLocator[] }
   /** Per-landing-side marginal of main base hits, captured by
    *  `_branchesFromMathKernel` after the math kernel runs. Read at
    *  AFTER_DICE_ROLL_STEP by abilities that gate on the realized roll's

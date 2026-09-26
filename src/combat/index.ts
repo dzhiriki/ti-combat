@@ -17,14 +17,11 @@ export {
   declareParam,
   type DicePool,
   enforceFleetPool,
-  type FindUnitOptions,
-  type FindUnitsOptions,
   hasStaticInvokes,
   isDeclaredParam,
   type OwnOpponentContext,
   type ParamChange,
   type ParamFilter,
-  type ParticipatingUnitQueryApi,
   type RegisteredAbility,
   resolveInvokes,
   type RuntimeAbilityList,
@@ -32,10 +29,6 @@ export {
   type SyncSortSpec,
   type SyncSourceConfig,
   type UnitListMode,
-  type UnitOption,
-  type UnitSelectorScope,
-  type UnitQueryApi,
-  type UnitQueryOptions,
   withRunningAbility,
 } from './abilities-engine'
 export {
@@ -45,9 +38,7 @@ export {
 } from './abilities-engine/declare-param'
 export { CombatEngine } from './combat-engine'
 export {
-  applyVariantPostFilter,
   CombatSideState,
-  filterDeclaredSubtypes,
   getOpponentSide,
 } from './combat-side-state/combat-side-state'
 export {
@@ -76,10 +67,4 @@ export type { CombatOutcome, SurfaceSurvivors, SurvivorSide } from './types'
 export { nextUnitIds } from './utils/unit-id'
 export { makeVariantId } from './utils/unit-variant'
 
-export {
-  makeUnitLocator,
-  matchesUnitLocator,
-  locatorWithSubtype,
-} from './utils/unit-locator'
-
-export { parseUnitLocator } from './utils/parse-unit-locator'
+export { makeUnitLocator } from './utils/unit-locator'

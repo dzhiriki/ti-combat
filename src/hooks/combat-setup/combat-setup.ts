@@ -8,12 +8,14 @@ import {
   extractDefaults,
   getOpponentSide,
   type SideAbilitiesConfig,
+  type SideStateData,
 } from '@/combat'
 import { UNIT_LIMITS } from '@/constants/units'
 import type {
   CollectedAbility,
   CombatSide,
   GameSystem,
+  SideUnitPlacements,
   SurfaceDefinition,
   SurfaceId,
   SurfaceUnitCounts,
@@ -29,10 +31,7 @@ import {
 } from '@/types'
 import { getFaction } from '@/utils/get-faction'
 import { DEFAULT_GAME_SYSTEM, getGameData } from '@/utils/get-game-data'
-import {
-  buildUnitStatsMap,
-  getSimulationUnitsOnSurfaces,
-} from '@/utils/get-simulation-units'
+import { buildUnitStatsMap } from '@/utils/get-simulation-units'
 import {
   getUnitConfig as buildUnitConfig,
   type UnitConfig,
@@ -40,7 +39,6 @@ import {
 import {
   collapseSurfaceCounts,
   createEmptySurfaceCounts,
-  createEmptyUnitSelections,
   expandSimplifiedCounts,
   materializeSurfaceSelections,
   normalizeSurfaceCounts,
@@ -50,6 +48,7 @@ import {
   applyAbilityPlacementOverrides,
   getAbilityPlacementOverrides,
 } from './ability-placement'
+import { buildSideState } from './build-side-state'
 import {
   initializeAbilityDefaults,
   reconcileAbilitiesConfig,
@@ -74,9 +73,9 @@ export class CombatSetup {
   private _attackerFaction: string
   private _defenderFaction: string
   private _editorMode: UnitEditorMode
-  private _surfaces: SurfaceDefinition[]
-  private _selectedPlanetId: SurfaceId
-  private _surfaceCounts: Record<CombatSide, SurfaceUnitCounts>
+  private _surfaces!: SurfaceDefinition[]
+  private _selectedPlanetId!: SurfaceId
+  private _surfaceCounts!: Record<CombatSide, SurfaceUnitCounts>
   private _upgradedTypes: Record<CombatSide, Set<UnitBaseType>>
   private _surfaceSelectionCache: Partial<
     Record<
@@ -90,10 +89,19 @@ export class CombatSetup {
   > = {}
   private _combatMode: CombatMode
   private _abilities: Record<CombatSide, SideAbilitiesConfig>
-  private _sideRegistered!: Record<CombatSide, CollectedAbility[]>
+  private _sideRegistered: Record<CombatSide, CollectedAbility[]> = {
+    attacker: [],
+    defender: [],
+  }
   private _lookups!: SideLookups
-  private _unitAbilityKeys: Record<CombatSide, ReadonlySet<string>>
-  private _factionOwnedKeys: Record<CombatSide, ReadonlySet<string>>
+  private _unitAbilityKeys: Record<CombatSide, ReadonlySet<string>> = {
+    attacker: new Set(),
+    defender: new Set(),
+  }
+  private _factionOwnedKeys: Record<CombatSide, ReadonlySet<string>> = {
+    attacker: new Set(),
+    defender: new Set(),
+  }
   private _stateData: CombatStateData
   private _engine: AbilitiesEngine
 
@@ -106,81 +114,33 @@ export class CombatSetup {
     this._defenderFaction = defaultFaction
 
     this._editorMode = editorMode
-    this._surfaces = createDefaultSurfaces()
-    this._selectedPlanetId = DEFAULT_PLANET_ID
-    this._surfaceCounts = {
-      attacker: createEmptySurfaceCounts(this._surfaces),
-      defender: createEmptySurfaceCounts(this._surfaces),
-    }
+    this.resetSurfaces()
     this._upgradedTypes = { attacker: new Set(), defender: new Set() }
     this._combatMode = 'SPACE'
     this._abilities = { attacker: {}, defender: {} }
+    this.loadAbilities()
 
-    const gameData = getGameData(this._system)
-    const attackerRegistered = gameData.getAvailableAbilities(
-      'attacker',
-      defaultFaction,
-      this.getUpgradedTypes('attacker'),
-    )
-    const defenderRegistered = gameData.getAvailableAbilities(
-      'defender',
-      defaultFaction,
-      this.getUpgradedTypes('defender'),
-    )
-    this._sideRegistered = {
-      attacker: attackerRegistered,
-      defender: defenderRegistered,
-    }
-    this._lookups = createLookups(this._sideRegistered)
-    this._unitAbilityKeys = {
-      attacker: gameData.getUnitDefinitionAbilityKeys(defaultFaction),
-      defender: gameData.getUnitDefinitionAbilityKeys(defaultFaction),
-    }
-    this._factionOwnedKeys = {
-      attacker: gameData.getFactionOwnedAbilityKeys(defaultFaction),
-      defender: gameData.getFactionOwnedAbilityKeys(defaultFaction),
-    }
-
+    const emptySide = (side: CombatSide): SideStateData => ({
+      faction: defaultFaction,
+      participatingUnits: '' as UnitIdList,
+      nonParticipatingUnits: '' as UnitIdList,
+      unitSurface: {},
+      unitType: {},
+      unitState: {},
+      unitStats: defaultUnitStats,
+      abilities: this._abilities[side],
+      liveAbilities: {},
+    })
     this._stateData = {
-      attacker: {
-        faction: defaultFaction,
-        participatingUnits: '' as UnitIdList,
-        nonParticipatingUnits: '' as UnitIdList,
-
-        unitSurface: {},
-        unitType: {},
-        unitState: {},
-        unitStats: defaultUnitStats,
-        abilities: this._abilities.attacker,
-        liveAbilities: {},
-      },
-      defender: {
-        faction: defaultFaction,
-        participatingUnits: '' as UnitIdList,
-        nonParticipatingUnits: '' as UnitIdList,
-
-        unitSurface: {},
-        unitType: {},
-        unitState: {},
-        unitStats: defaultUnitStats,
-        abilities: this._abilities.defender,
-        liveAbilities: {},
-      },
+      attacker: emptySide('attacker'),
+      defender: emptySide('defender'),
       combatMode: 'SPACE',
       surfaces: this._surfaces,
       activeSurfaceId: SPACE_SURFACE_ID,
     }
 
     initializeAbilityDefaults(this._abilities, this._sideRegistered)
-    reconcileAbilitiesConfig(
-      this._abilities,
-      this._sideRegistered,
-      this._combatMode,
-      this._stateData,
-      this._lookups,
-      undefined,
-      true,
-    )
+    this.reconcile()
 
     const wrapState = CombatState.fromDataStandalone(
       this._stateData,
@@ -258,9 +218,7 @@ export class CombatSetup {
   }
 
   getUnitConfig(side: CombatSide): Record<UnitBaseType, UnitConfig> {
-    const faction =
-      side === 'attacker' ? this._attackerFaction : this._defenderFaction
-    const result = buildUnitConfig(this._system, faction)
+    const result = buildUnitConfig(this._system, this.faction(side))
     const overrides = getAbilityPlacementOverrides(
       this._sideRegistered[side],
       this._abilities[side],
@@ -286,12 +244,7 @@ export class CombatSetup {
 
     const faction = getGameData(system).defaultFaction
 
-    this._surfaces = createDefaultSurfaces()
-    this._selectedPlanetId = DEFAULT_PLANET_ID
-    this._surfaceCounts = {
-      attacker: createEmptySurfaceCounts(this._surfaces),
-      defender: createEmptySurfaceCounts(this._surfaces),
-    }
+    this.resetSurfaces()
     this._upgradedTypes = { attacker: new Set(), defender: new Set() }
 
     // Drop all ability config so nothing carries across systems; setFaction
@@ -312,10 +265,7 @@ export class CombatSetup {
         abilities: {},
       },
       surfaces: this._surfaces,
-      activeSurfaceId:
-        this._combatMode === 'SPACE'
-          ? SPACE_SURFACE_ID
-          : this._selectedPlanetId,
+      activeSurfaceId: this.activeSurfaceId,
     }
 
     this.setFaction('attacker', faction)
@@ -334,28 +284,18 @@ export class CombatSetup {
     const nextStats = buildUnitStatsMap(
       this._system,
       faction,
-      this.getUpgradedTypes(side),
+      this._upgradedTypes[side],
     )
     if (this._editorMode === 'SIMPLIFIED') this.reflowSimplified(side)
     this._surfaceCounts[side] = normalizeSurfaceCounts(
       this._surfaceCounts[side],
       this._surfaces,
       this._selectedPlanetId,
-      side,
       nextStats,
     )
 
     // Reload abilities for the changed side
-    const gameData = getGameData(this._system)
-    const reg = gameData.getAvailableAbilities(
-      side,
-      faction,
-      this.getUpgradedTypes(side),
-    )
-    this._sideRegistered[side] = reg
-    this._lookups = createLookups(this._sideRegistered)
-    this._unitAbilityKeys[side] = gameData.getUnitDefinitionAbilityKeys(faction)
-    this._factionOwnedKeys[side] = gameData.getFactionOwnedAbilityKeys(faction)
+    this.loadAbilities([side])
 
     // Rebuild side config: keep existing params for surviving abilities,
     // initialize defaults for new ones
@@ -378,18 +318,10 @@ export class CombatSetup {
     }
 
     // Rebuild unit data
-    this.rebuildUnits(side, faction)
+    this.rebuildUnits(side)
 
     // Reconcile
-    reconcileAbilitiesConfig(
-      this._abilities,
-      this._sideRegistered,
-      this._combatMode,
-      this._stateData,
-      this._lookups,
-      undefined,
-      true,
-    )
+    this.reconcile()
     this.rebuildEngine()
   }
 
@@ -399,7 +331,10 @@ export class CombatSetup {
       console.warn(`Unit limit exceeded: ${unitType} has a maximum of ${limit}`)
       count = limit
     }
-    this.updateSelection(side, unitType, { count })
+    const totals = this.flatSelections(side, true)
+    totals[unitType] = { ...totals[unitType], count }
+    this.reflowSimplified(side, totals)
+    this.refreshSideAfterUnitChange(side, false)
   }
 
   setUpgraded(
@@ -430,21 +365,11 @@ export class CombatSetup {
       ability => ability.key === abilityKey && ability.unitPlacements?.length,
     )
     this.setParam(side, abilityKey, params)
-    reconcileAbilitiesConfig(
-      this._abilities,
-      this._sideRegistered,
-      this._combatMode,
-      this._stateData,
-      this._lookups,
-      undefined,
-      true,
-    )
+    this.reconcile()
     if (changesPlacement) {
       if (this._editorMode === 'SIMPLIFIED') this.reflowSimplified(side)
       else this.normalizeSideCounts(side)
-      const faction =
-        side === 'attacker' ? this._attackerFaction : this._defenderFaction
-      this.rebuildUnits(side, faction)
+      this.rebuildUnits(side)
     }
     // Force new stateData reference so React memoization triggers
     this._stateData = { ...this._stateData }
@@ -456,18 +381,9 @@ export class CombatSetup {
     this._stateData = {
       ...this._stateData,
       combatMode: mode,
-      activeSurfaceId:
-        mode === 'SPACE' ? SPACE_SURFACE_ID : this._selectedPlanetId,
+      activeSurfaceId: this.activeSurfaceId,
     }
-    reconcileAbilitiesConfig(
-      this._abilities,
-      this._sideRegistered,
-      this._combatMode,
-      this._stateData,
-      this._lookups,
-      undefined,
-      true,
-    )
+    this.reconcile()
     if (this._editorMode === 'SIMPLIFIED') {
       this.reflowSimplified('attacker')
       this.reflowSimplified('defender')
@@ -484,12 +400,7 @@ export class CombatSetup {
         attacker: this.flatSelections('attacker', true),
         defender: this.flatSelections('defender', true),
       }
-      this._surfaces = createDefaultSurfaces()
-      this._selectedPlanetId = DEFAULT_PLANET_ID
-      this._surfaceCounts = {
-        attacker: createEmptySurfaceCounts(this._surfaces),
-        defender: createEmptySurfaceCounts(this._surfaces),
-      }
+      this.resetSurfaces()
       this._editorMode = mode
       this.reflowSimplified('attacker', totals.attacker)
       this.reflowSimplified('defender', totals.defender)
@@ -507,8 +418,7 @@ export class CombatSetup {
     this._selectedPlanetId = surfaceId
     this._stateData = {
       ...this._stateData,
-      activeSurfaceId:
-        this._combatMode === 'SPACE' ? SPACE_SURFACE_ID : surfaceId,
+      activeSurfaceId: this.activeSurfaceId,
     }
     this.rebuildAllUnits()
   }
@@ -533,36 +443,6 @@ export class CombatSetup {
     }
     this._stateData = { ...this._stateData, surfaces: this._surfaces }
     this.selectPlanet(id)
-  }
-
-  removePlanet(surfaceId: SurfaceId): void {
-    if (this._editorMode !== 'FULL') return
-    const planets = this._surfaces.filter(s => s.type === 'PLANET')
-    if (planets.length <= 1) return
-    const hasUnits = (['attacker', 'defender'] as const).some(side =>
-      Object.values(this._surfaceCounts[side][surfaceId] ?? {}).some(
-        count => count > 0,
-      ),
-    )
-    if (hasUnits) return
-    this._surfaces = this._surfaces.filter(s => s.id !== surfaceId)
-    for (const side of ['attacker', 'defender'] as const) {
-      const next = { ...this._surfaceCounts[side] }
-      delete next[surfaceId]
-      this._surfaceCounts[side] = next
-    }
-    if (this._selectedPlanetId === surfaceId) {
-      this._selectedPlanetId = this._surfaces.find(s => s.type === 'PLANET')!.id
-    }
-    this._stateData = {
-      ...this._stateData,
-      surfaces: this._surfaces,
-      activeSurfaceId:
-        this._combatMode === 'SPACE'
-          ? SPACE_SURFACE_ID
-          : this._selectedPlanetId,
-    }
-    this.rebuildAllUnits()
   }
 
   setSurfaceUnitCount(
@@ -598,27 +478,10 @@ export class CombatSetup {
     this._surfaceCounts[side] = createEmptySurfaceCounts(this._surfaces)
     this._upgradedTypes[side] = new Set()
 
-    const faction =
-      side === 'attacker' ? this._attackerFaction : this._defenderFaction
-    this.rebuildUnits(side, faction)
-
+    this.rebuildUnits(side)
     // Upgrades may have changed — recalculate available abilities
-    const regReset = getGameData(this._system).getAvailableAbilities(
-      side,
-      faction,
-      this.getUpgradedTypes(side),
-    )
-    this._sideRegistered[side] = regReset
-    this._lookups = createLookups(this._sideRegistered)
-    reconcileAbilitiesConfig(
-      this._abilities,
-      this._sideRegistered,
-      this._combatMode,
-      this._stateData,
-      this._lookups,
-      undefined,
-      true,
-    )
+    this.loadAbilities([side])
+    this.reconcile()
     this.rebuildEngine()
   }
 
@@ -629,23 +492,13 @@ export class CombatSetup {
       [side]: { ...this._stateData[side], abilities: this._abilities[side] },
     }
     initializeAbilityDefaults(this._abilities, this._sideRegistered)
-    reconcileAbilitiesConfig(
-      this._abilities,
-      this._sideRegistered,
-      this._combatMode,
-      this._stateData,
-      this._lookups,
-      undefined,
-      true,
-    )
+    this.reconcile()
     if (this._editorMode === 'SIMPLIFIED') {
       this.reflowSimplified(side)
     } else {
       this.normalizeSideCounts(side)
     }
-    const faction =
-      side === 'attacker' ? this._attackerFaction : this._defenderFaction
-    this.rebuildUnits(side, faction)
+    this.rebuildUnits(side)
     // Force new stateData reference so React memoization triggers
     this._stateData = { ...this._stateData }
     this.rebuildEngine()
@@ -684,45 +537,8 @@ export class CombatSetup {
     // Recompute available abilities for the swapped sides — `side`-restricted
     // abilities (e.g. attacker-only commanders) need re-filtering against the
     // new side. Swapping the cached lists alone leaks old entries through.
-    const gameData = getGameData(this._system)
-    const attackerRegistered = gameData.getAvailableAbilities(
-      'attacker',
-      this._attackerFaction,
-      this.getUpgradedTypes('attacker'),
-    )
-    const defenderRegistered = gameData.getAvailableAbilities(
-      'defender',
-      this._defenderFaction,
-      this.getUpgradedTypes('defender'),
-    )
-    this._sideRegistered = {
-      attacker: attackerRegistered,
-      defender: defenderRegistered,
-    }
-    this._lookups = createLookups(this._sideRegistered)
-    this._unitAbilityKeys = {
-      attacker: gameData.getUnitDefinitionAbilityKeys(this._attackerFaction),
-      defender: gameData.getUnitDefinitionAbilityKeys(this._defenderFaction),
-    }
-    this._factionOwnedKeys = {
-      attacker: gameData.getFactionOwnedAbilityKeys(this._attackerFaction),
-      defender: gameData.getFactionOwnedAbilityKeys(this._defenderFaction),
-    }
-
-    // Rebuild units for both sides
-    this.rebuildUnits('attacker', this._attackerFaction)
-    this.rebuildUnits('defender', this._defenderFaction)
-
-    reconcileAbilitiesConfig(
-      this._abilities,
-      this._sideRegistered,
-      this._combatMode,
-      this._stateData,
-      this._lookups,
-      undefined,
-      true,
-    )
-    this.rebuildEngine()
+    this.loadAbilities()
+    this.rebuildAllUnits()
   }
 
   toSimulationInput(): SimulationInput | null {
@@ -737,18 +553,9 @@ export class CombatSetup {
       attackerFaction: this._attackerFaction,
       defenderFaction: this._defenderFaction,
       surfaces: this._surfaces,
-      activeSurfaceId:
-        this._combatMode === 'SPACE'
-          ? SPACE_SURFACE_ID
-          : this._selectedPlanetId,
-      attackerPlacements: {
-        counts: this._surfaceCounts.attacker,
-        upgradedTypes: [...this._upgradedTypes.attacker],
-      },
-      defenderPlacements: {
-        counts: this._surfaceCounts.defender,
-        upgradedTypes: [...this._upgradedTypes.defender],
-      },
+      activeSurfaceId: this.activeSurfaceId,
+      attackerPlacements: this.placements('attacker'),
+      defenderPlacements: this.placements('defender'),
       combatMode: this._combatMode,
       abilities: this._abilities,
     }
@@ -779,7 +586,6 @@ export class CombatSetup {
       this._combatMode,
       serializationState,
       this._lookups,
-      undefined,
       true,
     )
 
@@ -815,8 +621,7 @@ export class CombatSetup {
     this._attackerFaction = af
     this._defenderFaction = df
     this._combatMode = config.m === 'S' ? 'SPACE' : 'GROUND'
-    const planetIds =
-      config.v === 2 && config.p.length ? config.p : [DEFAULT_PLANET_ID]
+    const planetIds = config.p.length ? config.p : [DEFAULT_PLANET_ID]
     this._surfaces = [
       { id: SPACE_SURFACE_ID, type: 'SPACE', name: 'Space' },
       ...planetIds.map((id, index) => ({
@@ -825,100 +630,43 @@ export class CombatSetup {
         name: `Planet ${index + 1}`,
       })),
     ]
-    this._selectedPlanetId =
-      config.v === 2 && planetIds.includes(config.sp)
-        ? (config.sp as SurfaceId)
-        : (planetIds[0] as SurfaceId)
-    this._editorMode =
-      config.v === 2 && config.e === 'F' ? 'FULL' : 'SIMPLIFIED'
+    this._selectedPlanetId = (
+      planetIds.includes(config.sp) ? config.sp : planetIds[0]
+    ) as SurfaceId
+    this._editorMode = config.e === 'F' ? 'FULL' : 'SIMPLIFIED'
 
     this._surfaceCounts = {
       attacker: createEmptySurfaceCounts(this._surfaces),
       defender: createEmptySurfaceCounts(this._surfaces),
     }
     this._upgradedTypes = { attacker: new Set(), defender: new Set() }
+    for (const side of ['attacker', 'defender'] as const) {
+      const source = side === 'attacker' ? config.asu : config.dsu
+      for (const surface of this._surfaces) {
+        for (const [type, count] of Object.entries(source[surface.id] ?? {})) {
+          if (Object.hasOwn(this._surfaceCounts[side][surface.id], type)) {
+            this._surfaceCounts[side][surface.id][type as UnitBaseType] = count
+          }
+        }
+      }
+      this._upgradedTypes[side] = new Set(
+        side === 'attacker' ? config.aup : config.dup,
+      )
+    }
+    // Simplified totals reflow after abilities are registered below.
     let simplifiedTotals:
       | Record<CombatSide, Record<UnitBaseType, UnitSelection>>
       | undefined
-    if (config.v === 1) {
+    if (this._editorMode === 'SIMPLIFIED') {
       simplifiedTotals = {
-        attacker: createEmptyUnitSelections(),
-        defender: createEmptyUnitSelections(),
+        attacker: this.flatSelections('attacker', true),
+        defender: this.flatSelections('defender', true),
       }
-      for (const side of ['attacker', 'defender'] as const) {
-        const source = side === 'attacker' ? config.au : config.du
-        const upgrades = new Set<UnitBaseType>()
-        for (const [type, [count, upgraded]] of Object.entries(source)) {
-          if (!Object.hasOwn(simplifiedTotals[side], type)) continue
-          const unitType = type as UnitBaseType
-          simplifiedTotals[side][unitType] = { count, upgraded: upgraded === 1 }
-          if (upgraded) upgrades.add(unitType)
-        }
-        this._upgradedTypes[side] = upgrades
-      }
-      if (
-        typeof config.aa.TF_STARLANCER_XI?.mechsOnGround === 'number' ||
-        typeof config.da.TF_STARLANCER_XI?.mechsOnGround === 'number'
-      )
-        this._editorMode = 'FULL'
-    } else {
-      for (const side of ['attacker', 'defender'] as const) {
-        const source = side === 'attacker' ? config.asu : config.dsu
-        for (const surface of this._surfaces) {
-          for (const [type, count] of Object.entries(
-            source[surface.id] ?? {},
-          )) {
-            if (Object.hasOwn(this._surfaceCounts[side][surface.id], type)) {
-              this._surfaceCounts[side][surface.id][type as UnitBaseType] =
-                count
-            }
-          }
-        }
-        this._upgradedTypes[side] = new Set(
-          side === 'attacker' ? config.aup : config.dup,
-        )
-      }
-      if (this._editorMode === 'SIMPLIFIED') {
-        const totals = {
-          attacker: this.flatSelections('attacker', true),
-          defender: this.flatSelections('defender', true),
-        }
-        this._surfaces = createDefaultSurfaces()
-        this._selectedPlanetId = DEFAULT_PLANET_ID
-        this._surfaceCounts = {
-          attacker: createEmptySurfaceCounts(this._surfaces),
-          defender: createEmptySurfaceCounts(this._surfaces),
-        }
-        // Reflow after abilities are registered below.
-        simplifiedTotals = totals
-      }
+      this.resetSurfaces()
     }
 
     // Rebuild abilities for new factions
-    const gameData = getGameData(this._system)
-    const attackerReg = gameData.getAvailableAbilities(
-      'attacker',
-      af,
-      this.getUpgradedTypes('attacker'),
-    )
-    const defenderReg = gameData.getAvailableAbilities(
-      'defender',
-      df,
-      this.getUpgradedTypes('defender'),
-    )
-    this._sideRegistered = {
-      attacker: attackerReg,
-      defender: defenderReg,
-    }
-    this._lookups = createLookups(this._sideRegistered)
-    this._unitAbilityKeys = {
-      attacker: gameData.getUnitDefinitionAbilityKeys(af),
-      defender: gameData.getUnitDefinitionAbilityKeys(df),
-    }
-    this._factionOwnedKeys = {
-      attacker: gameData.getFactionOwnedAbilityKeys(af),
-      defender: gameData.getFactionOwnedAbilityKeys(df),
-    }
+    this.loadAbilities()
 
     // Apply saved differences to static defaults. The final reconciliation
     // runs after placements and state data are rebuilt.
@@ -945,16 +693,12 @@ export class CombatSetup {
       this.reflowSimplified('attacker', simplifiedTotals.attacker)
       this.reflowSimplified('defender', simplifiedTotals.defender)
     }
-    if (config.v === 1) {
-      this.migrateLegacyStarlancerPlacement('attacker', config.aa)
-      this.migrateLegacyStarlancerPlacement('defender', config.da)
-    }
     this.normalizeSideCounts('attacker')
     this.normalizeSideCounts('defender')
 
     // Rebuild units for both sides
-    this.rebuildUnits('attacker', af)
-    this.rebuildUnits('defender', df)
+    this.rebuildUnits('attacker')
+    this.rebuildUnits('defender')
 
     // Rebuild stateData references
     this._stateData = {
@@ -969,26 +713,73 @@ export class CombatSetup {
       },
       combatMode: this._combatMode,
       surfaces: this._surfaces,
-      activeSurfaceId:
-        this._combatMode === 'SPACE'
-          ? SPACE_SURFACE_ID
-          : this._selectedPlanetId,
+      activeSurfaceId: this.activeSurfaceId,
     }
 
     // Final reconcile and engine rebuild
+    this.reconcile()
+    this.rebuildEngine()
+  }
+
+  // ── Private helpers ──────────────────────────────────────────────────
+
+  private faction(side: CombatSide): string {
+    return side === 'attacker' ? this._attackerFaction : this._defenderFaction
+  }
+
+  private get activeSurfaceId(): SurfaceId {
+    return this._combatMode === 'SPACE'
+      ? SPACE_SURFACE_ID
+      : this._selectedPlanetId
+  }
+
+  private placements(side: CombatSide): SideUnitPlacements {
+    return {
+      counts: this._surfaceCounts[side],
+      upgradedTypes: [...this._upgradedTypes[side]],
+    }
+  }
+
+  private resetSurfaces(): void {
+    this._surfaces = createDefaultSurfaces()
+    this._selectedPlanetId = DEFAULT_PLANET_ID
+    this._surfaceCounts = {
+      attacker: createEmptySurfaceCounts(this._surfaces),
+      defender: createEmptySurfaceCounts(this._surfaces),
+    }
+  }
+
+  /** Reload the abilities available to `sides` for their current factions
+   *  and upgrades. */
+  private loadAbilities(
+    sides: readonly CombatSide[] = ['attacker', 'defender'],
+  ): void {
+    const gameData = getGameData(this._system)
+    for (const side of sides) {
+      const faction = this.faction(side)
+      this._sideRegistered[side] = gameData.getAvailableAbilities(
+        side,
+        faction,
+        this._upgradedTypes[side],
+      )
+      this._unitAbilityKeys[side] =
+        gameData.getUnitDefinitionAbilityKeys(faction)
+      this._factionOwnedKeys[side] =
+        gameData.getFactionOwnedAbilityKeys(faction)
+    }
+    this._lookups = createLookups(this._sideRegistered)
+  }
+
+  private reconcile(): void {
     reconcileAbilitiesConfig(
       this._abilities,
       this._sideRegistered,
       this._combatMode,
       this._stateData,
       this._lookups,
-      undefined,
       true,
     )
-    this.rebuildEngine()
   }
-
-  // ── Private helpers ──────────────────────────────────────────────────
 
   private flatSelections(
     side: CombatSide,
@@ -1016,10 +807,6 @@ export class CombatSetup {
     return value
   }
 
-  private getUpgradedTypes(side: CombatSide): Set<UnitBaseType> {
-    return this._upgradedTypes[side]
-  }
-
   private reflowSimplified(
     side: CombatSide,
     totals = this.flatSelections(side, true),
@@ -1028,9 +815,7 @@ export class CombatSetup {
       this._surfaceCounts[side],
       totals,
       this._surfaces,
-      SPACE_SURFACE_ID,
       this._selectedPlanetId,
-      side,
       this.getPlacementUnitStats(side),
       this._combatMode,
     )
@@ -1041,110 +826,41 @@ export class CombatSetup {
       this._surfaceCounts[side],
       this._surfaces,
       this._selectedPlanetId,
-      side,
       this.getPlacementUnitStats(side),
     )
   }
 
-  private getPlacementUnitStats(
-    side: CombatSide,
-    nativeStats?: ReturnType<typeof buildUnitStatsMap>,
-  ) {
-    const faction =
-      side === 'attacker' ? this._attackerFaction : this._defenderFaction
+  private getPlacementUnitStats(side: CombatSide) {
     return applyAbilityPlacementOverrides(
-      nativeStats ??
-        buildUnitStatsMap(this._system, faction, this.getUpgradedTypes(side)),
+      buildUnitStatsMap(
+        this._system,
+        this.faction(side),
+        this._upgradedTypes[side],
+      ),
       this._sideRegistered[side],
       this._abilities[side],
     )
   }
 
-  private migrateLegacyStarlancerPlacement(
-    side: CombatSide,
-    abilities: Record<string, Record<string, unknown>>,
-  ): boolean {
-    const raw = abilities['TF_STARLANCER_XI']?.mechsOnGround
-    if (typeof raw !== 'number' || raw < 0) return false
-    const placements = this._surfaceCounts[side]
-    const total = this._surfaces.reduce(
-      (sum, surface) => sum + placements[surface.id].MECH,
-      0,
-    )
-    const ground = Math.min(total, Math.max(0, Math.floor(raw)))
-    const next = Object.fromEntries(
-      Object.entries(placements).map(([id, counts]) => [
-        id,
-        { ...counts, MECH: 0 },
-      ]),
-    ) as SurfaceUnitCounts
-    next[SPACE_SURFACE_ID].MECH = total - ground
-    next[this._selectedPlanetId].MECH = ground
-    this._surfaceCounts[side] = next
-    return true
-  }
-
-  private updateSelection(
-    side: CombatSide,
-    unitType: UnitBaseType,
-    update: Partial<UnitSelection>,
-  ): void {
-    const totals = this.flatSelections(side, true)
-    const oldUpgrade = this._upgradedTypes[side].has(unitType)
-    totals[unitType] = { ...totals[unitType], ...update }
-    if (update.upgraded !== undefined && update.upgraded !== oldUpgrade) {
-      const next = new Set(this._upgradedTypes[side])
-      if (update.upgraded) next.add(unitType)
-      else next.delete(unitType)
-      this._upgradedTypes[side] = next
-    }
-    this.reflowSimplified(side, totals)
-    this.refreshSideAfterUnitChange(
-      side,
-      update.upgraded !== undefined && update.upgraded !== oldUpgrade,
-    )
-  }
-
-  private rebuildUnits(side: CombatSide, faction: string): void {
-    const gen: { _nextCode?: number } = {
-      _nextCode: this._stateData._nextCode,
-    }
-    const nativeStats = buildUnitStatsMap(
-      this._system,
-      faction,
-      this._upgradedTypes[side],
-    )
-    const { units, unitType, unitState, unitStats, unitSurface } =
-      getSimulationUnitsOnSurfaces(
-        this._system,
-        faction,
-        {
-          counts: this._surfaceCounts[side],
-          upgradedTypes: [...this._upgradedTypes[side]],
-        },
-        this._surfaces,
-        gen,
-        this.getPlacementUnitStats(side, nativeStats),
-        nativeStats,
-      )
+  private rebuildUnits(side: CombatSide): void {
+    const gen = { _nextCode: this._stateData._nextCode }
     this._stateData = {
       ...this._stateData,
       [side]: {
         ...this._stateData[side],
-        faction,
-        participatingUnits: units,
-        nonParticipatingUnits: '' as UnitIdList,
-        unitSurface,
-        unitType,
-        unitState,
-        unitStats: { ...nativeStats, ...unitStats },
+        ...buildSideState(
+          this._system,
+          this.faction(side),
+          this.placements(side),
+          this._surfaces,
+          this._abilities[side],
+          this._sideRegistered[side],
+          gen,
+        ),
       },
       _nextCode: gen._nextCode,
       surfaces: this._surfaces,
-      activeSurfaceId:
-        this._combatMode === 'SPACE'
-          ? SPACE_SURFACE_ID
-          : this._selectedPlanetId,
+      activeSurfaceId: this.activeSurfaceId,
     }
   }
 
@@ -1152,39 +868,16 @@ export class CombatSetup {
     side: CombatSide,
     upgradeChanged: boolean,
   ): void {
-    const faction =
-      side === 'attacker' ? this._attackerFaction : this._defenderFaction
-    this.rebuildUnits(side, faction)
-    if (upgradeChanged) {
-      this._sideRegistered[side] = getGameData(
-        this._system,
-      ).getAvailableAbilities(side, faction, this.getUpgradedTypes(side))
-      this._lookups = createLookups(this._sideRegistered)
-    }
-    reconcileAbilitiesConfig(
-      this._abilities,
-      this._sideRegistered,
-      this._combatMode,
-      this._stateData,
-      this._lookups,
-      undefined,
-      true,
-    )
+    this.rebuildUnits(side)
+    if (upgradeChanged) this.loadAbilities([side])
+    this.reconcile()
     this.rebuildEngine()
   }
 
   private rebuildAllUnits(): void {
-    this.rebuildUnits('attacker', this._attackerFaction)
-    this.rebuildUnits('defender', this._defenderFaction)
-    reconcileAbilitiesConfig(
-      this._abilities,
-      this._sideRegistered,
-      this._combatMode,
-      this._stateData,
-      this._lookups,
-      undefined,
-      true,
-    )
+    this.rebuildUnits('attacker')
+    this.rebuildUnits('defender')
+    this.reconcile()
     this.rebuildEngine()
   }
 

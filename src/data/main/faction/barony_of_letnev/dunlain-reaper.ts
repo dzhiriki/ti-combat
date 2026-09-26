@@ -1,7 +1,6 @@
 import { z } from 'zod/mini'
 
 import { type Ability, declareParam } from '@/combat'
-import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { UNIT_LIMITS } from '@/constants/units'
 import type { UnitList } from '@/types'
 import { UnitListBooleanSchema } from '@/types'
@@ -49,14 +48,12 @@ export const dunlainReaper: Ability<Params> = {
         return (
           ctx.api.own.participating.findUnitByPriority(
             ctx.utils.getFlat(params.targetPriority),
-            { includeVariants: false },
           ) !== undefined
         )
       },
       call: (ctx, params) => {
         const target = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false },
         )!
         ctx.api.own.removeUnits(target)
         ctx.api.own.placeUnits({ MECH: 1 })
@@ -70,22 +67,12 @@ export const dunlainReaper: Ability<Params> = {
       system: true,
       isCallable: (params, ctx, ids) => {
         if (params.availableMechs >= UNIT_LIMITS.MECH) return false
-        return ids.some(id => {
-          const variantKey = ctx.api.own.getUnitVariantKey(id)
-          return (
-            variantKey !== undefined &&
-            parseUnitLocator(variantKey).baseType === 'MECH'
-          )
-        })
+        return ids.some(id => ctx.api.own.getUnitBaseType(id) === 'MECH')
       },
       call: (ctx, params, ids) => {
-        let destroyed = 0
-        for (const id of ids) {
-          const variantKey = ctx.api.own.getUnitVariantKey(id)
-          if (variantKey && parseUnitLocator(variantKey).baseType === 'MECH') {
-            destroyed += 1
-          }
-        }
+        const destroyed = ids.filter(
+          id => ctx.api.own.getUnitBaseType(id) === 'MECH',
+        ).length
         ctx.api.own.updateAbilityConfig({
           availableMechs: Math.min(
             UNIT_LIMITS.MECH,

@@ -57,7 +57,6 @@ export const raidFormation: Ability<Params> = {
         const targets = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
           {
-            includeVariants: false,
             amount: excess,
             predicate: (variant, unitId) => {
               if (

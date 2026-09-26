@@ -1,8 +1,4 @@
 import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
-export {
-  expandWithSubtypes,
-  sortBaseTypes,
-} from '@/combat/utils/sort-unit-options'
 import { makeUnitLocator } from '@/combat/utils/unit-locator'
 import { makeVariantId } from '@/combat/utils/unit-variant'
 

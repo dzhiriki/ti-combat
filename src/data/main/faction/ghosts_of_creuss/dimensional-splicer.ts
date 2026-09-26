@@ -35,14 +35,12 @@ export const dimensionalSplicer: Ability<Params> = {
         return (
           ctx.api.opponent.participating.findUnitByPriority(
             ctx.utils.getFlat(params.targetPriority),
-            { includeVariants: false },
           ) !== undefined
         )
       },
       call: (ctx, params) => {
         const target = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false },
         )!
         const type = ctx.api.opponent.getUnitBaseType(target)!
 

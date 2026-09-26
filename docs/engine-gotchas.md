@@ -242,16 +242,12 @@ a check there too.
   `system: 'TF'` explicitly. See
   `tests/game-system.test.ts` for URL and worker regression coverage.
 
-- **`resetSettingsToBase` intentionally does NOT re-apply
-  `declareParamChange`.** These declarations expose possible setup options;
-  native `CATEGORIES` and per-unit grants determine runtime participation.
-  Hel-Titan and Starlancer XI inherit their categories from native stats,
-  including when the first unit is placed after PREPARE.
-
-- **`declareParamChange` additions to derived settings groups are re-applied
-  after `onParamSet`.** Deriving `spaceCombatParticipating` from `ships`, for
-  example, replaces its previous contents. The second pass preserves direct
-  declarations to derived groups. These groups control setup options only.
+- **`declareParamChange` only shapes setup options.** Native `CATEGORIES`
+  and `grantCategory` determine runtime participation; Hel-Titan and
+  Starlancer XI inherit their categories from native stats, including when
+  the first unit is placed after PREPARE. A stats invoke that changes
+  `CATEGORIES` (TF Hel-Titan) must also declare the matching
+  `declareParamChange` for its setup options.
 
 - **`declareParam` sourced params sync only at reconcile, and those values
   survive into the engine run.** Include eligible types even when none are
@@ -278,7 +274,7 @@ a check there too.
 
 - **Starlancer XI uses native ship and ground-force categories.** It needs
   no other ship to participate on the active surface. Its special combat-end
-  rules are deferred; do not restore the old SETTINGS participation adapter.
+  rules are deferred.
 
 - **Capacity and Fleet Pool split Fighter-II-style cargo between them.**
   Units with BOTH `CAPACITY_COST` and `FLEET_POOL_COST` (Fighter II, the TF
@@ -294,7 +290,7 @@ a check there too.
   `AbilitiesEngine.tryResolveOne` rejects a unit-sourced invoke whose
   `ability.key` is in `UNIT_ABILITIES` (SUSTAIN_DAMAGE, AFB, …) after
   `isCallable` when the source unit's ability is lost or cannotBeUsed,
-  surface scope included. Their guards must not re-check it (see
+  surface-scoped restrictions included. Their guards must not re-check it (see
   `sustain-damage.ts`); a re-keyed clone outside `UNIT_ABILITIES` must add
   the check itself. Pinned by
   `tests/engine/surface-scoped-sustain-restriction.test.ts`.
@@ -306,7 +302,7 @@ a check there too.
 
 - **Sustain Damage has per-mode allow-lists.** A unit sustains only if its
   variant is in `SUSTAIN_DAMAGE.spacePriority` / `groundPriority` (sourced
-  from `nonFighterShips` / `groundForces`). A unit added to combat outside
+  from non-fighter ships / ground forces). A unit added to combat outside
   those lists silently cannot sustain in that mode.
 
 - **Hit-assignment order: the FRONT of `UNIT_PRIORITY.*UnitPriority` takes
@@ -345,7 +341,7 @@ a check there too.
   rebuilds each `SideStateData` with every field present
   (`withAllSideFields`), and `cloneStateForBranch` spreads it per branch.
   V8 only bulk-copies a spread when it sees few source shapes; lazily added
-  optional fields (`_locationHash`, `hitPool`, …) arriving in path-dependent
+  optional fields (`_metaHash`, `hitPool`, …) arriving in path-dependent
   order made that spread and every side-data read megamorphic (~40% slower
   engine). A new `SideStateData` field is a compile error there until listed;
   never attach ad-hoc properties to side objects, and avoid conditional
@@ -358,19 +354,23 @@ a check there too.
   `unitSurface` in place because branches share it until a movement or
   placement clones it.
 
-- **`_locationHash` is one signature per id list.** Each list is `''` (all on
-  the active surface), `=surface` (all on another one), or a per-unit list
-  with commas; the field stores the whole segment, `''` or `@p!n`. Removing
-  units keeps uniform signatures valid, so hit assignment only drops hashes
-  containing commas; any membership change (`sortUnitsByPriority`) voids
-  everything but `''`, and moves void it outright.
+- **Surface-scoped restrictions resolve to the ids on that surface.**
+  `buildResolvedForSide` expands an entry with a `surfaceId` into the unit
+  ids standing there (no type keys, never `'ALL'`), so type-level queries
+  such as DEPLOY's ignore it, and `moveUnits` must drop
+  `_resolvedRestrictions`. Such an entry never disables its ability as a
+  restriction source. Pinned by `ability-api.test.ts` and
+  `tests/engine/surface-scoped-sustain-restriction.test.ts`.
 
-- **State-hash caches are validated by reference.** `_unitCombatHash` and
-  the `categoryHashes`/`overrideHashes` WeakMaps assume `unitStats` and
-  `unitCombat` are replaced, never mutated in place, on every write.
-  `getUnitsHash` writes ASCII `0`/`1` damage flags and `@`/`#`/`&` markers
-  right after ids, so UnitIds must stay at or above 0x80, and surface ids
-  and variant keys must not contain `!`, `,`, `@`, `#`, `&`, `|` or `+`.
+- **State-hash caches are validated by reference.** `_metaHash` (location,
+  native categories and grants) and the `categoryHashes` WeakMap assume
+  `unitSurface`, `unitStats` and `unitGrants` are replaced, never mutated
+  in place, on every write. The location part lists every id off the active
+  surface, destroyed ones included; they keep their last surface, so it only
+  changes when units are placed or moved. `getUnitsHash` writes ASCII
+  `0`/`1` damage flags and `@`/`#`/`&` markers right after ids, so UnitIds
+  must stay at or above 0x80, and surface ids and variant keys must not
+  contain `!`, `,`, `=`, `@`, `#`, `&`, `;`, `|` or `+`.
 
 - **Unlimited-use repair is the only thing that makes the state graph
   cyclic.** Without it, combat state decreases monotonically (units are

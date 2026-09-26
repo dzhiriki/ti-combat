@@ -51,9 +51,7 @@ export const strikeWingAlphaII: Ability<Params> = {
             const toDestroy: UnitId[] = []
             for (const variant of flat) {
               if (toDestroy.length >= count) break
-              const ids = branchCtx.api.opponent.surface.getUnits(variant, {
-                includeVariants: false,
-              })
+              const ids = branchCtx.api.opponent.surface.getUnits(variant)
               for (const id of ids) {
                 if (toDestroy.length >= count) break
                 toDestroy.push(id)

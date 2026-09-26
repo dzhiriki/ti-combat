@@ -1,4 +1,5 @@
 import type { Ability } from '@/combat'
+import { SPACE_SURFACE_ID } from '@/types'
 
 export const quantumManipulator: Ability = {
   key: 'QUANTUM_MANIPULATOR',
@@ -21,15 +22,10 @@ export const quantumManipulator: Ability = {
       isCallable: (_params, ctx) => {
         if (ctx.api.own.getPendingHits() <= 0) return false
         const unitId = ctx.getUnit()
-        if (
-          ctx.api.own.getUnitSurface(unitId) !== ctx.api.own.getSpaceSurfaceId()
-        )
+        if (ctx.api.own.getUnitSurface(unitId) !== SPACE_SURFACE_ID)
           return false
         if (ctx.api.own.getUnitState(unitId)?.isDamaged) return false
-        if (
-          ctx.api.own.isUnitAbilityLost('SUSTAIN_DAMAGE', unitId) ||
-          ctx.api.own.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', unitId)
-        ) {
+        if (ctx.api.own.isUnitAbilityDisabled('SUSTAIN_DAMAGE', unitId)) {
           return false
         }
         return true
