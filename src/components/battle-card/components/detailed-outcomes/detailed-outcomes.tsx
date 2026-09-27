@@ -1,10 +1,15 @@
 import { clsx } from 'clsx'
 import { useMemo, useState } from 'react'
 
-import type { CombatOutcome, SurvivorSide } from '@/combat'
+import type { CombatOutcome, SurfaceSurvivors, SurvivorSide } from '@/combat'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import { UNIT_SHORT_NAMES } from '@/constants/units'
-import type { UnitBaseType } from '@/types'
+import type {
+  CombatSide,
+  SurfaceDefinition,
+  SurfaceId,
+  UnitBaseType,
+} from '@/types'
 
 import { sortSurvivors } from './sort-survivors'
 
@@ -19,6 +24,8 @@ interface DetailedOutcomesProps {
   outcomes: CombatOutcome[]
   unitPriority: UnitPriority
   participatingTypes: UnitPriority
+  /** Group survivors by these surfaces (FULL editor mode). */
+  surfaces?: readonly SurfaceDefinition[]
 }
 
 type DisplayMode = 'all' | 'participating'
@@ -32,6 +39,7 @@ export function DetailedOutcomes({
   outcomes,
   unitPriority,
   participatingTypes,
+  surfaces,
 }: DetailedOutcomesProps) {
   const [mode, setMode] = useState<DisplayMode>('all')
 
@@ -42,10 +50,29 @@ export function DetailedOutcomes({
             ...o,
             attacker: filterSide(o.attacker, participatingTypes.attacker),
             defender: filterSide(o.defender, participatingTypes.defender),
+            attackerSurfaces: filterSurfaces(
+              o.attackerSurfaces,
+              participatingTypes.attacker,
+            ),
+            defenderSurfaces: filterSurfaces(
+              o.defenderSurfaces,
+              participatingTypes.defender,
+            ),
           }))
         : outcomes
-    return sortOutcomes(mergeOutcomes(filtered))
-  }, [outcomes, mode, participatingTypes])
+    return sortOutcomes(mergeOutcomes(filtered, !!surfaces))
+  }, [outcomes, mode, participatingTypes, surfaces])
+
+  const sideCell = (outcome: CombatOutcome, side: CombatSide) =>
+    surfaces ? (
+      <SurfaceSurvivorList
+        side={outcome[`${side}Surfaces`]}
+        surfaces={surfaces}
+        priority={unitPriority[side]}
+      />
+    ) : (
+      <SurvivorList side={outcome[side]} priority={unitPriority[side]} />
+    )
 
   return (
     <div className={styles.detailedPanel}>
@@ -76,10 +103,7 @@ export function DetailedOutcomes({
               )}
             >
               <td className={styles.outcomeSide}>
-                <SurvivorList
-                  side={outcome.attacker}
-                  priority={unitPriority.attacker}
-                />
+                {sideCell(outcome, 'attacker')}
               </td>
               <td
                 className={styles.outcomeProb}
@@ -90,10 +114,7 @@ export function DetailedOutcomes({
               <td
                 className={clsx(styles.outcomeSide, styles.outcomeSide_right)}
               >
-                <SurvivorList
-                  side={outcome.defender}
-                  priority={unitPriority.defender}
-                />
+                {sideCell(outcome, 'defender')}
               </td>
             </tr>
           ))}
@@ -103,14 +124,43 @@ export function DetailedOutcomes({
   )
 }
 
+function SurfaceSurvivorList({
+  side,
+  surfaces,
+  priority,
+}: {
+  side: SurfaceSurvivors
+  surfaces: readonly SurfaceDefinition[]
+  priority: string[]
+}) {
+  return (
+    <div>
+      {surfaces.map(surface => (
+        <div key={surface.id} className={styles.surfaceGroup}>
+          <span className={styles.surfaceLabel}>{surface.name}</span>
+          <span>
+            <SurvivorList
+              side={side[surface.id] ?? {}}
+              priority={priority}
+              surfaceId={surface.id}
+            />
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function SurvivorList({
   side,
   priority,
+  surfaceId,
 }: {
   side: SurvivorSide
   priority: string[]
+  surfaceId?: SurfaceId
 }) {
-  const entries = sortSurvivors(side, priority)
+  const entries = sortSurvivors(side, priority, surfaceId)
   if (entries.length === 0) {
     return <span className={styles.noSurvivors}>&mdash;</span>
   }
@@ -154,13 +204,30 @@ function filterSide(
   return result
 }
 
+function filterSurfaces(
+  surfaces: SurfaceSurvivors,
+  participating: readonly string[],
+): SurfaceSurvivors {
+  const result: SurfaceSurvivors = {}
+  for (const [surfaceId, side] of Object.entries(surfaces)) {
+    result[surfaceId] = filterSide(side, participating)
+  }
+  return result
+}
+
 /** Merge outcomes that show the same survivors on both sides (same winner,
- *  same per-variant healthy/damaged counts) — they only differ in internal
- *  ability resolution, which the table doesn't render. */
-function mergeOutcomes(outcomes: CombatOutcome[]): CombatOutcome[] {
+ *  same per-variant healthy/damaged counts, per surface when shown) — they
+ *  only differ in internal ability resolution, which the table doesn't
+ *  render. */
+function mergeOutcomes(
+  outcomes: CombatOutcome[],
+  bySurface: boolean,
+): CombatOutcome[] {
   const merged = new Map<string, CombatOutcome>()
   for (const outcome of outcomes) {
-    const key = `${outcome.winner}|${sideSignature(outcome.attacker)}|${sideSignature(outcome.defender)}`
+    const key = bySurface
+      ? `${outcome.winner}|${surfaceSignature(outcome.attackerSurfaces)}|${surfaceSignature(outcome.defenderSurfaces)}`
+      : `${outcome.winner}|${sideSignature(outcome.attacker)}|${sideSignature(outcome.defender)}`
     const existing = merged.get(key)
     if (existing) {
       existing.probability += outcome.probability
@@ -169,6 +236,13 @@ function mergeOutcomes(outcomes: CombatOutcome[]): CombatOutcome[] {
     }
   }
   return [...merged.values()]
+}
+
+function surfaceSignature(surfaces: SurfaceSurvivors): string {
+  return Object.entries(surfaces)
+    .map(([surfaceId, side]) => `${surfaceId}=${sideSignature(side)}`)
+    .sort()
+    .join(';')
 }
 
 function sideSignature(side: SurvivorSide): string {

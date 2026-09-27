@@ -1,6 +1,6 @@
 import { z } from 'zod/mini'
 
-import { type Ability, declareParam, parseVariantId } from '@/combat'
+import { type Ability, declareParam } from '@/combat'
 import { UNIT_LIMITS } from '@/constants/units'
 import type { UnitList } from '@/types'
 import { UnitListBooleanSchema } from '@/types'
@@ -32,7 +32,7 @@ export const dunlainReaper: Ability<Params> = {
     availableMechs: UNIT_LIMITS.MECH,
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       side: 'own',
       defaultItemValue: true,
       sort: 'worth-asc',
@@ -46,16 +46,14 @@ export const dunlainReaper: Ability<Params> = {
       isCallable: (params, ctx) => {
         if (params.availableMechs <= 0) return false
         return (
-          ctx.api.own.findUnitByPriority(
+          ctx.api.own.participating.findUnitByPriority(
             ctx.utils.getFlat(params.targetPriority),
-            { includeVariants: false },
           ) !== undefined
         )
       },
       call: (ctx, params) => {
-        const target = ctx.api.own.findUnitByPriority(
+        const target = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false },
         )!
         ctx.api.own.removeUnits(target)
         ctx.api.own.placeUnits({ MECH: 1 })
@@ -69,22 +67,12 @@ export const dunlainReaper: Ability<Params> = {
       system: true,
       isCallable: (params, ctx, ids) => {
         if (params.availableMechs >= UNIT_LIMITS.MECH) return false
-        return ids.some(id => {
-          const variantKey = ctx.api.own.getUnitVariantKey(id)
-          return (
-            variantKey !== undefined &&
-            parseVariantId(variantKey).type === 'MECH'
-          )
-        })
+        return ids.some(id => ctx.api.own.getUnitBaseType(id) === 'MECH')
       },
       call: (ctx, params, ids) => {
-        let destroyed = 0
-        for (const id of ids) {
-          const variantKey = ctx.api.own.getUnitVariantKey(id)
-          if (variantKey && parseVariantId(variantKey).type === 'MECH') {
-            destroyed += 1
-          }
-        }
+        const destroyed = ids.filter(
+          id => ctx.api.own.getUnitBaseType(id) === 'MECH',
+        ).length
         ctx.api.own.updateAbilityConfig({
           availableMechs: Math.min(
             UNIT_LIMITS.MECH,

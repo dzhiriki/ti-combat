@@ -1,4 +1,10 @@
+/* `position: relative` anchors the visually hidden input to the checkbox.
+ * Without it the input's containing block is the nearest positioned ancestor
+ * outside the abilities scroll area (the sticky side panel), where it sits at
+ * its unscrolled offset — focusing it on click then scrolls the page to reach
+ * that phantom position. */
 .wrapper {
+  position: relative;
   display: inline-flex;
   cursor: pointer;
 

@@ -22,7 +22,7 @@ export const ambush: Ability<Params> = {
     uses: 1,
     attackerPriority: declareParam({
       default: [] as UnitList<boolean>,
-      source: 'ships',
+      source: 'SHIPS',
       side: 'own',
       sort: 'worth-desc',
       defaultItemValue: true,
@@ -39,7 +39,7 @@ export const ambush: Ability<Params> = {
       isCallable: (_params, ctx) => {
         const ATTACKER_TYPES = ['CRUISER', 'DESTROYER'] as UnitBaseType[]
         return (
-          ctx.api.own.countUnits(ATTACKER_TYPES, {
+          ctx.api.own.participating.countUnits(ATTACKER_TYPES, {
             includeVariants: true,
           }) > 0
         )
@@ -52,9 +52,7 @@ export const ambush: Ability<Params> = {
         const selected: UnitId[] = []
 
         for (const variantKey of ctx.utils.getFlat(params.attackerPriority)) {
-          for (const uid of ctx.api.own.getUnits(variantKey, {
-            includeVariants: false,
-          })) {
+          for (const uid of ctx.api.own.participating.getUnits(variantKey)) {
             if (selected.length >= MAX_SHIPS) break
             selected.push(uid)
           }

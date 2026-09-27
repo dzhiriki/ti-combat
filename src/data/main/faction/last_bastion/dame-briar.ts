@@ -7,11 +7,12 @@ import {
   GALVANIZED,
   galvanizeUnit,
 } from '@/data/main/abilities/general/pre-galvanized'
-import type { UnitType } from '@/types'
+import { UnitLocatorSchema } from '@/types'
+import type { UnitLocator } from '@/types'
 
 type Params = {
-  spaceUnitType: UnitType
-  groundUnitType: UnitType
+  spaceUnitType: UnitLocator
+  groundUnitType: UnitLocator
 }
 
 export const dameBriar: Ability<Params> = {
@@ -21,21 +22,31 @@ export const dameBriar: Ability<Params> = {
     "When a player's unit is destroyed: You may exhaust this card to galvanize another of that player's units in the destroyed unit's system.",
   icon: lastBastionIcon,
   paramsSchema: z.object({
-    spaceUnitType: z.string(),
-    groundUnitType: z.string(),
+    spaceUnitType: UnitLocatorSchema,
+    groundUnitType: UnitLocatorSchema,
   }),
   params: {
     isEnabled: false,
     uses: 1,
-    spaceUnitType: declareParam<UnitType>({
+    spaceUnitType: declareParam<UnitLocator>({
+      scope: 'system',
       default: 'DESTROYER',
-      source: 'spaceCombatParticipating',
-      filter: { excludeSubtypes: [GALVANIZED], combatMode: 'SPACE' },
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
+      filter: {
+        excludeSubtypes: [GALVANIZED],
+        includeNonParticipating: true,
+        combatMode: 'SPACE',
+      },
     }),
-    groundUnitType: declareParam<UnitType>({
+    groundUnitType: declareParam<UnitLocator>({
+      scope: 'system',
       default: 'INFANTRY',
-      source: 'groundCombatParticipating',
-      filter: { excludeSubtypes: [GALVANIZED], combatMode: 'GROUND' },
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
+      filter: {
+        excludeSubtypes: [GALVANIZED],
+        includeNonParticipating: true,
+        combatMode: 'GROUND',
+      },
     }),
   },
   headerUI: 'isEnabled',
@@ -68,8 +79,7 @@ export const dameBriar: Ability<Params> = {
           ctx.state.combatMode === 'GROUND'
             ? params.groundUnitType
             : params.spaceUnitType
-        if (!ctx.api.own.hasUnitType(target, { includeVariants: false }))
-          return false
+        if (!ctx.api.own.system.hasUnitType(target)) return false
         const tokens =
           ctx.api.own.getAbilityConfig('PRE_GALVANIZED')?.reinforcementTokens ??
           0
@@ -80,7 +90,9 @@ export const dameBriar: Ability<Params> = {
           ctx.state.combatMode === 'GROUND'
             ? params.groundUnitType
             : params.spaceUnitType
-        const ids = ctx.api.own.getUnits(target, { includeVariants: true })
+        const ids = ctx.api.own.system.getUnits(target, {
+          includeVariants: true,
+        })
         for (const id of ids) {
           if (galvanizeUnit(ctx, id, true)) break
         }

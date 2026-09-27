@@ -27,8 +27,9 @@ export const strikeWingAlphaII: Ability<Params> = {
     isEnabled: true,
     uses: Infinity,
     targetPriority: declareParam<UnitList<boolean>>({
+      scope: 'type',
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       side: 'opponent',
       defaultItemValue: true,
       sort: 'worth-desc',
@@ -50,9 +51,7 @@ export const strikeWingAlphaII: Ability<Params> = {
             const toDestroy: UnitId[] = []
             for (const variant of flat) {
               if (toDestroy.length >= count) break
-              const ids = branchCtx.api.opponent.getUnits(variant, {
-                includeVariants: false,
-              })
+              const ids = branchCtx.api.opponent.surface.getUnits(variant)
               for (const id of ids) {
                 if (toDestroy.length >= count) break
                 toDestroy.push(id)

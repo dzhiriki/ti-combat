@@ -1,6 +1,7 @@
 import { z } from 'zod/mini'
 
-import { type Ability, declareParam, parseVariantId } from '@/combat'
+import { type Ability, declareParam } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { UNIT_LIMITS } from '@/constants/units'
 import type { UnitBaseType, UnitList } from '@/types'
 import { UnitListNumberSchema } from '@/types'
@@ -41,8 +42,9 @@ export const sleeperCell: Ability<Params> = {
     uses: Infinity,
     isActive: false,
     availableShips: declareParam<UnitList<number, UnitBaseType>>({
+      scope: 'type',
       default: SHIP_LIMITS_DEFAULT,
-      source: 'ships',
+      source: 'SHIPS',
       sort: 'worth-desc',
       defaultItemValue: 0,
       filter: { combatMode: 'SPACE', includeOnlyBaseTypes: true },
@@ -70,37 +72,32 @@ export const sleeperCell: Ability<Params> = {
       timing: 'DESTROY',
       isCallable: (params, ctx, ids) => {
         if (!params.isActive) return false
-        const { ships } = ctx.api.own.getAbilityConfig('SETTINGS')
-        const shipsSet = new Set<UnitBaseType>(ships)
         for (const id of ids) {
           const variantKey =
             ctx.api.own.getUnitVariantKey(id) ??
             ctx.api.opponent.getUnitVariantKey(id)
           if (!variantKey) continue
-          const { type } = parseVariantId(variantKey)
-          if (shipsSet.has(type)) return true
+          const { baseType: type } = parseUnitLocator(variantKey)
+          if (ctx.api.own.isUnitTypeCategory(type, 'SHIPS')) return true
         }
         return false
       },
       call: (ctx, params, ids) => {
-        const { ships } = ctx.api.own.getAbilityConfig('SETTINGS')
-        const shipsSet = new Set<UnitBaseType>(ships)
-
         const opponentDestroyed: Partial<Record<UnitBaseType, number>> = {}
         const ownDestroyed: Partial<Record<UnitBaseType, number>> = {}
 
         for (const id of ids) {
           const ownKey = ctx.api.own.getUnitVariantKey(id)
           if (ownKey) {
-            const { type } = parseVariantId(ownKey)
-            if (!shipsSet.has(type)) continue
+            const { baseType: type } = parseUnitLocator(ownKey)
+            if (!ctx.api.own.isUnitTypeCategory(type, 'SHIPS')) continue
             ownDestroyed[type] = (ownDestroyed[type] ?? 0) + 1
             continue
           }
           const oppKey = ctx.api.opponent.getUnitVariantKey(id)
           if (oppKey) {
-            const { type } = parseVariantId(oppKey)
-            if (!shipsSet.has(type)) continue
+            const { baseType: type } = parseUnitLocator(oppKey)
+            if (!ctx.api.own.isUnitTypeCategory(type, 'SHIPS')) continue
             opponentDestroyed[type] = (opponentDestroyed[type] ?? 0) + 1
           }
         }
@@ -125,7 +122,7 @@ export const sleeperCell: Ability<Params> = {
           const baseType = type as UnitBaseType
           const available = availableMap.get(baseType) ?? 0
           if (available <= 0) continue
-          const existing = ctx.api.own.countUnits(baseType, {
+          const existing = ctx.api.own.participating.countUnits(baseType, {
             includeVariants: true,
           })
           const onBoardCanPlace = Math.max(0, UNIT_LIMITS[baseType] - existing)

@@ -18,7 +18,9 @@ export const preDamaged: Ability<Params> = {
     isEnabled: true,
     uses: Infinity,
     damagedUnits: declareParam<UnitList<number>>({
-      source: 'units',
+      scope: 'system',
+      defaultItemValue: 0,
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       default: [],
       filter: { exclude: ['FIGHTER'], includeOnlyAvailable: true },
       limit: 'IN_COMBAT',
@@ -38,9 +40,7 @@ export const preDamaged: Ability<Params> = {
       call: (ctx, params) => {
         for (const [unitType, count] of params.damagedUnits) {
           if (count <= 0) continue
-          const ids = ctx.api.own.getUnits(unitType as UnitType, {
-            includeVariants: false,
-          })
+          const ids = ctx.api.own.system.getUnits(unitType as UnitType)
           const max = Math.min(count, ids.length)
           for (let i = 0; i < max; i++) {
             ctx.api.own.modifyUnitState(ids[i], { isDamaged: true })

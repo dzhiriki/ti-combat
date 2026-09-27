@@ -1,10 +1,13 @@
 import type { Ability } from '@/combat'
+import { SPACE_SURFACE_ID } from '@/types'
 
 export const quantumManipulator: Ability = {
   key: 'QUANTUM_MANIPULATOR',
   name: 'Quantum Manipulator',
   description:
     'While this unit is in a space area during combat, you may use its Sustain Damage ability to cancel a hit that is produced against your ships in this system.',
+  warning:
+    'In simplified view, all Nomad mechs are placed in the space area during space combat. For fine-tuned placement, use full view.',
   context: 'SPACE',
   params: {
     isEnabled: true,
@@ -19,12 +22,10 @@ export const quantumManipulator: Ability = {
       isCallable: (_params, ctx) => {
         if (ctx.api.own.getPendingHits() <= 0) return false
         const unitId = ctx.getUnit()
+        if (ctx.api.own.getUnitSurface(unitId) !== SPACE_SURFACE_ID)
+          return false
         if (ctx.api.own.getUnitState(unitId)?.isDamaged) return false
-        const unitType = ctx.api.own.getUnitBaseType(unitId)!
-        if (
-          ctx.api.own.isUnitAbilityLost('SUSTAIN_DAMAGE', unitType) ||
-          ctx.api.own.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', unitType)
-        ) {
+        if (ctx.api.own.isUnitAbilityDisabled('SUSTAIN_DAMAGE', unitId)) {
           return false
         }
         return true

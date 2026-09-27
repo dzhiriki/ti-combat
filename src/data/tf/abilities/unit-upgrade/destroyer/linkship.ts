@@ -1,8 +1,9 @@
 import ralNelIcon from '@/assets/faction/ral_nel.svg?raw'
 import type { Ability, AbilityReadContext } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { UNIT_WORTH } from '@/constants/units'
 import { janovetInherits } from '@/data/tf/faction/el_nen_janovet/janovet-inherits'
-import type { UnitBaseType, UnitId, UnitType } from '@/types'
+import type { UnitId } from '@/types'
 import { createStatsInvoke } from '@/utils/create-stats-invoke'
 
 // A target is eligible for Linkship's retreat destroy if it is damaged OR does
@@ -13,28 +14,20 @@ function isEligible(ctx: AbilityReadContext, id: UnitId): boolean {
   if (!stats?.UNIT_ABILITIES?.SUSTAIN_DAMAGE) return true
   const variantKey = ctx.api.opponent.getUnitVariantKey(id)
   if (!variantKey) return false
-  return (
-    ctx.api.opponent.isUnitAbilityLost('SUSTAIN_DAMAGE', variantKey) ||
-    ctx.api.opponent.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', variantKey)
-  )
+  return ctx.api.opponent.isUnitAbilityDisabled('SUSTAIN_DAMAGE', id)
 }
 
 // The highest-worth eligible opponent ship (the best thing to pick off).
 function bestTarget(ctx: AbilityReadContext): UnitId | undefined {
-  const { ships } = ctx.api.opponent.getAbilityConfig('SETTINGS')
   let best: UnitId | undefined
   let bestWorth = -1
-  for (const shipType of ships) {
-    for (const id of ctx.api.opponent.getUnits(shipType as UnitType, {
-      includeVariants: true,
-    })) {
-      if (!isEligible(ctx, id)) continue
-      const baseType = ctx.api.opponent.getUnitBaseType(id)
-      const worth = baseType ? (UNIT_WORTH[baseType] ?? 0) : 0
-      if (worth > bestWorth) {
-        bestWorth = worth
-        best = id
-      }
+  for (const id of ctx.api.opponent.participating.getUnits()) {
+    if (!isEligible(ctx, id)) continue
+    const baseType = ctx.api.opponent.getUnitBaseType(id)
+    const worth = baseType ? (UNIT_WORTH[baseType] ?? 0) : 0
+    if (worth > bestWorth) {
+      bestWorth = worth
+      best = id
     }
   }
   return best
@@ -65,7 +58,7 @@ export const linkship: Ability = {
       isCallable: (_params, ctx, unitId) => {
         const key = ctx.api.own.getUnitVariantKey(unitId)
         if (!key) return false
-        const baseType = key.split(':')[0] as UnitBaseType
+        const baseType = parseUnitLocator(key).baseType
         if (baseType !== 'DESTROYER') {
           if (
             baseType !== 'FLAGSHIP' ||

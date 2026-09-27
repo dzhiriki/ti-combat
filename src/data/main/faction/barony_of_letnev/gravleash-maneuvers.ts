@@ -22,7 +22,7 @@ export const gravleashManeuvers: Ability<Params> = {
     uses: Infinity,
     shipPriority: declareParam<UnitList>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       sort: 'worth-desc',
       filter: { combatMode: 'SPACE' },
     }),
@@ -40,23 +40,16 @@ export const gravleashManeuvers: Ability<Params> = {
     {
       timing: 'BEFORE_DICE_ROLL',
       call: (ctx, params) => {
-        const shipTypeCount = ctx.api.own
-          .getParticipatingUnitTypes()
-          .filter(unitType =>
-            ctx.api.own.hasUnitType(unitType, {
-              includeVariants: true,
-            }),
-          ).length
+        const shipTypeCount = ctx.api.own.participating.getUnitTypes().length
 
-        const target = ctx.api.own.findUnitByPriority(
+        const target = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.shipPriority),
-          { includeVariants: false },
         )
         if (shipTypeCount <= 0 || target === undefined) return
         const variantKey = ctx.api.own.getUnitVariantKey(target)
         if (!variantKey) return
         ctx.api.own.applyBonusToResult(shipTypeCount, {
-          singleUnit: variantKey,
+          unitId: target,
         })
       },
     },

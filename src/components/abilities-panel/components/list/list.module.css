@@ -99,3 +99,18 @@
   align-items: center;
   justify-content: center;
 }
+
+.surfaceGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.surfaceGroup + .surfaceGroup {
+  margin-top: var(--space-2);
+}
+
+.surfaceLabel {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

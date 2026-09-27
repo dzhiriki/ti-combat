@@ -1,5 +1,6 @@
 import winnuIcon from '@/assets/faction/winnu.svg?raw'
-import { type Ability, parseVariantId } from '@/combat'
+import { type Ability } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { planetaryShield } from '@/data/main/abilities/general/planetary-shield'
 import type { UnitType } from '@/types'
 import { createStatsInvoke } from '@/utils/create-stats-invoke'
@@ -33,7 +34,7 @@ export const justiciarRail: Ability = {
         const fighters: UnitType[] = []
         for (const [key] of priority) {
           const target = key as UnitType
-          if (parseVariantId(target).type === 'FIGHTER') {
+          if (parseUnitLocator(target).baseType === 'FIGHTER') {
             fighters.push(target)
           } else {
             nonFighters.push(target)

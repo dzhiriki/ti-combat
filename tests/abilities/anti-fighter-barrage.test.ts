@@ -59,4 +59,45 @@ describe('ANTI_FIGHTER_BARRAGE', () => {
     expect(pool.attacker?.DESTROYER).toBeUndefined()
     expect(pool.defender).toContainDice('DESTROYER', [9, 2])
   })
+
+  it('uses fighter-only priority as both eligibility and order by default', () => {
+    const t = combatTest({
+      mode: 'SPACE',
+      attacker: { faction: 'ARBOREC', units: { DESTROYER: 1, CRUISER: 1 } },
+      defender: {
+        faction: 'ARBOREC',
+        units: { FIGHTER: 1, CRUISER: 1 },
+      },
+    })
+
+    t.advanceToTiming('ANNOUNCE_RETREAT_STEP', { defender: 1 })
+
+    expect(t.defender.units.FIGHTER).toBeUndefined()
+    expect(t.defender.units.CRUISER).toHaveLength(1)
+  })
+
+  it('keeps simultaneous firing-side priorities independent', () => {
+    const t = combatTest({
+      mode: 'SPACE',
+      attacker: {
+        faction: 'ARBOREC',
+        units: { DESTROYER: 1, FIGHTER: 1, CRUISER: 1 },
+        abilities: { WAYLAY: true },
+      },
+      defender: {
+        faction: 'ARBOREC',
+        units: { DESTROYER: 1, CRUISER: 1 },
+      },
+    })
+
+    t.advanceToTiming('ANNOUNCE_RETREAT_STEP', {
+      attacker: 1,
+      defender: 1,
+    })
+
+    expect(t.attacker.units.FIGHTER).toBeUndefined()
+    expect(t.attacker.units.CRUISER).toHaveLength(1)
+    expect(t.defender.units.DESTROYER).toBeUndefined()
+    expect(t.defender.units.CRUISER).toHaveLength(1)
+  })
 })

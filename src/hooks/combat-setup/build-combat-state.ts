@@ -1,26 +1,24 @@
-import { makeVariantId } from '@/combat'
-import type { DeclaredSubtype } from '@/combat/abilities-engine/types'
+import { SHIPS, STRUCTURES } from '@/constants/units'
 import type {
   GameSystem,
+  SideUnitPlacements,
+  SurfaceDefinition,
+  SurfaceId,
   UnitBaseType,
-  UnitIdList,
-  UnitState,
-  UnitStats,
-  UnitType,
 } from '@/types'
-import { getFactionUnitConfig } from '@/utils/get-faction-unit-config'
-import { buildUnitStatsMap } from '@/utils/get-simulation-units'
+import {
+  createDefaultSurfaces,
+  DEFAULT_PLANET_ID,
+  SPACE_SURFACE_ID,
+} from '@/types'
+import { createEmptySurfaceCounts } from '@/utils/surface-placements'
 
 import { CombatState } from '../../combat/combat-state/combat-state'
-import type { UnitStatsEntry } from '../../combat/combat-state/types'
 import type {
   CombatMode,
   SideAbilitiesConfig,
-  SideStateData,
 } from '../../combat/combat-state/types'
-import { nextUnitIds } from '../../combat/utils/unit-id'
-import { prepareSimulationConfig } from './prepare-simulation-config'
-import { clampLimitParams } from './reconcile'
+import { prepareSimulation } from './prepare-simulation'
 
 // ============================================================================
 // CONFIG TYPES
@@ -29,6 +27,9 @@ import { clampLimitParams } from './reconcile'
 export interface SideConfig {
   faction: string
   units: Partial<Record<UnitBaseType, number>>
+  /** Explicit placement used by surface-focused tests. `units` remains a
+   *  compact authoring adapter and is ignored when placements are supplied. */
+  placements?: Record<string, Partial<Record<UnitBaseType, number>>>
   upgrades?: UnitBaseType[]
   abilities?: Record<string, true | false | Record<string, unknown>>
 }
@@ -36,10 +37,12 @@ export interface SideConfig {
 export interface CombatStateConfig {
   system: GameSystem
   mode: CombatMode
+  surfaces?: SurfaceDefinition[]
+  activeSurfaceId?: SurfaceId
   attacker: SideConfig
   defender: SideConfig
   customAbilities?: import('../../combat/abilities-engine/types').Ability[]
-  /** Hook invoked after `prepareSimulationConfig` and before
+  /** Hook invoked after `prepareSimulation` and before
    *  `forSimulation`, with mutable per-side registered ability arrays. Test
    *  harnesses use it to shuffle iteration order; production leaves it
    *  unset. */
@@ -53,81 +56,33 @@ export interface CombatStateConfig {
 // BUILDERS
 // ============================================================================
 
-function buildSideState(
-  system: GameSystem,
+function adaptTestPlacements(
   config: SideConfig,
-  abilities: SideAbilitiesConfig,
-  gen: { _nextCode?: number },
-): SideStateData {
-  const upgradedSet = new Set(config.upgrades ?? [])
-  let participatingUnits = ''
-  const unitType: Record<string, UnitType> = {}
-  const unitState: Record<string, UnitState> = {}
-  const unitStats: Record<string, UnitStats> = {}
-
-  const factionConfig = getFactionUnitConfig(system, config.faction)
-
-  for (const [type, count] of Object.entries(config.units)) {
-    const unitType_ = type as UnitBaseType
-    if (!count || count <= 0) continue
-
-    const def = factionConfig[unitType_]
-    if (!def?.BASE) continue
-
-    const upgraded = upgradedSet.has(unitType_)
-    let stats: UnitStats = { ...def.BASE }
-    if (upgraded && def.UPGRADED) {
-      stats = {
-        ...stats,
-        ...def.UPGRADED,
-        UNIT_ABILITIES: {
-          ...stats.UNIT_ABILITIES,
-          ...def.UPGRADED.UNIT_ABILITIES,
-        },
+  surfaces: SurfaceDefinition[],
+  activeSurfaceId: SurfaceId,
+): SideUnitPlacements {
+  const counts = createEmptySurfaceCounts(surfaces)
+  if (config.placements) {
+    for (const [surfaceId, units] of Object.entries(config.placements)) {
+      const target = counts[surfaceId]
+      if (!target) continue
+      for (const [type, count] of Object.entries(units)) {
+        if (count && Object.hasOwn(target, type))
+          target[type as UnitBaseType] += count
       }
     }
-
-    const ids = nextUnitIds(count, gen)
-    for (const id of ids) {
-      participatingUnits += id
-      unitType[id] = unitType_ as import('@/types').UnitType
+  } else {
+    for (const [type, count] of Object.entries(config.units)) {
+      if (!count) continue
+      const surfaceId = SHIPS.includes(type as UnitBaseType)
+        ? SPACE_SURFACE_ID
+        : STRUCTURES.includes(type as UnitBaseType)
+          ? surfaces.find(s => s.type === 'PLANET')!.id
+          : activeSurfaceId
+      counts[surfaceId][type as UnitBaseType] += count
     }
-    unitStats[unitType_] = stats
   }
-
-  const settings = abilities['SETTINGS'] as
-    | { subtypes?: DeclaredSubtype[] }
-    | undefined
-  const declaredSubtypes = settings?.subtypes ?? []
-
-  const baseUnitStats: Record<string, UnitStatsEntry> = {
-    ...buildUnitStatsMap(system, config.faction, upgradedSet),
-    ...unitStats,
-  }
-
-  // Pre-populate variant stats. Store the factory rather than its eager
-  // result so the variant tracks runtime mutations of its parent (e.g.
-  // Eidolon flipping MECH stats at start of combat) — `resolveUnitStats`
-  // applies the factory lazily on lookup.
-  for (const decl of declaredSubtypes) {
-    const variantKey = makeVariantId(decl.unitType, [decl.name])
-    if (baseUnitStats[variantKey]) continue
-    baseUnitStats[variantKey] = decl.statsFactory
-  }
-
-  return {
-    faction: config.faction,
-    participatingUnits: participatingUnits as UnitIdList,
-    nonParticipatingUnits: '' as UnitIdList,
-    unitType,
-    unitState,
-    unitStats: baseUnitStats as Record<
-      import('@/types').UnitType,
-      UnitStatsEntry
-    >,
-    abilities,
-    liveAbilities: {},
-  }
+  return { counts, upgradedTypes: config.upgrades ?? [] }
 }
 
 function buildSideAbilitiesConfig(config: SideConfig): SideAbilitiesConfig {
@@ -149,67 +104,38 @@ function buildSideAbilitiesConfig(config: SideConfig): SideAbilitiesConfig {
 // ============================================================================
 
 export function buildCombatState(config: CombatStateConfig): CombatState {
-  const abilitiesConfig = {
-    attacker: buildSideAbilitiesConfig(config.attacker),
-    defender: buildSideAbilitiesConfig(config.defender),
-  }
-
-  const sideAbilities = prepareSimulationConfig(
-    config.system,
-    abilitiesConfig,
-    config.attacker.faction,
-    config.defender.faction,
-    config.mode,
+  const surfaces = config.surfaces ?? createDefaultSurfaces()
+  const activeSurfaceId =
+    config.mode === 'SPACE'
+      ? SPACE_SURFACE_ID
+      : (config.activeSurfaceId ??
+        surfaces.find(s => s.type === 'PLANET')?.id ??
+        DEFAULT_PLANET_ID)
+  const setup = prepareSimulation(
+    {
+      system: config.system,
+      attackerFaction: config.attacker.faction,
+      defenderFaction: config.defender.faction,
+      surfaces,
+      activeSurfaceId,
+      attackerPlacements: adaptTestPlacements(
+        config.attacker,
+        surfaces,
+        activeSurfaceId,
+      ),
+      defenderPlacements: adaptTestPlacements(
+        config.defender,
+        surfaces,
+        activeSurfaceId,
+      ),
+      combatMode: config.mode,
+      abilities: {
+        attacker: buildSideAbilitiesConfig(config.attacker),
+        defender: buildSideAbilitiesConfig(config.defender),
+      },
+    },
     config.customAbilities,
   )
-
-  const gen: { _nextCode?: number } = {}
-  const attackerSide = buildSideState(
-    config.system,
-    config.attacker,
-    abilitiesConfig.attacker,
-    gen,
-  )
-  const defenderSide = buildSideState(
-    config.system,
-    config.defender,
-    abilitiesConfig.defender,
-    gen,
-  )
-
-  // Stateful clamp pass: with real per-side state now built, clamp IN_COMBAT
-  // and EXTRA values that bypassed the UI hook (e.g. tests that hand-feed
-  // over-limit values via `buildCombatState`).
-  clampLimitParams(
-    abilitiesConfig,
-    {
-      attacker: sideAbilities.attacker.registered,
-      defender: sideAbilities.defender.registered,
-    },
-    { attacker: attackerSide, defender: defenderSide },
-  )
-
-  config.prepareAbilities?.({
-    attacker: sideAbilities.attacker.registered,
-    defender: sideAbilities.defender.registered,
-  })
-
-  return CombatState.forSimulation(
-    attackerSide,
-    defenderSide,
-    config.mode,
-    {
-      attacker: sideAbilities.attacker.registered,
-      defender: sideAbilities.defender.registered,
-    },
-    {
-      attacker: sideAbilities.attacker.unitAbilityKeys,
-      defender: sideAbilities.defender.unitAbilityKeys,
-    },
-    {
-      attacker: sideAbilities.attacker.factionOwnedKeys,
-      defender: sideAbilities.defender.factionOwnedKeys,
-    },
-    gen._nextCode,
-  )
+  config.prepareAbilities?.(setup.abilities)
+  return CombatState.forSimulation(setup)
 }

@@ -7,7 +7,7 @@ import {
   type CombatMode,
   declareParam,
 } from '@/combat'
-import type { UnitId, UnitList } from '@/types'
+import type { UnitId, UnitList, UnitLocator } from '@/types'
 import { UnitListBooleanSchema } from '@/types'
 
 type Params = {
@@ -28,12 +28,16 @@ function modeKeys(mode: CombatMode) {
 function checkedDestroyed(
   ctx: AbilityReadContext,
   ids: UnitId[],
-  triggers: string[],
+  triggers: UnitLocator[],
 ): string[] {
   const out: string[] = []
   for (const id of ids) {
     const key = ctx.api.own.getUnitVariantKey(id)
-    if (key && triggers.includes(key)) out.push(key)
+    if (
+      key &&
+      triggers.some(target => ctx.api.own.matchesUnitLocator(id, target))
+    )
+      out.push(key)
   }
   return out
 }
@@ -64,28 +68,28 @@ export const valiantGenome: Ability<Params> = {
     uses: 1,
     spaceTriggers: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
       side: 'own',
       defaultItemValue: true,
       filter: { combatMode: 'SPACE' },
     }),
     groundTriggers: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundCombatParticipating',
+      source: 'GROUND_FORCES',
       side: 'own',
       defaultItemValue: true,
       filter: { combatMode: 'GROUND' },
     }),
     spaceTargets: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
       side: 'opponent',
       defaultItemValue: true,
       filter: { combatMode: 'SPACE' },
     }),
     groundTargets: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundCombatParticipating',
+      source: 'GROUND_FORCES',
       side: 'opponent',
       defaultItemValue: true,
       filter: { combatMode: 'GROUND' },
@@ -128,11 +132,8 @@ export const valiantGenome: Ability<Params> = {
 
         const targets = ctx.api.opponent.getAssignHitsTargets(1)
         if (targets.length === 0) return false
-        const targetEnabled = new Set<string>(
-          ctx.utils.getFlat(params[targetsKey]),
-        )
         return targets.every(targetId =>
-          targetEnabled.has(ctx.api.opponent.getUnitVariantKey(targetId)!),
+          ctx.api.opponent.matchesUnitList(targetId, params[targetsKey]),
         )
       },
       call: (ctx, params, ids) => {

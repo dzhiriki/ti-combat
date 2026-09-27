@@ -22,9 +22,9 @@ export const assaultCannon: Ability<Params> = {
     uses: Infinity,
     targetPriority: declareParam<UnitList>({
       default: [],
-      source: 'nonFighterShips',
+      source: 'SHIPS',
       side: 'opponent',
-      filter: { combatMode: 'SPACE' },
+      filter: { combatMode: 'SPACE', exclude: ['FIGHTER'] },
     }),
   },
   headerUI: 'isEnabled',
@@ -32,21 +32,21 @@ export const assaultCannon: Ability<Params> = {
     {
       timing: 'START_OF_COMBAT',
       isCallable: (_, ctx) => {
-        const { nonFighterShips } = ctx.api.own.getAbilityConfig('SETTINGS')
-        const nonFighterCount = ctx.api.own.countUnits(nonFighterShips, {
-          includeVariants: true,
-        })
-        if (nonFighterCount < 3) return false
-
-        return true
+        const nonFighterShips = ctx.api.own.participating
+          .getUnits()
+          .filter(id => ctx.api.own.getUnitBaseType(id) !== 'FIGHTER')
+        return nonFighterShips.length >= 3
       },
       call: (ctx, params) => {
-        const target = ctx.api.opponent.findUnitByPriority(
+        const target = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false },
-        )!
+          {
+            predicate: (_variant, id) =>
+              ctx.api.opponent.getUnitBaseType(id) !== 'FIGHTER',
+          },
+        )
 
-        ctx.api.opponent.destroyUnits(target)
+        if (target) ctx.api.opponent.destroyUnits(target)
       },
     },
   ],

@@ -25,14 +25,14 @@ export const exotrireme: Ability<Params> = {
     uses: 0,
     sacrificePriority: declareParam({
       default: [] as UnitList<boolean>,
-      source: 'ships',
+      source: 'SHIPS',
       side: 'own',
       defaultItemValue: true,
       filter: { include: ['DREADNOUGHT'], combatMode: 'SPACE' },
     }),
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'opponent',
       sort: 'worth-desc',
       defaultItemValue: true,
@@ -44,9 +44,7 @@ export const exotrireme: Ability<Params> = {
     const remaining = new Set(unitIds)
     const result: UnitId[] = []
     for (const variantId of ctx.utils.getFlat(params.sacrificePriority)) {
-      for (const id of ctx.api.own.getUnits(variantId, {
-        includeVariants: false,
-      })) {
+      for (const id of ctx.api.own.participating.getUnits(variantId)) {
         if (remaining.has(id)) {
           result.push(id)
           remaining.delete(id)
@@ -63,24 +61,22 @@ export const exotrireme: Ability<Params> = {
       timing: 'AFTER_COMBAT_ROUND',
       isCallable: (params, ctx) => {
         if (
-          ctx.api.opponent.findUnitByPriority(
+          ctx.api.opponent.participating.findUnitByPriority(
             ctx.utils.getFlat(params.targetPriority),
-            { includeVariants: false },
           ) === undefined
         ) {
           return false
         }
-        const variantKey = ctx.api.own.getUnitVariantKey(ctx.getUnit())
-        return (
-          variantKey !== undefined &&
-          ctx.utils.getFlat(params.sacrificePriority).includes(variantKey)
+        return ctx.api.own.matchesUnitList(
+          ctx.getUnit(),
+          params.sacrificePriority,
         )
       },
       call: (ctx, params) => {
         const self = ctx.getUnit()
-        const targets = ctx.api.opponent.findUnitByPriority(
+        const targets = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false, amount: 2 },
+          { amount: 2 },
         )
 
         if (targets.length > 0) ctx.api.opponent.destroyUnits(targets)

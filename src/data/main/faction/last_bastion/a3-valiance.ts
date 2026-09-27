@@ -1,5 +1,6 @@
 import lastBastionIcon from '@/assets/faction/last_bastion.svg?raw'
-import { type Ability, parseVariantId } from '@/combat'
+import { type Ability } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import {
   declareGalvanizeUnits,
   GALVANIZED,
@@ -27,9 +28,13 @@ export const a3Valiance: Ability = {
         const myId = ctx.getUnit()
         if (!ids.includes(myId)) return false
         const variantKey = ctx.api.own.getUnitVariantKey(myId)!
-        const { subtypes } = parseVariantId(variantKey)
+        const { subtypes } = parseUnitLocator(variantKey)
         if (!subtypes.includes(GALVANIZED)) return false
-        if (!ctx.api.own.hasUnitType('INFANTRY', { includeVariants: true }))
+        if (
+          !ctx.api.own.system.hasUnitType('INFANTRY', {
+            includeVariants: true,
+          })
+        )
           return false
         const tokens =
           ctx.api.own.getAbilityConfig('PRE_GALVANIZED')?.reinforcementTokens ??
@@ -37,7 +42,9 @@ export const a3Valiance: Ability = {
         return tokens > 0
       },
       call: ctx => {
-        const ids = ctx.api.own.getUnits('INFANTRY', { includeVariants: true })
+        const ids = ctx.api.own.system.getUnits('INFANTRY', {
+          includeVariants: true,
+        })
         let count = 0
         for (const id of ids) {
           if (count >= 3) break

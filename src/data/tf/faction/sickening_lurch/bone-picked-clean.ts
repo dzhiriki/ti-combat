@@ -52,7 +52,9 @@ export const bonePickedClean: Ability<Params> = {
       system: true,
       isCallable: params => params.isEnabled && params.uses > 0,
       call: (ctx, params) => {
-        const [mech] = ctx.api.own.getUnits('MECH', { includeVariants: true })
+        const [mech] = ctx.api.own.surface.getUnits('MECH', {
+          includeVariants: true,
+        })
         if (!mech) return
         const variantKey = (ctx.api.own.getUnitVariantKey(mech) ??
           'MECH') as UnitType

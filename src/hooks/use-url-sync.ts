@@ -19,19 +19,31 @@ export function configToSearchString(config: SerializedConfig): string {
     `af=${config.af}`,
     `df=${config.df}`,
     `m=${config.m}`,
+    `e=${config.e}`,
+    `sp=${config.sp}`,
+    `p=${config.p.join(',')}`,
+    `aup=${config.aup.join(',')}`,
+    `dup=${config.dup.join(',')}`,
   ]
-
-  for (const [type, [count, upgraded]] of Object.entries(config.au)) {
-    parts.push(`au.${type}=${count}.${upgraded}`)
-  }
-  for (const [type, [count, upgraded]] of Object.entries(config.du)) {
-    parts.push(`du.${type}=${count}.${upgraded}`)
-  }
+  writeSurfaceCounts(parts, 'asu', config.asu)
+  writeSurfaceCounts(parts, 'dsu', config.dsu)
 
   writeAbilityParams(parts, 'aa', config.aa)
   writeAbilityParams(parts, 'da', config.da)
 
   return parts.join('&')
+}
+
+function writeSurfaceCounts(
+  parts: string[],
+  prefix: string,
+  surfaces: Record<string, Record<string, number>>,
+): void {
+  for (const [surfaceId, units] of Object.entries(surfaces)) {
+    for (const [type, count] of Object.entries(units)) {
+      parts.push(`${prefix}.${surfaceId}.${type}=${count}`)
+    }
+  }
 }
 
 function writeAbilityParams(
@@ -41,7 +53,9 @@ function writeAbilityParams(
 ): void {
   for (const [key, params] of Object.entries(abilities)) {
     for (const [pk, pv] of Object.entries(params)) {
-      parts.push(`${prefix}.${key}.${pk}=${encodeValue(pv)}`)
+      parts.push(
+        `${prefix}.${key}.${pk}=${encodeURIComponent(encodeValue(pv))}`,
+      )
     }
   }
 }
@@ -92,6 +106,8 @@ export function searchParamsToConfig(search: string): Record<string, unknown> {
   const du: Record<string, [number, 0 | 1]> = {}
   const aa: Record<string, Record<string, unknown>> = {}
   const da: Record<string, Record<string, unknown>> = {}
+  const asu: Record<string, Record<string, number>> = {}
+  const dsu: Record<string, Record<string, number>> = {}
 
   for (const [key, value] of params) {
     if (key.startsWith('au.')) {
@@ -116,6 +132,14 @@ export function searchParamsToConfig(search: string): Record<string, unknown> {
         abilityLookup.get(abilityKey),
         paramKey,
       )
+    } else if (key.startsWith('asu.') || key.startsWith('dsu.')) {
+      const target = key.startsWith('asu.') ? asu : dsu
+      const rest = key.slice(4)
+      const dotIdx = rest.indexOf('.')
+      if (dotIdx === -1) continue
+      const surfaceId = rest.slice(0, dotIdx)
+      const type = rest.slice(dotIdx + 1)
+      ;(target[surfaceId] ??= {})[type] = Number(value)
     }
   }
 
@@ -127,6 +151,15 @@ export function searchParamsToConfig(search: string): Record<string, unknown> {
     m: params.get('m') ?? 'S',
     au,
     du,
+    ...(Number(params.get('v') ?? 1) >= 2 && {
+      e: params.get('e') ?? 'S',
+      sp: params.get('sp') ?? 'planet-1',
+      p: (params.get('p') ?? 'planet-1').split(',').filter(Boolean),
+      asu,
+      dsu,
+      aup: (params.get('aup') ?? '').split(',').filter(Boolean),
+      dup: (params.get('dup') ?? '').split(',').filter(Boolean),
+    }),
     aa,
     da,
   }

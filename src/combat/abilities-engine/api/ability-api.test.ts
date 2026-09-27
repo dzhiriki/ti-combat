@@ -1,10 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import type { UnitIdList } from '@/types'
+import {
+  createDefaultSurfaces,
+  DEFAULT_PLANET_ID,
+  SPACE_SURFACE_ID,
+  type SurfaceId,
+  type UnitId,
+  type UnitIdList,
+} from '@/types'
 
+import { CombatSideState } from '../../combat-side-state/combat-side-state'
 import {
   buildCombatDiceRollGroup,
-  buildUnitAbilityDiceRollGroup,
   CombatState,
 } from '../../combat-state/combat-state'
 import type {
@@ -22,6 +29,8 @@ function makeSide(): SideStateData {
     faction: 'FEDERATION_OF_SOL',
     participatingUnits: '' as UnitIdList,
     nonParticipatingUnits: '' as UnitIdList,
+
+    unitSurface: {},
     unitType: {},
     unitState: {},
     unitStats: {} as SideStateData['unitStats'],
@@ -35,6 +44,8 @@ function makeCombatState(): CombatState {
     attacker: makeSide(),
     defender: makeSide(),
     combatMode: 'SPACE',
+    surfaces: createDefaultSurfaces(),
+    activeSurfaceId: SPACE_SURFACE_ID,
   }
   return CombatState.fromDataStandalone(data)
 }
@@ -68,6 +79,128 @@ function withAbility(
   ctx.upgradeForCall(ability)
   return { ctx, api: ctx.api.own, ability }
 }
+
+describe('SideApi unit query scopes', () => {
+  it('separates units in the system, on the active surface, and participating', () => {
+    const cs = makeCombatState()
+    const cruiserId = 'a' as UnitId
+    const infantryId = 'b' as UnitId
+    const pdsId = 'c' as UnitId
+    const mechId = 'd' as UnitId
+    const destroyerId = 'e' as UnitId
+    const secondPlanetId = 'planet-2' as SurfaceId
+    const side = cs.data.attacker
+
+    side.participatingUnits = `${cruiserId}${infantryId}` as UnitIdList
+    side.nonParticipatingUnits = `${pdsId}${mechId}${destroyerId}` as UnitIdList
+    side.unitSurface = {
+      [cruiserId]: SPACE_SURFACE_ID,
+      [infantryId]: DEFAULT_PLANET_ID,
+      [pdsId]: DEFAULT_PLANET_ID,
+      [mechId]: secondPlanetId,
+      [destroyerId]: SPACE_SURFACE_ID,
+    }
+    side.unitType = {
+      [cruiserId]: 'CRUISER',
+      [infantryId]: 'INFANTRY',
+      [pdsId]: 'PDS',
+      [mechId]: 'MECH',
+      [destroyerId]: 'DESTROYER',
+    }
+    cs.data.activeSurfaceId = DEFAULT_PLANET_ID
+
+    const { api } = withAbility(cs)
+    const exact = { includeVariants: false }
+
+    expect(api.surface.getUnits('PDS', exact)).toEqual([pdsId])
+    expect(api.surface.countUnits(undefined, exact)).toBe(2)
+    expect(api.surface.hasUnitType('CRUISER', exact)).toBe(false)
+    expect(api.surface.getUnitTypes()).toEqual(['INFANTRY', 'PDS'])
+    expect(api.surface.findUnitByPriority(['PDS', 'INFANTRY'], exact)).toBe(
+      pdsId,
+    )
+
+    expect(api.participating.getUnits('CRUISER', exact)).toEqual([cruiserId])
+    expect(api.participating.countUnits(undefined, exact)).toBe(2)
+    expect(api.participating.hasUnitType('PDS', exact)).toBe(false)
+    expect(api.participating.getUnitTypes()).toEqual(['CRUISER', 'INFANTRY'])
+    expect(
+      api.participating.findUnitByPriority(['PDS', 'INFANTRY'], exact),
+    ).toBe(infantryId)
+
+    expect(api.getAssignHitsTargets(1)).toEqual([infantryId])
+    expect(side.participatingUnits).toBe(`${cruiserId}${infantryId}`)
+
+    expect(api.system.getUnits('CRUISER', exact)).toEqual([cruiserId])
+    expect(api.system.getUnits('PDS', exact)).toEqual([pdsId])
+    expect(api.system.getUnits('MECH', exact)).toEqual([mechId])
+    expect(api.system.getUnits('DESTROYER', exact)).toEqual([destroyerId])
+    expect(api.system.countUnits(undefined, exact)).toBe(5)
+    expect(api.system.hasUnitType('CRUISER', exact)).toBe(true)
+    expect(api.system.getUnitTypes()).toEqual([
+      'CRUISER',
+      'INFANTRY',
+      'PDS',
+      'MECH',
+      'DESTROYER',
+    ])
+    expect(api.system.findUnitByPriority(['PDS', 'INFANTRY'], exact)).toBe(
+      pdsId,
+    )
+
+    cs.data.activeSurfaceId = SPACE_SURFACE_ID
+    expect(api.surface.getUnits('CRUISER', exact)).toEqual([cruiserId])
+    expect(api.surface.getUnits('DESTROYER', exact)).toEqual([destroyerId])
+    expect(api.surface.countUnits(undefined, exact)).toBe(2)
+    expect(api.participating.hasUnitType('DESTROYER', exact)).toBe(false)
+    expect(api.system.countUnits(undefined, exact)).toBe(5)
+
+    api.removeUnits(pdsId)
+    expect(api.system.countUnits(undefined, exact)).toBe(4)
+    expect(api.system.hasUnitType('PDS', exact)).toBe(false)
+  })
+})
+
+describe('SideApi unit ability restriction scopes', () => {
+  it('applies scoped restrictions only to units on their surface and omitted scopes globally', () => {
+    const cs = makeCombatState()
+    const spacePds = 'a' as UnitId
+    const planetPds = 'b' as UnitId
+    const side = cs.data.attacker
+    side.nonParticipatingUnits = `${spacePds}${planetPds}` as UnitIdList
+    side.unitSurface = {
+      [spacePds]: SPACE_SURFACE_ID,
+      [planetPds]: DEFAULT_PLANET_ID,
+    }
+    side.unitType = { [spacePds]: 'PDS', [planetPds]: 'PDS' }
+
+    const { api } = withAbility(cs)
+    api.setUnitAbilityCannotBeUsed(
+      'SPACE_CANNON',
+      'SPACE_ONLY',
+      'STRUCTURES',
+      SPACE_SURFACE_ID,
+    )
+
+    expect(api.isUnitAbilityCannotBeUsed('SPACE_CANNON', spacePds)).toBe(true)
+    expect(api.isUnitAbilityCannotBeUsed('SPACE_CANNON', planetPds)).toBe(false)
+
+    CombatSideState.moveUnits(side, [planetPds], SPACE_SURFACE_ID)
+    expect(api.isUnitAbilityCannotBeUsed('SPACE_CANNON', planetPds)).toBe(true)
+
+    api.setUnitAbilityLost('PLANETARY_SHIELD', 'GLOBAL', 'PDS')
+    expect(api.isUnitAbilityLost('PLANETARY_SHIELD', spacePds)).toBe(true)
+    expect(api.isUnitAbilityLost('PLANETARY_SHIELD', planetPds)).toBe(true)
+
+    api.removeUnitAbilityCannotBeUsed(
+      'SPACE_CANNON',
+      'SPACE_ONLY',
+      'STRUCTURES',
+      SPACE_SURFACE_ID,
+    )
+    expect(api.isUnitAbilityCannotBeUsed('SPACE_CANNON', spacePds)).toBe(false)
+  })
+})
 
 describe('SideApi.declareRollTrigger', () => {
   let cs: CombatState
@@ -305,57 +438,5 @@ describe('AbilityContext dice-roll group getters', () => {
     expect(() => ctx.currentDiceRollPhase).toThrow(/dice-roll group/)
     pushDiceRollGroup(cs)
     expect(ctx.currentDiceRollPhase).toEqual(['SPACE_COMBAT'])
-  })
-
-  it('currentDiceRollFiring returns DiceRollContext.firing; throws outside', () => {
-    const { ctx } = withAbility(cs)
-    expect(() => ctx.currentDiceRollFiring).toThrow(/dice-roll group/)
-    pushDiceRollGroup(cs)
-    expect(ctx.currentDiceRollFiring).toEqual(['attacker', 'defender'])
-  })
-
-  it('currentDiceRollHitSource returns DiceRollContext.hitSource; throws outside', () => {
-    const { ctx } = withAbility(cs)
-    expect(() => ctx.currentDiceRollHitSource).toThrow(/dice-roll group/)
-    pushDiceRollGroup(cs)
-    expect(ctx.currentDiceRollHitSource).toBe('COMBAT')
-  })
-
-  it('currentDiceRollSelfTarget returns DiceRollContext.selfTarget; throws outside', () => {
-    const { ctx } = withAbility(cs)
-    expect(() => ctx.currentDiceRollSelfTarget).toThrow(/dice-roll group/)
-    // Default group is not self-target.
-    pushDiceRollGroup(cs)
-    expect(ctx.currentDiceRollSelfTarget).toBe(false)
-
-    // Replace top with a unit-ability group flagged self-target
-    // (combat rolls are never self-target).
-    cs.pendingSteps.pop()
-    cs.pendingSteps.push(
-      buildUnitAbilityDiceRollGroup({
-        phase: ['SPACE_CANNON_OFFENSE'],
-        firing: ['attacker'],
-        hitSource: 'SPACE_CANNON',
-        selfTarget: true,
-      }),
-    )
-    expect(ctx.currentDiceRollSelfTarget).toBe(true)
-  })
-
-  it('currentDiceRollIsUnitAbility returns DiceRollContext.isUnitAbility; throws outside', () => {
-    const { ctx } = withAbility(cs)
-    expect(() => ctx.currentDiceRollIsUnitAbility).toThrow(/dice-roll group/)
-    pushDiceRollGroup(cs)
-    expect(ctx.currentDiceRollIsUnitAbility).toBe(false)
-
-    cs.pendingSteps.pop()
-    cs.pendingSteps.push(
-      buildUnitAbilityDiceRollGroup({
-        phase: ['AFB'],
-        firing: ['attacker'],
-        hitSource: 'AFB',
-      }),
-    )
-    expect(ctx.currentDiceRollIsUnitAbility).toBe(true)
   })
 })

@@ -1,7 +1,7 @@
 import { z } from 'zod/mini'
 
 import { type Ability, type AbilityReadContext, declareParam } from '@/combat'
-import type { UnitId, UnitList, UnitType } from '@/types'
+import type { UnitId, UnitList } from '@/types'
 import { UnitListSchema } from '@/types'
 
 type Params = {
@@ -23,13 +23,13 @@ export const duraniumArmor: Ability<Params> = {
     uses: Infinity,
     spaceRepairPriority: declareParam<UnitList>({
       default: [],
-      source: 'nonFighterShips',
+      source: 'SHIPS',
       sort: 'worth-desc',
-      filter: { combatMode: 'SPACE' },
+      filter: { combatMode: 'SPACE', exclude: ['FIGHTER'] },
     }),
     groundRepairPriority: declareParam<UnitList>({
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       sort: 'worth-desc',
       filter: { combatMode: 'GROUND' },
     }),
@@ -97,9 +97,7 @@ function findRepairTarget(
     : params.spaceRepairPriority
 
   for (const [variantId] of priority) {
-    for (const unitId of ctx.api.own.getUnits(variantId as UnitType, {
-      includeVariants: false,
-    })) {
+    for (const unitId of ctx.api.own.participating.getUnits(variantId)) {
       const state = ctx.api.own.getUnitState(unitId)
       if (!state?.isDamaged) continue
       if (state.usedSustainThisRound) continue

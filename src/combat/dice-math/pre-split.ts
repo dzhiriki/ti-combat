@@ -1,6 +1,6 @@
 import type { CombatSide, UnitType } from '@/types'
 
-import { parseVariantId } from '../utils/unit-variant'
+import { parseUnitLocator } from '../utils/parse-unit-locator'
 import type {
   AdditionalHitPoolModifier,
   AdditionalHitPoolTargetSpec,
@@ -90,6 +90,6 @@ function splitForFiringSide(
 function matchUnit(variantKey: UnitType, units: UnitType[]): boolean {
   if (units.length === 0) return false
   if (units.includes(variantKey)) return true
-  const baseType = parseVariantId(variantKey).type as UnitType
+  const baseType = parseUnitLocator(variantKey).baseType as UnitType
   return units.includes(baseType)
 }

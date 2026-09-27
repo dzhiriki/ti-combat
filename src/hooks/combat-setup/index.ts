@@ -1,3 +1,3 @@
 export { CombatSetup } from './combat-setup'
-export { prepareSimulationConfig } from './prepare-simulation-config'
+export { prepareSimulation } from './prepare-simulation'
 export type { SimulationInput } from './types'

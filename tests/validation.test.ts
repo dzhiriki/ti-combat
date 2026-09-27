@@ -108,17 +108,21 @@ describe('validateSerializedConfig', () => {
 
   it('ignores unknown unit types with warning', () => {
     const config = makeValidConfig()
-    config.au['FAKE_UNIT'] = [3, 0]
+    if (config.v !== 2) throw new Error('expected v2')
+    config.asu.space['FAKE_UNIT'] = 3
     const result = validateSerializedConfig(config)
     expect(result.warnings.length).toBeGreaterThan(0)
-    expect(result.config.au['FAKE_UNIT']).toBeUndefined()
+    expect(
+      result.config.v === 2 && result.config.asu.space['FAKE_UNIT'],
+    ).toBeUndefined()
   })
 
   it('clamps unit count to limits', () => {
     const config = makeValidConfig()
-    config.au['FLAGSHIP'] = [5, 0]
+    if (config.v !== 2) throw new Error('expected v2')
+    config.asu.space['FLAGSHIP'] = 5
     const result = validateSerializedConfig(config)
-    expect(result.config.au['FLAGSHIP']![0]).toBe(1)
+    expect(result.config.v === 2 && result.config.asu.space['FLAGSHIP']).toBe(1)
   })
 
   it('skips ability with invalid base params', () => {
@@ -138,13 +142,18 @@ describe('validateSerializedConfig', () => {
     // the global ability directories. They must still be recognized so URL
     // restore doesn't drop them with an "Unknown ability" warning.
     const config: SerializedConfig = {
-      v: 1,
+      v: 2,
       g: 'TI4',
       af: 'BARONY_OF_LETNEV',
       df: 'ARBOREC',
       m: 'S',
-      au: { FIGHTER: [1, 0] },
-      du: { FIGHTER: [1, 0] },
+      e: 'S',
+      p: ['planet-1'],
+      sp: 'planet-1',
+      asu: { space: { FIGHTER: 1 } },
+      dsu: { space: { FIGHTER: 1 } },
+      aup: [],
+      dup: [],
       aa: {
         NON_EUCLIDEAN_SHIELDING: { isEnabled: true },
         GRAVLEASH_MANEUVERS: { isEnabled: true },

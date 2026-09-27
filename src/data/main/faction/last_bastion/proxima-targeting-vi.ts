@@ -1,6 +1,7 @@
 import { z } from 'zod/mini'
 
-import { type Ability, type AbilityReadContext, parseVariantId } from '@/combat'
+import { type Ability, type AbilityReadContext } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { GALVANIZED } from '@/data/main/abilities/general/pre-galvanized'
 
 type Params = {
@@ -72,35 +73,17 @@ export const proximaTargetingVi: Ability<Params> = {
         ctx.resolveStep('BOMBARDMENT', { dice: [[8, 3]], target: 'OWN' })
         ctx.resolveStep('BOMBARDMENT', {
           dice: [[8, 3]],
-          deferCompletionCheck: true,
+          deferPhaseEndCheck: true,
         })
       },
     },
   ],
 }
 
-/** "Galvanized units present" on the bombarded planet: participating units
- *  (ground forces in ground combat) plus structures sitting in the
- *  non-participating pool (PDS / SPACE_DOCK per SETTINGS.structures).
- *  Excludes ships parked in space during ground combat — they're not on
- *  the planet being bombarded. */
+/** "Galvanized units present" on the active planet. */
 function countGalvanizedUnits(ctx: AbilityReadContext): number {
-  const sideState = ctx.state[ctx.side]
-  const structures = new Set<string>(
-    ctx.api.own.getAbilityConfig('SETTINGS').structures,
-  )
-  let count = 0
-  for (const id of sideState.participatingUnits) {
-    const key = sideState.unitType[id]
-    if (!key) continue
-    if (parseVariantId(key).subtypes.includes(GALVANIZED)) count++
-  }
-  for (const id of sideState.nonParticipatingUnits) {
-    const key = sideState.unitType[id]
-    if (!key) continue
-    const { type, subtypes } = parseVariantId(key)
-    if (!structures.has(type)) continue
-    if (subtypes.includes(GALVANIZED)) count++
-  }
-  return count
+  return ctx.api.own.surface.getUnits().filter(id => {
+    const key = ctx.api.own.getUnitVariantKey(id)
+    return key && parseUnitLocator(key).subtypes.includes(GALVANIZED)
+  }).length
 }

@@ -1,12 +1,18 @@
 import type { Ability } from '@/combat'
+import type { UnitList } from '@/types'
+
+type Params = {
+  customPriority: boolean
+  unitPriority: UnitList
+}
 
 declare global {
   interface AbilityConfigMap {
-    ANTI_FIGHTER_BARRAGE: Record<string, never>
+    ANTI_FIGHTER_BARRAGE: Params
   }
 }
 
-export const antiFighterBarrage: Ability = {
+export const antiFighterBarrage: Ability<Params> = {
   key: 'ANTI_FIGHTER_BARRAGE',
   name: 'Anti-Fighter Barrage',
   description: 'AFB is resolved only when enabled',
@@ -14,6 +20,9 @@ export const antiFighterBarrage: Ability = {
   params: {
     isEnabled: true,
     uses: Infinity,
+    // Waylay turns this off so hits follow the target's space priority.
+    customPriority: true,
+    unitPriority: [['FIGHTER']],
   },
   headerUI: 'isEnabled',
   invoke: [

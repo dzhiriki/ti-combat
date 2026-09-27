@@ -1,7 +1,13 @@
 import type { UnitCategory } from '@/constants/units'
-import { UNIT_CATEGORIES, UNIT_LIMITS, UNIT_TYPES } from '@/constants/units'
+import {
+  DEFAULT_UNIT_SURFACES,
+  UNIT_CATEGORIES,
+  UNIT_LIMITS,
+  UNIT_TYPES,
+} from '@/constants/units'
 import type {
   CombatSide,
+  SurfaceId,
   UnitAbility,
   UnitBaseType,
   UnitId,
@@ -9,6 +15,7 @@ import type {
   UnitState,
   UnitStats,
   UnitType,
+  UnitLocator,
   UnitVariantId,
 } from '@/types'
 
@@ -29,27 +36,26 @@ import type {
   RestrictionEntry,
   SideAbilitiesConfig,
   SideStateData,
+  UnitAbilityMeta,
   UnitAbilityRestrictions,
 } from '../combat-state/types'
-import type { SideDiceCollection } from '../dice-math/types'
+import type {
+  HitValueModifierDecl,
+  SideDiceCollection,
+} from '../dice-math/types'
 import { canonicalizeUnitState } from '../utils/canonicalize-unit-state'
+import { parseUnitLocator } from '../utils/parse-unit-locator'
 import { resolveUnitStats } from '../utils/resolve-unit-stats'
-import { nextUnitIds } from '../utils/unit-id'
 import {
-  getVariantDisplayName,
-  makeVariantId,
-  matchesVariantSuperset,
-  parseVariantId,
-} from '../utils/unit-variant'
-import { getSettingsValidTargets as getSettingsValidTargetsUtil } from './get-settings-valid-targets'
-
-/** Maps UnitCategory to the corresponding SETTINGS parameter key */
-const CATEGORY_TO_SETTINGS_KEY: Record<UnitCategory, string> = {
-  SHIPS: 'ships',
-  NON_FIGHTER_SHIPS: 'nonFighterShips',
-  GROUND_FORCES: 'groundForces',
-  STRUCTURES: 'structures',
-}
+  isNativeCategory,
+  isUnitCategory,
+  isUnitAbilityTarget,
+  participatesNatively,
+  unitMetaHash,
+} from '../utils/unit-combat-properties'
+import { nextUnitIds } from '../utils/unit-id'
+import { matchesUnitLocator, unitLocatorMatcher } from '../utils/unit-locator'
+import { makeVariantId } from '../utils/unit-variant'
 
 /** Shared empty destroyed record to avoid per-call {} allocation */
 const EMPTY_DESTROYED: Record<string, UnitId[]> = {}
@@ -89,8 +95,8 @@ export function applyVariantPostFilter(
   >,
 ): string[] {
   if (!filter) return [...variants]
-  const includeParsed = filter.include?.map(v => parseVariantId(v))
-  const excludeParsed = filter.exclude?.map(v => parseVariantId(v))
+  const includeParsed = filter.include?.map(v => parseUnitLocator(v))
+  const excludeParsed = filter.exclude?.map(v => parseUnitLocator(v))
   const excludeSubtypeSet = filter.excludeSubtypes
     ? new Set<string>(filter.excludeSubtypes)
     : undefined
@@ -99,10 +105,10 @@ export function applyVariantPostFilter(
       ? new Set<string>(filter.includeSubtypes)
       : undefined
   const matches = (
-    variantParsed: { type: UnitBaseType; subtypes: UnitVariantId[] },
-    entry: { type: UnitBaseType; subtypes: UnitVariantId[] },
+    variantParsed: { baseType: UnitBaseType; subtypes: UnitVariantId[] },
+    entry: { baseType: UnitBaseType; subtypes: UnitVariantId[] },
   ) => {
-    if (variantParsed.type !== entry.type) return false
+    if (variantParsed.baseType !== entry.baseType) return false
     if (entry.subtypes.length === 0) return true
     const vSubs = new Set<string>(variantParsed.subtypes)
     return entry.subtypes.every(s => vSubs.has(s))
@@ -111,53 +117,40 @@ export function applyVariantPostFilter(
   let filtered: string[] = [...variants]
   if (includeParsed && includeParsed.length > 0) {
     filtered = filtered.filter(v => {
-      const p = parseVariantId(v as UnitType)
+      const p = parseUnitLocator(v as UnitType)
       return includeParsed.some(e => matches(p, e))
     })
   }
   if (excludeParsed && excludeParsed.length > 0) {
     filtered = filtered.filter(v => {
-      const p = parseVariantId(v as UnitType)
+      const p = parseUnitLocator(v as UnitType)
       return !excludeParsed.some(e => matches(p, e))
     })
   }
   if (excludeSubtypeSet) {
     filtered = filtered.filter(v => {
-      const { subtypes } = parseVariantId(v as UnitType)
+      const { subtypes } = parseUnitLocator(v as UnitType)
       return !subtypes.some(sub => excludeSubtypeSet.has(sub))
     })
   }
   if (includeSubtypeSet) {
     filtered = filtered.filter(v => {
-      const { subtypes } = parseVariantId(v as UnitType)
+      const { subtypes } = parseUnitLocator(v as UnitType)
       return subtypes.some(sub => includeSubtypeSet.has(sub))
     })
   }
   return filtered
 }
 
-/** Merge an ability's base config with its live-overlay config. */
-function mergeConfig(
-  s: SideStateData,
-  key: string,
-): Record<string, unknown> | undefined {
-  const base = s.abilities[key]
-  const live = s.liveAbilities[key]
-  if (base === undefined && live === undefined) return undefined
-  if (live === undefined) return base
-  if (base === undefined) return live
-  return { ...base, ...live }
-}
-
 /** Parse a UnitList (flat or `[type, enabled]` tuples) into a UnitType[]. */
-function parsePriorityList(raw: unknown): UnitType[] | undefined {
+function parsePriorityList(raw: unknown): UnitLocator[] | undefined {
   if (!Array.isArray(raw)) return undefined
-  if (raw.length === 0) return raw as UnitType[]
-  if (!Array.isArray(raw[0])) return raw as UnitType[]
-  const result: UnitType[] = []
+  if (raw.length === 0) return raw as UnitLocator[]
+  if (!Array.isArray(raw[0])) return raw as UnitLocator[]
+  const result: UnitLocator[] = []
   for (const entry of raw as readonly [string, ...unknown[]][]) {
     if (entry.length >= 2 && entry[1] === false) continue
-    result.push(entry[0] as UnitType)
+    result.push(entry[0] as UnitLocator)
   }
   return result
 }
@@ -233,23 +226,29 @@ function pickTargetsForCustom(
   s: SideStateData,
   pool: UnitIdList | readonly UnitId[],
   total: number,
-  unitPriority: readonly UnitType[],
+  unitPriority: readonly UnitLocator[],
+  targets?: readonly UnitLocator[],
 ): UnitId[] {
-  if (total <= 0 || pool.length === 0 || unitPriority.length === 0) return []
+  if (total <= 0 || pool.length === 0) return []
   const result: UnitId[] = []
-  for (const tier of unitPriority) {
-    if (result.length >= total) break
+  if (unitPriority.length === 0 && targets) {
     for (let i = pool.length - 1; i >= 0 && result.length < total; i--) {
       const id = pool[i] as UnitId
-      if (result.includes(id)) continue
-      const variantKey = s.unitType[id]
-      if (variantKey === tier) {
-        result.push(id)
-        continue
-      }
-      if ((parseVariantId(variantKey).type as UnitType) === tier) {
-        result.push(id)
-      }
+      if (isUnitAbilityTarget(s, id, targets)) result.push(id)
+    }
+    return result
+  }
+  for (const tier of unitPriority) {
+    if (result.length >= total) break
+    const matches = unitLocatorMatcher(
+      s,
+      tier,
+      !parseUnitLocator(tier).unitType.includes(':'),
+    )
+    for (let i = pool.length - 1; i >= 0 && result.length < total; i--) {
+      const id = pool[i] as UnitId
+      if (result.includes(id) || !isUnitAbilityTarget(s, id, targets)) continue
+      if (matches(id)) result.push(id)
     }
   }
   return result
@@ -260,7 +259,7 @@ function isFighterVariant(variantKey: UnitType | undefined): boolean {
   if (variantKey === undefined) return false
   if (variantKey === 'FIGHTER') return true
   // Variant keys are `BASE` or `BASE:subtype`, so a startsWith check on
-  // `FIGHTER:` is equivalent to (and cheaper than) parseVariantId.
+  // `FIGHTER:` is equivalent to (and cheaper than) parseUnitLocator.
   return (
     variantKey.length > 7 &&
     variantKey.charCodeAt(7) === 58 /* ':' */ &&
@@ -268,35 +267,48 @@ function isFighterVariant(variantKey: UnitType | undefined): boolean {
   )
 }
 
-/** True when `unitPriority` follows the `[0.0.1]`-style pattern:
- *  contains at least one FIGHTER tier and one non-FIGHTER tier, with every
- *  non-FIGHTER tier strictly before every FIGHTER tier. Necessary but not
+/** Checks the `[0.0.1]`-style pattern: `unitPriority` contains at least one
+ *  FIGHTER tier and one non-FIGHTER tier, with every non-FIGHTER tier
+ *  strictly before every FIGHTER tier. Returns the single surface its
+ *  qualified tiers name (`null` when none are qualified), or `false` when
+ *  the pattern fails or the tiers name several surfaces. Necessary but not
  *  sufficient for the assignHits fast path — the caller must also verify
  *  that every non-FIGHTER unit in the receiving pool has a base type
  *  covered by `unitPriority` (otherwise selective priorities like
  *  `[CRUISER, FIGHTER]` would over-pick into types that aren't actually
- *  in the tier list). Hot path — cached per unitPriority array. */
-const fighterAtBottomCache = new WeakMap<readonly UnitType[], boolean>()
-function isFighterAtBottomPriority(unitPriority: readonly UnitType[]): boolean {
+ *  in the tier list) and that every unit sits on the returned surface.
+ *  Hot path — cached per unitPriority array. */
+const fighterAtBottomCache = new WeakMap<
+  readonly UnitLocator[],
+  SurfaceId | null | false
+>()
+function fighterAtBottomSurface(
+  unitPriority: readonly UnitLocator[],
+): SurfaceId | null | false {
   const cached = fighterAtBottomCache.get(unitPriority)
   if (cached !== undefined) return cached
   let seenFighter = false
   let seenNonFighter = false
-  let ok = true
-  for (let i = 0; i < unitPriority.length; i++) {
-    const t = unitPriority[i]
-    const isFighter =
-      t === 'FIGHTER' || (parseVariantId(t).type as UnitType) === 'FIGHTER'
-    if (isFighter) {
+  let result: SurfaceId | null | false = null
+  for (const target of unitPriority) {
+    const { baseType, surfaceId } = parseUnitLocator(target)
+    if (surfaceId !== undefined) {
+      if (result !== null && result !== surfaceId) {
+        result = false
+        break
+      }
+      result = surfaceId
+    }
+    if (baseType === 'FIGHTER') {
       seenFighter = true
     } else if (seenFighter) {
-      ok = false
+      result = false
       break
     } else {
       seenNonFighter = true
     }
   }
-  const result = ok && seenFighter && seenNonFighter
+  if (!seenFighter || !seenNonFighter) result = false
   fighterAtBottomCache.set(unitPriority, result)
   return result
 }
@@ -323,15 +335,19 @@ function isFighterAtBottomPriority(unitPriority: readonly UnitType[]): boolean {
 function poolTailNonFightersFollowPriority(
   s: SideStateData,
   pool: UnitIdList | readonly UnitId[],
-  unitPriority: readonly UnitType[],
+  unitPriority: readonly UnitLocator[],
+  surfaceId: SurfaceId | null,
 ): boolean {
   let priIdx = 0
   const seenPool = new Set<string>()
   for (let i = pool.length - 1; i >= 0; i--) {
-    const variant = s.unitType[pool[i] as UnitId]
+    const id = pool[i] as UnitId
+    // Qualified tiers act like base-type tiers only on their own surface.
+    if (surfaceId !== null && s.unitSurface[id] !== surfaceId) return false
+    const variant = s.unitType[id]
     if (variant === undefined) continue
     if (isFighterVariant(variant)) continue
-    const base = parseVariantId(variant).type as string
+    const base = parseUnitLocator(variant).baseType as string
     if (seenPool.has(base)) continue
     seenPool.add(base)
     // Advance priIdx until we find this base in unitPriority, skipping
@@ -339,7 +355,7 @@ function poolTailNonFightersFollowPriority(
     let matched = false
     while (priIdx < unitPriority.length) {
       const pt = unitPriority[priIdx]
-      const pBase = parseVariantId(pt).type as string
+      const pBase = parseUnitLocator(pt).baseType as string
       if (pBase === 'FIGHTER') break
       priIdx++
       if (pBase === base) {
@@ -352,18 +368,19 @@ function poolTailNonFightersFollowPriority(
   return true
 }
 
-function isCategoryMember(
+/** Gate for the assignHits `[0.0.1]` single-pass fast path. */
+function fitsFighterFastPath(
   s: SideStateData,
-  category: UnitCategory,
-  baseType: string,
+  pool: NonNullable<SideStateData['hitPool']>,
+  units: UnitIdList,
 ): boolean {
-  const settings = CombatSideState.getLiveParams(s, 'SETTINGS')
-  if (settings) {
-    const key = CATEGORY_TO_SETTINGS_KEY[category]
-    const list = settings[key] as UnitBaseType[] | undefined
-    if (list) return list.includes(baseType as UnitBaseType)
-  }
-  return (UNIT_CATEGORIES[category] as readonly string[]).includes(baseType)
+  if (pool.custom.length !== 1 || pool.unitAbilityTargets) return false
+  const { unitPriority } = pool.custom[0]
+  const surfaceId = fighterAtBottomSurface(unitPriority)
+  return (
+    surfaceId !== false &&
+    poolTailNonFightersFollowPriority(s, units, unitPriority, surfaceId)
+  )
 }
 
 /** Check if the ability that sourced a restriction is itself disabled.
@@ -385,8 +402,10 @@ function isSourceDisabled(
       const entries = restrictions[layer]?.[ability]
       if (!entries || entries.length === 0) continue
 
+      // A surface-scoped entry disables its ability only on that surface,
+      // never the ability as a restriction source.
       const hasValidEntry = entries.some(
-        e => !isSourceDisabled(state, e.reason, visited),
+        e => !e.surfaceId && !isSourceDisabled(state, e.reason, visited),
       )
       if (hasValidEntry) return true
     }
@@ -405,22 +424,24 @@ const EMPTY_RESOLVED: ResolvedRestrictions = {
  *  / `isAbilityBlocked` read. Must be called from any mutation that could
  *  affect a restriction outcome: raw entry add/remove (this side or the
  *  other, because cascades cross sides), unit composition changes (new
- *  variant keys), and SETTINGS live-param writes (category membership). */
+ *  variant keys), native stats, and per-unit changes. */
 function invalidateResolvedRestrictions(state: CombatStateData): void {
   state.attacker._resolvedRestrictions = undefined
   state.defender._resolvedRestrictions = undefined
 }
 
 /** Build the resolved-restrictions cache for one side. Runs the cascade
- *  check (`isSourceDisabled`) once per raw entry, expands category/base
+ *  check (`isSourceDisabled`) once per raw entry, expands base-type and
+ *  category rules
  *  rules against the side's current variant keys, and caches a
- *  `Set<UnitType> | 'ALL'` per (layer, ability). Subsequent checks are
+ *  `Set<UnitType | UnitId> | 'ALL'` per (layer, ability). Subsequent checks are
  *  Map.get + Set.has — O(1). */
 function buildResolvedForSide(
   state: CombatStateData,
   side: CombatSide,
 ): ResolvedRestrictions {
   const s = state[side]
+  const phase = state.meta
   const raw = s.unitAbilityRestrictions
   if (!raw) return EMPTY_RESOLVED
 
@@ -428,9 +449,9 @@ function buildResolvedForSide(
   const lost: ResolvedRestrictionsLayer = new Map()
 
   // Unique variant keys currently on the side, needed to expand
-  // base-type and category rules into concrete variant matches.
-  const variantKeys = new Set<UnitType>()
-  for (const key of Object.values(s.unitType)) variantKeys.add(key)
+  // base-type rules into concrete variant matches.
+  const variantKeys = new Set<UnitType>(Object.values(s.unitType))
+  const unitIds = Object.keys(s.unitType)
 
   // reason -> unit base types that ignore restrictions from that source.
   const immuneByReason = new Map<string, Set<UnitBaseType>>()
@@ -448,50 +469,51 @@ function buildResolvedForSide(
     const existing = target.get(ability)
     if (existing === 'ALL') return
 
+    const { unitType, category, surfaceId } = entry
     const immune = immuneByReason.get(entry.reason)
     const isImmune = (baseType: string) =>
       immune !== undefined && immune.has(baseType as UnitBaseType)
 
-    if (!entry.unitType && !entry.category) {
-      if (!immune) {
-        target.set(ability, 'ALL')
-        return
-      }
-      // Blanket entry with an immune unit type on the side: expand it into
-      // the concrete types present instead of 'ALL', minus the immune ones.
-      const set = existing ?? new Set<UnitType>()
-      for (const key of variantKeys) {
-        const baseType = parseVariantId(key).type
-        if (isImmune(baseType)) continue
-        set.add(key)
-        set.add(baseType as UnitType)
-      }
-      target.set(ability, set)
+    // A blanket entry with an immune unit type on the side is expanded into
+    // the concrete types present instead of 'ALL', minus the immune ones.
+    if (!unitType && !category && !immune && !surfaceId) {
+      target.set(ability, 'ALL')
       return
     }
+    const set = existing ?? new Set<UnitType | UnitId>()
+    target.set(ability, set)
 
-    const set = existing ?? new Set<UnitType>()
-
-    if (entry.unitType) {
-      if (!isImmune(entry.unitType)) {
-        set.add(entry.unitType as UnitType)
-        // A bare baseType entry also restricts every variant of that type.
-        for (const key of variantKeys) {
-          if (parseVariantId(key).type === entry.unitType) set.add(key)
-        }
-      }
-    } else if (entry.category) {
+    // A surface-scoped entry restricts only the units standing on that
+    // surface, so it resolves to ids alone (`moveUnits` invalidates).
+    if (!surfaceId) {
+      // A bare baseType entry also restricts every variant of that type.
+      if (unitType && !isImmune(unitType)) set.add(unitType as UnitType)
       for (const key of variantKeys) {
-        const baseType = parseVariantId(key).type
+        const baseType = parseUnitLocator(key).baseType
         if (isImmune(baseType)) continue
-        if (isCategoryMember(s, entry.category, baseType)) {
+        if (
+          unitType
+            ? baseType === unitType
+            : !category || isNativeCategory(s, key, category, phase)
+        ) {
           set.add(key)
           set.add(baseType as UnitType)
         }
       }
     }
 
-    target.set(ability, set)
+    for (const id of unitIds) {
+      if (surfaceId && s.unitSurface[id] !== surfaceId) continue
+      const baseType = parseUnitLocator(s.unitType[id]).baseType
+      if (isImmune(baseType)) continue
+      if (
+        unitType
+          ? baseType === unitType
+          : !category || isUnitCategory(s, id, category, phase)
+      ) {
+        set.add(id as UnitId)
+      }
+    }
   }
 
   for (const layer of ['lost', 'cannotBeUsed'] as const) {
@@ -511,6 +533,24 @@ function buildResolvedForSide(
   return { cannotBeUsed, lost }
 }
 
+/** `unitState` segment of the state hash: one id char and one damage flag
+ *  per entry, ordered by id. Entries are few, so an inline insertion sort
+ *  beats `Array#sort`. */
+function unitStateHash(s: SideStateData): string {
+  const ids: string[] = []
+  for (const id in s.unitState) {
+    let i = ids.length - 1
+    while (i >= 0 && ids[i] > id) {
+      ids[i + 1] = ids[i]
+      i--
+    }
+    ids[i + 1] = id
+  }
+  let body = ''
+  for (const id of ids) body += s.unitState[id].isDamaged ? `${id}1` : `${id}0`
+  return body
+}
+
 /** Lazy accessor — returns the per-side resolved cache, building it on
  *  first read after invalidation. */
 function getResolvedRestrictions(
@@ -524,25 +564,7 @@ function getResolvedRestrictions(
   return built
 }
 
-function _removeOne(
-  s: SideStateData,
-  unitTypeOrUnit: UnitBaseType | UnitId,
-): void {
-  let unitId: UnitId
-
-  // UnitId is a single-char packed token; UnitBaseType is a multi-char
-  // tag like "CRUISER". Distinguish by length rather than `typeof`.
-  if (unitTypeOrUnit.length > 1) {
-    const found = CombatSideState.findFirstUnitId(
-      s,
-      unitTypeOrUnit as UnitBaseType,
-    )
-    if (!found) return
-    unitId = found.unitId
-  } else {
-    unitId = unitTypeOrUnit as UnitId
-  }
-
+function _removeOne(s: SideStateData, unitId: UnitId): void {
   const pIdx = s.participatingUnits.indexOf(unitId)
   if (pIdx !== -1) {
     s.participatingUnits = (s.participatingUnits.slice(0, pIdx) +
@@ -562,13 +584,26 @@ function addRestrictionEntry(
   reason: string,
   unitType?: UnitBaseType,
   category?: UnitCategory,
+  surfaceId?: SurfaceId,
 ): UnitAbilityRestrictions {
   const current = restrictions ?? {}
   const layerData = current[layer] ?? {}
   const entries = layerData[ability] ?? []
+  if (
+    entries.some(
+      entry =>
+        entry.reason === reason &&
+        entry.unitType === unitType &&
+        entry.category === category &&
+        entry.surfaceId === surfaceId,
+    )
+  ) {
+    return current
+  }
   const entry: RestrictionEntry = { reason }
   if (unitType) entry.unitType = unitType
   if (category) entry.category = category
+  if (surfaceId) entry.surfaceId = surfaceId
 
   return {
     ...current,
@@ -586,6 +621,7 @@ function removeRestrictionEntry(
   reason: string,
   unitType?: UnitBaseType,
   category?: UnitCategory,
+  surfaceId?: SurfaceId,
 ): UnitAbilityRestrictions | undefined {
   if (!restrictions) return undefined
   const layerData = restrictions[layer]
@@ -595,7 +631,10 @@ function removeRestrictionEntry(
 
   const filtered = entries.filter(
     e =>
-      e.reason !== reason || e.unitType !== unitType || e.category !== category,
+      e.reason !== reason ||
+      e.unitType !== unitType ||
+      e.category !== category ||
+      e.surfaceId !== surfaceId,
   )
 
   const newLayerData = { ...layerData }
@@ -646,7 +685,9 @@ function removeImmunityEntry(
 }
 
 export interface GetUnitsOptions {
-  includeVariants: boolean
+  includeVariants?: boolean
+  participatingOnly?: boolean
+  surfaceId?: SurfaceId
 }
 
 /** Predicate to further restrict candidates in `findUnitByPriority`.
@@ -677,17 +718,14 @@ export class CombatSideState {
   /** Hash this side's units (participating, non-participating, and
    *  per-unit mutable state) for state deduplication.
    *
-   *  `unitState` is canonicalized: falsy field values are dropped (so
-   *  `{ isDamaged: false }` is equivalent to no entry at all — important
-   *  because CLEANUP_ROUND resets `usedSustainThisRound` to `false`
-   *  rather than deleting it, and we don't want that residual to fork
-   *  the cache from the never-touched starting state). Keys are sorted
-   *  so the same truthy state hashes identically regardless of which
-   *  ability happened to touch each unit first.
-   *
-   *  Phantom entries (a `unitState` key whose UnitId is no longer in
-   *  `participatingUnits` or `nonParticipatingUnits`) are skipped —
-   *  they belong to destroyed units and don't affect future combat.
+   *  Layout: `participating!nonParticipating|state[location][categories]`.
+   *  `state` is one id char plus a `1`/`0` damage flag per `unitState`
+   *  entry, ordered by id, so the same entries hash identically regardless
+   *  of which ability touched each unit first. Entries of destroyed units
+   *  are kept, and an entry without damage still differs from no entry.
+   *  UnitIds sit above ASCII, so the ASCII markers of the optional
+   *  `@location` and `#categories` segments (`unitMetaHash`) cannot be
+   *  mistaken for state.
    *
    *  Convergence across equivalent states ("A damaged" vs "B damaged")
    *  relies on `canonicalizeUnitState` having run. Natural sustain
@@ -696,19 +734,12 @@ export class CombatSideState {
    *  `SideApi.resortUnits()` to mark `_needsCanonicalize`. The flush
    *  here catches state read at round-start (cache-key time), where
    *  the BEFORE_ASSIGN_HITS script step hasn't run yet. */
-  static getUnitsHash(s: SideStateData): string {
+  static getUnitsHash(s: SideStateData, activeSurfaceId: SurfaceId): string {
     const dirty = s._needsCanonicalize
     if (dirty) {
       canonicalizeUnitState(s, dirty)
     }
-    const ids = Object.keys(s.unitState).sort()
-    let body = ''
-    for (const id of ids) {
-      const entry = s.unitState[id as UnitId]
-      const inner = `isDamaged=${entry.isDamaged ?? false}`
-      body += `${id}:${inner},`
-    }
-    return `${s.participatingUnits}!${s.nonParticipatingUnits}|${body}`
+    return `${s.participatingUnits}!${s.nonParticipatingUnits}|${unitStateHash(s)}${unitMetaHash(s, activeSurfaceId)}`
   }
 
   /** Hash this side's `liveAbilities`. The initial `abilities` config is
@@ -720,8 +751,8 @@ export class CombatSideState {
   }
 
   /** Full identity hash for this side — units + runtime ability overlay. */
-  static getHash(s: SideStateData): string {
-    return `${CombatSideState.getUnitsHash(s)}+${CombatSideState.getAbilitiesHash(s)}`
+  static getHash(s: SideStateData, activeSurfaceId: SurfaceId): string {
+    return `${CombatSideState.getUnitsHash(s, activeSurfaceId)}+${CombatSideState.getAbilitiesHash(s)}`
   }
 
   // ==========================================================================
@@ -731,11 +762,6 @@ export class CombatSideState {
   /** True if the side still holds any participating unit. */
   static hasParticipatingUnits(s: SideStateData): boolean {
     return s.participatingUnits.length > 0
-  }
-
-  /** True if the side has any alive unit (participating or not). */
-  static hasAnyUnits(s: SideStateData): boolean {
-    return s.participatingUnits.length > 0 || s.nonParticipatingUnits.length > 0
   }
 
   /** Check if a specific UnitId is alive on this side. */
@@ -749,7 +775,7 @@ export class CombatSideState {
   /** Check if a unit type has any alive units. */
   static hasUnitType(
     s: SideStateData,
-    unitType: UnitType,
+    unitType: UnitLocator,
     options?: GetUnitsOptions,
   ): boolean {
     return CombatSideState.countUnits(s, unitType, options) > 0
@@ -764,43 +790,27 @@ export class CombatSideState {
     return s.unitType[unitId] ?? ''
   }
 
-  /** Find the first (highest-priority) alive UnitId for a base type.
-   *  Participating units are scanned first; non-participating are fallback. */
-  static findFirstUnitId(
-    s: SideStateData,
-    baseType: UnitBaseType,
-  ): { unitId: UnitId; key: UnitType } | undefined {
-    const { participatingUnits, nonParticipatingUnits, unitType } = s
-    for (const id of participatingUnits) {
-      const key = unitType[id]
-      if (parseVariantId(key).type === baseType)
-        return { unitId: id as UnitId, key }
-    }
-    for (const id of nonParticipatingUnits) {
-      const key = unitType[id]
-      if (parseVariantId(key).type === baseType)
-        return { unitId: id as UnitId, key }
-    }
-    return undefined
-  }
-
   /** Get all UnitIds for a type, optionally including variants.
    *  Participating ids are returned first (in priority-sort order). */
   static getUnits(
     s: SideStateData,
-    unitType: UnitType,
+    unitType: UnitLocator | undefined,
     options?: GetUnitsOptions,
   ): UnitId[] {
-    const { participatingUnits, nonParticipatingUnits, unitType: typeMap } = s
     const result: UnitId[] = []
-    const matches = options?.includeVariants
-      ? (key: UnitType) => matchesVariantSuperset(key, unitType)
-      : (key: UnitType) => key === unitType
-    for (const id of participatingUnits) {
-      if (matches(typeMap[id])) result.push(id as UnitId)
+    const matches =
+      unitType === undefined
+        ? () => true
+        : unitLocatorMatcher(s, unitType, options?.includeVariants)
+    const surfaceId = options?.surfaceId
+    for (const id of s.participatingUnits) {
+      if ((!surfaceId || s.unitSurface[id] === surfaceId) && matches(id))
+        result.push(id as UnitId)
     }
-    for (const id of nonParticipatingUnits) {
-      if (matches(typeMap[id])) result.push(id as UnitId)
+    if (options?.participatingOnly) return result
+    for (const id of s.nonParticipatingUnits) {
+      if ((!surfaceId || s.unitSurface[id] === surfaceId) && matches(id))
+        result.push(id as UnitId)
     }
     return result
   }
@@ -809,12 +819,10 @@ export class CombatSideState {
    *  Counts across both participating and non-participating pools. */
   static countUnits(
     s: SideStateData,
-    filter?: UnitType | UnitType[],
+    filter?: UnitLocator | UnitLocator[],
     options?: GetUnitsOptions,
   ): number {
-    if (!filter) {
-      return s.participatingUnits.length + s.nonParticipatingUnits.length
-    }
+    if (!filter) return CombatSideState.getUnits(s, undefined, options).length
     const filters = typeof filter === 'string' ? [filter] : filter
     let total = 0
     for (const f of filters) {
@@ -825,14 +833,12 @@ export class CombatSideState {
 
   static findUnitByPriority(
     s: SideStateData,
-    priority: UnitType[],
-    participatingTypes: ReadonlySet<UnitBaseType> | undefined,
+    priority: UnitLocator[],
     options: GetUnitsOptions & { predicate?: FindUnitPredicate },
   ): UnitId | undefined
   static findUnitByPriority(
     s: SideStateData,
-    priority: UnitType[],
-    participatingTypes: ReadonlySet<UnitBaseType> | undefined,
+    priority: UnitLocator[],
     options: GetUnitsOptions & {
       amount: number
       predicate?: FindUnitPredicate
@@ -840,8 +846,7 @@ export class CombatSideState {
   ): UnitId[]
   static findUnitByPriority(
     s: SideStateData,
-    priority: UnitType[],
-    participatingTypes: ReadonlySet<UnitBaseType> | undefined,
+    priority: UnitLocator[],
     options: GetUnitsOptions & {
       amount?: number
       predicate?: FindUnitPredicate
@@ -853,8 +858,6 @@ export class CombatSideState {
     const result: UnitId[] = []
 
     for (const variantId of priority) {
-      const { type } = parseVariantId(variantId)
-      if (participatingTypes && !participatingTypes.has(type)) continue
       for (const id of CombatSideState.getUnits(s, variantId, options)) {
         if (predicate && !predicate(s.unitType[id], id)) continue
         if (!collect) return id
@@ -870,6 +873,39 @@ export class CombatSideState {
     return s.unitState[unitId] ?? {}
   }
 
+  /** Grant `category` to the living `ids` (see `SideStateData.unitGrants`). */
+  static grantCategory(
+    s: SideStateData,
+    ids: readonly UnitId[],
+    category: UnitCategory,
+  ): void {
+    let next: Record<string, UnitCategory> | undefined
+    for (const id of ids) {
+      if (!CombatSideState.hasUnit(s, id) || s.unitGrants?.[id] === category)
+        continue
+      next ??= { ...s.unitGrants }
+      next[id] = category
+    }
+    if (!next) return
+    s.unitGrants = next
+    s._resolvedRestrictions = undefined
+  }
+
+  static canAssignHitToUnit(s: SideStateData, id: UnitId): boolean {
+    const pool = s.hitPool
+    if (!pool) return true
+    if (!isUnitAbilityTarget(s, id, pool.unitAbilityTargets)) return false
+    if (pool.base + pool.additional > 0) return true
+    return pool.custom.some(
+      entry =>
+        entry.base > 0 &&
+        (entry.unitPriority.length === 0 ||
+          entry.unitPriority.some(type =>
+            matchesUnitLocator(s, id, type, true),
+          )),
+    )
+  }
+
   /** Get base type for a UnitId. */
   static getUnitBaseType(
     s: SideStateData,
@@ -877,19 +913,17 @@ export class CombatSideState {
   ): UnitBaseType | undefined {
     const key = s.unitType[unitId]
     if (!key) return undefined
-    return parseVariantId(key).type as UnitBaseType
+    return parseUnitLocator(key).baseType as UnitBaseType
   }
 
   /** Get all active base types (types with at least one alive unit). */
-  static getActiveBaseTypes(s: SideStateData): UnitBaseType[] {
-    const { participatingUnits, nonParticipatingUnits, unitType } = s
+  static getActiveBaseTypes(
+    s: SideStateData,
+    options?: GetUnitsOptions,
+  ): UnitBaseType[] {
     const types = new Set<UnitBaseType>()
-    for (const id of participatingUnits) {
-      types.add(parseVariantId(unitType[id]).type as UnitBaseType)
-    }
-    for (const id of nonParticipatingUnits) {
-      types.add(parseVariantId(unitType[id]).type as UnitBaseType)
-    }
+    for (const id of CombatSideState.getUnits(s, undefined, options))
+      types.add(parseUnitLocator(s.unitType[id]).baseType as UnitBaseType)
     return [...types]
   }
 
@@ -938,7 +972,7 @@ export class CombatSideState {
     if (unitTypeOrId.length > 1) {
       const stats = resolveUnitStats(s.unitStats, unitTypeOrId as UnitType)
       if (stats) return stats
-      const { type } = parseVariantId(unitTypeOrId as UnitType)
+      const { baseType: type } = parseUnitLocator(unitTypeOrId as UnitType)
       if (type !== unitTypeOrId) {
         return resolveUnitStats(s.unitStats, type)
       }
@@ -950,7 +984,7 @@ export class CombatSideState {
   }
 
   // ==========================================================================
-  // LIVE PARAMS / SETTINGS
+  // LIVE PARAMS
   // ==========================================================================
 
   /** Merge base ability config with any live overlay for this side. */
@@ -965,48 +999,34 @@ export class CombatSideState {
     return { ...base, ...live }
   }
 
-  /** Get participating base types from SETTINGS ability as a Set.
-   *  Hot path — inlined merge. */
-  static getParticipatingUnits(
+  /** Types that can be `source` during `phase` (option lists pass their
+   *  mode's combat meta). */
+  static getCategoryOptionTypes(
     s: SideStateData,
-    mode: CombatMode,
-  ): ReadonlySet<UnitBaseType> {
-    const liveSettings = s.liveAbilities['SETTINGS']
-    const baseSettings = s.abilities['SETTINGS']
-    const settings =
-      liveSettings === undefined
-        ? baseSettings
-        : baseSettings === undefined
-          ? liveSettings
-          : { ...baseSettings, ...liveSettings }
-
-    if (!settings) throw new Error('No SETTINGS in getParticipatingUnits')
-
-    const units =
-      mode === 'GROUND'
-        ? (settings.groundCombatParticipating as UnitBaseType[])
-        : (settings.spaceCombatParticipating as UnitBaseType[])
-
-    return new Set(units)
-  }
-
-  /** Get participating unit types from SETTINGS. */
-  static getParticipatingUnitTypes(
-    s: SideStateData,
-    mode: CombatMode,
+    source: UnitCategory | readonly UnitCategory[],
+    phase?: MetaPhase,
   ): UnitBaseType[] {
-    const settings = CombatSideState.getLiveParams(s, 'SETTINGS')
-    if (!settings) {
-      const { participatingUnits, unitType } = s
-      const types = new Set<UnitBaseType>()
-      for (const id of participatingUnits) {
-        types.add(parseVariantId(unitType[id]).type as UnitBaseType)
-      }
-      return [...types]
+    const categories: readonly UnitCategory[] = Array.isArray(source)
+      ? source
+      : [source]
+    // Stand-ins carry the declared changes: their stats and grants.
+    const standIns = s.optionMetadata?.standIns ?? s
+    const alive = standIns.participatingUnits + standIns.nonParticipatingUnits
+    const result: UnitBaseType[] = []
+    const add = (type: UnitBaseType) => {
+      if (!result.includes(type)) result.push(type)
     }
-    return mode === 'GROUND'
-      ? ((settings.groundCombatParticipating as UnitBaseType[]) ?? [])
-      : ((settings.spaceCombatParticipating as UnitBaseType[]) ?? [])
+    for (const category of categories) {
+      for (const type of UNIT_TYPES) {
+        if (isNativeCategory(standIns, type, category, phase)) add(type)
+      }
+      // Granted types follow the native ones; worth sorts keep ties in order.
+      for (const [id, grant] of Object.entries(standIns.unitGrants ?? {})) {
+        if (grant === category && alive.includes(id))
+          add(parseUnitLocator(standIns.unitType[id]).baseType)
+      }
+    }
+    return result
   }
 
   /** Get all unit types (participating + structures) */
@@ -1019,7 +1039,7 @@ export class CombatSideState {
     s: SideStateData,
     mode: CombatMode,
     abilitiesOverride?: Readonly<AbilitiesOverride>,
-  ): UnitType[] | undefined {
+  ): UnitLocator[] | undefined {
     const key = mode === 'GROUND' ? 'groundUnitPriority' : 'spaceUnitPriority'
 
     // Resolution-scoped override wins over base/live config — e.g. SCO passes
@@ -1033,114 +1053,55 @@ export class CombatSideState {
       }
     }
 
-    const unitPriority = mergeConfig(s, 'UNIT_PRIORITY')
+    const unitPriority = CombatSideState.getLiveParams(s, 'UNIT_PRIORITY')
     if (!unitPriority) return undefined
     return parsePriorityList(unitPriority[key])
   }
 
-  /** Get valid targets from SETTINGS for the given meta. Throws when
-   *  SETTINGS is absent. */
-  static getValidTargetsForPhase(
-    s: SideStateData,
-    meta: MetaPhase,
-  ): UnitBaseType[] {
-    const settings = CombatSideState.getLiveParams(s, 'SETTINGS')
-    if (!settings) throw new Error('No SETTINGS in getValidTargetsForPhase')
-    return getSettingsValidTargetsUtil(settings, meta)
-  }
+  /** Resolve one firing side's unit-ability priority. A custom priority on
+   *  the producing ability wins; otherwise the final target side's normal
+   *  UNIT_PRIORITY is inherited. The returned list defines both eligibility
+   *  and assignment order. */
+  static getUnitAbilityPriority(
+    firing: SideStateData,
+    target: SideStateData,
+    meta: UnitAbilityMeta,
+    abilitiesOverride?: Readonly<AbilitiesOverride>,
+  ): UnitLocator[] {
+    const abilityKey: keyof AbilityConfigMap =
+      meta === 'AFB'
+        ? 'ANTI_FIGHTER_BARRAGE'
+        : meta === 'BOMBARDMENT'
+          ? 'BOMBARDMENT'
+          : meta === 'SPACE_CANNON_OFFENSE'
+            ? 'SPACE_CANNON_OFFENSE'
+            : 'SPACE_CANNON_DEFENSE'
+    const base = CombatSideState.getLiveParams(firing, abilityKey) ?? {}
+    const scoped = abilitiesOverride?.[abilityKey]
+    const params =
+      scoped !== undefined && typeof scoped !== 'boolean'
+        ? { ...base, ...scoped }
+        : base
 
-  /** Snapshot of the side's currently-targetable types for the *next*
-   *  hit incoming. Returns `undefined` when no restriction applies —
-   *  either no pool, or the main pool still has hits to drain (main
-   *  drains first and is unrestricted). Otherwise returns the union of
-   *  every queued custom entry's `unitPriority`, deduped. Used by
-   *  sustain-damage selection logic. */
-  static getHitPoolValidTargets(s: SideStateData): UnitType[] | undefined {
-    const pool = s.hitPool
-    if (pool === undefined) return undefined
-    if (pool.base + pool.additional > 0) return undefined
-    if (pool.custom.length === 0) return undefined
-    const set = new Set<UnitType>()
-    for (const c of pool.custom) for (const t of c.unitPriority) set.add(t)
-    return set.size > 0 ? [...set] : undefined
-  }
-
-  // ==========================================================================
-  // VARIANT OPTIONS
-  // ==========================================================================
-
-  static getUnitVariants(
-    s: SideStateData,
-    mode: CombatMode,
-    filter?: ParamFilter,
-    sourceBaseTypes?: readonly UnitBaseType[],
-  ): UnitType[] {
-    let baseTypes = filter?.includeNonParticipating
-      ? CombatSideState.getAllUnitTypes()
-      : CombatSideState.getParticipatingUnitTypes(s, filter?.combatMode ?? mode)
-    if (sourceBaseTypes) {
-      const allowed = new Set<string>(sourceBaseTypes)
-      baseTypes = baseTypes.filter(b => allowed.has(b))
-    }
-    const settings = CombatSideState.getLiveParams(s, 'SETTINGS')
-    const allDeclaredSubtypes = (settings?.subtypes ?? []) as DeclaredSubtype[]
-    let declaredSubtypes = filterDeclaredSubtypes(allDeclaredSubtypes, filter)
-
-    const baseSet = new Set<string>(baseTypes)
-    const result: UnitType[] = [...baseTypes]
-    const addedSet = new Set<string>(baseTypes)
-    if (filter?.includeOnlyBaseTypes) {
-      declaredSubtypes = []
-    }
-    for (const decl of declaredSubtypes) {
-      const { type, subtypes: parentSubs } = parseVariantId(decl.unitType)
-      if (!baseSet.has(decl.unitType) && !addedSet.has(decl.unitType)) continue
-      const variantId = makeVariantId(type, [
-        ...parentSubs,
-        decl.name as UnitVariantId,
-      ])
-      if (addedSet.has(variantId)) continue
-      let insertIdx = result.length
-      for (let i = result.length - 1; i >= 0; i--) {
-        if (
-          result[i] === decl.unitType ||
-          result[i].startsWith(decl.unitType + ':')
-        ) {
-          insertIdx = i + 1
-          break
-        }
-      }
-      result.splice(insertIdx, 0, variantId)
-      addedSet.add(variantId)
+    if (params.customPriority === true) {
+      return parsePriorityList(params.unitPriority) ?? []
     }
 
-    return applyVariantPostFilter(result, filter) as UnitType[]
-  }
-
-  static getUnitVariantOptions(
-    s: SideStateData,
-    mode: CombatMode,
-    filter?: ParamFilter,
-    sourceBaseTypes?: readonly UnitBaseType[],
-  ): { label: string; value: UnitType }[] {
-    return CombatSideState.getUnitVariants(
-      s,
-      mode,
-      filter,
-      sourceBaseTypes,
-    ).map(id => ({
-      label: getVariantDisplayName(id),
-      value: id,
-    }))
+    const mode: CombatMode =
+      meta === 'AFB' || meta === 'SPACE_CANNON_OFFENSE' ? 'SPACE' : 'GROUND'
+    return (
+      CombatSideState.getPhasePriorityList(target, mode, abilitiesOverride) ??
+      []
+    )
   }
 
   // ==========================================================================
   // RESTRICTIONS (queries)
   // ==========================================================================
 
-  /** Check if a unit ability is restricted (variant-aware, category-aware).
+  /** Check if a unit ability is restricted for this variant or unit.
    *  O(1) — reads the pre-resolved cache (lazy-built on first call after
-   *  each restriction/unit/SETTINGS mutation). */
+   *  each restriction or unit mutation). */
   static isRestricted(
     state: CombatStateData,
     side: CombatSide,
@@ -1151,8 +1112,26 @@ export class CombatSideState {
     if (!state[side].unitAbilityRestrictions) return false
     const resolved = getResolvedRestrictions(state, side)[layer].get(ability)
     if (!resolved) return false
-    if (resolved === 'ALL') return true
-    return resolved.has(unitType as UnitType)
+    return resolved === 'ALL' || resolved.has(unitType as UnitType)
+  }
+
+  /** Lost or cannot be used: the unit (or type) may not use `ability`. */
+  static isUnitAbilityDisabled(
+    state: CombatStateData,
+    side: CombatSide,
+    ability: UnitAbility,
+    unitType: string,
+  ): boolean {
+    return (
+      CombatSideState.isRestricted(state, side, 'lost', ability, unitType) ||
+      CombatSideState.isRestricted(
+        state,
+        side,
+        'cannotBeUsed',
+        ability,
+        unitType,
+      )
+    )
   }
 
   /** Check if a unit ability is fully blocked by a blanket restriction.
@@ -1178,13 +1157,10 @@ export class CombatSideState {
     state: CombatStateData,
     side: CombatSide,
     source: HitSource,
-    allowedUnitTypes?: ReadonlySet<UnitBaseType>,
+    sourceSurfaceId?: SurfaceId,
+    instanceModifiers: readonly HitValueModifierDecl[] = [],
   ): SideDiceCollection {
     const s = state[side]
-    const participatingTypes = CombatSideState.getParticipatingUnits(
-      s,
-      state.combatMode,
-    )
     const collection: SideDiceCollection = {}
 
     const scanNonParticipating =
@@ -1194,33 +1170,18 @@ export class CombatSideState {
       UnitType,
       readonly [number, number] | null
     >()
-    const restrictionChecked = new Map<UnitBaseType, boolean>()
 
-    const walk = (pool: UnitIdList, skipParticipatingCheck: boolean) => {
+    const walk = (pool: UnitIdList) => {
       for (const id of pool) {
+        if (sourceSurfaceId && s.unitSurface[id] !== sourceSurfaceId) continue
         const key = s.unitType[id]
-        const { type } = parseVariantId(key)
+        const { baseType: type } = parseUnitLocator(key)
 
-        if (allowedUnitTypes && !allowedUnitTypes.has(type)) continue
-        if (!skipParticipatingCheck && !participatingTypes.has(type)) continue
-
-        if (source !== 'COMBAT') {
-          let allowed = restrictionChecked.get(type)
-          if (allowed === undefined) {
-            allowed = !(
-              CombatSideState.isRestricted(state, side, 'lost', source, type) ||
-              CombatSideState.isRestricted(
-                state,
-                side,
-                'cannotBeUsed',
-                source,
-                type,
-              )
-            )
-            restrictionChecked.set(type, allowed)
-          }
-          if (!allowed) continue
-        }
+        if (
+          source !== 'COMBAT' &&
+          CombatSideState.isUnitAbilityDisabled(state, side, source, id)
+        )
+          continue
 
         let die = variantStatsCache.get(key)
         if (die === undefined) {
@@ -1244,7 +1205,12 @@ export class CombatSideState {
         }
         if (die === null) continue
 
-        const [hitValue, dpu] = die
+        let [hitValue, dpu] = die
+        for (const mod of instanceModifiers) {
+          if (mod.unitId && mod.unitId !== id) continue
+          if (mod.excludeUnitTypes?.includes(type)) continue
+          hitValue = Math.max(1, hitValue + mod.amount)
+        }
         // Pool outer key is the base type, so galvanized + normal variants
         // of the same base type land in the same list — distinguished only
         // by `(hitValue, dpu)` of each entry.
@@ -1255,8 +1221,8 @@ export class CombatSideState {
       }
     }
 
-    walk(s.participatingUnits, true)
-    if (scanNonParticipating) walk(s.nonParticipatingUnits, true)
+    walk(s.participatingUnits)
+    if (scanNonParticipating) walk(s.nonParticipatingUnits)
 
     return collection
   }
@@ -1267,8 +1233,8 @@ export class CombatSideState {
 
   /** Assign hits to this side. Replaces `participatingUnits` with a new
    *  array (does NOT mutate the original — safe for shared branch data).
-   *  Drains the main pool first (always unrestricted, tail-slice), then
-   *  each custom entry in declaration order using its own `unitPriority`. */
+   *  Drains the main pool first, then each custom entry in declaration order
+   *  using its own `unitPriority`. The phase filter applies to both. */
   static assignHits(
     s: SideStateData,
     trackDestroyed?: boolean,
@@ -1291,7 +1257,7 @@ export class CombatSideState {
     const destroyedIds: UnitId[] = []
     const hasCustom = pool.custom.length > 0
 
-    if (!hasCustom) {
+    if (!hasCustom && !pool.unitAbilityTargets) {
       const take = Math.min(mainTotal, oldUnits.length)
       const kept = oldUnits.length - take
       s.participatingUnits = oldUnits.slice(0, kept) as UnitIdList
@@ -1299,15 +1265,7 @@ export class CombatSideState {
         for (let i = kept; i < oldUnits.length; i++)
           destroyedIds.push(oldUnits[i] as UnitId)
       }
-    } else if (
-      pool.custom.length === 1 &&
-      isFighterAtBottomPriority(pool.custom[0].unitPriority) &&
-      poolTailNonFightersFollowPriority(
-        s,
-        oldUnits,
-        pool.custom[0].unitPriority,
-      )
-    ) {
+    } else if (fitsFighterFastPath(s, pool, oldUnits)) {
       // Single-pass fast path for the [0.0.1]-style pattern (custom
       // entry prefers non-FIGHTER, fallback to FIGHTER). Walks the
       // participating pool tail-to-head ONCE: fighters go to main (its
@@ -1364,7 +1322,15 @@ export class CombatSideState {
     } else {
       const working = [...oldUnits] as UnitId[]
       if (mainTotal > 0) {
-        const picks = pickTailTargets(working, mainTotal)
+        const picks = pool.unitAbilityTargets
+          ? pickTargetsForCustom(
+              s,
+              working,
+              mainTotal,
+              [],
+              pool.unitAbilityTargets,
+            )
+          : pickTailTargets(working, mainTotal)
         for (const id of picks) {
           const idx = working.indexOf(id)
           if (idx === -1) continue
@@ -1379,6 +1345,7 @@ export class CombatSideState {
           working,
           entry.base,
           entry.unitPriority,
+          pool.unitAbilityTargets,
         )
         for (const id of picks) {
           const idx = working.indexOf(id)
@@ -1403,9 +1370,7 @@ export class CombatSideState {
     return destroyed
   }
 
-  /** Simulate resolving N unrestricted hits against this side's current
-   *  units (tail-slice) — returns the UnitIds that would be destroyed in
-   *  sacrifice order. Non-destructive. */
+  /** Simulate casualties in the side's participating unit order. */
   static getAssignHitsTargets(s: SideStateData, hits: number): UnitId[] {
     return pickTailTargets(s.participatingUnits, hits)
   }
@@ -1429,15 +1394,15 @@ export class CombatSideState {
     s: SideStateData,
     hits: number,
     key: string,
-    unitPriority: UnitType[],
+    unitPriority: UnitLocator[],
   ): void {
     if (hits === 0) return
-    s.hitPool = {
-      base: 0,
-      additional: 0,
-      custom: [{ key, base: hits, unitPriority }],
-    }
-    s._hitPoolShared = false
+    const pool = ensureHitPool(s)
+    pool.custom.push({
+      key,
+      base: hits,
+      unitPriority,
+    })
   }
 
   /** Merge a custom entry's hits into the main pool's `base` and drop the
@@ -1483,10 +1448,7 @@ export class CombatSideState {
   // ==========================================================================
 
   /** Remove one or more units by UnitId, UnitId[], or base type (first found). */
-  static removeUnits(
-    s: SideStateData,
-    target: UnitBaseType | UnitId | UnitId[],
-  ): void {
+  static removeUnits(s: SideStateData, target: UnitId | UnitId[]): void {
     if (Array.isArray(target)) {
       for (const id of target) _removeOne(s, id)
       return
@@ -1535,7 +1497,8 @@ export class CombatSideState {
   ): UnitType | undefined {
     const sourceKey = s.unitType[unitId]
     if (!sourceKey) return undefined
-    const { type, subtypes: currentSubtypes } = parseVariantId(sourceKey)
+    const { baseType: type, subtypes: currentSubtypes } =
+      parseUnitLocator(sourceKey)
 
     const newSubtypes = [...currentSubtypes, subtype].sort()
     const newKey = makeVariantId(type, newSubtypes as UnitVariantId[])
@@ -1565,7 +1528,7 @@ export class CombatSideState {
   ): UnitType | undefined {
     const sourceKey = s.unitType[unitId]
     if (!sourceKey) return undefined
-    const { type, subtypes: sourceSubs } = parseVariantId(sourceKey)
+    const { baseType: type, subtypes: sourceSubs } = parseUnitLocator(sourceKey)
     if (!sourceSubs.includes(subtype)) return undefined
 
     const newSubtypes = sourceSubs.filter(sub => sub !== subtype)
@@ -1587,26 +1550,22 @@ export class CombatSideState {
     key: UnitType,
     updates: Partial<UnitStats>,
   ): { keysWithAbilitiesChange: { key: UnitType; ids: UnitId[] }[] } {
-    const { type } = parseVariantId(key)
+    const { baseType: type } = parseUnitLocator(key)
     const isVariantKey = key.includes(':')
     const hasAbilitiesUpdate = 'ABILITIES' in updates
 
-    if (isVariantKey) {
-      if (s.unitStats[key]) {
-        if (typeof s.unitStats[key] === 'function') {
-          s.unitStats[key] = resolveUnitStats(s.unitStats, key)!
-        }
-        Object.assign(s.unitStats[key], updates)
-      }
-    } else {
-      for (const vKey of Object.keys(s.unitStats) as UnitType[]) {
-        const { type: vType } = parseVariantId(vKey)
-        if (vType !== type) continue
-        if (!s.unitStats[vKey]) continue
-        if (typeof s.unitStats[vKey] === 'function') continue
-        Object.assign(s.unitStats[vKey], updates)
-      }
+    const stats = { ...s.unitStats }
+    for (const vKey of Object.keys(stats) as UnitType[]) {
+      if (
+        isVariantKey ? vKey !== key : parseUnitLocator(vKey).baseType !== type
+      )
+        continue
+      if (!isVariantKey && typeof stats[vKey] === 'function') continue
+      const current = resolveUnitStats(s.unitStats, vKey)
+      if (current) stats[vKey] = { ...current, ...updates }
     }
+    s.unitStats = stats
+    s._resolvedRestrictions = undefined
 
     if (!hasAbilitiesUpdate) return { keysWithAbilitiesChange: [] }
 
@@ -1618,7 +1577,7 @@ export class CombatSideState {
         if (isVariantKey) {
           if (vKey !== key) continue
         } else {
-          if (parseVariantId(vKey).type !== type) continue
+          if (parseUnitLocator(vKey).baseType !== type) continue
         }
         let bucket = buckets.get(vKey)
         if (!bucket) buckets.set(vKey, (bucket = []))
@@ -1640,24 +1599,37 @@ export class CombatSideState {
    *  sides. */
   static placeUnits(
     s: SideStateData,
-    mode: CombatMode,
+    state: Pick<
+      CombatStateData,
+      '_nextCode' | 'surfaces' | 'combatMode' | 'activeSurfaceId' | 'meta'
+    >,
     unitsToAdd: Partial<Record<UnitType, number>>,
-    gen: { _nextCode?: number },
+    destination: SurfaceId,
   ): Record<UnitType, UnitId[]> {
-    const placed: Record<UnitType, UnitId[]> = {} as Record<UnitType, UnitId[]>
-    const participatingTypes = new Set(
-      CombatSideState.getParticipatingUnitTypes(s, mode),
+    const destinationSurface = state.surfaces.find(
+      surface => surface.id === destination,
     )
+    if (!destinationSurface) throw new Error(`Unknown surface: ${destination}`)
+    const placed: Record<UnitType, UnitId[]> = {} as Record<UnitType, UnitId[]>
 
     let nextPart = s.participatingUnits
     let nextNon = s.nonParticipatingUnits
     let nextUnitType = s.unitType
+    let nextUnitSurface = s.unitSurface
 
     for (const [variantKey, count] of Object.entries(unitsToAdd)) {
       const vKey = variantKey as UnitType
       if (!count || count <= 0) continue
 
-      const baseType = parseVariantId(vKey).type as UnitBaseType
+      const baseType = parseUnitLocator(vKey).baseType as UnitBaseType
+      const stats = CombatSideState.getUnitStats(s, vKey)
+      const allowedSurfaces =
+        stats?.ALLOWED_SURFACES ?? DEFAULT_UNIT_SURFACES[baseType]
+      if (!allowedSurfaces.includes(destinationSurface.type)) {
+        throw new Error(
+          `${baseType} cannot be placed on ${destinationSurface.type}`,
+        )
+      }
 
       const existing = countUnitsByBaseType(s, baseType)
 
@@ -1670,32 +1642,68 @@ export class CombatSideState {
       const allowed = Math.min(count, limit - existing)
       if (allowed <= 0) continue
 
-      const newIds = nextUnitIds(allowed, gen)
-      if (participatingTypes.has(baseType)) {
+      const newIds = nextUnitIds(allowed, state)
+      if (
+        participatesNatively(
+          s,
+          vKey,
+          destination,
+          state.combatMode,
+          state.activeSurfaceId,
+          state.meta,
+        )
+      ) {
         nextPart = (nextPart + newIds.join('')) as UnitIdList
       } else {
         nextNon = (nextNon + newIds.join('')) as UnitIdList
       }
       const typeMapAdditions: Record<UnitId, UnitType> = {}
-      for (const id of newIds) typeMapAdditions[id] = vKey
+      const surfaceMapAdditions: Record<UnitId, SurfaceId> = {}
+      for (const id of newIds) {
+        typeMapAdditions[id] = vKey
+        surfaceMapAdditions[id] = destination
+      }
       nextUnitType = { ...nextUnitType, ...typeMapAdditions }
+      nextUnitSurface = { ...nextUnitSurface, ...surfaceMapAdditions }
 
       // Stats for vKey are pre-populated by buildSideState; if missing
       // (test fixtures bypassing declareSubtype), seed an empty record so
       // resolveUnitStats can fall back to the parent.
       if (!s.unitStats[vKey]) {
-        s.unitStats[vKey] = {}
+        s.unitStats = { ...s.unitStats, [vKey]: {} }
       }
 
       placed[vKey] = newIds
     }
 
+    // Placing nothing leaves the side untouched.
+    if (nextUnitSurface === s.unitSurface) return placed
+
     s.participatingUnits = nextPart
     s.nonParticipatingUnits = nextNon
     s.unitType = nextUnitType
+    s.unitSurface = nextUnitSurface
     s._resolvedRestrictions = undefined
 
     return placed
+  }
+
+  static moveUnits(
+    s: SideStateData,
+    unitIds: readonly UnitId[],
+    destination: SurfaceId,
+  ): void {
+    if (unitIds.length === 0) return
+    const moving = new Set(unitIds.filter(id => CombatSideState.hasUnit(s, id)))
+    if (moving.size === 0) return
+    const unitSurface = { ...s.unitSurface }
+    for (const id of unitIds) {
+      if (!moving.has(id)) continue
+      unitSurface[id] = destination
+    }
+    s.unitSurface = unitSurface
+    // Surface-scoped restrictions resolve to the ids standing on the surface.
+    s._resolvedRestrictions = undefined
   }
 
   // ==========================================================================
@@ -1709,6 +1717,7 @@ export class CombatSideState {
     ability: UnitAbility,
     reason: string,
     target?: UnitBaseType | UnitCategory,
+    surfaceId?: SurfaceId,
   ): void {
     const s = state[side]
     const isCategory = target !== undefined && target in UNIT_CATEGORIES
@@ -1717,8 +1726,9 @@ export class CombatSideState {
       layer,
       ability,
       reason,
-      isCategory ? undefined : (target as UnitBaseType),
+      isCategory ? undefined : (target as UnitBaseType | undefined),
       isCategory ? (target as UnitCategory) : undefined,
+      surfaceId,
     )
     // Cascade crosses sides — drop both caches.
     invalidateResolvedRestrictions(state)
@@ -1731,6 +1741,7 @@ export class CombatSideState {
     ability: UnitAbility,
     reason: string,
     target?: UnitBaseType | UnitCategory,
+    surfaceId?: SurfaceId,
   ): void {
     const s = state[side]
     const isCategory = target !== undefined && target in UNIT_CATEGORIES
@@ -1739,8 +1750,9 @@ export class CombatSideState {
       layer,
       ability,
       reason,
-      isCategory ? undefined : (target as UnitBaseType),
+      isCategory ? undefined : (target as UnitBaseType | undefined),
       isCategory ? (target as UnitCategory) : undefined,
+      surfaceId,
     )
     invalidateResolvedRestrictions(state)
   }

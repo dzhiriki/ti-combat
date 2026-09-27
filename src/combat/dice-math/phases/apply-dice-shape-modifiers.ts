@@ -1,8 +1,8 @@
 import type { CombatSide, UnitBaseType } from '@/types'
 
 import type { HitSource, SideStateData } from '../../combat-state/types'
+import { parseUnitLocator } from '../../utils/parse-unit-locator'
 import { resolveUnitStats } from '../../utils/resolve-unit-stats'
-import { parseVariantId } from '../../utils/unit-variant'
 import type {
   AddDiceCountDecl,
   AddDiceGroupDecl,
@@ -56,7 +56,7 @@ function applySetDiceCount(
   unitStats: SideStateData['unitStats'],
   hitSource: HitSource,
 ): void {
-  const baseType = parseVariantId(mod.unitType).type as UnitBaseType
+  const baseType = parseUnitLocator(mod.unitType).baseType as UnitBaseType
   const entries = collection[baseType]
   if (!entries) return
   const stats = resolveUnitStats(unitStats, mod.unitType)

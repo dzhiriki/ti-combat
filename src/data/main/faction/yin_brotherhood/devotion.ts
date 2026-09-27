@@ -24,14 +24,14 @@ export const devotion: Ability<Params> = {
     uses: Infinity,
     sacrificePriority: declareParam({
       default: [] as UnitList<boolean>,
-      source: 'ships',
+      source: 'SHIPS',
       side: 'own',
       defaultItemValue: true,
       filter: { include: ['CRUISER', 'DESTROYER'], combatMode: 'SPACE' },
     }),
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'opponent',
       defaultItemValue: true,
       filter: { combatMode: 'SPACE' },
@@ -42,26 +42,22 @@ export const devotion: Ability<Params> = {
     {
       timing: 'END_OF_COMBAT_ROUND',
       isCallable: (params, ctx) => {
-        const sacrifice = ctx.api.own.findUnitByPriority(
+        const sacrifice = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.sacrificePriority),
-          { includeVariants: false },
         )
-        const target = ctx.api.opponent.findUnitByPriority(
+        const target = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false },
         )
         if (sacrifice === undefined) return false
         if (target === undefined) return false
         return true
       },
       call: (ctx, params) => {
-        const sacrifice = ctx.api.own.findUnitByPriority(
+        const sacrifice = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.sacrificePriority),
-          { includeVariants: false },
         )
-        const target = ctx.api.opponent.findUnitByPriority(
+        const target = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false },
         )
         if (sacrifice === undefined) return
         if (target === undefined) return

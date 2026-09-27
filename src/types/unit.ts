@@ -1,7 +1,9 @@
-import type { Ability } from '@/combat'
+import type { Ability, MetaPhase } from '@/combat'
+import type { UnitCategory } from '@/constants/units'
 
 import type { DiceGroup } from './die'
 import type { Lazy } from './faction'
+import type { SurfaceType } from './surface'
 
 export type UnitVariantId = string & { readonly __brand: 'UnitVariantId' }
 
@@ -20,6 +22,11 @@ export type UnitBaseType =
 type UnitVariant = `${UnitBaseType}:${UnitVariantId}`
 export type UnitType = UnitBaseType | UnitVariant
 
+/** An ability selection identifies a variant at a location, never a stat key. */
+export type SurfaceUnitKey = string & { readonly __brand: 'SurfaceUnitKey' }
+/** Plain types remain supported for legacy settings and type-only choices. */
+export type UnitLocator = UnitType | SurfaceUnitKey
+
 // Unit abilities
 interface UnitAbilities {
   SUSTAIN_DAMAGE?: boolean
@@ -33,7 +40,20 @@ interface UnitAbilities {
 
 export type UnitAbility = keyof UnitAbilities
 
+/** A category held only while the scheduler's meta phase is one of `phase`
+ *  (Starlancer XI is a ship during space combat). */
+export interface PhaseCategory {
+  category: UnitCategory
+  phase: MetaPhase | readonly MetaPhase[]
+}
+
+export type CategoryEntry = UnitCategory | PhaseCategory
+
 export interface UnitStats {
+  /** Native categories inherited by every new instance. Omission uses the
+   *  base unit type's categories. Temporary grants are stored per UnitId. */
+  CATEGORIES?: readonly CategoryEntry[]
+  UNIT_ABILITY_HIT_IMMUNE?: boolean
   NAME?: string
   DESCRIPTION?: string
   COST?: number | null
@@ -47,6 +67,10 @@ export interface UnitStats {
    *  living units, so the exemption ends when the carrier dies. */
   FREE_CARGO?: readonly UnitBaseType[]
   FLEET_POOL_COST?: number
+  /** Surfaces on which this unit may physically exist. When omitted the
+   *  default follows its base category: ships in space, ground forces on
+   *  either surface, and structures on planets. */
+  ALLOWED_SURFACES?: readonly SurfaceType[]
   DIRECT_HIT_IMMUNE?: boolean
   UNIT_ABILITIES?: UnitAbilities
   ABILITIES?: readonly Ability[]
@@ -93,12 +117,12 @@ export type UnitId = string & { readonly __brand: 'UnitId' }
 export type UnitIdList = string & { readonly __brand: 'UnitIdList' }
 
 /** Unified shape for ability list params that the `<List>` UI component edits.
- *  - `UnitList` (V = never)        → `[UnitType][]`        (order mode)
- *  - `UnitList<boolean>`           → `[UnitType, boolean][]` (checkbox mode)
- *  - `UnitList<number>`            → `[UnitType, number][]`  (number mode)
+ *  - `UnitList` (V = never)        → `[UnitLocator][]`        (order mode)
+ *  - `UnitList<boolean>`           → `[UnitLocator, boolean][]` (checkbox mode)
+ *  - `UnitList<number>`            → `[UnitLocator, number][]`  (number mode)
  *  Override the key type with the second generic for non-unit lists, e.g.
  *  `UnitList<boolean, MetaPhase>` or `UnitList<never, string>`. */
-export type UnitList<V = never, K extends string = UnitType> = [V] extends [
+export type UnitList<V = never, K extends string = UnitLocator> = [V] extends [
   never,
 ]
   ? [K][]

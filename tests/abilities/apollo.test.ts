@@ -1,8 +1,40 @@
 import { describe, expect, it } from 'vitest'
 
+import { makeUnitLocator, withRunningAbility } from '@/combat'
+import { CombatSetup } from '@/hooks/combat-setup'
+import { SPACE_SURFACE_ID, type UnitType } from '@/types'
+
 import { combatTest, unitsByBaseType } from '../utils/combat-test'
 
+function apolloSetup() {
+  const setup = new CombatSetup('FULL')
+  setup.setFaction('attacker', 'LAST_BASTION')
+  setup.setSurfaceUnitCount('attacker', SPACE_SURFACE_ID, 'CRUISER', 2)
+  setup.setAbilityParam('attacker', 'APOLLO', { isEnabled: true })
+  return setup
+}
+
 describe('APOLLO', () => {
+  it('leaves the hero unchosen until the player picks one', () => {
+    const setup = apolloSetup()
+    setup.setSurfaceUnitCount('attacker', SPACE_SURFACE_ID, 'DESTROYER', 1)
+    expect(setup.abilities.attacker.APOLLO.heroUnit).toBeNull()
+  })
+
+  it('offers units that are only galvanized during combat as heroes', () => {
+    const setup = apolloSetup()
+    const ability = setup
+      .getAvailableAbilities('attacker')
+      .find(item => item.key === 'APOLLO')!
+    const ctx = setup.getReadContext('attacker')
+    const items = withRunningAbility(ctx, ability, () =>
+      ctx.api.own.getUnitVariantsOptions('heroUnit'),
+    )
+    expect(items.map(item => item.value)).toContain(
+      makeUnitLocator('CRUISER:Galvanized' as UnitType, SPACE_SURFACE_ID),
+    )
+  })
+
   it('stamps Hero subtype on the pre-galvanized target at combat construction', () => {
     const t = combatTest({
       mode: 'SPACE',

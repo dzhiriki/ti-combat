@@ -8,12 +8,15 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
+import {
+  groupUnitOptions,
+  labelUnitOptions,
+  type SurfaceOption,
+} from '../unit-option-presentation'
+
 import styles from './select.module.css'
 
-export interface SelectOption {
-  label: string
-  value: string
-}
+export type SelectOption = SurfaceOption
 
 export interface SelectOptionGroup {
   group: string
@@ -31,13 +34,29 @@ export function Select({
   value,
   onChange,
 }: SelectProps): React.ReactElement {
+  const hasSurfaces = items.some(
+    item => !('group' in item) && item.surfaceId !== undefined,
+  )
+  const flat = items.flatMap(item =>
+    'group' in item ? [...item.items] : [item],
+  )
+  const presented = hasSurfaces
+    ? groupUnitOptions(flat).flatMap<SelectOption | SelectOptionGroup>(group =>
+        group.label
+          ? [{ group: group.label, items: group.items }]
+          : group.items,
+      )
+    : items
+  const selected = hasSurfaces
+    ? labelUnitOptions(flat).find(item => item.value === value)?.label
+    : undefined
   return (
     <SelectRoot value={value} onValueChange={onChange}>
       <SelectTrigger className={styles.trigger}>
-        <SelectValue />
+        <SelectValue>{selected}</SelectValue>
       </SelectTrigger>
       <SelectContent className={styles.content}>
-        {items.map(item =>
+        {presented.map(item =>
           'group' in item ? (
             <SelectGroup key={item.group}>
               <SelectLabel className={styles.label}>{item.group}</SelectLabel>

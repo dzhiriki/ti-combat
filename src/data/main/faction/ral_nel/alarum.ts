@@ -5,7 +5,7 @@ import type { UnitId, UnitList, UnitType } from '@/types'
 import { UnitListNumberSchema } from '@/types'
 
 type Params = {
-  availableUnits: UnitList<number>
+  availableUnits: UnitList<number, UnitType>
 }
 
 declare global {
@@ -26,10 +26,11 @@ export const alarum: Ability<Params> = {
   params: {
     isEnabled: false,
     uses: Infinity,
-    availableUnits: declareParam<UnitList<number>>({
-      default: [] as UnitList<number>,
+    availableUnits: declareParam<UnitList<number, UnitType>>({
+      scope: 'type',
+      default: [] as UnitList<number, UnitType>,
       defaultItemValue: 0,
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       sort: 'worth-desc',
       filter: {
         combatMode: 'GROUND',
@@ -56,6 +57,7 @@ export const alarum: Ability<Params> = {
       isCallable: (params, ctx) => {
         if (!params.availableUnits.some(([, n]) => n > 0)) return false
         const callerId = ctx.getUnit()
+        if (!ctx.api.own.isParticipating(callerId)) return false
         const state = (ctx.api.own.getRunState('ALARUM')?.firedRoundIds ??
           []) as UnitId[]
         return !state.includes(callerId)
@@ -83,9 +85,10 @@ export const alarum: Ability<Params> = {
         }
 
         ctx.api.own.updateAbilityConfig({
-          availableUnits: Array.from(
-            updatedCounts.entries(),
-          ) as UnitList<number>,
+          availableUnits: Array.from(updatedCounts.entries()) as UnitList<
+            number,
+            UnitType
+          >,
         })
 
         ctx.api.own.updateRunState({

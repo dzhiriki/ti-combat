@@ -1,15 +1,6 @@
 import nekroVirusIcon from '@/assets/faction/nekro_virus.svg?raw'
-import {
-  type Ability,
-  cloneAbility,
-  createRuntimeAbilityList,
-  resolveInvokes,
-} from '@/combat'
-import type {
-  AbilityCallContext,
-  ParamChange,
-  SettingsParams,
-} from '@/combat/abilities-engine/types'
+import { type Ability, cloneAbility, resolveInvokes } from '@/combat'
+import type { AbilityCallContext } from '@/combat/abilities-engine/types'
 import { sustainDamage } from '@/data/main/abilities/general/sustain-damage'
 import type {
   Faction,
@@ -28,13 +19,7 @@ import { theAlastor } from './the-alastor'
 // createFactionUnitAbility helpers
 // ---------------------------------------------------------------------------
 
-// createFactionUnitAbility runs while collecting Nekro's copies, forwarding
-// unit abilities' declareParamChange before any side context exists — pass
-// an empty lookup.
-const EMPTY_LIST = createRuntimeAbilityList([])
-const EMPTY_LOOKUPS = { own: EMPTY_LIST, opponent: EMPTY_LIST }
-
-const EXCLUDED_UNIT_TYPES = new Set(['FLAGSHIP', 'MECH', 'SPACE_DOCK'])
+const EXCLUDED_UNIT_TYPES = new Set(['FLAGSHIP', 'MECH'])
 
 const STANDARD_ABILITY_KEYS = new Set([
   'SUSTAIN_DAMAGE',
@@ -73,16 +58,6 @@ function createFactionUnitAbility(
     }
   }
 
-  // Collect declareParamChange from unit abilities (e.g. Hel-Titan adds PDS to groundForces)
-  const paramChanges = (stats.ABILITIES ?? [])
-    .filter(a => a.declareParamChange)
-    .flatMap(a =>
-      a.declareParamChange!(a.params, {} as SettingsParams, {
-        abilities: EMPTY_LOOKUPS,
-        this: a,
-      }),
-    )
-
   return {
     key,
     name: displayName,
@@ -102,21 +77,25 @@ function createFactionUnitAbility(
     },
     headerUI: 'isEnabled',
     ...(mainAbility?.uiConfig && { uiConfig: mainAbility.uiConfig }),
-    ...(paramChanges.length > 0 && {
-      declareParamChange: (): ParamChange[] => paramChanges,
-    }),
+    declareChanges: ctx => {
+      ctx.api.own.modifyUnitType(unitType, effectiveStats)
+    },
     invoke: [
       {
+        system: true,
         timing: 'PREPARE',
         call: (ctx: AbilityCallContext) => {
           // Save original stats before overwriting
-          const original = { ...ctx.api.own.getUnitStats(unitType)! }
+          const original = {
+            CATEGORIES: undefined,
+            ...ctx.api.own.getUnitStats(unitType)!,
+          }
           ctx.api.own.updateAbilityConfig(key, {
             reset: () => (ctx: AbilityCallContext) => {
               ctx.api.own.modifyUnitType(unitType, original)
             },
           })
-          ctx.api.own.modifyUnitType(unitType, effectiveStats)
+          ctx.invokeChanges()
           // Run child ability's config-level PREPARE invokes
           if (mainAbility) {
             const invokes = resolveInvokes(

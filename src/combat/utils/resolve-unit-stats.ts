@@ -1,7 +1,8 @@
 import type { UnitStats, UnitType } from '@/types'
 
 import type { SideStateData } from '../combat-state/types'
-import { makeVariantId, parseVariantId } from './unit-variant'
+import { parseUnitLocator } from './parse-unit-locator'
+import { makeVariantId } from './unit-variant'
 
 /**
  * Resolve a unitStats entry to concrete UnitStats.
@@ -15,7 +16,7 @@ export function resolveUnitStats(
   const entry = unitStats[key]
   if (!entry) return undefined
   if (typeof entry === 'function') {
-    const { type, subtypes } = parseVariantId(key)
+    const { baseType: type, subtypes } = parseUnitLocator(key)
     for (let i = 0; i < subtypes.length; i++) {
       const parentSubs = [...subtypes.slice(0, i), ...subtypes.slice(i + 1)]
       const parentKey =

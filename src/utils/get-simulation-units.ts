@@ -1,74 +1,62 @@
 import { nextUnitIds } from '@/combat'
-import { UNIT_TYPES } from '@/constants/units'
+import { DEFAULT_UNIT_SURFACES, UNIT_TYPES } from '@/constants/units'
 import type {
   GameSystem,
+  SurfaceDefinition,
+  SurfaceId,
+  SurfaceUnitCounts,
   UnitBaseType,
   UnitIdList,
-  UnitSelection,
-  UnitState,
   UnitStats,
   UnitType,
 } from '@/types'
 
 import { getFactionUnitConfig } from './get-faction-unit-config'
 
-/**
- * Converts faction + unit selections into compact unit data for combat simulation.
- * Returns a packed UnitIdList and stats maps keyed by variant key (base type only at creation).
- */
-export function getSimulationUnits(
-  system: GameSystem,
-  faction: string,
-  selections: Record<UnitBaseType, UnitSelection>,
+/** Builds unit instances from surface placements. `units` is a packed
+ *  UnitIdList — the caller places it into `participatingUnits` and lets
+ *  `CombatState.forSimulation` split out the non-participating tail. The
+ *  shared `gen` carries the post-allocation counter so the caller can store
+ *  it on the parent CombatStateData for runtime placements. */
+export function getSimulationUnitsOnSurfaces(
+  counts: SurfaceUnitCounts,
+  surfaces: readonly SurfaceDefinition[],
   gen: { _nextCode?: number },
+  placementStats: Partial<Record<UnitBaseType, UnitStats>>,
 ): {
   units: UnitIdList
   unitType: Record<string, UnitType>
-  unitState: Record<string, UnitState>
-  unitStats: Record<string, UnitStats>
+  unitSurface: Record<string, SurfaceId>
 } {
-  const factionConfig = getFactionUnitConfig(system, faction)
+  const surfacesById = new Map(surfaces.map(surface => [surface.id, surface]))
   let units = ''
   const unitType: Record<string, UnitType> = {}
-  const unitState: Record<string, UnitState> = {}
-  const unitStats: Record<string, UnitStats> = {}
+  const unitSurface: Record<string, SurfaceId> = {}
 
-  for (const baseType of UNIT_TYPES) {
-    const sel = selections[baseType]
-    if (sel.count === 0) continue
+  for (const [surfaceKey, byType] of Object.entries(counts)) {
+    const surface = surfacesById.get(surfaceKey as SurfaceId)
+    if (!surface) throw new Error(`Unknown surface: ${surfaceKey}`)
 
-    const unitDef = factionConfig[baseType]
-    const baseStats = unitDef.BASE
-    const upgradedStats = unitDef.UPGRADED
+    for (const baseType of UNIT_TYPES) {
+      const count = byType[baseType]
+      if (!count || count <= 0) continue
 
-    if (!baseStats && !upgradedStats) continue
+      const stats = placementStats[baseType]
+      if (!stats) continue
+      const allowed = stats.ALLOWED_SURFACES ?? DEFAULT_UNIT_SURFACES[baseType]
+      if (!allowed.includes(surface.type)) {
+        throw new Error(`${baseType} cannot be placed on ${surface.type}`)
+      }
 
-    const effectiveStats = getEffectiveStats(
-      baseStats,
-      upgradedStats,
-      sel.upgraded,
-    )
-    if (!effectiveStats) continue
-
-    const ids = nextUnitIds(sel.count, gen)
-    for (const id of ids) {
-      units += id
-      unitType[id] = baseType as UnitType
+      for (const id of nextUnitIds(count, gen)) {
+        units += id
+        unitType[id] = baseType as UnitType
+        unitSurface[id] = surface.id
+      }
     }
-    unitStats[baseType] = effectiveStats
   }
 
-  // Returns a packed UnitIdList — the caller places it into
-  // `participatingUnits` and lets `sortUnitsAtSetup` split out the
-  // non-participating tail. The shared `gen` carries the
-  // post-allocation counter so the caller can store it on the parent
-  // CombatStateData for runtime placements.
-  return {
-    units: units as UnitIdList,
-    unitType,
-    unitState,
-    unitStats,
-  }
+  return { units: units as UnitIdList, unitType, unitSurface }
 }
 
 /**

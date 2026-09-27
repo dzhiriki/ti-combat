@@ -1,6 +1,7 @@
 import { z } from 'zod/mini'
 
-import { type Ability, declareParam, parseVariantId } from '@/combat'
+import { type Ability, declareParam } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import type { UnitBaseType, UnitList } from '@/types'
 import { UnitListSchema } from '@/types'
 
@@ -23,8 +24,9 @@ export const salvageOperations: Ability<Params> = {
     isEnabled: false,
     uses: 1,
     shipPriority: declareParam({
+      scope: 'type',
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       filter: { combatMode: 'SPACE', includeOnlyBaseTypes: true },
     }),
     _destroyedShipTypes: [],
@@ -44,16 +46,14 @@ export const salvageOperations: Ability<Params> = {
       timing: 'DESTROY',
       system: true,
       call: (ctx, params, ids) => {
-        const { ships } = ctx.api.own.getAbilityConfig('SETTINGS')
-        const shipsSet = new Set<UnitBaseType>(ships)
         const collected = new Set<UnitBaseType>(params._destroyedShipTypes)
         for (const id of ids) {
           const variantKey =
             ctx.api.own.getUnitVariantKey(id) ||
             ctx.api.opponent.getUnitVariantKey(id)
           if (!variantKey) continue
-          const { type } = parseVariantId(variantKey)
-          if (shipsSet.has(type)) collected.add(type)
+          const { baseType: type } = parseUnitLocator(variantKey)
+          if (ctx.api.own.isUnitTypeCategory(type, 'SHIPS')) collected.add(type)
         }
         ctx.api.own.updateAbilityConfig({
           _destroyedShipTypes: [...collected],
@@ -63,15 +63,8 @@ export const salvageOperations: Ability<Params> = {
     {
       timing: 'END_OF_COMBAT',
       isCallable: (params, ctx) => {
-        const { ships: ownShips } = ctx.api.own.getAbilityConfig('SETTINGS')
-
         if (params._destroyedShipTypes.length === 0) return false
-        if (
-          ctx.api.own.countUnits(ownShips, {
-            includeVariants: true,
-          }) === 0
-        )
-          return false
+        if (ctx.api.own.participating.countUnits() === 0) return false
 
         const destroyed = new Set<UnitBaseType>(params._destroyedShipTypes)
         return ctx.utils

@@ -28,14 +28,14 @@ export const exotrireme: Ability<Params> = {
     uses: 0,
     sacrificePriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'own',
       defaultItemValue: true,
       filter: { include: ['DREADNOUGHT'], combatMode: 'SPACE' },
     }),
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'opponent',
       sort: 'worth-desc',
       defaultItemValue: true,
@@ -75,13 +75,11 @@ export const exotrireme: Ability<Params> = {
       timing: 'AFTER_COMBAT_ROUND',
       context: 'SPACE_COMBAT',
       isCallable: (params, ctx) =>
-        ctx.api.own.findUnitByPriority(
+        ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(params.sacrificePriority),
-          { includeVariants: false },
         ) !== undefined &&
-        ctx.api.opponent.findUnitByPriority(
+        ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false },
         ) !== undefined,
       call: (ctx, params) => {
         // The engine bills one use for this invocation; further same-round
@@ -90,13 +88,12 @@ export const exotrireme: Ability<Params> = {
         const usesLeft = params.uses
         let spent = 0
         while (spent < usesLeft) {
-          const sacrifice = ctx.api.own.findUnitByPriority(
+          const sacrifice = ctx.api.own.participating.findUnitByPriority(
             ctx.utils.getFlat(params.sacrificePriority),
-            { includeVariants: false },
           )
-          const targets = ctx.api.opponent.findUnitByPriority(
+          const targets = ctx.api.opponent.participating.findUnitByPriority(
             ctx.utils.getFlat(params.targetPriority),
-            { includeVariants: false, amount: 2 },
+            { amount: 2 },
           )
           if (sacrifice === undefined || targets.length === 0) break
           ctx.api.opponent.destroyUnits(targets)

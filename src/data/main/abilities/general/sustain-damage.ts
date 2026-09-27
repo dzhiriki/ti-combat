@@ -32,20 +32,17 @@ export const sustainDamage: Ability<Params> = {
   params: {
     isEnabled: true,
     uses: Infinity,
-    // Sourced from PARTICIPATING units (minus fighters) rather than
-    // nonFighterShips so non-ship space combatants (Starlancer XI mechs)
-    // appear in the panel and the allow-list. For every normal faction
-    // spaceCombatParticipating === ships, so the list is identical to the
-    // old nonFighterShips source.
+    // Setup candidates include units that abilities can bring into combat.
+    // Actual participation and hit eligibility are checked per unit below.
     spacePriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
       defaultItemValue: true,
       filter: { exclude: ['FIGHTER'], combatMode: 'SPACE' },
     }),
     groundPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       defaultItemValue: true,
       filter: { combatMode: 'GROUND' },
     }),
@@ -57,9 +54,7 @@ export const sustainDamage: Ability<Params> = {
     const remaining = new Set(unitIds)
     const result: UnitId[] = []
     for (const variantId of ctx.utils.getFlat(priority)) {
-      for (const id of ctx.api.own.getUnits(variantId, {
-        includeVariants: false,
-      })) {
+      for (const id of ctx.api.own.participating.getUnits(variantId)) {
         if (remaining.has(id)) {
           result.push(id)
           remaining.delete(id)
@@ -77,33 +72,20 @@ export const sustainDamage: Ability<Params> = {
       isCallable: (params, ctx) => {
         const unitId = ctx.getUnit()
         if (ctx.api.own.getPendingHits() <= 0) return false
-
-        if (ctx.api.own.getUnitState(unitId)?.isDamaged) {
-          return false
-        }
-
-        const unitType = ctx.api.own.getUnitBaseType(unitId)!
-        const variantId = ctx.api.own.getUnitVariantKey(unitId)!
+        // Cheapest rejections first: most candidates are already damaged.
+        if (ctx.api.own.getUnitState(unitId)?.isDamaged) return false
 
         const isGround = ctx.state.combatMode === 'GROUND'
         const allowedUnits = isGround
           ? params.groundPriority
           : params.spacePriority
-        if (!ctx.utils.getFlat(allowedUnits).includes(variantId)) return false
-
-        const validTargets = ctx.api.own.getHitPoolValidTargets()
-        if (validTargets && !validTargets.includes(unitType)) {
-          return false
-        }
-
-        if (
-          ctx.api.own.isUnitAbilityLost('SUSTAIN_DAMAGE', unitType) ||
-          ctx.api.own.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', unitType)
-        ) {
-          return false
-        }
-
-        return true
+        // Lost or blocked Sustain Damage is rejected by the engine for every
+        // unit-sourced unit ability, so it is not re-checked here.
+        return (
+          ctx.api.own.matchesUnitList(unitId, allowedUnits) &&
+          ctx.api.own.isParticipating(unitId) &&
+          ctx.api.own.canAssignHitToUnit(unitId)
+        )
       },
       call: ctx => {
         const unitId = ctx.getUnit()

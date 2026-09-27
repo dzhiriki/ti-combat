@@ -1,11 +1,13 @@
-import { GROUND_FORCES, STRUCTURES } from '@/constants/units'
-import type {
-  CombatSide,
-  DiceGroup,
-  UnitAbility,
-  UnitBaseType,
-  UnitId,
-  UnitType,
+import {
+  type CombatSide,
+  type DiceGroup,
+  SPACE_SURFACE_ID,
+  type SurfaceDefinition,
+  type SurfaceId,
+  type UnitAbility,
+  type UnitBaseType,
+  type UnitId,
+  type UnitLocator,
 } from '@/types'
 
 import {
@@ -19,6 +21,7 @@ import {
   type InvokeCollections,
 } from '../abilities-engine'
 import { AbilityContext } from '../abilities-engine/api/ability-api'
+import { returnCommittedFighters } from '../abilities-engine/api/commit-fighters'
 import { extractDefaults } from '../abilities-engine/declare-param'
 import type {
   AbilitiesOverride,
@@ -31,20 +34,32 @@ import type {
   PendingEffect,
 } from '../dice-math/branch-accumulator'
 import { runDiceMath } from '../dice-math/run-dice-math'
-import type { RollTriggerDecl, SideDiceCollection } from '../dice-math/types'
+import type {
+  HitValueModifierDecl,
+  RollTriggerDecl,
+  SideDiceCollection,
+} from '../dice-math/types'
 import { marginalizeBaseHits } from '../dice-math/utils/marginalize-base-hits'
 import { type LogEntry, Logger } from '../logger'
 import { canonicalizeUnitState } from '../utils/canonicalize-unit-state'
 import { sortUnitsByPriority } from '../utils/sort-units-by-priority'
+import {
+  hasPhaseCategories,
+  isUnitCategory,
+  participatesInCombat,
+} from '../utils/unit-combat-properties'
+import { getNextPhaseInFlow, isCombatMeta } from './phase-utils'
 import type {
   CombatMode,
   CombatStateData,
   DiceRollContext,
+  HitPool,
   HitSource,
   MetaPhase,
   PendingStep,
   PhaseStep,
   PhaseStepGroup,
+  PhaseTransitionTarget,
   SideStateData,
   UnitAbilityMeta,
 } from './types'
@@ -63,82 +78,28 @@ function innerMeta(phase: MetaPhase[]): MetaPhase {
   return phase[phase.length - 1]
 }
 
-/** Extract `UnitType[]` keys from a `UnitList<V>` tuple-array, dropping
- *  entries whose value slot is explicitly `false` (checkbox-mode "off").
- *  Number-mode entries are kept regardless of count — sortUnitsByPriority
- *  consumers care about ordering, not magnitude. */
-function unwrapUnitListKeys(raw: unknown): UnitType[] {
-  if (!Array.isArray(raw)) return raw as UnitType[]
-  if (raw.length === 0) return raw as UnitType[]
-  if (!Array.isArray(raw[0])) return raw as UnitType[]
-  const result: UnitType[] = []
-  for (const entry of raw as readonly [string, ...unknown[]][]) {
-    if (entry.length >= 2 && entry[1] === false) continue
-    result.push(entry[0] as UnitType)
-  }
-  return result
+/** True when the step runs inside SPACE_COMBAT / GROUND_COMBAT. Combat metas
+ *  only ever root a loaded script, so checking the root is enough. */
+function inCombatPhase(phase: MetaPhase[]): boolean {
+  return phase.length > 0 && isCombatMeta(phase[0])
 }
 
-function sortUnitsAtSetup(data: CombatStateData): void {
-  const mode = data.combatMode
-  for (const side of ['attacker', 'defender'] as const) {
-    // Merge base + live SETTINGS and UNIT_PRIORITY — PREPARE may have
-    // written derived fields (Hel Titan → groundCombatParticipating
-    // includes PDS) into liveAbilities.
-    const baseSide = data[side].abilities
-    const liveSide = data[side].liveAbilities
-
-    const baseUP = baseSide['UNIT_PRIORITY']
-    const liveUP = liveSide['UNIT_PRIORITY']
-    const unitPriority = (
-      liveUP === undefined
-        ? baseUP
-        : baseUP === undefined
-          ? liveUP
-          : { ...baseUP, ...liveUP }
-    ) as
-      | { spaceUnitPriority?: UnitType[]; groundUnitPriority?: UnitType[] }
-      | undefined
-
-    const rawList =
-      mode === 'GROUND'
-        ? unitPriority?.groundUnitPriority
-        : unitPriority?.spaceUnitPriority
-    if (!rawList) continue
-    const list = unwrapUnitListKeys(rawList)
-
-    // Membership comes from SETTINGS.{space,ground}CombatParticipating
-    // — the authoritative runtime field. UNIT_PRIORITY only dictates
-    // order; it's synced from an extended "source" view and may list
-    // variants/types that aren't currently participating.
-    const baseSettings = baseSide['SETTINGS']
-    const liveSettings = liveSide['SETTINGS']
-    const settings = (
-      liveSettings === undefined
-        ? baseSettings
-        : baseSettings === undefined
-          ? liveSettings
-          : { ...baseSettings, ...liveSettings }
-    ) as
-      | {
-          spaceCombatParticipating?: UnitBaseType[]
-          groundCombatParticipating?: UnitBaseType[]
-        }
-      | undefined
-    const partList =
-      mode === 'GROUND'
-        ? settings?.groundCombatParticipating
-        : settings?.spaceCombatParticipating
-    const participatingTypes = partList ? new Set(partList) : undefined
-
-    sortUnitsByPriority(data[side], list, participatingTypes)
-  }
-}
-
-interface UnitAbilityPhaseConfig {
-  firing: CombatSide[]
-  hitSource: HitSource
-  allowedUnitTypes?: ReadonlySet<UnitBaseType>
+/** Rebuild a side's membership from native categories (for the current
+ *  meta) and explicit instance grants, sorted by the mode's priority. */
+function resyncSide(data: CombatStateData, side: CombatSide): void {
+  const s = data[side]
+  sortUnitsByPriority(
+    s,
+    CombatSideState.getPhasePriorityList(s, data.combatMode) ?? [],
+    id =>
+      participatesInCombat(
+        s,
+        id,
+        data.combatMode,
+        data.activeSurfaceId,
+        data.meta,
+      ),
+  )
 }
 
 /** AFB-context AFTER_UNIT_ABILITY_ROLL abilities (e.g. RAID_FORMATION) need
@@ -148,6 +109,20 @@ function hasAfbAfterRollInvokes(
   side: CombatSide,
 ): boolean {
   return !!invokes[side].get('AFB')?.get('AFTER_UNIT_ABILITY_ROLL')?.length
+}
+
+/** Everything `CombatState.forSimulation` needs; built by `prepareSimulation`. */
+export interface SimulationSetup {
+  attacker: SideStateData
+  defender: SideStateData
+  combatMode: CombatMode
+  surfaces: SurfaceDefinition[]
+  activeSurfaceId: SurfaceId
+  abilities: Record<CombatSide, RegisteredAbility[]>
+  unitAbilityKeys: Record<CombatSide, ReadonlySet<string>>
+  factionOwnedKeys: Record<CombatSide, ReadonlySet<string>>
+  nextCode?: number
+  collapseThreshold?: number
 }
 
 /** Main combat state class */
@@ -234,46 +209,29 @@ export class CombatState {
   }
 
   /** Create CombatState for simulation */
-  static forSimulation(
-    attacker: SideStateData,
-    defender: SideStateData,
-    combatMode: CombatMode,
-    abilities?: Record<import('@/types').CombatSide, RegisteredAbility[]>,
-    unitAbilityKeys?: Record<import('@/types').CombatSide, ReadonlySet<string>>,
-    factionOwnedKeys?: Record<
-      import('@/types').CombatSide,
-      ReadonlySet<string>
-    >,
-    nextCode?: number,
-    collapseThreshold?: number,
-  ): CombatState {
+  static forSimulation(setup: SimulationSetup): CombatState {
     const instance = Object.create(CombatState.prototype) as CombatState
 
     const baseData: CombatStateData = {
-      attacker,
-      defender,
-      combatMode,
-      _nextCode: nextCode,
+      attacker: withAllSideFields(setup.attacker),
+      defender: withAllSideFields(setup.defender),
+      combatMode: setup.combatMode,
+      surfaces: setup.surfaces,
+      activeSurfaceId: setup.activeSurfaceId,
+      _nextCode: setup.nextCode,
     }
-
-    const emptyKeys = {
-      attacker: new Set<string>(),
-      defender: new Set<string>(),
-    }
-
-    const registered = abilities ?? { attacker: [], defender: [] }
 
     instance.data = baseData
-    instance._collapseThreshold = collapseThreshold
+    instance._collapseThreshold = setup.collapseThreshold
     instance.pendingSteps = []
     // Materialize ability defaults into base config BEFORE building the engine,
     // so its invoke index sees every ability's full params.
-    CombatState._ensureAbilityDefaults(baseData, registered)
+    CombatState._ensureAbilityDefaults(baseData, setup.abilities)
     instance._params = AbilitiesEngine.fromConfig(
       instance,
-      registered,
-      unitAbilityKeys ?? emptyKeys,
-      factionOwnedKeys ?? emptyKeys,
+      setup.abilities,
+      setup.unitAbilityKeys,
+      setup.factionOwnedKeys,
     )
 
     // PREPARE abilities mutate baseData in-place. Drain any timing triggers
@@ -284,7 +242,8 @@ export class CombatState {
 
     // One-time sort: filter `units[]` to participating-only and order by
     // combat-mode priority rank. Never re-sorted during combat in iteration 1.
-    sortUnitsAtSetup(baseData)
+    resyncSide(baseData, 'attacker')
+    resyncSide(baseData, 'defender')
 
     return instance
   }
@@ -369,20 +328,24 @@ export class CombatState {
       ...this.getAssignHitsScript(phase),
       {
         kind: 'method',
-        fn: CombatState.prototype._postAssignHits,
+        fn: CombatState.prototype._endCombatPhaseIfSideMissing,
         phase,
       },
     ])
   }
 
-  /** Queue a wipe check after a direct unit-removal effect. */
-  queueCompletionCheck(phase: MetaPhase[]): void {
-    if (this.data.winnerSide !== undefined) return
-    this.pendingSteps.push({
+  /** Queue a phase-end check after direct participation changes. Destruction
+   *  cascades drain first so reactions can restore a force before the check. */
+  queuePhaseEndCheck(phase: MetaPhase[]): void {
+    if (this.data.winnerSide !== undefined || !inCombatPhase(phase)) return
+    const check: PhaseStep = {
       kind: 'method',
-      fn: CombatState.prototype._postUnitMutation,
+      fn: CombatState.prototype._endCombatPhaseIfSideMissing,
       phase,
-    })
+    }
+    const group = this.pendingSteps.at(-1)
+    if (group?.kind === 'group') group.steps.unshift(check)
+    else this.pendingSteps.push(check)
   }
 
   isFinished(): boolean {
@@ -426,19 +389,19 @@ export class CombatState {
 
   getUnitsHash(): string {
     const d = this.data
-    return `${CombatSideState.getUnitsHash(d.attacker)}|${CombatSideState.getUnitsHash(d.defender)}`
+    return `${CombatSideState.getUnitsHash(d.attacker, d.activeSurfaceId)}|${CombatSideState.getUnitsHash(d.defender, d.activeSurfaceId)}`
   }
 
   getHash(): string {
     const d = this.data
-    return `${CombatSideState.getHash(d.attacker)}|${CombatSideState.getHash(d.defender)}`
+    return `${CombatSideState.getHash(d.attacker, d.activeSurfaceId)}|${CombatSideState.getHash(d.defender, d.activeSurfaceId)}`
   }
 
   /**
    * Phase state machine driver: pops and executes steps from
    * `pendingSteps` until one of: (a) a step branches, (b) `pendingSteps`
-   * drains, (c) `isFinished()` becomes true, or (d) `stopAt` matches the
-   * next step. Deterministic runs return `[{ state: this, probability: 1 }]`
+   * drains, (c) the end script finishes, or (d) `stopAt` matches the next
+   * step. Deterministic runs return `[{ state: this, probability: 1 }]`
    * — literally `this`, no allocation.
    *
    * The caller (combat-engine / test harness) owns phase flow — it must
@@ -485,9 +448,8 @@ export class CombatState {
 
   /** Pop the current pending step from the top of the stack. If the top is
    *  a group, pop its innermost step; when the group drains, remove it.
-   *  No-op when the stack is empty — an ability handler may have cleared it
-   *  mid-step (e.g. `syncWinnerSide` cancelling completion after a unit
-   *  placement restored a previously-wiped side). */
+   *  No-op when the stack is empty — an ability handler may have cleared the
+   *  current phase by explicitly transitioning out of combat. */
   private _popTopStep(): void {
     const top = this.pendingSteps[this.pendingSteps.length - 1]
     if (top === undefined) return
@@ -523,9 +485,26 @@ export class CombatState {
    *  Called by combat-engine / the test harness when the stack is empty
    *  and combat is still ongoing. Stored in reverse execution order. */
   public loadPhaseScript(meta: MetaPhase, round: number): void {
+    this._enterMeta(meta)
     const script = this.getPhaseScript(meta, round)
     // Reverse so pop() yields execution order.
     this.pendingSteps = script.slice().reverse()
+  }
+
+  /** Record the scheduler's meta. Phase-scoped categories change membership
+   *  between metas, so their sides re-split and restriction targets resolve
+   *  again. */
+  private _enterMeta(meta: MetaPhase): void {
+    const d = this.data
+    if (d.meta === meta) return
+    d.meta = meta
+    const changing = (['attacker', 'defender'] as const).filter(side =>
+      hasPhaseCategories(d[side]),
+    )
+    if (changing.length === 0) return
+    d.attacker._resolvedRestrictions = undefined
+    d.defender._resolvedRestrictions = undefined
+    for (const side of changing) resyncSide(d, side)
   }
 
   /** One script per meta — defines the ordered steps a single round (or
@@ -541,46 +520,22 @@ export class CombatState {
   ): PendingStep[] {
     const phase: MetaPhase[] = parentMeta ? [...parentMeta, meta] : [meta]
     switch (meta) {
+      // Unit-ability steps end with `runUnitAbility`'s own participant
+      // check; outside a combat phase that check never truncates the flow.
       case 'AFB':
-        return [
-          { kind: 'timing', timing: 'AFB_STEP', phase },
-          {
-            kind: 'method',
-            fn: CombatState.prototype._postAssignHits,
-            phase,
-          },
-        ]
+        return [{ kind: 'timing', timing: 'AFB_STEP', phase }]
 
       case 'BOMBARDMENT':
-        return [
-          { kind: 'timing', timing: 'BOMBARDMENT_STEP', phase },
-          {
-            kind: 'method',
-            fn: CombatState.prototype._postAssignHits,
-            phase,
-          },
-        ]
+        return [{ kind: 'timing', timing: 'BOMBARDMENT_STEP', phase }]
 
       case 'SPACE_CANNON_OFFENSE':
         return [
           { kind: 'timing', timing: 'SPACE_CANNON_OFFENSE_STEP', phase },
-          {
-            kind: 'method',
-            fn: CombatState.prototype._postAssignHits,
-            phase,
-          },
           { kind: 'timing', timing: 'CLEANUP', phase },
         ]
 
       case 'SPACE_CANNON_DEFENSE':
-        return [
-          { kind: 'timing', timing: 'SPACE_CANNON_DEFENSE_STEP', phase },
-          {
-            kind: 'method',
-            fn: CombatState.prototype._postAssignHits,
-            phase,
-          },
-        ]
+        return [{ kind: 'timing', timing: 'SPACE_CANNON_DEFENSE_STEP', phase }]
 
       case 'SPACE_COMBAT':
       case 'GROUND_COMBAT': {
@@ -599,7 +554,7 @@ export class CombatState {
           { kind: 'timing', timing: 'AFTER_ASSIGN_HITS_STEP', phase },
           {
             kind: 'method',
-            fn: CombatState.prototype._postAssignHits,
+            fn: CombatState.prototype._endCombatPhaseIfSideMissing,
             phase,
           },
           { kind: 'timing', timing: 'RETREAT_STEP', phase },
@@ -610,7 +565,14 @@ export class CombatState {
       }
 
       case 'COMMIT_UNITS':
-        return [{ kind: 'timing', timing: 'COMMIT_UNITS', phase }]
+        return [
+          { kind: 'timing', timing: 'COMMIT_UNITS', phase },
+          {
+            kind: 'method',
+            fn: CombatState.prototype._commitUnits,
+            phase,
+          },
+        ]
     }
   }
 
@@ -640,6 +602,30 @@ export class CombatState {
   // STEP METHODS (referenced by PhaseStep entries in getPhaseScript)
   // ===========================================================================
 
+  /** Land every eligible attacking unit currently in space on the selected
+   *  planet. COMMIT_UNITS abilities run first so Matriarch/Morphwing-style
+   *  rules can extend the eligible type list before movement. */
+  private _commitUnits(): void {
+    const data = this.data
+    if (data.combatMode !== 'GROUND') return
+    const attacker = data.attacker
+    const moving: UnitId[] = []
+    for (const pool of [
+      attacker.participatingUnits,
+      attacker.nonParticipatingUnits,
+    ]) {
+      for (const id of pool) {
+        if (
+          attacker.unitSurface[id] === SPACE_SURFACE_ID &&
+          isUnitCategory(attacker, id, 'GROUND_FORCES', data.meta)
+        )
+          moving.push(id as UnitId)
+      }
+    }
+    CombatSideState.moveUnits(attacker, moving, data.activeSurfaceId)
+    this.resyncParticipating('attacker')
+  }
+
   /** Swap the two sides' pending hit pools. Queued inside a self-targeting
    *  unit-ability dice-roll group (Proxima self-bomb): the roll produces hits
    *  against the natural opponent so AFTER_UNIT_ABILITY_ROLL abilities (e.g.
@@ -657,167 +643,138 @@ export class CombatState {
     d.defender._hitPoolShared = tmpShared
   }
 
-  /** After ASSIGN_HITS completes: trigger completion if either side is
-   *  wiped; otherwise return so the script continues draining. Combat metas
-   *  (SPACE_COMBAT / GROUND_COMBAT / AFB) have further steps queued;
-   *  non-combat metas drain to empty and the engine picks up the transition. */
-  private _postAssignHits(phase: MetaPhase[]): void {
-    const meta = innerMeta(phase)
-    // Unit-ability phases (BOMBARDMENT / SCD / AFB / SCO) must let later
-    // phases run even when the phase wiped a side's participants — e.g. PDS
-    // still fires in SCD after bombardment clears ground forces. Only the
-    // combat-round metas can shortcut on missing participants.
-    const isCombatRound = meta === 'SPACE_COMBAT' || meta === 'GROUND_COMBAT'
-    const d = this.data
-    const attackerOut = isCombatRound
-      ? !CombatSideState.hasParticipatingUnits(d.attacker)
-      : !CombatSideState.hasAnyUnits(d.attacker)
-    const defenderOut = isCombatRound
-      ? !CombatSideState.hasParticipatingUnits(d.defender)
-      : !CombatSideState.hasAnyUnits(d.defender)
-
-    let winner: CombatSide | 'draw' | undefined
-    if (attackerOut && defenderOut) winner = 'draw'
-    else if (attackerOut) winner = 'defender'
-    else if (defenderOut) winner = 'attacker'
-
-    // Winning space combat requires space-combat participants. A side whose
-    // only remaining units merely share the area (ferried ground forces,
-    // structures) doesn't take the win when the opponent is absent or wiped
-    // in a unit-ability phase — the combat ends with no winner instead.
-    // Participation is SETTINGS-driven, so ship-mechs (Eidolon Maximum,
-    // Starlancer XI while ships are fielded) still win. Combat-round wipes
-    // are unaffected: the surviving side has participants by construction.
-    // Mirrors `syncWinnerSide`, which already re-derives winners from
-    // participating units only.
-    if (
-      d.combatMode === 'SPACE' &&
-      (winner === 'attacker' || winner === 'defender') &&
-      !CombatSideState.hasParticipatingUnits(d[winner])
-    ) {
-      winner = 'draw'
-    }
-
-    if (winner !== undefined) this._triggerCompletion(phase, winner)
-  }
-
-  private _postUnitMutation(phase: MetaPhase[]): void {
-    const destroyGroup = this.pendingSteps.at(-1)
-    if (destroyGroup?.kind === 'group' && Array.isArray(destroyGroup.data)) {
-      destroyGroup.steps.unshift({
-        kind: 'method',
-        fn: CombatState.prototype._postUnitMutation,
-        phase,
-      })
-      return
-    }
-    this._postAssignHits(phase)
-  }
-
-  private _setComplete(): void {
-    this.data.isFinished = true
-  }
-
-  /** Re-split participating vs non-participating units for one side.
-   *  SETTINGS.{space,ground}CombatParticipating is the authoritative
-   *  "is this base type in combat?" source — UNIT_PRIORITY is used for
-   *  ordering only (it can lag behind SETTINGS mid-combat because
-   *  `declareParam` source sync runs only at reconcile). Called by
-   *  `updateAbilityConfig` when a participation-affecting ability param
-   *  changes. */
-  public resyncParticipating(side: CombatSide): void {
-    const data = this.data
-    const liveSide = data[side].liveAbilities
-    const baseSide = data[side].abilities
-
-    const liveSettings = liveSide['SETTINGS']
-    const baseSettings = baseSide['SETTINGS']
-    const settings =
-      liveSettings === undefined
-        ? baseSettings
-        : baseSettings === undefined
-          ? liveSettings
-          : { ...baseSettings, ...liveSettings }
-    if (!settings) return
-    const partList =
-      data.combatMode === 'GROUND'
-        ? (settings.groundCombatParticipating as UnitBaseType[] | undefined)
-        : (settings.spaceCombatParticipating as UnitBaseType[] | undefined)
-    if (!partList) return
-    const participatingTypes = new Set<UnitBaseType>(partList)
-
-    const liveUP = liveSide['UNIT_PRIORITY']
-    const baseUP = baseSide['UNIT_PRIORITY']
-    const unitPriority =
-      liveUP === undefined
-        ? baseUP
-        : baseUP === undefined
-          ? liveUP
-          : { ...baseUP, ...liveUP }
-    const rawOrderList =
-      unitPriority &&
-      ((data.combatMode === 'GROUND'
-        ? unitPriority.groundUnitPriority
-        : unitPriority.spaceUnitPriority) as unknown)
-    const orderList = rawOrderList
-      ? (unwrapUnitListKeys(rawOrderList) as UnitType[])
-      : (partList as unknown as UnitType[])
-
-    sortUnitsByPriority(data[side], orderList, participatingTypes)
-  }
-
-  /** Replace any in-flight pending steps with the completion sequence and
-   *  set `winnerSide` if not already set. The first caller (e.g. an
-   *  ability's `transitionTo` pinning a 'draw') wins — later wipe-checks
-   *  won't overwrite an explicit decision. After this, combat-state owns
-   *  the path to `_setComplete`; the engine and test harness only observe
-   *  via `isFinished`. Stored reversed (pop yields END_OF_COMBAT first). */
-  public _triggerCompletion(
-    phase: MetaPhase[],
-    winner: CombatSide | 'draw',
-  ): void {
-    // Idempotent: once a winner is pinned, the completion sequence is owned
-    // by the first caller. Subsequent unit-state changes (Harrow killing the
-    // last opponent unit, Alarum placing reinforcements) update winnerSide
-    // via `syncWinnerSide` rather than re-pushing the completion script.
-    if (this.data.winnerSide !== undefined) return
-    this.data.winnerSide = winner
+  /** Stop the active combat phase once one side has no participants. This
+   *  never decides the winner or jumps to an end sequence: after round
+   *  cleanup drains, the ordinary next-phase decision applies. Top-level
+   *  pre-combat phases are never truncated by participant state. */
+  private _endCombatPhaseIfSideMissing(phase: MetaPhase[]): void {
+    if (this.data.winnerSide !== undefined || !inCombatPhase(phase)) return
+    if (this._canStartCombatPhase()) return
     this.pendingSteps = []
+    this._pushRoundCleanup(phase)
+  }
+
+  /** Replace the rest of a phase cut short with its round cleanup, followed
+   *  by the in-place end-of-flow check. */
+  private _pushRoundCleanup(phase: MetaPhase[]): void {
     this.pushScript([
-      { kind: 'timing', timing: 'END_OF_COMBAT', phase },
       { kind: 'timing', timing: 'CLEANUP_ROUND', phase },
-      { kind: 'timing', timing: 'CLEANUP', phase },
       {
         kind: 'method',
-        fn: CombatState.prototype._setComplete,
+        fn: CombatState.prototype._loadEndScriptIfFlowExhausted,
         phase,
       },
     ])
   }
 
-  /** Re-derive `winnerSide` from current participating-unit state. No-op
-   *  unless a winner has already been pinned (initial wipe detection is
-   *  owned by `_postAssignHits` → `_triggerCompletion`). Called from
-   *  unit-mutation sites so abilities that destroy or place units during
-   *  the completion sequence keep the outcome correct:
-   *  - A destruction can flip the outcome (e.g. Harrow's bombardment kills
-   *    the last opposing infantry → defender→draw, or →attacker).
-   *  - A placement that restores a wiped side cancels the completion
-   *    entirely: clears `pendingSteps` and `winnerSide` so the engine sees
-   *    an empty stack with `isFinished=false` and loads the next round. */
-  public syncWinnerSide(): void {
-    if (this.data.winnerSide === undefined) return
+  /** Queued behind the CLEANUP_ROUND of a phase that ended early. Once
+   *  cleanup has drained, take the scheduler's next-phase decision in place:
+   *  when no phase follows, the end script runs in this same `advance()`
+   *  instead of costing every finished combat a scheduler round trip. Any
+   *  other outcome (cleanup restored a participant) leaves the empty stack to
+   *  the scheduler. The phase root is the scheduler's current meta. */
+  private _loadEndScriptIfFlowExhausted(phase: MetaPhase[]): void {
+    if (this.pendingSteps.length > 0 || phase.length === 0) return
+    if (this.getNextPhase(phase[0]) === 'COMPLETE') this.loadEndScript(phase[0])
+  }
+
+  /** Return the phase that follows a drained script. Combat phases repeat
+   *  while both sides can participate. If they cannot start, the phase is
+   *  skipped and flow proceeds normally; reaching the end of the flow then
+   *  starts the end-of-combat timings. */
+  public getNextPhase(current: MetaPhase): PhaseTransitionTarget {
+    if (this.data.winnerSide !== undefined) return 'COMPLETE'
+
+    let next: PhaseTransitionTarget = isCombatMeta(current)
+      ? current
+      : getNextPhaseInFlow(current, this.data.combatMode)
+
+    while (
+      next !== 'COMPLETE' &&
+      isCombatMeta(next) &&
+      !this._canStartCombatPhase(next)
+    ) {
+      next = getNextPhaseInFlow(next, this.data.combatMode)
+    }
+
+    return next
+  }
+
+  /** Combat phases require participating forces on both sides before their
+   *  script starts: those `meta` would have, phase-scoped categories
+   *  included. START_OF_COMBAT effects cannot bootstrap that admission. */
+  private _canStartCombatPhase(meta = this.data.meta): boolean {
+    return (
+      this._hasParticipants('attacker', meta) &&
+      this._hasParticipants('defender', meta)
+    )
+  }
+
+  /** The pools hold the current meta's participants; another meta is
+   *  evaluated only for sides whose membership depends on it. */
+  private _hasParticipants(
+    side: CombatSide,
+    meta: MetaPhase | undefined,
+  ): boolean {
+    const d = this.data
+    const s = d[side]
+    if (meta === d.meta || !hasPhaseCategories(s))
+      return CombatSideState.hasParticipatingUnits(s)
+    for (const id of s.participatingUnits + s.nonParticipatingUnits) {
+      if (participatesInCombat(s, id, d.combatMode, d.activeSurfaceId, meta))
+        return true
+    }
+    return false
+  }
+
+  /** Load the timings that run after the phase flow is exhausted. This is a
+   *  normal flow boundary, never an interrupt from hit assignment. */
+  public loadEndScript(current: MetaPhase): void {
+    if (this.data.winnerSide === undefined) {
+      this.data.winnerSide = this._deriveWinner()
+    }
+    const phase = [current]
+    this.pushScript([
+      { kind: 'timing', timing: 'END_OF_COMBAT', phase },
+      { kind: 'timing', timing: 'CLEANUP', phase },
+      {
+        kind: 'method',
+        fn: CombatState.prototype._finish,
+        phase,
+      },
+    ])
+  }
+
+  private _deriveWinner(): CombatSide | 'draw' {
     const d = this.data
     const attackerOut = !CombatSideState.hasParticipatingUnits(d.attacker)
     const defenderOut = !CombatSideState.hasParticipatingUnits(d.defender)
-    if (!attackerOut && !defenderOut) {
-      this.pendingSteps = []
-      d.winnerSide = undefined
-      return
-    }
-    if (attackerOut && defenderOut) d.winnerSide = 'draw'
-    else if (attackerOut) d.winnerSide = 'defender'
-    else d.winnerSide = 'attacker'
+    if (attackerOut && defenderOut) return 'draw'
+    if (attackerOut) return 'defender'
+    if (defenderOut) return 'attacker'
+    return 'draw'
+  }
+
+  private _finish(): void {
+    this.data.winnerSide = this._deriveWinner()
+    for (const side of returnCommittedFighters(this.data))
+      this.resyncParticipating(side)
+    this.data.isFinished = true
+  }
+
+  /** Rebuild membership from native categories and explicit instance grants. */
+  public resyncParticipating(side: CombatSide): void {
+    resyncSide(this.data, side)
+  }
+
+  /** Explicit transitions (retreats and similar effects) pin an outcome and
+   *  leave the normal phase flow. They still run round cleanup before the
+   *  engine reaches the ordinary end-of-combat boundary. */
+  public forceOutcome(phase: MetaPhase[], winner: CombatSide | 'draw'): void {
+    if (this.data.winnerSide !== undefined) return
+    this.data.winnerSide = winner
+    this.pendingSteps = []
+    this._pushRoundCleanup(phase)
   }
 
   public pushScript(entity: PendingStep[]) {
@@ -847,8 +804,6 @@ export class CombatState {
       data.defender,
       trackDestroyed,
     )
-
-    this.syncWinnerSide()
 
     if (!trackDestroyed) return
 
@@ -934,22 +889,26 @@ export class CombatState {
 
     const meta = innerMeta(phase)
 
-    // validTargets uses SETTINGS, which BEFORE_UNIT_ABILITY_ROLL abilities
-    // (e.g. WAYLAY, EIDOLON_MAXIMUM) may have just modified — compute here,
-    // after they ran. Regular combat rolls leave it empty so hit assignment
-    // uses the fast tail-slice path.
-    const validTargets = ctx.isUnitAbility
-      ? {
-          attacker: CombatSideState.getValidTargetsForPhase(
-            data.attacker,
-            meta,
-          ),
-          defender: CombatSideState.getValidTargetsForPhase(
-            data.defender,
-            meta,
-          ),
-        }
-      : { attacker: [], defender: [] }
+    // BEFORE_UNIT_ABILITY_ROLL abilities (e.g. WAYLAY) may have just changed
+    // their producing side's priority, so resolve it only now. The result is
+    // keyed by the raw landing pool (the natural opponent); self-targeted
+    // pools are swapped later with their priority intact.
+    const unitAbilityPriority = ctx.isUnitAbility
+      ? ({ attacker: [], defender: [] } as Record<CombatSide, UnitLocator[]>)
+      : undefined
+    if (unitAbilityPriority) {
+      for (const firingSide of ctx.firing) {
+        const rawLandingSide = CombatSideState.getOpponentSide(firingSide)
+        const targetSide = ctx.selfTarget ? firingSide : rawLandingSide
+        unitAbilityPriority[rawLandingSide] =
+          CombatSideState.getUnitAbilityPriority(
+            data[firingSide],
+            data[targetSide],
+            meta as UnitAbilityMeta,
+            ctx.abilitiesOverride,
+          )
+      }
+    }
 
     let modifiers: readonly import('../dice-math/types').ModifierDecl[] =
       ctx.modifiers ?? []
@@ -999,19 +958,6 @@ export class CombatState {
           }
         : undefined
 
-    const priorityList = {
-      attacker: CombatSideState.getPhasePriorityList(
-        data.attacker,
-        data.combatMode,
-        ctx.abilitiesOverride,
-      ),
-      defender: CombatSideState.getPhasePriorityList(
-        data.defender,
-        data.combatMode,
-        ctx.abilitiesOverride,
-      ),
-    }
-
     const { branches, isEmpty } = runDiceMath({
       diceCollection,
       modifiers,
@@ -1019,8 +965,7 @@ export class CombatState {
       firing: ctx.firing,
       isUnitAbility: ctx.isUnitAbility,
       selfTarget: ctx.selfTarget,
-      validTargets,
-      priorityList,
+      unitAbilityPriority,
       sideData: { attacker: data.attacker, defender: data.defender },
       abilityUses,
       meta,
@@ -1046,6 +991,7 @@ export class CombatState {
       abilityOwnerByKey,
       abilityUses,
       phase,
+      unitAbilityPriority,
     )
   }
 
@@ -1068,7 +1014,6 @@ export class CombatState {
    *      `addHits` calls in the round triggered `_assignHits` inline via
    *      the `wasEmpty` path — so a Thundarian-style cancel simply
    *      clears `hitPools` instead of tracking a base index.
-   *   4. Removes any `destroyedUnits` from the relevant side.
    *   5. Forks the logger and emits per-branch `DICE_ROLL` / `DICE_HITS`.
    *   6. Dispatches each `PendingEffect` via a freshly-bound `AbilityContext`. */
   private _branchesFromMathKernel(
@@ -1076,12 +1021,16 @@ export class CombatState {
     abilityOwnerByKey: Map<string, CombatSide>,
     abilityUses: Map<string, number>,
     phase: MetaPhase[],
+    unitAbilityPriority: Record<CombatSide, UnitLocator[]> | undefined,
   ): StateWithProbability[] {
     const metaPhase = innerMeta(phase)
     const ctx = this.currentGroupData as DiceRollContext
-    ctx.hitDistribution = {
-      attacker: marginalizeBaseHits(branches, 'attacker'),
-      defender: marginalizeBaseHits(branches, 'defender'),
+    // Only read at AFTER_DICE_ROLL_STEP, which combat-round rolls alone fire.
+    if (!ctx.isUnitAbility) {
+      ctx.hitDistribution = {
+        attacker: marginalizeBaseHits(branches, 'attacker'),
+        defender: marginalizeBaseHits(branches, 'defender'),
+      }
     }
     const modifiers = ctx.modifiers ?? []
 
@@ -1149,13 +1098,19 @@ export class CombatState {
       for (const side of ['attacker', 'defender'] as const) {
         const pending = branch.pendingHitPool[side]
         if (pending.base === 0 && pending.custom.length === 0) continue
+        // Per raw landing side; a self-target swap carries it to the firer.
+        const targets = unitAbilityPriority?.[side]
         const sideData = branchData[side]
         if (sideData.hitPool === undefined) {
-          sideData.hitPool = {
+          // Assigned separately: a conditional spread in the literal would
+          // take V8's slow object-literal path for every combat branch.
+          const pool: HitPool = {
             base: pending.base,
             additional: 0,
             custom: pending.custom.map(c => ({ ...c })),
           }
+          if (targets) pool.unitAbilityTargets = targets
+          sideData.hitPool = pool
           sideData._hitPoolShared = false
         } else {
           if (sideData._hitPoolShared) {
@@ -1166,17 +1121,9 @@ export class CombatState {
             sideData._hitPoolShared = false
           }
           const own = sideData.hitPool
+          if (targets) own.unitAbilityTargets = targets
           own.base += pending.base
           for (const c of pending.custom) own.custom.push({ ...c })
-        }
-      }
-
-      // Remove any destroyed units (kernel currently never produces these;
-      // future-proofed for effect-driven destruction).
-      if (branch.destroyedUnits.size > 0) {
-        const ids = [...branch.destroyedUnits]
-        for (const side of ['attacker', 'defender'] as const) {
-          CombatSideState.removeUnits(branchData[side], ids)
         }
       }
 
@@ -1270,26 +1217,6 @@ export class CombatState {
     })
   }
 
-  /** Derive the unit-ability firing config from the given meta. */
-  private _getUnitAbilityConfig(meta: MetaPhase): UnitAbilityPhaseConfig {
-    switch (meta) {
-      case 'SPACE_CANNON_OFFENSE':
-        return { firing: ['attacker', 'defender'], hitSource: 'SPACE_CANNON' }
-      case 'AFB':
-        return { firing: ['attacker', 'defender'], hitSource: 'AFB' }
-      case 'BOMBARDMENT':
-        return { firing: ['attacker'], hitSource: 'BOMBARDMENT' }
-      case 'SPACE_CANNON_DEFENSE':
-        return {
-          firing: ['defender'],
-          hitSource: 'SPACE_CANNON',
-          allowedUnitTypes: new Set([...GROUND_FORCES, ...STRUCTURES]),
-        }
-      default:
-        throw new Error(`Unexpected meta for unit-ability dice roll: ${meta}`)
-    }
-  }
-
   /** Queue a full unit-ability step (DICE_ROLL + ASSIGN_HITS) as nested
    *  script entries. Called from `AbilityContext.resolveStep`: the outer
    *  ability is inside a script-driven pass, so after its `call` returns
@@ -1300,20 +1227,17 @@ export class CombatState {
    *  and an optional `selfTarget` flag (e.g. `target: 'OWN'` self-damage):
    *  hits are produced against the natural opponent, then `_swapHitPools`
    *  (queued inside the dice-roll group, after AFTER_UNIT_ABILITY_ROLL)
-   *  moves them to the firer. Everything else (BEFORE/AFTER ASSIGN_HITS,
-   *  destroy cascade, completion check) flows through the standard phase
-   *  script. */
+   *  moves them to the firer. Everything else (BEFORE/AFTER ASSIGN_HITS and
+   *  the destroy cascade) flows through the standard phase script. */
   public runUnitAbility(config: {
     meta: UnitAbilityMeta
     firing: CombatSide[]
     outerPhase: MetaPhase[]
     customDice?: { attacker: SideDiceCollection; defender: SideDiceCollection }
     selfTarget?: boolean
-    /** When true, omit the trailing `_postAssignHits` wipe-check. The
-     *  caller will run another step (or steps) whose terminal
-     *  `_postAssignHits` covers the combined result. Used by chained
-     *  `resolveStep` calls that must resolve atomically (Proxima). */
-    deferCompletionCheck?: boolean
+    /** Defer the phase-end participant check to a later paired resolution or
+     *  to the enclosing phase driver. */
+    deferPhaseEndCheck?: boolean
     /** Ability params overrides scoped to this resolution. Stamped onto every
      *  timing step the resolution pushes; consumed by the ability loop. */
     abilitiesOverride?: Readonly<AbilitiesOverride>
@@ -1322,23 +1246,29 @@ export class CombatState {
     const innermostOuter = outerPhase[outerPhase.length - 1]
     const phase: MetaPhase[] =
       innermostOuter === meta ? [...outerPhase] : [...outerPhase, meta]
-    const baseConfig = this._getUnitAbilityConfig(meta)
     const script: PendingStep[] = [
       buildUnitAbilityDiceRollGroup({
         phase,
         firing,
-        hitSource: baseConfig.hitSource,
-        allowedUnitTypes: baseConfig.allowedUnitTypes,
+        hitSource:
+          meta === 'SPACE_CANNON_OFFENSE' || meta === 'SPACE_CANNON_DEFENSE'
+            ? 'SPACE_CANNON'
+            : meta,
+        // Space Cannon Defense fires only from the planet being invaded.
+        sourceSurfaceId:
+          meta === 'SPACE_CANNON_DEFENSE'
+            ? this.data.activeSurfaceId
+            : undefined,
         customDice,
         selfTarget,
         abilitiesOverride: config.abilitiesOverride,
       }),
       ...this.getAssignHitsScript(phase),
     ]
-    if (!config.deferCompletionCheck) {
+    if (!config.deferPhaseEndCheck) {
       script.push({
         kind: 'method',
-        fn: CombatState.prototype._postAssignHits,
+        fn: CombatState.prototype._endCombatPhaseIfSideMissing,
         phase,
       })
     }
@@ -1459,7 +1389,7 @@ function cloneStep(step: PhaseStep): PhaseStep {
  *  roll. Two builders share the LIFO skeleton but differ in which timings
  *  fire (BEFORE_DICE_ROLL vs BEFORE_UNIT_ABILITY_ROLL), the per-side run
  *  options (unit-ability rolls scope by firing side), and which inputs make
- *  sense (combat rolls have no `customDice` / `allowedUnitTypes` /
+ *  sense (combat rolls have no `customDice` / `sourceSurfaceId` /
  *  `selfTarget`, and always fire on both sides at hitSource COMBAT).
  *
  *  Execution order: BEFORE → REROLL → _rollDice → AFTER → AFTER_STEP.
@@ -1512,7 +1442,7 @@ export function buildUnitAbilityDiceRollGroup(args: {
   phase: MetaPhase[]
   firing: CombatSide[]
   hitSource: HitSource
-  allowedUnitTypes?: ReadonlySet<UnitBaseType>
+  sourceSurfaceId?: SurfaceId
   selfTarget?: boolean
   customDice?: { attacker: SideDiceCollection; defender: SideDiceCollection }
   abilitiesOverride?: Readonly<AbilitiesOverride>
@@ -1521,7 +1451,7 @@ export function buildUnitAbilityDiceRollGroup(args: {
     phase,
     firing,
     hitSource,
-    allowedUnitTypes,
+    sourceSurfaceId,
     selfTarget,
     customDice,
     abilitiesOverride,
@@ -1533,7 +1463,7 @@ export function buildUnitAbilityDiceRollGroup(args: {
       firing,
       selfTarget,
       customDice,
-      allowedUnitTypes,
+      sourceSurfaceId,
       isUnitAbility: true,
       abilitiesOverride,
     },
@@ -1588,7 +1518,11 @@ function collectSideDice(
     state,
     side,
     ctx.hitSource,
-    ctx.allowedUnitTypes,
+    ctx.sourceSurfaceId,
+    (ctx.modifiers ?? []).filter(
+      (mod): mod is HitValueModifierDecl =>
+        mod.type === 'HIT_VALUE' && mod.side === side && !!mod.unitId,
+    ),
   )
 }
 
@@ -1640,4 +1574,35 @@ export function cloneStateForBranch(base: CombatStateData): CombatStateData {
     attacker: { ...base.attacker },
     defender: { ...base.defender },
   }
+}
+
+/** Copy with every field present, so the root state and all its branch
+ *  clones share one hidden class. Optional fields are otherwise added lazily
+ *  in path-dependent order, and V8 only bulk-copies a spread (see
+ *  `cloneStateForBranch`) when it sees few source shapes. The mapped type
+ *  makes a new `SideStateData` field a compile error until it is listed. */
+function withAllSideFields(s: SideStateData): SideStateData {
+  const side: { [K in keyof Required<SideStateData>]: SideStateData[K] } = {
+    faction: s.faction,
+
+    unitSurface: s.unitSurface,
+    participatingUnits: s.participatingUnits,
+    nonParticipatingUnits: s.nonParticipatingUnits,
+    unitType: s.unitType,
+    unitState: s.unitState,
+    unitGrants: s.unitGrants,
+    unitStats: s.unitStats,
+    optionMetadata: s.optionMetadata,
+    hitPool: s.hitPool,
+    unitAbilityRestrictions: s.unitAbilityRestrictions,
+    abilities: s.abilities,
+    liveAbilities: s.liveAbilities,
+    _unitStateShared: s._unitStateShared,
+    _needsCanonicalize: s._needsCanonicalize,
+    _hitPoolShared: s._hitPoolShared,
+    _metaHash: s._metaHash,
+
+    _resolvedRestrictions: s._resolvedRestrictions,
+  }
+  return side
 }

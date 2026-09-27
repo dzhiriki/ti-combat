@@ -1,6 +1,6 @@
 import naazRokhaAllianceIcon from '@/assets/faction/naaz_rokha_alliance.svg?raw'
 import type { Ability } from '@/combat'
-import type { UnitBaseType } from '@/types'
+import { commitFighters } from '@/combat/abilities-engine/api/commit-fighters'
 import { createStatsInvoke } from '@/utils/create-stats-invoke'
 
 // Carries the Fighter II movement/fleet-pool clause (fighters fill ship
@@ -15,7 +15,9 @@ export const morphwing: Ability = {
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
   exclusiveGroup: 'UNIT_UPGRADE_FIGHTER',
-  declareParamChange: () => [{ key: 'groundForces', value: 'FIGHTER' }],
+  declareChanges: ctx => {
+    if (ctx.side === 'attacker') commitFighters(ctx)
+  },
   invoke: [
     createStatsInvoke('FIGHTER', {
       COST: 0.5,
@@ -32,9 +34,7 @@ export const morphwing: Ability = {
       timing: 'COMMIT_UNITS',
       isCallable: (_params, ctx) => ctx.side === 'attacker',
       call: ctx => {
-        ctx.api.own.updateAbilityConfig('SETTINGS', {
-          groundForces: (current: UnitBaseType[]) => [...current, 'FIGHTER'],
-        })
+        ctx.invokeChanges()
       },
     },
   ],

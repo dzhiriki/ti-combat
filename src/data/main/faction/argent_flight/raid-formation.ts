@@ -16,9 +16,9 @@ export const raidFormation: Ability<Params> = {
     uses: Infinity,
     targetPriority: declareParam<UnitList>({
       default: [],
-      source: 'nonFighterShips',
+      source: 'SHIPS',
       side: 'opponent',
-      filter: { combatMode: 'SPACE' },
+      filter: { combatMode: 'SPACE', exclude: ['FIGHTER'] },
     }),
   },
   uiConfig: ctx => [
@@ -35,27 +35,32 @@ export const raidFormation: Ability<Params> = {
       context: 'AFB',
       isCallable: (_, ctx) => {
         const pendingHits = ctx.api.opponent.getPendingHits()
-        const fighterCount = ctx.api.opponent.countUnits('FIGHTER', {
-          includeVariants: true,
-        })
+        const fighterCount = ctx.api.opponent.participating.countUnits(
+          'FIGHTER',
+          {
+            includeVariants: true,
+          },
+        )
 
         return pendingHits > fighterCount
       },
       call: (ctx, params) => {
         const pendingHits = ctx.api.opponent.getPendingHits()
-        const fighterCount = ctx.api.opponent.countUnits('FIGHTER', {
-          includeVariants: true,
-        })
+        const fighterCount = ctx.api.opponent.participating.countUnits(
+          'FIGHTER',
+          {
+            includeVariants: true,
+          },
+        )
         const excess = pendingHits - fighterCount
 
-        const targets = ctx.api.opponent.findUnitByPriority(
+        const targets = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
           {
-            includeVariants: false,
             amount: excess,
             predicate: (variant, unitId) => {
               if (
-                ctx.api.opponent.isUnitAbilityLost('SUSTAIN_DAMAGE', variant)
+                ctx.api.opponent.isUnitAbilityLost('SUSTAIN_DAMAGE', unitId)
               ) {
                 return false
               }

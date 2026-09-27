@@ -24,7 +24,7 @@ export const greyfireMutagen: Ability<Params> = {
     uses: 1,
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       side: 'opponent',
       defaultItemValue: true,
       sort: 'worth-desc',
@@ -37,23 +37,16 @@ export const greyfireMutagen: Ability<Params> = {
       timing: 'START_OF_COMBAT',
       isCallable: (params, ctx) => {
         if (ctx.api.opponent.getFaction() === 'YIN_BROTHERHOOD') return false
-        const { groundForces } = ctx.api.opponent.getAbilityConfig('SETTINGS')
-        if (
-          ctx.api.opponent.countUnits(groundForces, { includeVariants: true }) <
-          2
-        )
-          return false
+        if (ctx.api.opponent.participating.countUnits() < 2) return false
         return (
-          ctx.api.opponent.findUnitByPriority(
+          ctx.api.opponent.participating.findUnitByPriority(
             ctx.utils.getFlat(params.targetPriority),
-            { includeVariants: false },
           ) !== undefined
         )
       },
       call: (ctx, params) => {
-        const target = ctx.api.opponent.findUnitByPriority(
+        const target = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false },
         )
         if (target === undefined) return
         ctx.api.opponent.removeUnits(target)

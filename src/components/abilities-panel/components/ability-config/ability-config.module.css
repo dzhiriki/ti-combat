@@ -147,6 +147,7 @@
 
 .tooltipParagraph {
   margin: 0;
+  white-space: pre-line;
 }
 
 .tooltipParagraph + .tooltipParagraph {

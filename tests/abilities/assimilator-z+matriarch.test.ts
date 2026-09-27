@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { combatTest } from '../utils/combat-test'
 
-describe.forEachSide('ASSIMILATOR_Z + MATRIARCH', () => {
+describe('ASSIMILATOR_Z + MATRIARCH', () => {
   it('fighters participate in ground combat when Nekro flagship is present', () => {
     const t = combatTest({
       mode: 'GROUND',

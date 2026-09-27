@@ -14,9 +14,13 @@ import {
   UNIT_LIMITS,
   UNIT_PRICE,
 } from '@/constants/units'
+import type { UnitEditorMode } from '@/hooks/combat-setup/combat-setup'
 import type {
   CombatSide,
   GameSystem,
+  SurfaceDefinition,
+  SurfaceId,
+  SurfaceUnitSelections,
   UnitBaseType,
   UnitSelection,
 } from '@/types'
@@ -29,7 +33,7 @@ import {
   CombatResultBar,
 } from './components/combat-result-bar'
 import { FactionSelect } from './components/faction-select'
-import { UnitRowDual } from './components/unit-row-dual'
+import { type SideUnitControls, UnitRowDual } from './components/unit-row-dual'
 
 import styles from './battle-card.module.css'
 
@@ -65,6 +69,10 @@ interface BattleCardProps {
   defenderFaction: string
   attackerSelections: Record<UnitBaseType, UnitSelection>
   defenderSelections: Record<UnitBaseType, UnitSelection>
+  editorMode: UnitEditorMode
+  surfaces: readonly SurfaceDefinition[]
+  selectedPlanetId: SurfaceId
+  surfaceSelections: Record<CombatSide, SurfaceUnitSelections>
   attackerConfig: Record<UnitBaseType, UnitConfig>
   defenderConfig: Record<UnitBaseType, UnitConfig>
   combatResult: CombatResult | null
@@ -74,10 +82,18 @@ interface BattleCardProps {
   isComputing?: boolean
   combatMode: CombatMode
   onCombatModeChange: (mode: CombatMode) => void
+  onPlanetChange: (surfaceId: SurfaceId) => void
+  onAddPlanet: () => void
   onFactionChange: (side: CombatSide, faction: string) => void
   onSwap: () => void
   onUnitCountChange: (
     side: CombatSide,
+    unit: UnitBaseType,
+    count: number,
+  ) => void
+  onSurfaceUnitCountChange: (
+    side: CombatSide,
+    surfaceId: SurfaceId,
     unit: UnitBaseType,
     count: number,
   ) => void
@@ -106,6 +122,10 @@ export function BattleCard({
   defenderFaction,
   attackerSelections,
   defenderSelections,
+  editorMode,
+  surfaces,
+  selectedPlanetId,
+  surfaceSelections,
   attackerConfig,
   defenderConfig,
   combatResult,
@@ -115,15 +135,122 @@ export function BattleCard({
   isComputing,
   combatMode,
   onCombatModeChange,
+  onPlanetChange,
+  onAddPlanet,
   onFactionChange,
   onSwap,
   onUnitCountChange,
+  onSurfaceUnitCountChange,
   onUpgradeToggle,
   onResetUnits,
   attackerActions,
   defenderActions,
   className,
 }: BattleCardProps) {
+  const space = surfaces.find(surface => surface.type === 'SPACE')!
+  const planet = surfaces.find(surface => surface.id === selectedPlanetId)!
+  const planets = surfaces.filter(surface => surface.type === 'PLANET')
+
+  const planetTabs = (
+    <nav className={styles.planetTabs} aria-label="Planets">
+      {planets.map((surface, index) => (
+        <span className={styles.planetTabItem} key={surface.id}>
+          {index > 0 && <span className={styles.planetSeparator}>/</span>}
+          <button
+            type="button"
+            className={clsx(
+              styles.planetTab,
+              surface.id === selectedPlanetId && styles.planetTabSelected,
+            )}
+            aria-current={surface.id === selectedPlanetId ? 'page' : undefined}
+            onClick={() => onPlanetChange(surface.id)}
+          >
+            {surface.name}
+          </button>
+        </span>
+      ))}
+      <span className={styles.planetSeparator}>/</span>
+      <button
+        type="button"
+        className={styles.planetTab}
+        onClick={onAddPlanet}
+        title="Add planet"
+        aria-label="Add planet"
+      >
+        +
+      </button>
+    </nav>
+  )
+
+  const countOnOtherSurfaces = (
+    side: CombatSide,
+    surfaceId: SurfaceId,
+    unitType: UnitBaseType,
+  ) =>
+    surfaces.reduce(
+      (total, surface) =>
+        surface.id === surfaceId
+          ? total
+          : total +
+            (surfaceSelections[side][surface.id]?.[unitType]?.count ?? 0),
+      0,
+    )
+
+  const renderUnitGroups = (
+    attacker: Record<UnitBaseType, UnitSelection>,
+    defender: Record<UnitBaseType, UnitSelection>,
+    surface?: SurfaceDefinition,
+  ) =>
+    UNITS.map(({ label, items }) => {
+      const visibleItems = surface
+        ? items.filter(
+            unitKey =>
+              attackerConfig[unitKey].allowedSurfaces.includes(surface.type) ||
+              defenderConfig[unitKey].allowedSurfaces.includes(surface.type),
+          )
+        : items
+      if (visibleItems.length === 0) return null
+      return (
+        <section className={styles.unitGroup} key={label}>
+          <header className={styles.unitGroupHeader}>
+            <Divider className="theme-attacker" />
+            <span className={styles.unitGroupTitle}>{label}</span>
+            <Divider className="theme-defender" />
+          </header>
+          {visibleItems.map(unitKey => {
+            const controls = (side: CombatSide): SideUnitControls => {
+              const config = (
+                side === 'attacker' ? attackerConfig : defenderConfig
+              )[unitKey]
+              return {
+                ...(side === 'attacker' ? attacker : defender)[unitKey],
+                hasUpgrade: config.hasUpgrade,
+                limit: surface
+                  ? UNIT_LIMITS[unitKey] -
+                    countOnOtherSurfaces(side, surface.id, unitKey)
+                  : UNIT_LIMITS[unitKey],
+                disabled:
+                  !!surface && !config.allowedSurfaces.includes(surface.type),
+                onCountChange: count =>
+                  surface
+                    ? onSurfaceUnitCountChange(side, surface.id, unitKey, count)
+                    : onUnitCountChange(side, unitKey, count),
+                onUpgradeToggle: () => onUpgradeToggle(side, unitKey),
+              }
+            }
+            return (
+              <UnitRowDual
+                key={unitKey}
+                name={attackerConfig[unitKey].name}
+                attacker={controls('attacker')}
+                defender={controls('defender')}
+              />
+            )
+          })}
+        </section>
+      )
+    })
+
   return (
     <GlassCard as="section" className={clsx(styles.battleCard, className)}>
       <div className={styles.systemToggle}>
@@ -163,40 +290,29 @@ export function BattleCard({
         )}
       </header>
 
-      {/* Unit rows */}
       <div className={styles.unitRows}>
-        {UNITS.map(({ label, items }) => (
-          <section className={styles.unitGroup} key={label}>
-            <header className={styles.unitGroupHeader}>
-              <Divider className="theme-attacker" />
-              <span className={styles.unitGroupTitle}>{label}</span>
-              <Divider className="theme-defender" />
-            </header>
-            {items.map(unitKey => (
-              <UnitRowDual
-                key={unitKey}
-                name={attackerConfig[unitKey].name}
-                limit={UNIT_LIMITS[unitKey]}
-                attackerHasUpgrade={attackerConfig[unitKey].hasUpgrade}
-                defenderHasUpgrade={defenderConfig[unitKey].hasUpgrade}
-                attacker={attackerSelections[unitKey]}
-                defender={defenderSelections[unitKey]}
-                onAttackerCountChange={count =>
-                  onUnitCountChange('attacker', unitKey, count)
-                }
-                onAttackerUpgradeToggle={() =>
-                  onUpgradeToggle('attacker', unitKey)
-                }
-                onDefenderCountChange={count =>
-                  onUnitCountChange('defender', unitKey, count)
-                }
-                onDefenderUpgradeToggle={() =>
-                  onUpgradeToggle('defender', unitKey)
-                }
-              />
-            ))}
-          </section>
-        ))}
+        {editorMode === 'SIMPLIFIED' ? (
+          renderUnitGroups(attackerSelections, defenderSelections)
+        ) : (
+          <>
+            <section className={styles.surfaceSection}>
+              <h3 className={styles.surfaceTitle}>Space</h3>
+              {renderUnitGroups(
+                surfaceSelections.attacker[space.id],
+                surfaceSelections.defender[space.id],
+                space,
+              )}
+            </section>
+            <section className={styles.surfaceSection}>
+              <div className={styles.surfaceTitle}>{planetTabs}</div>
+              {renderUnitGroups(
+                surfaceSelections.attacker[planet.id],
+                surfaceSelections.defender[planet.id],
+                planet,
+              )}
+            </section>
+          </>
+        )}
       </div>
 
       <div className={styles.amounts}>
@@ -239,6 +355,7 @@ export function BattleCard({
         outcomes={outcomes}
         unitPriority={unitPriority}
         participatingTypes={participatingTypes}
+        surfaces={editorMode === 'FULL' ? surfaces : undefined}
         isComputing={isComputing}
       />
     </GlassCard>
