@@ -1,4 +1,4 @@
-import type { Ability } from '@/combat'
+import type { Ability, MetaPhase } from '@/combat'
 import type { UnitCategory } from '@/constants/units'
 
 import type { DiceGroup } from './die'
@@ -40,10 +40,19 @@ interface UnitAbilities {
 
 export type UnitAbility = keyof UnitAbilities
 
+/** A category held only while the scheduler's meta phase is one of `phase`
+ *  (Starlancer XI is a ship during space combat). */
+export interface PhaseCategory {
+  category: UnitCategory
+  phase: MetaPhase | readonly MetaPhase[]
+}
+
+export type CategoryEntry = UnitCategory | PhaseCategory
+
 export interface UnitStats {
   /** Native categories inherited by every new instance. Omission uses the
    *  base unit type's categories. Temporary grants are stored per UnitId. */
-  CATEGORIES?: readonly UnitCategory[]
+  CATEGORIES?: readonly CategoryEntry[]
   UNIT_ABILITY_HIT_IMMUNE?: boolean
   NAME?: string
   DESCRIPTION?: string

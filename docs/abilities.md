@@ -247,9 +247,10 @@ surfaces their type may stand on. Reconcile stores that model as
 `optionMetadata.standIns`, and setup reads it like any combat state:
 
 - **Placement** — `ALLOWED_SURFACES` (Miniaturization, Nekro unit copies).
-- **Option lists** — unit categories (Eidolon, Hel-Titan) and grants (Alastor,
-  Matriarch). A stand-in stands for every unit of its type on its surface,
-  placed or not; placed units only supply counts and caps.
+- **Option lists** — unit categories (Eidolon Maximum, Hel-Titan) and grants
+  (Alastor, Z-Grav Eidolon, Matriarch). A stand-in stands for every unit of
+  its type on its surface, placed or not; placed units only supply counts and
+  caps.
 
 The engine never runs `declareChanges` on its own. An invoke applying the same
 effect calls `ctx.invokeChanges()` (params default to the ability's current
@@ -257,8 +258,8 @@ config) instead of repeating the code. TF Hel-Titan keeps its plain stats
 invoke for Janovet and declares `declareChanges: statsInvoke.call` instead.
 
 - Put in `declareChanges` only what setup must see; keep combat-only or
-  conditional effects in the invoke (Z-Grav Eidolon's change adds the SHIPS
-  category; its START_OF_COMBAT invoke also rewrites combat values).
+  conditional effects in the invoke (Z-Grav Eidolon's change grants SHIPS to
+  the mechs in space; its START_OF_COMBAT invoke also rewrites combat values).
 - Changes see stand-ins: don't count units or rely on which units exist, and
   don't place, move or remove units, add subtypes, write ability config, or
   check `isEnabled` (setup already gates on it).
@@ -453,7 +454,7 @@ canAssignHitToUnit(unitId: UnitId): boolean  // Includes phase and unit-ability 
 isParticipating(unitId: UnitId): boolean
 matchesUnitLocator(unitId: UnitId, locator: UnitLocator): boolean
 matchesUnitList(unitId: UnitId, list: UnitList): boolean  // Any enabled entry; skips false/0 like getFlat
-isUnitCategory(unitId: UnitId, category: UnitCategory): boolean
+isUnitCategory(unitId: UnitId, category: UnitCategory): boolean  // During the current meta
 isUnitTypeCategory(unitType: UnitType, category: UnitCategory): boolean  // Native categories, for production choices
 getUnitVariantsOptions(filter?: ParamFilter): { label: string, value: string }[]
 getUnitVariantsOptions(paramKey: string): { label: string, value: string }[]   // reads filter/limit from the declareParam
@@ -480,19 +481,33 @@ modifyUnitState(unitId: UnitId, updates: Partial<UnitState>): void // Modify per
 grantCategory(ids: UnitId | readonly UnitId[], category: UnitCategory): void
 ```
 
-Native `UnitStats.CATEGORIES` defaults to the base type's categories. Native ships
-join space combat and native ground forces join ground combat on the active
-surface automatically, including newly placed units. Hel-Titans natively belong
-to both `STRUCTURES` and `GROUND_FORCES`.
+Native `UnitStats.CATEGORIES` defaults to the base type's categories.
+Participation follows categories alone: ships (native or granted) join space
+combat wherever they stand in the system, and ground forces join ground combat
+on the invaded planet (the attacker's are committed there from space),
+including newly placed units. Hel-Titans natively belong to both `STRUCTURES`
+and `GROUND_FORCES`; Eidolon Maximum mechs are ships and ground forces, so one
+on a planet fights in space combat too.
+
+A `CATEGORIES` entry may be limited to meta phases:
+`{ category: 'SHIPS', phase: 'SPACE_COMBAT' }` (or a list of phases) holds only
+while the scheduler's current meta (`CombatStateData.meta`) is one of them.
+Nested metas such as AFB count as the combat they run in; PREPARE has no meta,
+and setup option lists use their mode's combat meta (`getCombatMeta`).
+Starlancer XI is a ground force that is a ship during space combat: its mechs
+fight in space combat from a planet too, but are no ships during Space Cannon
+Offense or ground combat. No invoke is involved.
 
 `grantCategory` applies only to the selected IDs: each counts as a member of the
-category for the rest of the combat and takes part in that category's combat
-mode (ships in space, ground forces on the ground) wherever it stands. A unit
-holds at most one grant. The categories are `SHIPS`, `GROUND_FORCES`, and
+category for the rest of the combat and takes part in its combat like a native
+member. A unit holds at most one grant. The categories are `SHIPS`, `GROUND_FORCES`, and
 `STRUCTURES`. Non-fighter ships are ships whose base type is not `FIGHTER`;
 they are not a separate category. Base types and variants remain unchanged.
 
-Alastor snapshots its chosen ground forces and grants them `SHIPS`. Matriarch
+Alastor snapshots its chosen ground forces and grants them `SHIPS`; Z-Grav
+Eidolon grants `SHIPS` to the mechs in the space area when it flips, because
+it is a ship only there (changing the mech's `CATEGORIES` would make every mech
+a ship). Matriarch
 and Morphwing grant `GROUND_FORCES` to the fighters in space at commitment;
 the engine lands them on the active planet with the native ground forces and
 returns them to space at completion. Later reinforcements do not inherit these
@@ -501,9 +516,8 @@ grants.
 Setup sees these effects only through `declareChanges` (see
 [Setup changes](#setup-changes)), which shapes possible setup options such as
 Sustain Priority and Assign Hits Order. Runtime effects use scoped queries and
-`isUnitCategory` instead. Starlancer XI has native ship and ground-force
-membership, like Hel-Titan's native dual category. Its special combat-end rules
-are deferred; no passive participation-rule API is provided.
+`isUnitCategory` instead. Starlancer XI's membership is a phase-scoped native
+entry (see above). Its special combat-end rules are deferred.
 
 #### Hit Operations
 

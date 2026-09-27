@@ -38,6 +38,8 @@ export {
   SPACE_SURFACE_ID,
 } from './surface'
 export type {
+  CategoryEntry,
+  PhaseCategory,
   Unit,
   UnitAbility,
   UnitBaseType,

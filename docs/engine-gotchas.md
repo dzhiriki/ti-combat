@@ -235,14 +235,31 @@ a check there too.
   phase drivers (AFB, Space Cannon, Bombardment, Retreat, Fleet Pool,
   Capacity) — never hide it, even for Twilight's Fall.
 
+- **Participation follows categories; only ground combat is local.** Any
+  ship (native, phase-scoped or granted) fights a space combat from any surface
+  of the system; a ground force fights a ground combat only on the invaded
+  planet (the attacker's are committed there). A type-wide `CATEGORIES` change
+  therefore reaches mechs on planets too: an effect limited to some units
+  (Z-Grav Eidolon is a ship only in the space area) grants the category to
+  those units instead, like Alastor. `participatesInCombat`, the `placeUnits`
+  split and `fightsOn` in `unit-options.ts` share the rule.
+
 - **Winning and entering SPACE combat require participating units.** A combat
-  phase starts only when both sides already have participants; a
-  `START_OF_COMBAT` effect cannot bootstrap admission. Base Z-Grav Eidolon
-  therefore does not transform when its side has no native ship. When flow is
-  exhausted, a side whose remaining units are ferried ground forces or
-  structures cannot win; Eidolon Maximum and Starlancer XI can because they
-  participate natively. See
-  `tests/engine/space-combat-winner-participation.test.ts`.
+  phase starts only when both sides already have participants for it,
+  phase-scoped categories of that phase included (Starlancer XI alone starts a
+  space combat); a `START_OF_COMBAT` effect cannot bootstrap admission. Base
+  Z-Grav Eidolon therefore does not transform when its side has no native ship.
+  When flow is exhausted, a side whose remaining units are ferried ground forces
+  or structures cannot win; Eidolon Maximum can because it participates
+  natively, Starlancer XI cannot because it is a ship only during space combat.
+  See `tests/engine/space-combat-winner-participation.test.ts`.
+
+- **During PREPARE every unit is still a participant, and no meta is set.**
+  `buildSideState` puts every unit in `participatingUnits`, and
+  `forSimulation` splits out the non-participants after PREPARE, unless a
+  PREPARE effect resyncs the side earlier (grants, placements, moves, category
+  or subtype changes). Guards on `isParticipating` or `participating` queries
+  see the whole force until then, and phase-scoped categories never apply.
 
 ## Reconcile and config
 
@@ -300,9 +317,15 @@ a check there too.
   the field (`undefined`) for "any eligible surface"; pre-galvanized does so for
   unselected types so mid-combat Galvanized units stay selectable.
 
-- **Starlancer XI uses native ship and ground-force categories.** It needs
-  no other ship to participate on the active surface. Its special combat-end
-  rules are deferred.
+- **Phase-scoped categories follow the scheduler's meta.**
+  `CombatStateData.meta` is set by `loadPhaseScript` (every top-level entry,
+  engine and test harness); nested metas keep the combat's. On a meta change,
+  sides with scoped entries re-split their pools and both restriction caches
+  reset, and `getNextPhase` admits a combat phase by the participants it would
+  have. Readers without a meta (setup option lists, the participating filter)
+  pass their mode's combat meta (`getCombatMeta`); a new category reader must
+  pass a phase too, or scoped entries never apply. `categoryHash` serializes
+  scoped entries. Starlancer XI's special combat-end rules are deferred.
 
 - **Capacity and Fleet Pool split Fighter-II-style cargo between them.**
   Units with BOTH `CAPACITY_COST` and `FLEET_POOL_COST` (Fighter II, the TF

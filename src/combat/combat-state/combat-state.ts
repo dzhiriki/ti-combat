@@ -44,6 +44,7 @@ import { type LogEntry, Logger } from '../logger'
 import { canonicalizeUnitState } from '../utils/canonicalize-unit-state'
 import { sortUnitsByPriority } from '../utils/sort-units-by-priority'
 import {
+  hasPhaseCategories,
   isUnitCategory,
   participatesInCombat,
 } from '../utils/unit-combat-properties'
@@ -83,14 +84,21 @@ function inCombatPhase(phase: MetaPhase[]): boolean {
   return phase.length > 0 && isCombatMeta(phase[0])
 }
 
-/** Rebuild a side's membership from native categories and explicit
- *  instance grants, sorted by the mode's priority. */
+/** Rebuild a side's membership from native categories (for the current
+ *  meta) and explicit instance grants, sorted by the mode's priority. */
 function resyncSide(data: CombatStateData, side: CombatSide): void {
   const s = data[side]
   sortUnitsByPriority(
     s,
     CombatSideState.getPhasePriorityList(s, data.combatMode) ?? [],
-    id => participatesInCombat(s, id, data.combatMode, data.activeSurfaceId),
+    id =>
+      participatesInCombat(
+        s,
+        id,
+        data.combatMode,
+        data.activeSurfaceId,
+        data.meta,
+      ),
   )
 }
 
@@ -477,9 +485,26 @@ export class CombatState {
    *  Called by combat-engine / the test harness when the stack is empty
    *  and combat is still ongoing. Stored in reverse execution order. */
   public loadPhaseScript(meta: MetaPhase, round: number): void {
+    this._enterMeta(meta)
     const script = this.getPhaseScript(meta, round)
     // Reverse so pop() yields execution order.
     this.pendingSteps = script.slice().reverse()
+  }
+
+  /** Record the scheduler's meta. Phase-scoped categories change membership
+   *  between metas, so their sides re-split and restriction targets resolve
+   *  again. */
+  private _enterMeta(meta: MetaPhase): void {
+    const d = this.data
+    if (d.meta === meta) return
+    d.meta = meta
+    const changing = (['attacker', 'defender'] as const).filter(side =>
+      hasPhaseCategories(d[side]),
+    )
+    if (changing.length === 0) return
+    d.attacker._resolvedRestrictions = undefined
+    d.defender._resolvedRestrictions = undefined
+    for (const side of changing) resyncSide(d, side)
   }
 
   /** One script per meta — defines the ordered steps a single round (or
@@ -592,7 +617,7 @@ export class CombatState {
       for (const id of pool) {
         if (
           attacker.unitSurface[id] === SPACE_SURFACE_ID &&
-          isUnitCategory(attacker, id, 'GROUND_FORCES')
+          isUnitCategory(attacker, id, 'GROUND_FORCES', data.meta)
         )
           moving.push(id as UnitId)
       }
@@ -667,7 +692,7 @@ export class CombatState {
     while (
       next !== 'COMPLETE' &&
       isCombatMeta(next) &&
-      !this._canStartCombatPhase()
+      !this._canStartCombatPhase(next)
     ) {
       next = getNextPhaseInFlow(next, this.data.combatMode)
     }
@@ -676,13 +701,30 @@ export class CombatState {
   }
 
   /** Combat phases require participating forces on both sides before their
-   *  script starts. START_OF_COMBAT effects cannot bootstrap that admission. */
-  private _canStartCombatPhase(): boolean {
-    const d = this.data
+   *  script starts: those `meta` would have, phase-scoped categories
+   *  included. START_OF_COMBAT effects cannot bootstrap that admission. */
+  private _canStartCombatPhase(meta = this.data.meta): boolean {
     return (
-      CombatSideState.hasParticipatingUnits(d.attacker) &&
-      CombatSideState.hasParticipatingUnits(d.defender)
+      this._hasParticipants('attacker', meta) &&
+      this._hasParticipants('defender', meta)
     )
+  }
+
+  /** The pools hold the current meta's participants; another meta is
+   *  evaluated only for sides whose membership depends on it. */
+  private _hasParticipants(
+    side: CombatSide,
+    meta: MetaPhase | undefined,
+  ): boolean {
+    const d = this.data
+    const s = d[side]
+    if (meta === d.meta || !hasPhaseCategories(s))
+      return CombatSideState.hasParticipatingUnits(s)
+    for (const id of s.participatingUnits + s.nonParticipatingUnits) {
+      if (participatesInCombat(s, id, d.combatMode, d.activeSurfaceId, meta))
+        return true
+    }
+    return false
   }
 
   /** Load the timings that run after the phase flow is exhausted. This is a

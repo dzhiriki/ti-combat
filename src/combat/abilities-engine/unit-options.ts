@@ -13,6 +13,7 @@ import {
   applyVariantPostFilter,
   filterDeclaredSubtypes,
 } from '../combat-side-state/combat-side-state'
+import { getCombatMeta } from '../combat-state/phase-utils'
 import type { CombatMode, SideStateData } from '../combat-state/types'
 import { parseUnitLocator } from '../utils/parse-unit-locator'
 import { expandWithSubtypes, sortBaseTypes } from '../utils/sort-unit-options'
@@ -46,9 +47,12 @@ export function resolveUnitOptions(
   spec: OptionSpec,
 ): UnitOption[] {
   const mode = spec.filter?.combatMode ?? context.combatMode
+  // Choices are made for the mode's combat, so phase-scoped categories of
+  // that combat count.
+  const phase = getCombatMeta(mode)
   const types = spec.filter?.includeNonParticipating
     ? CombatSideState.getAllUnitTypes()
-    : CombatSideState.getCategoryOptionTypes(s, spec.source)
+    : CombatSideState.getCategoryOptionTypes(s, spec.source, phase)
   const sorted = sortBaseTypes(types, spec.sort ?? 'normal-asc')
   const subtypes = spec.filter?.includeOnlyBaseTypes
     ? []
@@ -87,19 +91,18 @@ export function resolveUnitOptions(
   )
   if (!active.size) return []
   const category = mode === 'SPACE' ? 'SHIPS' : 'GROUND_FORCES'
-  // Where a unit fights, mirroring `participatesInCombat` and commitment: a
-  // granted unit where it stands, a native member only on an active surface,
-  // and the attacker's ground forces from space on the invaded planet.
-  // System controls keep units where they stand.
+  // Where a unit fights, mirroring `participatesInCombat` and commitment:
+  // ships where they stand, ground forces on an active planet, and the
+  // attacker's ground forces from space on the invaded planet. System
+  // controls keep units where they stand.
   const fightsOn = (side: SideStateData, id: UnitId): readonly SurfaceId[] => {
     const surface = side.unitSurface[id]
     if (spec.scope === 'system') return [surface]
-    if (!isUnitCategory(side, id, category)) return []
-    if (mode === 'GROUND' && surface === SPACE_SURFACE_ID)
+    if (!isUnitCategory(side, id, category, phase)) return []
+    if (mode === 'SPACE') return [surface]
+    if (surface === SPACE_SURFACE_ID)
       return context.side === 'attacker' ? [...active] : []
-    return side.unitGrants?.[id] === category || active.has(surface)
-      ? [surface]
-      : []
+    return active.has(surface) ? [surface] : []
   }
   const units = (side: SideStateData) =>
     [...side.participatingUnits, ...side.nonParticipatingUnits] as UnitId[]

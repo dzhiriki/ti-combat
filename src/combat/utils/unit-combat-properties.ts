@@ -1,21 +1,69 @@
 import { UNIT_CATEGORIES, type UnitCategory } from '@/constants/units'
-import type { SurfaceId, UnitId, UnitLocator, UnitType } from '@/types'
+import type {
+  CategoryEntry,
+  PhaseCategory,
+  SurfaceId,
+  UnitId,
+  UnitLocator,
+  UnitType,
+} from '@/types'
 
-import type { CombatMode, SideStateData } from '../combat-state/types'
+import type {
+  CombatMode,
+  MetaPhase,
+  SideStateData,
+} from '../combat-state/types'
 import { parseUnitLocator } from './parse-unit-locator'
 import { resolveUnitStats } from './resolve-unit-stats'
 import { matchesUnitLocator } from './unit-locator'
 
+const phasesOf = (entry: PhaseCategory): readonly MetaPhase[] =>
+  typeof entry.phase === 'string' ? [entry.phase] : entry.phase
+
+/** Whether `entry` is `category` during `phase`: plain entries always,
+ *  phase-scoped ones only while `phase` is one of theirs. */
+function holdsCategory(
+  entry: CategoryEntry,
+  category: UnitCategory,
+  phase: MetaPhase | undefined,
+): boolean {
+  if (typeof entry === 'string') return entry === category
+  return (
+    entry.category === category &&
+    phase !== undefined &&
+    phasesOf(entry).includes(phase)
+  )
+}
+
+/** Native membership of `type` during `phase` (the scheduler's meta).
+ *  Phase-scoped entries never apply without one: setup and PREPARE. */
 export function isNativeCategory(
   side: SideStateData,
   type: UnitType,
   category: UnitCategory,
+  phase?: MetaPhase,
 ): boolean {
-  const base = parseUnitLocator(type).baseType
   const categories = resolveUnitStats(side.unitStats, type)?.CATEGORIES
   return categories
-    ? categories.includes(category)
-    : UNIT_CATEGORIES[category].includes(base)
+    ? categories.some(entry => holdsCategory(entry, category, phase))
+    : UNIT_CATEGORIES[category].includes(parseUnitLocator(type).baseType)
+}
+
+const phaseCategoryStats = new WeakMap<SideStateData['unitStats'], boolean>()
+
+/** Whether any of the side's stats has a phase-scoped entry, so membership
+ *  can change between metas. Cached per copy-on-write stats object. */
+export function hasPhaseCategories(side: SideStateData): boolean {
+  let value = phaseCategoryStats.get(side.unitStats)
+  if (value === undefined) {
+    value = Object.keys(side.unitStats).some(key =>
+      resolveUnitStats(side.unitStats, key as UnitType)?.CATEGORIES?.some(
+        entry => typeof entry !== 'string',
+      ),
+    )
+    phaseCategoryStats.set(side.unitStats, value)
+  }
+  return value
 }
 
 /** Also works for destroyed ids, whose metadata is retained for reactions. */
@@ -23,27 +71,65 @@ export function isUnitCategory(
   side: SideStateData,
   id: string,
   category: UnitCategory,
+  phase?: MetaPhase,
 ): boolean {
   const type = side.unitType[id]
   if (!type) return false
   return (
-    side.unitGrants?.[id] === category || isNativeCategory(side, type, category)
+    side.unitGrants?.[id] === category ||
+    isNativeCategory(side, type, category, phase)
   )
 }
 
+/** Ships fight a space combat wherever they stand in the system; ground
+ *  forces fight a ground combat only on the invaded planet (the attacker's
+ *  land there when committed). */
+function fightsFrom(
+  surfaceId: string,
+  mode: CombatMode,
+  activeSurfaceId: string,
+): boolean {
+  return mode === 'SPACE' || surfaceId === activeSurfaceId
+}
+
+/** Whether a new unit of `type` on `surfaceId` takes part: a native member of
+ *  the mode's category where that mode fights. */
+export function participatesNatively(
+  side: SideStateData,
+  type: UnitType,
+  surfaceId: string,
+  mode: CombatMode,
+  activeSurfaceId: string,
+  phase: MetaPhase | undefined,
+): boolean {
+  return (
+    fightsFrom(surfaceId, mode, activeSurfaceId) &&
+    isNativeCategory(
+      side,
+      type,
+      mode === 'SPACE' ? 'SHIPS' : 'GROUND_FORCES',
+      phase,
+    )
+  )
+}
+
+/** Membership in the mode's category (native for the current meta, or
+ *  granted) where that mode fights. */
 export function participatesInCombat(
   side: SideStateData,
   id: string,
   mode: CombatMode,
   activeSurfaceId: string,
+  phase: MetaPhase | undefined,
 ): boolean {
-  const type = side.unitType[id]
-  if (!type) return false
-  const category = mode === 'SPACE' ? 'SHIPS' : 'GROUND_FORCES'
   return (
-    side.unitGrants?.[id] === category ||
-    (side.unitSurface[id] === activeSurfaceId &&
-      isNativeCategory(side, type, category))
+    fightsFrom(side.unitSurface[id], mode, activeSurfaceId) &&
+    isUnitCategory(
+      side,
+      id,
+      mode === 'SPACE' ? 'SHIPS' : 'GROUND_FORCES',
+      phase,
+    )
   )
 }
 
@@ -113,6 +199,11 @@ function locationHash(
   return hash && `@${hash}`
 }
 
+const categoryKey = (entry: CategoryEntry): string =>
+  typeof entry === 'string'
+    ? entry
+    : `${entry.category}/${[...phasesOf(entry)].sort().join('/')}`
+
 /** `#native&grants` when a stats entry declares categories (or hit
  *  immunity) or a unit holds a grant, else ''. */
 function categoryHash(side: SideStateData): string {
@@ -124,7 +215,7 @@ function categoryHash(side: SideStateData): string {
         const stats = resolveUnitStats(side.unitStats, key as UnitType)
         return stats?.CATEGORIES || stats?.UNIT_ABILITY_HIT_IMMUNE
           ? [
-              `${key}:${[...(stats.CATEGORIES ?? [])].sort().join(',')}:${!!stats.UNIT_ABILITY_HIT_IMMUNE}`,
+              `${key}:${(stats.CATEGORIES ?? []).map(categoryKey).sort().join(',')}:${!!stats.UNIT_ABILITY_HIT_IMMUNE}`,
             ]
           : []
       })

@@ -249,9 +249,9 @@ export class SideApi {
     return this._sideData.participatingUnits.includes(unitId)
   }
 
-  /** The ids count as `category` members for the rest of the combat and
-   *  take part in its combat mode wherever they stand (Alastor's ground
-   *  forces fight as ships; committed fighters as ground forces). */
+  /** The ids count as `category` members for the rest of the combat
+   *  (Alastor's ground forces and Z-Grav Eidolon's mechs in space fight as
+   *  ships; committed fighters as ground forces). */
   grantCategory(ids: UnitId | readonly UnitId[], category: UnitCategory): void {
     CombatSideState.grantCategory(
       this._sideData,
@@ -263,13 +263,14 @@ export class SideApi {
     combat?.queuePhaseEndCheck(this._ctx.phaseStack ?? [])
   }
 
+  /** Membership during the current meta (phase-scoped categories included). */
   isUnitCategory(id: UnitId, category: UnitCategory): boolean {
-    return isUnitCategory(this._sideData, id, category)
+    return isUnitCategory(this._sideData, id, category, this.state.meta)
   }
 
   /** Native membership for production/reinforcement choices. */
   isUnitTypeCategory(type: UnitType, category: UnitCategory): boolean {
-    return isNativeCategory(this._sideData, type, category)
+    return isNativeCategory(this._sideData, type, category, this.state.meta)
   }
 
   canAssignHitToUnit(id: UnitId): boolean {

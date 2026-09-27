@@ -8,6 +8,7 @@ import { clsx } from 'clsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { CombatSideState } from '@/combat/combat-side-state/combat-side-state'
+import { getCombatMeta } from '@/combat/combat-state/phase-utils'
 import {
   AbilitiesPanel,
   type AbilityFilterMode,
@@ -207,6 +208,7 @@ export function CombatSimulator({
       CombatSideState.getCategoryOptionTypes(
         stateData[side],
         combatMode === 'GROUND' ? 'GROUND_FORCES' : 'SHIPS',
+        getCombatMeta(combatMode),
       )
     return { attacker: read('attacker'), defender: read('defender') }
     // oxlint-disable-next-line react/exhaustive-deps

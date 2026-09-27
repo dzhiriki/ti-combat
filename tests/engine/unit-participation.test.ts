@@ -6,6 +6,7 @@ import {
   CombatState,
   type Ability,
   type AbilityCallContext,
+  type MetaPhase,
 } from '@/combat'
 import { AbilityContext } from '@/combat/abilities-engine/api/ability-api'
 import { canonicalizeUnitState } from '@/combat/utils/canonicalize-unit-state'
@@ -133,6 +134,50 @@ describe('individual combat participation and categories', () => {
     expect(api.isUnitTypeCategory('MECH', 'SHIPS')).toBe(false)
     expect(branch.isUnitTypeCategory('MECH', 'SHIPS')).toBe(true)
     expect(cs.getHash()).toBe(originalHash)
+  })
+
+  it('lets native ships fight a space combat from any surface', () => {
+    const { api } = makeSpace()
+    const [grounded] = api.system.getUnits('MECH', { includeVariants: true })
+    api.moveUnits(grounded, DEFAULT_PLANET_ID)
+    expect(api.isParticipating(grounded)).toBe(false)
+    api.modifyUnitType('MECH', { CATEGORIES: ['GROUND_FORCES', 'SHIPS'] })
+    expect(api.isParticipating(grounded)).toBe(true)
+    const [placed] = api.placeUnits({ MECH: 1 }, DEFAULT_PLANET_ID).MECH
+    expect(api.isParticipating(placed)).toBe(true)
+  })
+
+  it('applies phase-scoped categories only in their phase', () => {
+    const { cs, api } = makeSpace()
+    const [grounded, spaced] = api.system.getUnits('MECH', {
+      includeVariants: true,
+    })
+    api.moveUnits(grounded, DEFAULT_PLANET_ID)
+    const shipsDuring = (phase: MetaPhase) => ({
+      CATEGORIES: [
+        'GROUND_FORCES' as const,
+        { category: 'SHIPS' as const, phase },
+      ],
+    })
+
+    // No meta has started, so neither scope applies: only the stats hash
+    // tells them apart.
+    api.modifyUnitType('MECH', shipsDuring('GROUND_COMBAT'))
+    const hash = cs.getHash()
+    api.modifyUnitType('MECH', shipsDuring('SPACE_COMBAT'))
+    expect(cs.getHash()).not.toBe(hash)
+    expect(api.isUnitCategory(spaced, 'SHIPS')).toBe(false)
+
+    cs.loadPhaseScript('SPACE_CANNON_OFFENSE', 0)
+    expect(api.isParticipating(spaced)).toBe(false)
+
+    cs.loadPhaseScript('SPACE_COMBAT', 1)
+    expect(api.isUnitCategory(grounded, 'SHIPS')).toBe(true)
+    expect(api.isUnitCategory(grounded, 'GROUND_FORCES')).toBe(true)
+    expect(api.isParticipating(grounded)).toBe(true)
+    expect(api.isParticipating(spaced)).toBe(true)
+    const [placed] = api.placeUnits({ MECH: 1 }, DEFAULT_PLANET_ID).MECH
+    expect(api.isParticipating(placed)).toBe(true)
   })
 
   it('does not move damage from a granted mech onto an ungranted one', () => {

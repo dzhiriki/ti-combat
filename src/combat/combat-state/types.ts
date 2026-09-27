@@ -190,8 +190,8 @@ export interface SideStateData {
   /** UnitId → per-unit mutable state (flat map, sparse — only entries with non-default state) */
   unitState: Record<string, UnitState>
   /** Sparse, copy-on-write category grants: the unit counts as a member of
-   *  that category and takes part in its combat mode wherever it stands
-   *  (Alastor's ships, committed fighters). Retained for destroy reactions. */
+   *  that category (Alastor's and Z-Grav Eidolon's ships, committed
+   *  fighters). Retained for destroy reactions. */
   unitGrants?: Readonly<Record<string, UnitCategory>>
   /** Variant key → shared stats template (may be a factory for subtypes) */
   unitStats: Record<UnitType, UnitStatsEntry>
@@ -356,6 +356,10 @@ export interface CombatStateData {
   surfaces: SurfaceDefinition[]
   /** Space for SPACE mode, or the planet whose invasion is being resolved. */
   activeSurfaceId: SurfaceId
+  /** The scheduler's current meta, set when its script loads; undefined
+   *  during PREPARE. Nested metas (AFB) keep the enclosing combat's. Selects
+   *  the phase-scoped `CATEGORIES` entries that apply. */
+  meta?: MetaPhase
   /** The side that won, or 'draw'. Derived when the ordered phase flow is
    *  exhausted, or pinned earlier by an explicit `transitionTo`. Guaranteed
    *  to be defined whenever `isFinished` is true. */

@@ -30,6 +30,7 @@ import type {
   CombatStateData,
   HitPool,
   HitSource,
+  MetaPhase,
   ResolvedRestrictions,
   ResolvedRestrictionsLayer,
   RestrictionEntry,
@@ -49,6 +50,7 @@ import {
   isNativeCategory,
   isUnitCategory,
   isUnitAbilityTarget,
+  participatesNatively,
   unitMetaHash,
 } from '../utils/unit-combat-properties'
 import { nextUnitIds } from '../utils/unit-id'
@@ -439,6 +441,7 @@ function buildResolvedForSide(
   side: CombatSide,
 ): ResolvedRestrictions {
   const s = state[side]
+  const phase = state.meta
   const raw = s.unitAbilityRestrictions
   if (!raw) return EMPTY_RESOLVED
 
@@ -491,7 +494,7 @@ function buildResolvedForSide(
         if (
           unitType
             ? baseType === unitType
-            : !category || isNativeCategory(s, key, category)
+            : !category || isNativeCategory(s, key, category, phase)
         ) {
           set.add(key)
           set.add(baseType as UnitType)
@@ -506,7 +509,7 @@ function buildResolvedForSide(
       if (
         unitType
           ? baseType === unitType
-          : !category || isUnitCategory(s, id, category)
+          : !category || isUnitCategory(s, id, category, phase)
       ) {
         set.add(id as UnitId)
       }
@@ -996,9 +999,12 @@ export class CombatSideState {
     return { ...base, ...live }
   }
 
+  /** Types that can be `source` during `phase` (option lists pass their
+   *  mode's combat meta). */
   static getCategoryOptionTypes(
     s: SideStateData,
     source: UnitCategory | readonly UnitCategory[],
+    phase?: MetaPhase,
   ): UnitBaseType[] {
     const categories: readonly UnitCategory[] = Array.isArray(source)
       ? source
@@ -1012,7 +1018,7 @@ export class CombatSideState {
     }
     for (const category of categories) {
       for (const type of UNIT_TYPES) {
-        if (isNativeCategory(standIns, type, category)) add(type)
+        if (isNativeCategory(standIns, type, category, phase)) add(type)
       }
       // Granted types follow the native ones; worth sorts keep ties in order.
       for (const [id, grant] of Object.entries(standIns.unitGrants ?? {})) {
@@ -1595,7 +1601,7 @@ export class CombatSideState {
     s: SideStateData,
     state: Pick<
       CombatStateData,
-      '_nextCode' | 'surfaces' | 'combatMode' | 'activeSurfaceId'
+      '_nextCode' | 'surfaces' | 'combatMode' | 'activeSurfaceId' | 'meta'
     >,
     unitsToAdd: Partial<Record<UnitType, number>>,
     destination: SurfaceId,
@@ -1638,11 +1644,13 @@ export class CombatSideState {
 
       const newIds = nextUnitIds(allowed, state)
       if (
-        destination === state.activeSurfaceId &&
-        isNativeCategory(
+        participatesNatively(
           s,
           vKey,
-          state.combatMode === 'SPACE' ? 'SHIPS' : 'GROUND_FORCES',
+          destination,
+          state.combatMode,
+          state.activeSurfaceId,
+          state.meta,
         )
       ) {
         nextPart = (nextPart + newIds.join('')) as UnitIdList
