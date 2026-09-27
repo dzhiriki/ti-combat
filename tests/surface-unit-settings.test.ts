@@ -7,6 +7,7 @@ import {
   makeUnitLocator,
   withRunningAbility,
 } from '@/combat'
+import { runSimulation } from '@/combat/run-simulation'
 import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import {
   labelUnitOptions,
@@ -14,7 +15,6 @@ import {
 } from '@/components/abilities-panel/components/unit-option-presentation'
 import { SHIPS } from '@/constants/units'
 import { CombatSetup } from '@/hooks/combat-setup'
-import type { SimulationInput } from '@/hooks/combat-setup/types'
 import { validateSerializedConfig } from '@/hooks/combat-setup/validation'
 import {
   configToSearchString,
@@ -632,7 +632,7 @@ describe('surface-aware unit settings', () => {
     ).toContain(target('MECH:Galvanized', P1))
   })
 
-  it('preserves qualified selections through the simulation worker boundary', async () => {
+  it('preserves qualified selections through the simulation worker boundary', () => {
     const setup = setupWithAlastor()
     setup.setAbilityParam('attacker', 'PRE_GALVANIZED', {
       galvanizedUnits: [[target('INFANTRY', P2), 1]],
@@ -645,13 +645,6 @@ describe('surface-aware unit settings', () => {
     })
     const input = structuredClone(setup.toSimulationInput()!)
     const priority = input.abilities.attacker.UNIT_PRIORITY.spaceUnitPriority
-    const worker = {
-      onmessage: undefined as
-        | ((event: MessageEvent<SimulationInput>) => void)
-        | undefined,
-      postMessage: vi.fn(),
-    }
-    vi.stubGlobal('self', worker)
     const simulate = vi
       .spyOn(CombatEngine.prototype, 'simulate')
       .mockImplementation(state => {
@@ -666,13 +659,10 @@ describe('surface-aware unit settings', () => {
         return []
       })
     try {
-      await import('@/combat/combat.worker')
-      worker.onmessage!({ data: input } as MessageEvent<SimulationInput>)
+      expect(runSimulation(input)).toEqual([])
       expect(simulate).toHaveBeenCalledOnce()
-      expect(worker.postMessage).toHaveBeenCalledWith([])
     } finally {
       simulate.mockRestore()
-      vi.unstubAllGlobals()
     }
   })
 

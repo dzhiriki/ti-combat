@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
-import type { CombatOutcome } from '@/combat'
-import { CombatSetup, type SimulationInput } from '@/hooks/combat-setup'
+import { runSimulation } from '@/combat/run-simulation'
+import { CombatSetup } from '@/hooks/combat-setup'
 import { buildCombatState } from '@/hooks/combat-setup/build-combat-state'
 import { prepareSimulation } from '@/hooks/combat-setup/prepare-simulation'
 import { validateSerializedConfig } from '@/hooks/combat-setup/validation'
@@ -20,10 +20,6 @@ import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
 import { matchesAbilitySlot } from '@/utils/matches-ability-slot'
 
 describe('explicit game system', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
   it.each(GAME_SYSTEMS)(
     'lists every available ability exactly once in %s',
     system => {
@@ -174,7 +170,7 @@ describe('explicit game system', () => {
     expect(state.data.attacker.abilities.PRE_GALVANIZED).toBeUndefined()
   })
 
-  it('uses TF genomes in the worker when both factions are Neutral', async () => {
+  it('uses TF genomes in the worker when both factions are Neutral', () => {
     const setup = new CombatSetup()
     setup.setSystem('TF')
     setup.setFaction('attacker', 'NEUTRAL')
@@ -189,20 +185,8 @@ describe('explicit game system', () => {
     const input = setup.toSimulationInput()!
     expect(input.system).toBe('TF')
 
-    const worker = {
-      onmessage: undefined as
-        | ((event: MessageEvent<SimulationInput>) => void)
-        | undefined,
-      postMessage: vi.fn<(outcomes: CombatOutcome[]) => void>(),
-    }
-    vi.stubGlobal('self', worker)
-    await import('@/combat/combat.worker')
     // Match the worker boundary: prepare mutates its own cloned params.
-    worker.onmessage!({
-      data: structuredClone(input),
-    } as MessageEvent<SimulationInput>)
-    expect(worker.postMessage).toHaveBeenCalledTimes(1)
-    const outcomes = worker.postMessage.mock.calls[0][0]
+    const outcomes = runSimulation(structuredClone(input))
     const attackerWin = outcomes
       .filter(o => o.winner === 'attacker')
       .reduce((sum, o) => sum + o.probability, 0)

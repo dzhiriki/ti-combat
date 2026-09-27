@@ -495,6 +495,14 @@ a check there too.
   assert `expect(payload).toEqual('SHOW')` and read the diff, or write a
   temporary `_probe.test.ts` (delete it afterwards).
 
+- **Test files share one module cache per thread.** The npm test scripts run
+  `--no-isolate`, so a module's top-level code runs once per thread, and a
+  later file's `await import()` gets the cached module without rerunning it.
+  Never test through import side effects, such as `combat.worker.ts` binding
+  `self.onmessage` to a stubbed `self`; call `runSimulation` directly. Which
+  files share a thread depends on the core count, so such tests pass locally
+  and fail on CI; reproduce with `--maxWorkers=1`.
+
 ## UI config and data modules
 
 - **Unit selector keys are not variant/stat keys.** Scoped `declareParam` lists
