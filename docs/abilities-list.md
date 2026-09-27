@@ -140,7 +140,7 @@
 
 - [x] **Unrelenting** (Faction Ability) — Apply +1 to the result of each of your unit's combat rolls.
 - [x] **Tekklar Legion** (Promissory Note) — At the start of an invasion combat: Apply +1 to the result of each of your unit's combat rolls during this combat. If your opponent is the N'orr player, apply -1 to the result of each of their unit's combat rolls during this combat. Then, return this card to the N'orr player.
-- [x] **Exotrireme II** (Faction Technology) — This unit cannot be destroyed by "Direct Hit" action cards. After a round of space combat, you may destroy this unit to destroy up to 2 ships in this system.
+- [x] **Exotrireme II** (Faction Technology) — This unit cannot be destroyed by "Direct Hit" action cards. After a round of space combat, you may destroy this unit to destroy up to 2 ships in this system. On by default with Uses in the header (0 = no sacrifices). The sacrifice list offers the units carrying this ability, listing the dreadnoughts even before the upgrade is toggled.
 - [x] **Valkyrie Particle Weave** (Faction Technology) — After making combat rolls during a round of ground combat, if your opponent produced 1 or more hits, you produce 1 additional hit.
 - [x] **C'morran N'orr** (Flagship) — Apply +1 to the result of each of your other ship's combat rolls in this system.
 - [x] **Valkyrie Exoskeleton** (Mech) — After this unit uses its Sustain Damage ability during ground combat, it produces 1 hit against your opponent's ground forces on this planet.
@@ -298,7 +298,7 @@ Listed in the UI's unit order (cards alphabetical within each unit type):
 
 - [x] Flagship: Echo of Ascension (relative: −1 combat value, +1 die, +1 move, +2 capacity on the faction's own flagship)
 - [x] War Sun: Prototype War Sun, The Dragon Freed, University War Sun
-- [x] Dreadnought: Dawncrusher, Exotrireme (Spark-immune + opt-in self-destruct to kill up to 2 ships), Super-Dreadnought
+- [x] Dreadnought: Dawncrusher, Exotrireme (Spark-immune + opt-in self-destruct to kill up to 2 ships — the Sardakk N'orr Exotrireme II text on each upgraded dreadnought), Super-Dreadnought
 - [x] Carrier: Advanced Carrier, Ambassador, Vortexer (capacity changes feed the capacity phase; their coexistence/capture clauses are out-of-combat)
 - [x] Cruiser: Ahk Syl Fier, Corsair, Saggitaria
 - [x] Destroyer: Exile, Linkship (destroys an eligible enemy ship on retreat), Strike Wing Alpha (AFB 9/10 also destroys enemy infantry in the space area)
@@ -335,7 +335,7 @@ Stats (combat/AFB/Bombardment/Sustain) are wired for all 8 factions. Unique text
 - [x] Il Na Viroset mech (Starlancer XI) — a ground force that is also a ship during space combat: `CATEGORIES: ['GROUND_FORCES', { category: 'SHIPS', phase: 'SPACE_COMBAT' }]`. Ships fight in space combat from any surface, so unlike Z-Grav Eidolon the mechs on planets fight too, and no other ship is needed; newly placed mechs join the same way. Outside space combat (Space Cannon Offense, ground combat) it is not a ship. Assign Hits Order and Sustain Priority use their standard controls. Anomaly bonus (+1 per anomaly in/adjacent) is a manual count input. Special combat-end rules are deferred.
 - [x] A Sickening Lurch flagship (A Strangled Whisper) — transports any number of infantry and fighters free of capacity; mechs still pay into the printed capacity of 1. Modeled via the `FREE_CARGO` unit stat, which the capacity driver checks against LIVING units — the exemption ends the moment the flagship dies and the cleanup enforces real capacity again
 - [x] Sickening Lurch mech (Bone Picked Clean) — uses counter = captured infantry available; each mech whose missed-dice count reaches the spend threshold (select: 1/2/3 misses) spends 1 infantry to reroll ITS missed dice, worst rolls first when infantry run short. Built on the kernel's per-unit scoped rerolls (`unitType` + `perUnit` on `declareReroll`)
-- [x] El Nen Janovet flagship (The Faces of Janovet) — gains the unit abilities and text abilities of the side's enabled **cruiser, destroyer, and dreadnought** unit-upgrade cards: AFB / Bombardment / Sustain Damage / Spark immunity merge onto the flagship at PREPARE, and the invoke-based texts extend to it (Strike Wing Alpha's 9/10-kills-infantry AFB trigger, Linkship's retreat destroy). Exotrireme's self-destruct stays dreadnought-only ("destroy this unit" sacrifices the dreadnought itself)
+- [x] El Nen Janovet flagship (The Faces of Janovet) — gains the unit abilities and text abilities of the side's enabled **cruiser, destroyer, and dreadnought** unit-upgrade cards: AFB / Bombardment / Sustain Damage / Spark immunity merge onto the flagship at PREPARE, and the invoke-based texts extend to it (Strike Wing Alpha's 9/10-kills-infantry AFB trigger, Linkship's retreat destroy). Text abilities a card's stat block attaches to its unit are copied onto the flagship: with Exotrireme the flagship joins the sacrifice list (after the dreadnoughts by default) and destroys itself when sacrificed
 
 ### Not yet implemented
 

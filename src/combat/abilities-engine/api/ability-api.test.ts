@@ -19,6 +19,7 @@ import type {
   DiceRollContext,
   PhaseStep,
   SideStateData,
+  UnitStatsEntry,
 } from '../../combat-state/types'
 import { isDiceRollContext } from '../../combat-state/types'
 import type { Ability } from '../types'
@@ -199,6 +200,32 @@ describe('SideApi unit ability restriction scopes', () => {
       SPACE_SURFACE_ID,
     )
     expect(api.isUnitAbilityCannotBeUsed('SPACE_CANNON', spacePds)).toBe(false)
+  })
+})
+
+describe('SideApi.getUnitTypesWithAbility', () => {
+  it('lists the variants whose stats carry the ability, fielded or not', () => {
+    const cs = makeCombatState()
+    const exotrireme = makeAbility('EXOTRIREME')
+    const other = makeAbility('OTHER')
+    const unitStats: Record<string, UnitStatsEntry> = {
+      CRUISER: { ABILITIES: [other] },
+      DREADNOUGHT: { ABILITIES: [other, exotrireme] },
+      // Subtype factories resolve against their parent's stats.
+      'DREADNOUGHT:Cavalry': stats => ({ ...stats, COMBAT: [5, 2] }),
+      FLAGSHIP: { ABILITIES: [exotrireme] },
+      WAR_SUN: {},
+    }
+    cs.data.attacker.unitStats = unitStats as SideStateData['unitStats']
+
+    const { api } = withAbility(cs)
+
+    expect(api.getUnitTypesWithAbility('EXOTRIREME')).toEqual([
+      'DREADNOUGHT',
+      'DREADNOUGHT:Cavalry',
+      'FLAGSHIP',
+    ])
+    expect(api.getUnitTypesWithAbility('SUSTAIN_DAMAGE')).toEqual([])
   })
 })
 

@@ -38,6 +38,31 @@ type OptionSpec = Pick<
   'source' | 'filter' | 'scope' | 'limit'
 > & {
   sort?: SyncSourceConfig['sort']
+  /** Key of the ability declaring the param, for `filter.withAbility`. */
+  abilityKey?: string
+}
+
+/** Keep the types whose units carry the ability `abilityKey`. */
+function filterAbilityHolders(
+  s: SideStateData,
+  types: readonly UnitBaseType[],
+  abilityKey: string | undefined,
+): UnitBaseType[] {
+  if (abilityKey === undefined)
+    throw new Error('filter.withAbility needs the declaring ability key')
+  // Reconcile lists the holders as if the ability were switched on;
+  // otherwise the stand-ins carry the declared changes: upgrade cards and
+  // copies.
+  const holders =
+    s.optionMetadata?.abilityHolders?.[abilityKey] ??
+    CombatSideState.getUnitTypesWithAbility(
+      s.optionMetadata?.standIns ?? s,
+      abilityKey,
+    )
+  const baseTypes = new Set(
+    holders.map(type => parseUnitLocator(type).baseType),
+  )
+  return types.filter(type => baseTypes.has(type))
 }
 
 /** The same candidates and caps drive reconciliation and UI controls. */
@@ -50,9 +75,12 @@ export function resolveUnitOptions(
   // Choices are made for the mode's combat, so phase-scoped categories of
   // that combat count.
   const phase = getCombatMeta(mode)
-  const types = spec.filter?.includeNonParticipating
+  const sourceTypes = spec.filter?.includeNonParticipating
     ? CombatSideState.getAllUnitTypes()
     : CombatSideState.getCategoryOptionTypes(s, spec.source, phase)
+  const types = spec.filter?.withAbility
+    ? filterAbilityHolders(s, sourceTypes, spec.abilityKey)
+    : sourceTypes
   const sorted = sortBaseTypes(types, spec.sort ?? 'normal-asc')
   const subtypes = spec.filter?.includeOnlyBaseTypes
     ? []

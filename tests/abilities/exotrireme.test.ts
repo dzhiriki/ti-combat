@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
+import { CombatSetup } from '@/hooks/combat-setup'
+import type { UnitList } from '@/types'
+
 import { combatTest } from '../utils/combat-test'
 
 describe.forEachSide('EXOTRIREME', () => {
@@ -24,6 +28,41 @@ describe.forEachSide('EXOTRIREME', () => {
     expect(t.attacker.units.DREADNOUGHT).toBeUndefined()
     expect(t.defender.units.CRUISER).toHaveLength(1)
     expect(t.abilityLog('EXOTRIREME')).not.toHaveLength(0)
+  })
+
+  it('is on by default: setting its uses is enough', () => {
+    const t = combatTest({
+      mode: 'SPACE',
+      attacker: {
+        faction: 'SARDAKK_NORR',
+        units: { DREADNOUGHT: 1, CRUISER: 1 },
+        upgrades: ['DREADNOUGHT'],
+        abilities: { EXOTRIREME: { uses: 1 } },
+      },
+      defender: {
+        faction: 'ARBOREC',
+        units: { CRUISER: 3 },
+      },
+    })
+
+    t.advanceTo('SPACE_COMBAT')
+    t.advanceRound({ attacker: 0, defender: 0 })
+
+    expect(t.attacker.units.DREADNOUGHT).toBeUndefined()
+    expect(t.defender.units.CRUISER).toHaveLength(1)
+  })
+
+  it('lists dreadnoughts for sacrifice before they are upgraded', () => {
+    const setup = new CombatSetup()
+    setup.setFaction('attacker', 'SARDAKK_NORR')
+
+    const { sacrificePriority } = setup.abilities.attacker.EXOTRIREME as {
+      sacrificePriority: UnitList<boolean>
+    }
+
+    expect(
+      sacrificePriority.map(([key]) => parseUnitLocator(key).unitType),
+    ).toEqual(['DREADNOUGHT'])
   })
 
   it('destroys only 1 ship when only 1 target remains', () => {

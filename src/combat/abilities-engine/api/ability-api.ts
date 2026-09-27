@@ -288,13 +288,14 @@ export class SideApi {
   getUnitVariantsOptions(filter?: ParamFilter): UnitOption[]
   getUnitVariantsOptions(paramKey: string): UnitOption[]
   getUnitVariantsOptions(arg?: ParamFilter | string): UnitOption[] {
+    const abilityKey = this._ctx.ability?.key
     if (typeof arg === 'string') {
       const declared = this._resolveDeclaredParam(arg)
       if (declared?.source)
         return resolveUnitOptions(
           this._sideData,
           { ...this.state, side: this._side },
-          { ...declared, source: declared.source },
+          { ...declared, source: declared.source, abilityKey },
         )
     }
     return resolveUnitOptions(
@@ -304,6 +305,7 @@ export class SideApi {
         source: this.state.combatMode === 'GROUND' ? 'GROUND_FORCES' : 'SHIPS',
         scope: 'type',
         filter: typeof arg === 'string' ? undefined : arg,
+        abilityKey,
       },
     )
   }
@@ -345,6 +347,14 @@ export class SideApi {
         ? parseUnitLocator(unitTypeOrId).unitType
         : unitTypeOrId,
     )
+  }
+
+  /** Variant keys whose current stats carry the ability `abilityKey`, e.g.
+   *  `ctx.api.own.getUnitTypesWithAbility(ctx.this.key)`. Setup applies no
+   *  PREPARE or declared changes to these stats; build setup lists with
+   *  `filter.withAbility`, which reads the stand-ins. */
+  getUnitTypesWithAbility(abilityKey: string): UnitType[] {
+    return CombatSideState.getUnitTypesWithAbility(this._sideData, abilityKey)
   }
 
   getUnitVariantKey(unitId: UnitId) {

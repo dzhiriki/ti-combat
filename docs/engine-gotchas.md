@@ -46,6 +46,15 @@ a check there too.
   object it came from — dedupe by `key` instead. Invoke objects are shared by
   the copy, so invoke-identity dedup is unaffected.
 
+- **A unit-attached ability's `sort` and params come from the registered
+  ability with its key.** `applyUnitSourceSort` looks the hook up with
+  `abilityForKey`, never on the object in `ABILITIES`. Params are filled
+  only for registered abilities and those units carry when the engine is
+  built, so an ability attached later (at PREPARE) under a key nothing
+  registered never fires. A card that attaches its text to units (TF
+  Exotrireme) must therefore share the text's key and carry its `sort`.
+  Nekro's unit-copy wrapper carries none, so its copies fire in pool order.
+
 - **TF clones never share a key with their TI4 source.** Every `cloneAbility`
   call passes its own `TF_<NAME>` key, so a TF session addresses Altruistic
   Genome as `TF_ALTRUISTIC_GENOME`, not `TELLURIAN`. Anything
@@ -280,6 +289,19 @@ a check there too.
   changes `CATEGORIES` or `ALLOWED_SURFACES` (TF Hel-Titan) must expose the
   same effect as `declareChanges` (`declareChanges: statsInvoke.call`) or
   setup options and placement miss it.
+
+- **`filter.withAbility` lists read the stand-ins' stats.** Setup runs no
+  PREPARE, so a unit that gains an ability there is not offered unless a
+  `declareChanges` attaches the ability too: TF Exotrireme declares its stat
+  block, and The Faces of Janovet declares its copy. A switched-off ability's
+  changes don't run there, so reconcile reruns the changes once per such
+  ability with it switched on (and the rest of its exclusive group off) and
+  stores the holders in `optionMetadata.abilityHolders`; otherwise its list
+  would empty out and lose its order. The unit type whose `FACTION_<UNIT>`
+  slot holds the ability counts too, as if upgraded (Exotrireme II lists
+  dreadnoughts before the upgrade is toggled). `resolveUnitOptions` needs the
+  declaring ability's key (`abilityKey`), which reconcile and
+  `getUnitVariantsOptions` pass; without it the filter throws.
 
 - **Setup runs changes against stand-ins, not placed units.** One unit of
   every type stands on every surface, so a change must not count units or
@@ -529,6 +551,8 @@ a check there too.
   the native stat blocks exposed by `createStatsInvoke` through the runtime
   `UNIT_UPGRADE_<TYPE>` lookups — one slot per unit type (`isStatsInvoke`
   narrows the tagged entries). Reading
-  `getUnitStats` instead would also copy unrelated PREPARE modifiers. Keep
+  `getUnitStats` instead would also copy unrelated PREPARE modifiers. The
+  copy includes the block's `ABILITIES` (Exotrireme's text) and runs as
+  `declareChanges`, so setup lists see the flagship carrying them. Keep
   shared text helpers independent of faction/deck modules to avoid import
   cycles (see `faces-of-janovet.ts` and `janovet-inherits.ts`).

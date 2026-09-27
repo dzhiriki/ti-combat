@@ -32,6 +32,17 @@ export interface DeclaredChangesSide {
   abilities: readonly RegisteredAbility[]
 }
 
+/** Whether the panel shows `ability` as switched on in `config`. */
+export function isSwitchedOn(
+  ability: RegisteredAbility,
+  config: SideAbilitiesConfig,
+): boolean {
+  const params = { ...extractDefaults(ability), ...config[ability.key] }
+  return Boolean(
+    params.isEnabled && (!ability.headerUI || params[ability.headerUI]),
+  )
+}
+
 /** The model setup reads: one stand-in unit of every type on every surface,
  *  after every active ability's `declareChanges`, kept where its type may
  *  stand — or, given `simplifiedPlanetId`, only where the simplified editor
@@ -78,14 +89,10 @@ export function applyDeclaredChanges(
   }
   // Setup applies what the panel shows as switched on.
   const active = (side: CombatSide) =>
-    sides[side].abilities.filter(ability => {
-      if (!ability.declareChanges) return false
-      const params = {
-        ...extractDefaults(ability),
-        ...sides[side].config[ability.key],
-      }
-      return params.isEnabled && (!ability.headerUI || params[ability.headerUI])
-    })
+    sides[side].abilities.filter(
+      ability =>
+        ability.declareChanges && isSwitchedOn(ability, sides[side].config),
+    )
   const changing = {
     attacker: active('attacker'),
     defender: active('defender'),

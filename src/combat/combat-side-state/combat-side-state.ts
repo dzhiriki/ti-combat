@@ -983,6 +983,21 @@ export class CombatSideState {
     return resolveUnitStats(s.unitStats, key)
   }
 
+  /** Variant keys whose stats carry the ability `abilityKey` in `ABILITIES`,
+   *  whether or not any unit of that variant is on the field. */
+  static getUnitTypesWithAbility(
+    s: SideStateData,
+    abilityKey: string,
+  ): UnitType[] {
+    const result: UnitType[] = []
+    for (const key in s.unitStats) {
+      const stats = resolveUnitStats(s.unitStats, key as UnitType)
+      if (stats?.ABILITIES?.some(ability => ability.key === abilityKey))
+        result.push(key as UnitType)
+    }
+    return result
+  }
+
   // ==========================================================================
   // LIVE PARAMS
   // ==========================================================================

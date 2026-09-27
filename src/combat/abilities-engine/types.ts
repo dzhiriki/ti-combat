@@ -44,6 +44,11 @@ export interface ParamFilter {
    *  `declareParam`) resolves to 0 are dropped. No-op when `limit` is unset
    *  or when the filter is used standalone (no associated paramKey). */
   includeOnlyAvailable?: boolean
+  /** When true, only unit types whose stats carry the ability declaring the
+   *  param (matched by key, so re-keyed copies keep working). Reads the
+   *  setup stand-ins, so an ability attached at PREPARE must also be
+   *  attached by a `declareChanges` to be offered (TF Exotrireme, Janovet). */
+  withAbility?: boolean
 }
 
 export type UnitSelectorScope = 'participating' | 'system' | 'type'
@@ -109,6 +114,10 @@ export interface SideOptionMetadata {
    *  of its type on its surface. */
   standIns: SideStateData
   subtypes: DeclaredSubtype[]
+  /** Unit types carrying each ability with a `filter.withAbility` list, as
+   *  if that ability were switched on: its list keeps its options and order
+   *  while the ability is off. */
+  abilityHolders?: Readonly<Record<string, readonly UnitType[]>>
 }
 
 // Sided context (external API - attacker/defender perspective)

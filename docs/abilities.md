@@ -459,6 +459,7 @@ isUnitTypeCategory(unitType: UnitType, category: UnitCategory): boolean  // Nati
 getUnitVariantsOptions(filter?: ParamFilter): { label: string, value: string }[]
 getUnitVariantsOptions(paramKey: string): { label: string, value: string }[]   // reads filter/limit from the declareParam
 getUnitStats(unitTypeOrId: string | UnitId): UnitStats
+getUnitTypesWithAbility(abilityKey: string): UnitType[]  // Variant keys whose stats carry the ability, fielded or not
 getUnitVariantKey(unitId: UnitId): string | undefined
 getUnitState(unitId: UnitId): UnitState
 getUnitBaseType(unitId: UnitId): UnitBaseType
@@ -689,7 +690,21 @@ PREPARE work, call its stats invoke inside that same handler and retain
 
 Stats invokes expose their `unitType` and `stats`, narrowed by `isStatsInvoke`
 from `@/utils/is-stats-invoke`. Janovet uses these to inherit printed upgrade
-abilities without depending on factory metadata or runtime unit modifications.
+abilities without depending on factory metadata or runtime unit modifications,
+copying the block's `ABILITIES` onto the flagship along with its unit
+abilities.
+
+A card whose text belongs to the upgraded unit ("destroy this unit") puts that
+text in its stat block's `ABILITIES` under the card's own key, so it fires per
+unit and reads the card's config. TF Exotrireme is the Sardakk N'orr
+Exotrireme II re-keyed this way. The registered card spreads the text to carry
+its params, controls, and `sort` (the engine reads `sort` from the registered
+ability), keeps only the stats invoke, drops the text's ability-level
+`context` so the stat block applies in both modes, and declares
+`declareChanges: statsInvoke.call` so setup lists see which units carry the
+text. The Sardakk ability is on by default with `uses` in its header; the card
+restores an `isEnabled` header, off by default, since switching it on means
+holding the upgrade.
 
 ### Lazy faction data
 
@@ -919,6 +934,18 @@ multiple surfaces.
 Otherwise, they stay flat without headings. `IN_COMBAT` limits count the units
 the control offers on that surface, including commitments projected onto the
 active planet; the build-time clamp uses the same caps.
+
+`filter: { withAbility: true }` offers only the unit types whose stats carry
+the ability declaring the param, matched by key so re-keyed copies keep
+working. Exotrireme's sacrifice list uses it, so every dreadnought carrying
+the text and The Faces of Janovet (which copies it) can be picked. Setup never
+runs PREPARE, so the filter reads the stand-ins: an ability attached to units
+at PREPARE must also be attached by a `declareChanges` to be offered. Reconcile
+lists the holders as if the ability were switched on and its unit upgraded (an
+ability in a unit's `FACTION_<UNIT>` slot counts that unit), so the control
+keeps its options and order meanwhile.
+`SideApi.getUnitTypesWithAbility(key)` answers the same question at runtime
+from the current stats.
 
 `UnitLocator` accepts legacy `UnitType` values as well as qualified keys from
 `makeUnitLocator(type, surfaceId)`. Unit queries, priority helpers, and

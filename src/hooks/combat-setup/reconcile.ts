@@ -1,5 +1,6 @@
 import {
   type AbilityLookupContext,
+  CombatSideState,
   createLookups,
   getOpponentSide,
   type OwnOpponentContext,
@@ -28,14 +29,17 @@ import type {
   SideStateData,
 } from '@/combat/combat-state/types'
 import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
+import { UNIT_TYPES } from '@/constants/units'
 import {
   type CombatSide,
   createDefaultSurfaces,
   SPACE_SURFACE_ID,
   type SurfaceId,
+  type UnitType,
 } from '@/types'
+import { factionSlot } from '@/utils/faction-slot'
 
-import { applyDeclaredChanges } from './apply-declared-changes'
+import { applyDeclaredChanges, isSwitchedOn } from './apply-declared-changes'
 import {
   reconcileStringParam,
   reconcileUnitListParam,
@@ -88,20 +92,35 @@ export function reconcileAbilitiesConfig(
   ensureConsumerDefaults(config, abilities)
 
   // Changes read no synced params, so they apply once, before syncing.
-  const input = (side: CombatSide) => ({
-    faction: state[side].faction,
-    unitStats: state[side].unitStats,
-    config: config[side],
-    abilities: abilities[side],
-  })
-  const standIns = applyDeclaredChanges(
-    { attacker: input('attacker'), defender: input('defender') },
-    state.surfaces ?? createDefaultSurfaces(),
-    combatMode,
-    state.activeSurfaceId ?? SPACE_SURFACE_ID,
-    state.simplifiedPlanetId,
+  const applyChanges = (changed: AbilitiesConfig) => {
+    const input = (side: CombatSide) => ({
+      faction: state[side].faction,
+      unitStats: state[side].unitStats,
+      config: changed[side],
+      abilities: abilities[side],
+    })
+    return applyDeclaredChanges(
+      { attacker: input('attacker'), defender: input('defender') },
+      state.surfaces ?? createDefaultSurfaces(),
+      combatMode,
+      state.activeSurfaceId ?? SPACE_SURFACE_ID,
+      state.simplifiedPlanetId,
+    )
+  }
+  const standIns = applyChanges(config)
+  const holders = collectAbilityHolders(
+    config,
+    abilities,
+    standIns,
+    applyChanges,
   )
-  let metadata = collectOptionMetadata(config, abilities, lookups, standIns)
+  let metadata = collectOptionMetadata(
+    config,
+    abilities,
+    lookups,
+    standIns,
+    holders,
+  )
   reconcileSyncAll(
     config,
     abilities,
@@ -111,7 +130,13 @@ export function reconcileAbilitiesConfig(
     scopedDefaults,
   )
 
-  const refreshed = collectOptionMetadata(config, abilities, lookups, standIns)
+  const refreshed = collectOptionMetadata(
+    config,
+    abilities,
+    lookups,
+    standIns,
+    holders,
+  )
   // JSON skips the subtypes' stats factories, which never differ here.
   if (
     JSON.stringify(subtypes(metadata)) !== JSON.stringify(subtypes(refreshed))
@@ -139,20 +164,87 @@ function collectOptionMetadata(
   abilities: Record<CombatSide, RegisteredAbility[]>,
   lookups: SideLookups,
   standIns: Record<CombatSide, SideStateData>,
+  holders: Record<CombatSide, Record<string, UnitType[]>>,
 ): OptionMetadata {
-  return Object.fromEntries(
-    (['attacker', 'defender'] as const).map(side => [
-      side,
-      {
-        standIns: standIns[side],
-        subtypes: collectDeclaredSubtypes(
-          abilities[side],
-          config[side],
-          lookups[side],
-        ),
-      },
-    ]),
-  ) as OptionMetadata
+  const sideMetadata = (side: CombatSide): SideOptionMetadata => ({
+    standIns: standIns[side],
+    subtypes: collectDeclaredSubtypes(
+      abilities[side],
+      config[side],
+      lookups[side],
+    ),
+    abilityHolders: holders[side],
+  })
+  return {
+    attacker: sideMetadata('attacker'),
+    defender: sideMetadata('defender'),
+  }
+}
+
+/** Unit types carrying each ability with a `filter.withAbility` list, as if
+ *  the ability were switched on and its unit upgraded, so a list doesn't
+ *  empty out (and reconcile doesn't drop its order) meanwhile. */
+function collectAbilityHolders(
+  config: AbilitiesConfig,
+  abilities: Record<CombatSide, RegisteredAbility[]>,
+  standIns: Record<CombatSide, SideStateData>,
+  applyChanges: (config: AbilitiesConfig) => Record<CombatSide, SideStateData>,
+): Record<CombatSide, Record<string, UnitType[]>> {
+  const holders: Record<CombatSide, Record<string, UnitType[]>> = {
+    attacker: {},
+    defender: {},
+  }
+  for (const side of ['attacker', 'defender'] as const) {
+    for (const ability of abilities[side]) {
+      const listsHolders = extractSyncSources(ability)?.some(
+        source => source.filter?.withAbility,
+      )
+      if (!listsHolders) continue
+      const model = isSwitchedOn(ability, config[side])
+        ? standIns
+        : applyChanges({
+            ...config,
+            [side]: switchOn(ability, abilities[side], config[side]),
+          })
+      const carriers = CombatSideState.getUnitTypesWithAbility(
+        model[side],
+        ability.key,
+      )
+      // An ability in a unit's slot belongs to that unit: Exotrireme II
+      // counts even before the dreadnought is upgraded.
+      const owner = UNIT_TYPES.find(type => factionSlot(type) === ability.slot)
+      holders[side][ability.key] =
+        owner === undefined || carriers.includes(owner)
+          ? carriers
+          : [...carriers, owner]
+    }
+  }
+  return holders
+}
+
+/** `config` as the panel leaves it once `ability` is switched on: the rest
+ *  of its exclusive group switches off. */
+function switchOn(
+  ability: RegisteredAbility,
+  abilities: readonly RegisteredAbility[],
+  config: SideAbilitiesConfig,
+): SideAbilitiesConfig {
+  const next = { ...config }
+  for (const other of abilities) {
+    if (
+      other.key !== ability.key &&
+      ability.exclusiveGroup !== undefined &&
+      other.exclusiveGroup === ability.exclusiveGroup &&
+      next[other.key]
+    )
+      next[other.key] = { ...next[other.key], isEnabled: false }
+  }
+  next[ability.key] = {
+    ...next[ability.key],
+    isEnabled: true,
+    [ability.headerUI ?? 'isEnabled']: true,
+  }
+  return next
 }
 
 function subtypes(metadata: OptionMetadata): DeclaredSubtype[][] {
@@ -367,6 +459,7 @@ function reconcileSyncSources(
         {
           ...source,
           scope: surfaceScoped ? source.scope : 'type',
+          abilityKey: ability.key,
         },
       )
       const validList = options.map(option => option.value)
@@ -456,6 +549,7 @@ export function clampLimitParams(
                 {
                   ...source,
                   filter: { ...source.filter, includeOnlyAvailable: false },
+                  abilityKey: ability.key,
                 },
               )
             : []
