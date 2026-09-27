@@ -63,6 +63,7 @@ describe('TF_UPGRADE_EXOTRIREME + TF_FACES_OF_JANOVET', () => {
     t.advanceTo('SPACE_COMBAT')
     t.advanceRound({ attacker: 0, defender: 0 })
 
+    expect(t.abilityLog('TF_UPGRADE_EXOTRIREME')).not.toHaveLength(0)
     expect(t.attacker.units.FLAGSHIP).toBeUndefined()
     expect(t.defender.units.CRUISER).toHaveLength(1)
   })
@@ -146,6 +147,7 @@ describe('TF_UPGRADE_EXOTRIREME + TF_FACES_OF_JANOVET', () => {
     t.advanceTo('SPACE_COMBAT')
     t.advanceRound({ attacker: 0, defender: 0 })
 
+    expect(t.abilityLog('TF_UPGRADE_EXOTRIREME')).toHaveLength(0)
     expect(t.attacker.units.FLAGSHIP).toHaveLength(1)
     expect(t.defender.units.CRUISER).toHaveLength(3)
   })

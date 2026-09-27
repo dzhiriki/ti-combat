@@ -552,7 +552,7 @@ a check there too.
   `UNIT_UPGRADE_<TYPE>` lookups — one slot per unit type (`isStatsInvoke`
   narrows the tagged entries). Reading
   `getUnitStats` instead would also copy unrelated PREPARE modifiers. The
-  copy includes the block's `ABILITIES` (Exotrireme's text) and runs as
-  `declareChanges`, so setup lists see the flagship carrying them. Keep
-  shared text helpers independent of faction/deck modules to avoid import
-  cycles (see `faces-of-janovet.ts` and `janovet-inherits.ts`).
+  copy includes the block's `ABILITIES` (the Exotrireme, Strike Wing Alpha
+  and Linkship texts) and runs as `declareChanges`, so setup lists see the
+  flagship carrying them. Cards never check for Janovet: a text that belongs
+  to the upgraded unit rides in the stat block (see `faces-of-janovet.ts`).

@@ -11,14 +11,12 @@ const INHERITABLE_TYPES: readonly UnitBaseType[] = [
 
 // El Nen Janovet flagship. "This unit gains the unit abilities and text
 // abilities of your destroyer, cruiser, and dreadnought unit upgrade
-// technologies." Merges the enabled cards' unit abilities (AFB, Bombardment,
-// Sustain Damage) and Spark immunity onto the flagship's stats, and copies
-// the text abilities their stat blocks attach to the upgraded unit
-// (Exotrireme's self-destruct, which then sacrifices the flagship itself).
-// Declared as a change so setup sees the copies: the Exotrireme sacrifice
-// list offers every unit carrying its text. The invoke-based texts of
-// Strike Wing Alpha and Linkship still extend to the flagship inside their
-// own cards (see strike-wing-alpha.ts / linkship.ts).
+// technologies." At PREPARE, merges the enabled cards' unit abilities (AFB,
+// Bombardment, Sustain Damage) and Spark immunity onto the flagship's stats,
+// and adds the text abilities their stat blocks attach to the upgraded unit
+// (Exotrireme, Strike Wing Alpha, Linkship), which then fire from the
+// flagship itself. Declared as a change so setup sees the copies too: the
+// Exotrireme sacrifice list offers every unit carrying its text.
 export const facesOfJanovet: Ability = {
   key: 'TF_FACES_OF_JANOVET',
   name: 'The Faces of Janovet',

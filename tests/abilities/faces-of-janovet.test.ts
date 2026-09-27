@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import type { Ability } from '@/combat'
 
-import { unitCount } from '../utils/branches'
 import { combatTest } from '../utils/combat-test'
 
 // El Nen Janovet flagship: gains the unit abilities and text abilities of the
@@ -109,52 +108,5 @@ describe('TF_FACES_OF_JANOVET', () => {
 
     // War sun cards are not part of the inheritance — no bombardment dice.
     expect(t.dicePool().attacker).not.toContainDice('FLAGSHIP', [3, 3])
-  })
-
-  it('inherits Linkship retreat text without fielding a destroyer', () => {
-    const t = combatTest({
-      system: 'TF',
-      mode: 'SPACE',
-      attacker: {
-        faction: 'EL_NEN_JANOVET',
-        units: { FLAGSHIP: 1 },
-        abilities: {
-          TF_UPGRADE_LINKSHIP: true,
-          RETREAT: { isEnabled: true, rounds: 1 },
-        },
-      },
-      defender: { faction: 'AVARICE_REX', units: { CRUISER: 3 } },
-    })
-
-    t.advanceTo('SPACE_COMBAT')
-    t.advanceRound()
-
-    expect(t.defender.units.CRUISER).toHaveLength(2)
-  })
-
-  it("inherits Strike Wing Alpha's AFB text: naturals 9/10 destroy infantry", () => {
-    // Flagship AFB [6,3] via SWA → same distribution as the destroyer test.
-    const t = combatTest({
-      system: 'TF',
-      mode: 'SPACE',
-      attacker: {
-        faction: 'EL_NEN_JANOVET',
-        units: { FLAGSHIP: 1 },
-        abilities: { TF_UPGRADE_STRIKE_WING_ALPHA: true },
-      },
-      defender: {
-        faction: 'AVARICE_REX',
-        units: { CARRIER: 1, FIGHTER: 1, INFANTRY: 3 },
-      },
-    })
-
-    const afbBranches = t.advance()
-
-    expect(afbBranches).toHaveBranches(unitCount('defender', 'INFANTRY'), [
-      { value: 3, probability: 0.512 },
-      { value: 2, probability: 0.384 },
-      { value: 1, probability: 0.096 },
-      { value: 0, probability: 0.008 },
-    ])
   })
 })

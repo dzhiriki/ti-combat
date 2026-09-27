@@ -696,13 +696,16 @@ abilities.
 
 A card whose text belongs to the upgraded unit ("destroy this unit") puts that
 text in its stat block's `ABILITIES` under the card's own key, so it fires per
-unit and reads the card's config. TF Exotrireme is the Sardakk N'orr
-Exotrireme II re-keyed this way. The registered card spreads the text to carry
+unit and reads the card's config; Janovet copies it like any other block
+ability, so cards never check for the flagship. TF Exotrireme and Strike Wing
+Alpha are the Sardakk N'orr Exotrireme II and Argent Flight Strike Wing Alpha
+II re-keyed this way; Linkship has its own text, gated on the retreating unit
+(`unitId === ctx.getUnit()`). The registered card spreads the text to carry
 its params, controls, and `sort` (the engine reads `sort` from the registered
-ability), keeps only the stats invoke, drops the text's ability-level
-`context` so the stat block applies in both modes, and declares
-`declareChanges: statsInvoke.call` so setup lists see which units carry the
-text. The Sardakk ability is on by default with `uses` in its header; the card
+ability), keeps only the stats invoke, and drops the text's ability-level
+`context` so the stat block applies in both modes. Exotrireme also declares
+`declareChanges: statsInvoke.call` so its sacrifice list sees which units
+carry the text. The Sardakk ability is on by default with `uses` in its header; the card
 restores an `isEnabled` header, off by default, since switching it on means
 holding the upgrade.
 
