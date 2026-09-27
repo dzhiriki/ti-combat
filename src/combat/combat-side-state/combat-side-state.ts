@@ -1003,14 +1003,21 @@ export class CombatSideState {
     const categories: readonly UnitCategory[] = Array.isArray(source)
       ? source
       : [source]
+    // Stand-ins carry the declared changes: their stats and grants.
+    const standIns = s.optionMetadata?.standIns ?? s
+    const alive = standIns.participatingUnits + standIns.nonParticipatingUnits
     const result: UnitBaseType[] = []
+    const add = (type: UnitBaseType) => {
+      if (!result.includes(type)) result.push(type)
+    }
     for (const category of categories) {
-      const configured = s.optionMetadata?.categories[category]
-      const types =
-        configured ??
-        UNIT_TYPES.filter(type => isNativeCategory(s, type, category))
-      for (const type of types) {
-        if (!result.includes(type)) result.push(type)
+      for (const type of UNIT_TYPES) {
+        if (isNativeCategory(standIns, type, category)) add(type)
+      }
+      // Granted types follow the native ones; worth sorts keep ties in order.
+      for (const [id, grant] of Object.entries(standIns.unitGrants ?? {})) {
+        if (grant === category && alive.includes(id))
+          add(parseUnitLocator(standIns.unitType[id]).baseType)
       }
     }
     return result

@@ -68,6 +68,25 @@ describe('TECHNOLOGICAL_SINGULARITY + FLOATING_FACTORY', () => {
     ).toBe(1)
   })
 
+  it('keeps Space Docks on planets when Singularity targets the copy', () => {
+    const setup = new CombatSetup('FULL')
+    setup.setFaction('attacker', 'NEKRO_VIRUS')
+    setup.setSurfaceUnitCount('attacker', DEFAULT_PLANET_ID, 'SPACE_DOCK', 1)
+    setup.setAbilityParam('attacker', 'TECHNOLOGICAL_SINGULARITY', {
+      ...setup.abilities.attacker.TECHNOLOGICAL_SINGULARITY,
+      isEnabled: true,
+      enableAbilityKey: FLOATING_FACTORY,
+    })
+
+    // The copy is gained mid-combat, after the dock was placed.
+    expect(setup.getUnitConfig('attacker').SPACE_DOCK.allowedSurfaces).toEqual([
+      'PLANET',
+    ])
+    expect(
+      setup.surfaceSelections.attacker[DEFAULT_PLANET_ID].SPACE_DOCK.count,
+    ).toBe(1)
+  })
+
   it('uses the copied factory stats and capacity in space', () => {
     const state = buildCombatState({
       system: 'TI4',

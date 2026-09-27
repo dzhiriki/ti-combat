@@ -20,7 +20,6 @@ export {
   hasStaticInvokes,
   isDeclaredParam,
   type OwnOpponentContext,
-  type ParamChange,
   type ParamFilter,
   type RegisteredAbility,
   resolveInvokes,

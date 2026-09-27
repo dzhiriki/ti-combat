@@ -1,10 +1,12 @@
 import { createLookups } from '@/combat'
 import type { SimulationSetup } from '@/combat/combat-state/combat-state'
 import { makeVariantId } from '@/combat/utils/unit-variant'
-import type { CollectedAbility } from '@/types'
+import type { CollectedAbility, CombatSide, UnitStats } from '@/types'
 import { getGameData } from '@/utils/get-game-data'
+import { buildUnitStatsMap } from '@/utils/get-simulation-units'
 
 import type { Ability } from '../../combat/abilities-engine/types'
+import { applyDeclaredChanges } from './apply-declared-changes'
 import { buildSideState } from './build-side-state'
 import {
   clampLimitParams,
@@ -68,6 +70,23 @@ export function prepareSimulation(
   // snapshot/restore must not capture these defaults and overwrite reconciled
   // sync values. Mirrors the UI store's setup (combat-setup.ts).
   initializeAbilityDefaults(config, registered)
+  // Units are placed on the surfaces the declared changes allow.
+  const declaredSide = (side: CombatSide) => ({
+    faction: factions[side],
+    unitStats: buildUnitStatsMap(
+      system,
+      factions[side],
+      new Set(placements[side].upgradedTypes),
+    ),
+    config: config[side],
+    abilities: registered[side],
+  })
+  const declared = applyDeclaredChanges(
+    { attacker: declaredSide('attacker'), defender: declaredSide('defender') },
+    surfaces,
+    combatMode,
+    input.activeSurfaceId,
+  )
   const gen: { _nextCode?: number } = {}
   const state = {
     attacker: buildSideState(
@@ -76,7 +95,7 @@ export function prepareSimulation(
       placements.attacker,
       surfaces,
       config.attacker,
-      registered.attacker,
+      declared.attacker.unitStats as Record<string, UnitStats>,
       gen,
     ),
     defender: buildSideState(
@@ -85,7 +104,7 @@ export function prepareSimulation(
       placements.defender,
       surfaces,
       config.defender,
-      registered.defender,
+      declared.defender.unitStats as Record<string, UnitStats>,
       gen,
     ),
     surfaces: [...surfaces],

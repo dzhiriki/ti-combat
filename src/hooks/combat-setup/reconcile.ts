@@ -16,34 +16,38 @@ import type {
   Ability,
   AbilityBaseParams,
   DeclaredSubtype,
-  ParamChange,
   RegisteredAbility,
   SideOptionMetadata,
   SyncSourceConfig,
-  UnitCategoryOptions,
 } from '@/combat/abilities-engine/types'
 import { resolveUnitOptions } from '@/combat/abilities-engine/unit-options'
 import type {
   CombatMode,
   CombatStateData,
   SideAbilitiesConfig,
+  SideStateData,
 } from '@/combat/combat-state/types'
 import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
-import { isNativeCategory } from '@/combat/utils/unit-combat-properties'
 import {
-  UNIT_CATEGORIES,
-  UNIT_TYPES,
-  type UnitCategory,
-} from '@/constants/units'
-import type { CombatSide, UnitBaseType } from '@/types'
+  type CombatSide,
+  createDefaultSurfaces,
+  SPACE_SURFACE_ID,
+  type SurfaceId,
+} from '@/types'
 
+import { applyDeclaredChanges } from './apply-declared-changes'
 import {
   reconcileStringParam,
   reconcileUnitListParam,
 } from './reconcile-helpers'
 
 type OptionState = Pick<CombatStateData, 'attacker' | 'defender'> &
-  Partial<Pick<CombatStateData, 'surfaces' | 'activeSurfaceId' | 'combatMode'>>
+  Partial<
+    Pick<CombatStateData, 'surfaces' | 'activeSurfaceId' | 'combatMode'>
+  > & {
+    /** Set by the simplified editor: options cover only what it can put. */
+    simplifiedPlanetId?: SurfaceId
+  }
 
 type AbilitiesConfig = Record<CombatSide, SideAbilitiesConfig>
 
@@ -83,7 +87,21 @@ export function reconcileAbilitiesConfig(
 ): OptionMetadata {
   ensureConsumerDefaults(config, abilities)
 
-  let metadata = collectOptionMetadata(config, abilities, lookups, state)
+  // Changes read no synced params, so they apply once, before syncing.
+  const input = (side: CombatSide) => ({
+    faction: state[side].faction,
+    unitStats: state[side].unitStats,
+    config: config[side],
+    abilities: abilities[side],
+  })
+  const standIns = applyDeclaredChanges(
+    { attacker: input('attacker'), defender: input('defender') },
+    state.surfaces ?? createDefaultSurfaces(),
+    combatMode,
+    state.activeSurfaceId ?? SPACE_SURFACE_ID,
+    state.simplifiedPlanetId,
+  )
+  let metadata = collectOptionMetadata(config, abilities, lookups, standIns)
   reconcileSyncAll(
     config,
     abilities,
@@ -93,9 +111,11 @@ export function reconcileAbilitiesConfig(
     scopedDefaults,
   )
 
-  const refreshed = collectOptionMetadata(config, abilities, lookups, state)
+  const refreshed = collectOptionMetadata(config, abilities, lookups, standIns)
   // JSON skips the subtypes' stats factories, which never differ here.
-  if (JSON.stringify(metadata) !== JSON.stringify(refreshed)) {
+  if (
+    JSON.stringify(subtypes(metadata)) !== JSON.stringify(subtypes(refreshed))
+  ) {
     metadata = refreshed
     reconcileSyncAll(
       config,
@@ -118,51 +138,25 @@ function collectOptionMetadata(
   config: AbilitiesConfig,
   abilities: Record<CombatSide, RegisteredAbility[]>,
   lookups: SideLookups,
-  state: OptionState,
+  standIns: Record<CombatSide, SideStateData>,
 ): OptionMetadata {
   return Object.fromEntries(
-    (['attacker', 'defender'] as const).map(side => {
-      const categories = Object.fromEntries(
-        (Object.keys(UNIT_CATEGORIES) as UnitCategory[]).map(category => [
-          category,
-          UNIT_TYPES.filter(type =>
-            isNativeCategory(state[side], type, category),
-          ),
-        ]),
-      ) as UnitCategoryOptions
-      const changes = collectParamChanges(
-        abilities[side],
-        config[side],
-        lookups[side],
-      )
-
-      for (let pass = 0; pass < 2; pass++) {
-        for (const change of changes) {
-          const additions =
-            change.value in UNIT_CATEGORIES
-              ? categories[change.value as UnitCategory]
-              : [change.value as UnitBaseType]
-          for (const type of additions) {
-            if (!categories[change.key].includes(type))
-              categories[change.key].push(type)
-          }
-        }
-      }
-
-      return [
-        side,
-        {
-          categories,
-          changes,
-          subtypes: collectDeclaredSubtypes(
-            abilities[side],
-            config[side],
-            lookups[side],
-          ),
-        },
-      ]
-    }),
+    (['attacker', 'defender'] as const).map(side => [
+      side,
+      {
+        standIns: standIns[side],
+        subtypes: collectDeclaredSubtypes(
+          abilities[side],
+          config[side],
+          lookups[side],
+        ),
+      },
+    ]),
   ) as OptionMetadata
+}
+
+function subtypes(metadata: OptionMetadata): DeclaredSubtype[][] {
+  return [metadata.attacker.subtypes, metadata.defender.subtypes]
 }
 
 function ensureConsumerDefaults(
@@ -256,29 +250,6 @@ function reconcileAbilityOrder(
       orderConfig[group.paramKey] = [...added, ...kept]
     }
   }
-}
-
-function collectParamChanges(
-  abilities: readonly RegisteredAbility[],
-  params: SideAbilitiesConfig,
-  lookups: OwnOpponentContext<RuntimeAbilityList>,
-): ParamChange[] {
-  const result: ParamChange[] = []
-  for (const ability of abilities) {
-    if (!ability.declareParamChange) continue
-    const abilityParams = {
-      ...extractDefaults(ability),
-      ...params[ability.key],
-    }
-    if (ability.headerUI && !abilityParams[ability.headerUI]) continue
-    result.push(
-      ...ability.declareParamChange(
-        abilityParams,
-        hookContext(lookups, ability),
-      ),
-    )
-  }
-  return result
 }
 
 export function collectDeclaredSubtypes(

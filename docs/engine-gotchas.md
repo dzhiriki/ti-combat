@@ -157,6 +157,20 @@ a check there too.
   reads only the completed roster and catalog. Nekro uses the context's faction
   keys and excludes itself from its copy sources.
 
+- **Declaring changes moves an ability's PREPARE first.**
+  `sortPreSortedBuckets` (`abilities-engine.ts`) runs the PREPARE invokes of
+  abilities with `declareChanges` before the rest (Nekro unit copies,
+  Miniaturization, Eidolon Maximum), so copied or transformed stats are in
+  place before Capacity and Fleet Pool enforce. Don't give an ability
+  `declareChanges` if its PREPARE must keep its registration position.
+
+- **Copiers replay another ability's invokes as that ability.** Technological
+  Singularity and TF Singularity run a gained ability's PREPARE inside
+  `withRunningAbility`, so its `invokeChanges` and `ctx.this.key` restriction
+  reasons resolve to the copy (a gained Fourth Moon's DESTROY removal then
+  matches its PREPARE). `withRunningAbility` doesn't swap `SideApi`'s ability
+  key: a one-argument `updateAbilityConfig` still writes the copier's config.
+
 - **Config abilities resolve before unit-attached abilities within a timing
   pass.** A unit ability's PREPARE cannot pre-empt an ADVANCED phase driver's
   PREPARE — e.g. a flagship text zeroing `CAPACITY_COST` runs AFTER the
@@ -242,17 +256,31 @@ a check there too.
   `system: 'TF'` explicitly. See
   `tests/game-system.test.ts` for URL and worker regression coverage.
 
-- **`declareParamChange` only shapes setup options.** Native `CATEGORIES`
-  and `grantCategory` determine runtime participation; Hel-Titan and
-  Starlancer XI inherit their categories from native stats, including when
-  the first unit is placed after PREPARE. A stats invoke that changes
-  `CATEGORIES` (TF Hel-Titan) must also declare the matching
-  `declareParamChange` for its setup options.
+- **`declareChanges` only shapes setup unless an invoke runs it.** Native
+  `CATEGORIES` and `grantCategory` determine runtime participation;
+  Hel-Titan and Starlancer XI inherit their categories from native stats,
+  including when the first unit is placed after PREPARE. A stats invoke that
+  changes `CATEGORIES` or `ALLOWED_SURFACES` (TF Hel-Titan) must expose the
+  same effect as `declareChanges` (`declareChanges: statsInvoke.call`) or
+  setup options and placement miss it.
+
+- **Setup runs changes against stand-ins, not placed units.** One unit of
+  every type stands on every surface, so a change must not count units or
+  depend on which exist; a grant on a stand-in marks that type on that
+  surface (`optionMetadata.standIns`). Changes run in registration order with
+  no PREPARE run: one reading categories another change sets must register
+  later. Reconcile applies them once, before syncing, so they must not read
+  `declareParam` unit lists. The setup's placement runs one side's changes without the
+  opponent's abilities, so `ctx.abilities.opponent` may be empty. After the
+  changes run, the simplified editor keeps each type's stand-in only on the
+  surface `simplifiedSurfaceId` places it on, so its options never offer a
+  surface it cannot fill (Alastor infantry on the planet in space combat). See
+  `tests/engine/declare-changes.test.ts`.
 
 - **`declareParam` sourced params sync only at reconcile, and those values
   survive into the engine run.** Include eligible types even when none are
   fielded yet: later placements need their priority, sustain, and repair
-  settings. Declarations extend the possible surfaces without requiring a
+  settings. Change grants extend the possible surfaces without requiring a
   fielded host. A runtime source-list edit does not update dependent priorities. Use the reconciled priorities to order candidates,
   and scoped unit queries to determine runtime eligibility.
 

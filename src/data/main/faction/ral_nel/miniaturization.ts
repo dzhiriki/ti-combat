@@ -15,19 +15,18 @@ export const miniaturization: Ability = {
   },
   headerUI: 'isEnabled',
   readOnly: true,
-  unitPlacements: STRUCTURES.map(unitType => ({
-    unitType,
-    allowedSurfaces: ALLOWED_SURFACES,
-  })),
+  declareChanges: ctx => {
+    for (const structure of STRUCTURES) {
+      ctx.api.own.modifyUnitType(structure, {
+        ALLOWED_SURFACES,
+      })
+    }
+  },
   invoke: [
     {
       timing: 'PREPARE',
       call: ctx => {
-        for (const structure of STRUCTURES) {
-          ctx.api.own.modifyUnitType(structure, {
-            ALLOWED_SURFACES,
-          })
-        }
+        ctx.invokeChanges()
         for (const unitAbility of UNIT_ABILITIES) {
           ctx.api.own.setUnitAbilityCannotBeUsed(
             unitAbility,

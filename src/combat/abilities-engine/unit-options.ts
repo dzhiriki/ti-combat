@@ -1,4 +1,3 @@
-import { DEFAULT_UNIT_SURFACES } from '@/constants/units'
 import {
   type CombatSide,
   SPACE_SURFACE_ID,
@@ -16,12 +15,12 @@ import {
 } from '../combat-side-state/combat-side-state'
 import type { CombatMode, SideStateData } from '../combat-state/types'
 import { parseUnitLocator } from '../utils/parse-unit-locator'
-import { resolveUnitStats } from '../utils/resolve-unit-stats'
 import { expandWithSubtypes, sortBaseTypes } from '../utils/sort-unit-options'
+import { isUnitCategory } from '../utils/unit-combat-properties'
 import { makeUnitLocator } from '../utils/unit-locator'
 import { getVariantDisplayName } from '../utils/unit-variant'
 import { resolveVariantLimit } from './param-limit'
-import type { ParamChange, SyncSourceConfig, UnitOption } from './types'
+import type { SyncSourceConfig, UnitOption } from './types'
 
 export interface UnitOptionContext {
   combatMode: CombatMode
@@ -88,88 +87,56 @@ export function resolveUnitOptions(
   )
   if (!active.size) return []
   const category = mode === 'SPACE' ? 'SHIPS' : 'GROUND_FORCES'
-  const categoryTypes = new Map<string, UnitBaseType[]>()
-  const typesOf = (key: 'SHIPS' | 'GROUND_FORCES' | 'STRUCTURES') => {
-    let result = categoryTypes.get(key)
-    if (!result) {
-      result = CombatSideState.getCategoryOptionTypes(s, key)
-      categoryTypes.set(key, result)
-    }
-    return result
+  // Where a unit fights, mirroring `participatesInCombat` and commitment: a
+  // granted unit where it stands, a native member only on an active surface,
+  // and the attacker's ground forces from space on the invaded planet.
+  // System controls keep units where they stand.
+  const fightsOn = (side: SideStateData, id: UnitId): readonly SurfaceId[] => {
+    const surface = side.unitSurface[id]
+    if (spec.scope === 'system') return [surface]
+    if (!isUnitCategory(side, id, category)) return []
+    if (mode === 'GROUND' && surface === SPACE_SURFACE_ID)
+      return context.side === 'attacker' ? [...active] : []
+    return side.unitGrants?.[id] === category || active.has(surface)
+      ? [surface]
+      : []
   }
-  const participatingTypes = typesOf(category)
-  const changes = s.optionMetadata?.changes ?? []
-  const matchesChange = (base: UnitBaseType, change: ParamChange) => {
-    return (
-      change.key === category &&
-      (change.value === base ||
-        (change.value in (s.optionMetadata?.categories ?? {}) &&
-          typesOf(
-            change.value as 'SHIPS' | 'GROUND_FORCES' | 'STRUCTURES',
-          ).includes(base)))
-    )
+  const units = (side: SideStateData) =>
+    [...side.participatingUnits, ...side.nonParticipatingUnits] as UnitId[]
+  // Choices describe units that may exist later, not just the starting
+  // force: a stand-in of every type on every surface it may stand on decides
+  // where the units it stands for fight.
+  const standIns = s.optionMetadata?.standIns ?? s
+  const offered = new Set(types)
+  const reach = new Map<UnitBaseType, Map<SurfaceId, readonly SurfaceId[]>>()
+  for (const id of units(standIns)) {
+    const base = parseUnitLocator(standIns.unitType[id]).baseType
+    if (!offered.has(base)) continue
+    let bySurface = reach.get(base)
+    if (!bySurface) reach.set(base, (bySurface = new Map()))
+    bySurface.set(standIns.unitSurface[id], fightsOn(standIns, id))
   }
-  const alive = [
-    ...s.participatingUnits,
-    ...s.nonParticipatingUnits,
-  ] as UnitId[]
-  // Map setup units onto the surface where they can participate. System
-  // controls always use their physical location before commitment.
+  // Fielded units supply the caps.
   const projected = new Map<SurfaceId, Map<UnitBaseType, Set<UnitId>>>()
-  const add = (surface: SurfaceId, base: UnitBaseType, id: UnitId) => {
-    let byBase = projected.get(surface)
-    if (!byBase) projected.set(surface, (byBase = new Map()))
-    let ids = byBase.get(base)
-    if (!ids) byBase.set(base, (ids = new Set()))
-    ids.add(id)
-  }
-  const commit = (base: UnitBaseType, id: UnitId) => {
-    for (const surface of active) add(surface, base, id)
-  }
-  for (const id of alive) {
+  for (const id of units(s)) {
     const surface = s.unitSurface[id]
     const base = parseUnitLocator(s.unitType[id]).baseType
-    if (spec.scope === 'system') {
-      add(surface, base, id)
-      continue
-    }
-    const participates = participatingTypes.includes(base)
-    if (active.has(surface) && participates) add(surface, base, id)
-    const inSpace = surface === SPACE_SURFACE_ID
-    if (
-      mode === 'GROUND' &&
-      context.side === 'attacker' &&
-      inSpace &&
-      participates
-    )
-      commit(base, id)
-    for (const change of changes) {
-      if (!matchesChange(base, change)) continue
-      if (change.scope === 'system') add(surface, base, id)
-      if (change.scope === 'commit' && inSpace && context.side === 'attacker')
-        commit(base, id)
+    if (!offered.has(base)) continue
+    for (const target of reach.get(base)?.get(surface) ?? fightsOn(s, id)) {
+      let byBase = projected.get(target)
+      if (!byBase) projected.set(target, (byBase = new Map()))
+      let ids = byBase.get(base)
+      if (!ids) byBase.set(base, (ids = new Set()))
+      ids.add(id)
     }
   }
   const items: UnitOption[] = []
   for (const variant of variants) {
     const { baseType: base, subtypes: variantSubs } = parseUnitLocator(variant)
-    const allowedSurfaces =
-      resolveUnitStats(s.unitStats, variant)?.ALLOWED_SURFACES ??
-      DEFAULT_UNIT_SURFACES[base]
-    const participates = participatingTypes.includes(base)
-    const systemChange = changes.some(
-      change => change.scope === 'system' && matchesChange(base, change),
-    )
+    const reachable = new Set([...(reach.get(base)?.values() ?? [])].flat())
     surfaces.forEach((surface, surfaceOrder) => {
       const ids = [...(projected.get(surface.id)?.get(base) ?? [])]
-      // Choices describe units that may exist later, not just the starting
-      // force. Declarations add remote surfaces; fielded ids supply caps and
-      // explicit runtime participation, never the default option catalog.
-      const eligibleSurface =
-        spec.scope === 'system'
-          ? allowedSurfaces.includes(surface.type)
-          : (active.has(surface.id) && participates) || systemChange
-      if (!eligibleSurface && !ids.length) return
+      if (!reachable.has(surface.id) && !ids.length) return
       if (
         variantSubs.length &&
         !ids.some(id => s.unitType[id] === variant) &&

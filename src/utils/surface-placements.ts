@@ -46,6 +46,23 @@ export function defaultSurfaceId(
   return target === 'PLANET' ? activePlanetId : SPACE_SURFACE_ID
 }
 
+/** The one surface the simplified editor puts units of `type` on: the combat
+ *  mode's surface when allowed, and space for ships. */
+export function simplifiedSurfaceId(
+  planetId: SurfaceId,
+  type: UnitBaseType,
+  stats: UnitStats | undefined,
+  combatMode: 'SPACE' | 'GROUND',
+): SurfaceId {
+  const allowed = allowedSurfaceTypes(type, stats)
+  const preferred: SurfaceType =
+    (combatMode === 'SPACE' && allowed.includes('SPACE')) ||
+    SHIPS.includes(type)
+      ? 'SPACE'
+      : 'PLANET'
+  return defaultSurfaceId(planetId, type, stats, preferred)
+}
+
 export function createEmptySurfaceCounts(
   surfaces: readonly SurfaceDefinition[],
 ): SurfaceUnitCounts {
@@ -106,13 +123,7 @@ export function expandSimplifiedCounts(
   ) as Record<UnitBaseType, number>
   next[planetId] = { ...next[SPACE_SURFACE_ID] }
   for (const type of UNIT_TYPES) {
-    const allowed = allowedSurfaceTypes(type, stats[type])
-    const preferred: SurfaceType =
-      (combatMode === 'SPACE' && allowed.includes('SPACE')) ||
-      SHIPS.includes(type)
-        ? 'SPACE'
-        : 'PLANET'
-    next[defaultSurfaceId(planetId, type, stats[type], preferred)][type] =
+    next[simplifiedSurfaceId(planetId, type, stats[type], combatMode)][type] =
       totals[type].count
   }
   return next

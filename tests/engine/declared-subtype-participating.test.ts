@@ -11,8 +11,8 @@ import { resolveUnitOptions } from '@/combat/abilities-engine/unit-options'
 import { reconcileAbilitiesConfig } from '@/hooks/combat-setup/reconcile'
 import type { UnitList } from '@/types'
 
-/** Build a minimal SideStateData with the supplied participating units and
- *  declared subtype metadata.
+/** Build a minimal SideStateData where the supplied base types count as
+ *  ships and ground forces, with declared subtype metadata.
  *  Anything not exercised by the variant-options path is left empty. */
 function makeSide(opts: {
   baseTypes: string[]
@@ -23,17 +23,14 @@ function makeSide(opts: {
     nonParticipatingUnits: [],
     unitType: {},
     unitState: {},
-    unitStats: {},
+    unitStats: Object.fromEntries(
+      opts.baseTypes.map(type => [
+        type,
+        { CATEGORIES: ['SHIPS', 'GROUND_FORCES'] },
+      ]),
+    ),
     abilities: {},
-    optionMetadata: {
-      categories: {
-        SHIPS: opts.baseTypes,
-        GROUND_FORCES: opts.baseTypes,
-        STRUCTURES: [],
-      },
-      changes: [],
-      subtypes: opts.subtypes,
-    },
+    optionMetadata: { subtypes: opts.subtypes },
     liveAbilities: {},
   } as unknown as SideStateData
 }

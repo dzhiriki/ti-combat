@@ -13,7 +13,11 @@ export const eidolon: Ability = {
   },
   headerUI: 'isEnabled',
   readOnly: true,
-  declareParamChange: () => [{ key: 'SHIPS', value: 'MECH' }],
+  declareChanges: ctx => {
+    ctx.api.own.modifyUnitType('MECH', {
+      CATEGORIES: ['GROUND_FORCES', 'SHIPS'],
+    })
+  },
   invoke: [
     {
       timing: 'START_OF_COMBAT',
@@ -21,9 +25,9 @@ export const eidolon: Ability = {
         ctx.api.own.getUnitSurface(ctx.getUnit()) === SPACE_SURFACE_ID,
       call: ctx => {
         const stats = ctx.api.own.getUnitStats('MECH')!
+        ctx.invokeChanges()
         // Modify all mechs to Z-Grav form: combat [8, 2], loses Sustain Damage
         ctx.api.own.modifyUnitType('MECH', {
-          CATEGORIES: ['GROUND_FORCES', 'SHIPS'],
           COMBAT: [8, 2, stats.COMBAT![2] ?? 0],
           UNIT_ABILITIES: {},
           ABILITIES: [eidolon],

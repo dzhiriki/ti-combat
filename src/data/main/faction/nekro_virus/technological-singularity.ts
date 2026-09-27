@@ -1,4 +1,4 @@
-import { resolveInvokes } from '@/combat'
+import { resolveInvokes, withRunningAbility } from '@/combat'
 import { extractDefaults } from '@/combat/abilities-engine/declare-param'
 import type {
   Ability,
@@ -8,6 +8,7 @@ import type {
   SelectGroup,
   SelectItem,
 } from '@/combat/abilities-engine/types'
+import { UNIT_TYPES } from '@/constants/units'
 import baseUnits from '@/data/main/base-units'
 import type { UnitBaseType } from '@/types'
 
@@ -91,18 +92,25 @@ export const technologicalSingularity: Ability<TSParams> = {
     disableMordred: false,
   },
   headerUI: 'isEnabled',
-  declareParamChange: (params, ctx) => {
-    if (!params.isEnabled || params.enableAbilityKey === NONE) return []
+  declareChanges: (ctx, params) => {
+    if (params.enableAbilityKey === NONE) return
     const target = findAbility(ctx, params.enableAbilityKey)
-    if (!target?.declareParamChange) return []
-    const synth = {
-      ...extractDefaults(target),
-      [target.headerUI ?? 'isEnabled']: true,
-    }
-    return target.declareParamChange(
-      synth as Parameters<NonNullable<typeof target.declareParamChange>>[0],
-      { abilities: ctx.abilities, this: target },
+    if (!target?.declareChanges) return
+    // The copy is gained mid-combat, after units are placed: it may change
+    // what units count as, but not where they can stand.
+    const surfaces = UNIT_TYPES.map(
+      type => [type, ctx.api.own.getUnitStats(type)?.ALLOWED_SURFACES] as const,
     )
+    withRunningAbility(ctx, target, () =>
+      ctx.invokeChanges({
+        ...extractDefaults(target),
+        [target.headerUI ?? 'isEnabled']: true,
+      }),
+    )
+    for (const [type, allowed] of surfaces) {
+      if (ctx.api.own.getUnitStats(type)?.ALLOWED_SURFACES !== allowed)
+        ctx.api.own.modifyUnitType(type, { ALLOWED_SURFACES: allowed })
+    }
   },
   uiConfig: ctx => {
     const disableGroups = buildSelectGroups(
@@ -197,14 +205,18 @@ export const technologicalSingularity: Ability<TSParams> = {
   ],
 }
 
+/** Replay the gained ability's PREPARE as that ability, so its
+ *  `invokeChanges` and `ctx.this.key` resolve to it. */
 function applyPrepare(ability: Ability, ctx: AbilityCallContext): void {
   const params = (ctx.api.own.getAbilityConfig(
     ability.key as keyof AbilityConfigMap,
   ) ?? {}) as Record<string, unknown>
-  for (const invoke of resolveInvokes(ability, params, ctx)) {
-    if (invoke.timing !== 'PREPARE') continue
-    invoke.call(ctx, params)
-  }
+  withRunningAbility(ctx, ability, () => {
+    for (const invoke of resolveInvokes(ability, params, ctx)) {
+      if (invoke.timing !== 'PREPARE') continue
+      invoke.call(ctx, params)
+    }
+  })
 }
 
 function buildSelectGroups(

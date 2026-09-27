@@ -326,16 +326,18 @@ describe('ability selections are snapshots of units', () => {
           key: 'TEST_PARTICIPATION',
           name: 'Selection',
           params: { isEnabled: true, uses: 1 },
-          declareParamChange: () => [{ key: 'SHIPS', value: 'MECH' }],
+          declareChanges: ctx => {
+            const mechs = ctx.api.own.system.getUnits('MECH', {
+              includeVariants: true,
+            })
+            ctx.api.own.grantCategory(mechs, 'SHIPS')
+          },
           invoke: [
             {
               timing: 'START_OF_COMBAT',
               isCallable: (_params, ctx) => ctx.side === 'attacker',
               call: ctx => {
-                const mechs = ctx.api.own.system.getUnits('MECH', {
-                  includeVariants: true,
-                })
-                ctx.api.own.grantCategory(mechs, 'SHIPS')
+                ctx.invokeChanges()
               },
             },
           ],

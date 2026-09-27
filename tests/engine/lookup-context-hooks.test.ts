@@ -4,7 +4,7 @@ import type { Ability } from '@/combat'
 import { buildCombatState } from '@/hooks/combat-setup/build-combat-state'
 
 describe('declare hooks receive the lookup context', () => {
-  it('declareSubtype and declareParamChange see ctx.this and ctx.abilities', () => {
+  it('declareSubtype and declareChanges see ctx.this and ctx.abilities', () => {
     const seen: string[] = []
     const probe: Ability = {
       key: 'PROBE',
@@ -17,11 +17,10 @@ describe('declare hooks receive the lookup context', () => {
         )
         return []
       },
-      declareParamChange: (_params, ctx) => {
+      declareChanges: ctx => {
         seen.push(
           `change:${ctx.this.key}:${ctx.abilities.opponent.all.length > 0}`,
         )
-        return []
       },
       invoke: [],
     }

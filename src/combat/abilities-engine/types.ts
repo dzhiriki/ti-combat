@@ -2,7 +2,6 @@ import type { UnitCategory } from '@/constants/units'
 import type {
   CombatSide,
   DiceGroup,
-  SurfaceType,
   SurfaceId,
   UnitBaseType,
   UnitId,
@@ -15,6 +14,7 @@ import type {
   CombatMode,
   CombatStateData,
   MetaPhase,
+  SideStateData,
   UnitAbilityMeta,
 } from '../combat-state/types'
 import type { Logger } from '../logger'
@@ -102,22 +102,12 @@ export interface DeclaredSubtype {
   source?: string
 }
 
-/** Setup-only category addition declared by an ability. A category value
- *  copies every current member of that category into `key`. */
-export interface ParamChange {
-  key: UnitCategory
-  value: UnitBaseType | UnitCategory
-  /** Setup participation preview; runtime membership still comes from invokes. */
-  scope?: 'system' | 'commit'
-}
-
-export type UnitCategoryOptions = Record<UnitCategory, UnitBaseType[]>
-
-/** Setup option metadata that reconcile derives from native stats and
- *  ability declarations. Only option lists (`resolveUnitOptions`) read it. */
+/** Setup option metadata written by reconcile. Only option lists read it. */
 export interface SideOptionMetadata {
-  categories: UnitCategoryOptions
-  changes: ParamChange[]
+  /** One unit of every type on every surface it may stand on, once the
+   *  active abilities' `declareChanges` applied. Each stands for all units
+   *  of its type on its surface. */
+  standIns: SideStateData
   subtypes: DeclaredSubtype[]
 }
 
@@ -273,6 +263,11 @@ export interface AbilityCallContext {
   logger?: Logger
   /** Run abilities for the given timing inline during this call */
   trigger<K extends AbilityTiming>(name: K, context: TimingContextMap[K]): void
+  /** Run the running ability's `declareChanges`, so an invoke applies the
+   *  effect setup already previews without repeating its code. `params`
+   *  default to the ability's current config. Throws when the ability
+   *  declares no changes. */
+  invokeChanges(params?: object): void
   /** UnitId the ability is attached to, or `undefined` for config-sourced
    *  candidates (including the external-invoke no-unit fallback). */
   readonly unitSource: UnitId | undefined
@@ -527,13 +522,16 @@ export interface Ability<Params extends Record<string, unknown> = any> {
   sync?: boolean
   /** Abilities sharing the same exclusiveGroup are mutually exclusive — enabling one disables others in the group. */
   exclusiveGroup?: string
-  /** Placement permissions supplied by this ability while it is enabled.
-   *  Setup uses this before PREPARE invokes run so copied or transformed
-   *  units can be authored on the same surfaces their runtime stats allow. */
-  unitPlacements?: readonly {
-    unitType: UnitBaseType
-    allowedSurfaces: readonly SurfaceType[]
-  }[]
+  /** The effect setup must see before any invoke runs: unit stats (categories,
+   *  placement surfaces) and category grants. Setup runs it for every active
+   *  ability against one stand-in unit of every type on every surface and
+   *  derives placement and option lists from the result, so a grant on a
+   *  stand-in covers that unit type on that surface. The engine never runs
+   *  it on its own; an invoke applies it with `ctx.invokeChanges()`. */
+  declareChanges?: (
+    ctx: AbilityCallContext,
+    params: AbilityBaseParams & Params,
+  ) => void
   /** Called when a user changes a param. Can modify other params in response.
    *  Receives the params with the new value already applied, the changed key,
    *  the value, and a lookup context (`ctx.this` is this ability; `ctx.abilities`
@@ -545,13 +543,6 @@ export interface Ability<Params extends Record<string, unknown> = any> {
     value: unknown,
     ctx: AbilityLookupContext,
   ) => (AbilityBaseParams & Params) | void
-  /** Declare setup-only category additions based on ability params.
-   *  `ctx` is a lookup context (`ctx.this` is this ability; `ctx.abilities` the
-   *  registered abilities per side). Native categories come from unit stats. */
-  declareParamChange?: (
-    params: AbilityBaseParams & Params,
-    ctx: AbilityLookupContext,
-  ) => ParamChange[]
   /** Declare subtype variants this ability registers. Called during reconcile.
    *  Each entry's `statsFactory` is invoked once at config time to compute the
    *  variant's stats from its parent variant's stats. Subtypes are surfaced in

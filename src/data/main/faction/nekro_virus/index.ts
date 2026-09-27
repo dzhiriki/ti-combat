@@ -1,10 +1,6 @@
 import nekroVirusIcon from '@/assets/faction/nekro_virus.svg?raw'
 import { type Ability, cloneAbility, resolveInvokes } from '@/combat'
-import type {
-  AbilityCallContext,
-  ParamChange,
-} from '@/combat/abilities-engine/types'
-import { DEFAULT_UNIT_SURFACES } from '@/constants/units'
+import type { AbilityCallContext } from '@/combat/abilities-engine/types'
 import { sustainDamage } from '@/data/main/abilities/general/sustain-damage'
 import type {
   Faction,
@@ -54,10 +50,6 @@ function createFactionUnitAbility(
       }
     : stats
 
-  const categoryChanges: ParamChange[] = (effectiveStats.CATEGORIES ?? []).map(
-    category => ({ key: category, value: unitType }),
-  )
-
   // Extract child's custom params (exclude base params)
   const childCustomParams: Record<string, unknown> = {}
   if (mainAbility) {
@@ -71,13 +63,6 @@ function createFactionUnitAbility(
     name: displayName,
     icon: faction.icon,
     exclusiveGroup: unitType,
-    unitPlacements: [
-      {
-        unitType,
-        allowedSurfaces:
-          effectiveStats.ALLOWED_SURFACES ?? DEFAULT_UNIT_SURFACES[unitType],
-      },
-    ],
     description: mainAbility?.description,
     params: {
       isEnabled: false,
@@ -92,9 +77,9 @@ function createFactionUnitAbility(
     },
     headerUI: 'isEnabled',
     ...(mainAbility?.uiConfig && { uiConfig: mainAbility.uiConfig }),
-    ...(categoryChanges.length > 0 && {
-      declareParamChange: () => categoryChanges,
-    }),
+    declareChanges: ctx => {
+      ctx.api.own.modifyUnitType(unitType, effectiveStats)
+    },
     invoke: [
       {
         system: true,
@@ -110,7 +95,7 @@ function createFactionUnitAbility(
               ctx.api.own.modifyUnitType(unitType, original)
             },
           })
-          ctx.api.own.modifyUnitType(unitType, effectiveStats)
+          ctx.invokeChanges()
           // Run child ability's config-level PREPARE invokes
           if (mainAbility) {
             const invokes = resolveInvokes(

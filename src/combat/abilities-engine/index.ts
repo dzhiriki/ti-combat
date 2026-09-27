@@ -32,7 +32,6 @@ export type {
   DeclaredSubtype,
   DicePool,
   OwnOpponentContext,
-  ParamChange,
   ParamFilter,
   RegisteredAbility,
   RuntimeAbilityList,

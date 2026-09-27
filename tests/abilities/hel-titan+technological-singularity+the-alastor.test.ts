@@ -1,14 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  createRuntimeAbilityList,
-  extractDefaults,
-  withRunningAbility,
-} from '@/combat'
+import { CombatSideState, withRunningAbility } from '@/combat'
 import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { CombatSetup } from '@/hooks/combat-setup'
 import { DEFAULT_PLANET_ID, SPACE_SURFACE_ID } from '@/types'
-import { getGameData } from '@/utils/get-game-data'
 
 import { combatTest } from '../utils/combat-test'
 
@@ -27,23 +22,19 @@ function priorityKeys(value: unknown): string[] {
 }
 
 describe('HEL_TITAN + TECHNOLOGICAL_SINGULARITY + THE_ALASTOR', () => {
-  it('declares every explicit category on the generated Nekro unit copy', () => {
-    const abilities = getGameData('TI4').getAvailableAbilities(
-      'attacker',
-      'NEKRO_VIRUS',
-    )
-    const helTitan = abilities.find(ability => ability.key === HEL_TITAN)!
-    const list = createRuntimeAbilityList(abilities)
+  it('gives PDS every explicit category of the enabled Nekro unit copy', () => {
+    const setup = new CombatSetup('FULL')
+    setup.setFaction('attacker', 'NEKRO_VIRUS')
+    const types = (category: 'GROUND_FORCES' | 'STRUCTURES') =>
+      CombatSideState.getCategoryOptionTypes(setup.stateData.attacker, category)
+    expect(types('GROUND_FORCES')).not.toContain('PDS')
 
-    expect(
-      helTitan.declareParamChange?.(extractDefaults(helTitan), {
-        abilities: { own: list, opponent: list },
-        this: helTitan,
-      }),
-    ).toEqual([
-      { key: 'STRUCTURES', value: 'PDS' },
-      { key: 'GROUND_FORCES', value: 'PDS' },
-    ])
+    setup.setAbilityParam('attacker', HEL_TITAN, {
+      ...setup.abilities.attacker[HEL_TITAN],
+      isEnabled: true,
+    })
+    expect(types('STRUCTURES')).toContain('PDS')
+    expect(types('GROUND_FORCES')).toContain('PDS')
   })
 
   it('lists a directly copied Hel-Titan in ground and Alastor space hit order', () => {

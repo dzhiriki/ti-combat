@@ -25,6 +25,7 @@ export const helTitan: Ability = {
   params: { isEnabled: false, uses: Infinity },
   headerUI: 'isEnabled',
   exclusiveGroup: 'UNIT_UPGRADE_PDS',
-  declareParamChange: () => [{ key: 'GROUND_FORCES', value: 'PDS' }],
+  // The stats invoke stays a plain stats block so Janovet can inherit it.
+  declareChanges: statsInvoke.call,
   invoke: [statsInvoke],
 }

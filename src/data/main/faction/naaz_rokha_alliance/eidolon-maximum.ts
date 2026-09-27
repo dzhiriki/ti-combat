@@ -10,21 +10,22 @@ export const eidolonMaximum: Ability = {
     uses: Infinity,
   },
   headerUI: 'isEnabled',
-  declareParamChange: () => [{ key: 'SHIPS', value: 'MECH' }],
+  declareChanges: ctx => {
+    const stats = ctx.api.own.getUnitStats('MECH')!
+    // Modify all mechs to Eidolon Maximum form: combat [4, 4]
+    ctx.api.own.modifyUnitType('MECH', {
+      CATEGORIES: ['GROUND_FORCES', 'SHIPS'],
+      UNIT_ABILITY_HIT_IMMUNE: true,
+      COMBAT: [4, 4, stats.COMBAT![2] ?? 0],
+    })
+  },
   invoke: [
     {
       timing: 'PREPARE',
       call: ctx => {
         // Disable base Eidolon ability (prevent Z-Grav transform)
         ctx.api.own.updateAbilityConfig('EIDOLON', { isEnabled: false })
-
-        const stats = ctx.api.own.getUnitStats('MECH')!
-        // Modify all mechs to Eidolon Maximum form: combat [4, 4]
-        ctx.api.own.modifyUnitType('MECH', {
-          CATEGORIES: ['GROUND_FORCES', 'SHIPS'],
-          UNIT_ABILITY_HIT_IMMUNE: true,
-          COMBAT: [4, 4, stats.COMBAT![2] ?? 0],
-        })
+        ctx.invokeChanges()
       },
     },
     {

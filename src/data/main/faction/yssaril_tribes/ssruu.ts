@@ -62,15 +62,6 @@ export const ssruu: Ability<Params> = {
     }
     return next as typeof params
   },
-  declareParamChange: (params, ctx) => {
-    const agent = findAgent(ctx, params.agentKey)
-    if (!agent?.declareParamChange) return []
-    const merged = withAgentDefaults(agent, params)
-    return agent.declareParamChange(
-      merged as Parameters<NonNullable<Ability['declareParamChange']>>[0],
-      { abilities: ctx.abilities, this: agent },
-    )
-  },
   declareSubtype: (params, ctx) => {
     const agent = findAgent(ctx, params.agentKey)
     if (!agent?.declareSubtype) return []

@@ -1,4 +1,3 @@
-import type { RegisteredAbility } from '@/combat/abilities-engine/types'
 import type {
   SideAbilitiesConfig,
   SideStateData,
@@ -8,13 +7,12 @@ import type {
   SideUnitPlacements,
   SurfaceDefinition,
   UnitIdList,
+  UnitStats,
 } from '@/types'
 import {
   buildUnitStatsMap,
   getSimulationUnitsOnSurfaces,
 } from '@/utils/get-simulation-units'
-
-import { applyAbilityPlacementOverrides } from './ability-placement'
 
 export function buildSideState(
   system: GameSystem,
@@ -22,7 +20,7 @@ export function buildSideState(
   placements: SideUnitPlacements,
   surfaces: readonly SurfaceDefinition[],
   abilities: SideAbilitiesConfig,
-  registeredAbilities: readonly RegisteredAbility[],
+  placementStats: Record<string, UnitStats>,
   gen: { _nextCode?: number },
 ): SideStateData {
   const unitStats = buildUnitStatsMap(
@@ -34,7 +32,7 @@ export function buildSideState(
     placements.counts,
     surfaces,
     gen,
-    applyAbilityPlacementOverrides(unitStats, registeredAbilities, abilities),
+    placementStats,
   )
 
   return {

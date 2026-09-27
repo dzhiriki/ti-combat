@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { type SideStateData } from '@/combat'
 import { resolveUnitOptions } from '@/combat/abilities-engine/unit-options'
 
-/** Minimal SideStateData where ships participate, including FIGHTER. */
+/** Minimal SideStateData whose ships keep their native categories,
+ *  FIGHTER included. */
 function makeSide(): SideStateData {
-  const ships = ['CRUISER', 'DESTROYER', 'FIGHTER']
   return {
     participatingUnits: [],
     nonParticipatingUnits: [],
@@ -13,11 +13,6 @@ function makeSide(): SideStateData {
     unitState: {},
     unitStats: {},
     abilities: {},
-    optionMetadata: {
-      categories: { SHIPS: ships, GROUND_FORCES: [], STRUCTURES: [] },
-      changes: [],
-      subtypes: [],
-    },
     liveAbilities: {},
   } as unknown as SideStateData
 }

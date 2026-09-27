@@ -13,13 +13,13 @@ export const matriarch: Ability = {
     uses: Infinity,
   },
   headerUI: 'isEnabled',
-  declareParamChange: () => [
-    { key: 'GROUND_FORCES', value: 'FIGHTER', scope: 'commit' },
-  ],
+  declareChanges: commitFighters,
   invoke: [
     {
       timing: 'COMMIT_UNITS',
-      call: commitFighters,
+      call: ctx => {
+        ctx.invokeChanges()
+      },
     },
   ],
 }

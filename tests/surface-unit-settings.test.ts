@@ -214,6 +214,40 @@ describe('surface-aware unit settings', () => {
     )
   })
 
+  it('offers Alastor ground forces only where the simplified editor puts them', () => {
+    const setup = new CombatSetup('SIMPLIFIED')
+    setup.setFaction('attacker', 'NEKRO_VIRUS')
+    setup.setUnitCount('attacker', 'FLAGSHIP', 1)
+    const items = options(setup, 'UNIT_PRIORITY', 'spaceUnitPriority')
+    expect(items.map(item => item.value)).toEqual(
+      expect.arrayContaining([
+        ...SHIPS.map(type => target(type, SPACE)),
+        target('INFANTRY', SPACE),
+        target('MECH', SPACE),
+      ]),
+    )
+    expect(items).toHaveLength(SHIPS.length + 2)
+    expect(labelUnitOptions(items).map(item => item.label)).toEqual(
+      expect.arrayContaining(['Infantry', 'Mech']),
+    )
+    expect(keys(setup, 'UNIT_PRIORITY', 'spaceUnitPriority')).toEqual(
+      items.map(item => item.value),
+    )
+
+    setup.setEditorMode('FULL')
+    expect(
+      options(setup, 'UNIT_PRIORITY', 'spaceUnitPriority').map(
+        item => item.value,
+      ),
+    ).toEqual(
+      expect.arrayContaining([target('INFANTRY', P1), target('MECH', P1)]),
+    )
+    setup.setEditorMode('SIMPLIFIED')
+    expect(keys(setup, 'UNIT_PRIORITY', 'spaceUnitPriority')).toEqual(
+      items.map(item => item.value),
+    )
+  })
+
   it('keeps space-only category additions on the space surface', () => {
     const setup = new CombatSetup('FULL')
     setup.setFaction('attacker', 'NAAZ_ROKHA_ALLIANCE')

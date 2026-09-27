@@ -40,7 +40,7 @@ interface Ability<Params extends Record<string, unknown>> {
   sync?: boolean // Both sides share identical config
   exclusiveGroup?: string // Mutually exclusive abilities sharing same group
   onParamSet?: (params, key, value, ctx) => params | void // Setup: react to a UI param edit
-  declareParamChange?: (params, ctx) => ParamChange[] // Setup-only category options
+  declareChanges?: (ctx, params) => void // Setup-visible effect; invokes reuse it via ctx.invokeChanges()
   declareSubtype?: (params) => DeclaredSubtype[] // Declare variant subtypes (e.g. Cavalry)
   sort?: (params, ctx, unitIds) => UnitId[] // Pre-sort this ability's unit invokes
   preventDestroy?: (params, ids, api) => UnitId[] // Spare units from opponent direct destroys
@@ -214,6 +214,64 @@ invoke: (params, ctx) => {
 
 Factories must be pure and cheap. Only config abilities may use this form; unit-attached abilities keep the array (see engine-gotchas). Use `resolveInvokes(ability, params, ctx)` from `@/combat` to read another ability's list, and `hasStaticInvokes(ability)` when you need the array itself.
 
+## Setup changes
+
+Setup never runs PREPARE, so an effect it must show before combat — a unit's
+categories, where it may be placed, or which units a grant makes ships — is
+written once in `declareChanges`. It has exactly the API of an invoke `call`:
+
+```typescript
+export const theAlastor: Ability = {
+  // ...
+  declareChanges: ctx => {
+    const selected = ctx.api.own.system
+      .getUnits()
+      .filter(id => ctx.api.own.isUnitCategory(id, 'GROUND_FORCES'))
+    ctx.api.own.grantCategory(selected, 'SHIPS')
+  },
+  invoke: [
+    {
+      timing: 'START_OF_COMBAT',
+      call: ctx => {
+        ctx.invokeChanges()
+      },
+    },
+  ],
+}
+```
+
+Setup runs the changes of every active ability (enabled, with its `headerUI`
+param set) in registration order, attacker first, against a model holding one
+stand-in unit of every type on every surface, then keeps the stand-ins on
+surfaces their type may stand on. Reconcile stores that model as
+`optionMetadata.standIns`, and setup reads it like any combat state:
+
+- **Placement** — `ALLOWED_SURFACES` (Miniaturization, Nekro unit copies).
+- **Option lists** — unit categories (Eidolon, Hel-Titan) and grants (Alastor,
+  Matriarch). A stand-in stands for every unit of its type on its surface,
+  placed or not; placed units only supply counts and caps.
+
+The engine never runs `declareChanges` on its own. An invoke applying the same
+effect calls `ctx.invokeChanges()` (params default to the ability's current
+config) instead of repeating the code. TF Hel-Titan keeps its plain stats
+invoke for Janovet and declares `declareChanges: statsInvoke.call` instead.
+
+- Put in `declareChanges` only what setup must see; keep combat-only or
+  conditional effects in the invoke (Z-Grav Eidolon's change adds the SHIPS
+  category; its START_OF_COMBAT invoke also rewrites combat values).
+- Changes see stand-ins: don't count units or rely on which units exist, and
+  don't place, move or remove units, add subtypes, write ability config, or
+  check `isEnabled` (setup already gates on it).
+- A change that reads what another change sets must register after it (Nekro's
+  unit copies precede its flagship's Alastor).
+- Declaring changes moves the ability's PREPARE ahead of other PREPAREs, so
+  unit copies and transformations set stats before Capacity and Fleet Pool
+  enforce.
+- A copier runs its target's changes as the target:
+  `withRunningAbility(ctx, target, () => ctx.invokeChanges(params))`
+  (Technological Singularity, which then restores placement surfaces because
+  the copy is gained mid-combat).
+
 ## Timing System
 
 Timings define when abilities fire. They run in this order during combat:
@@ -325,7 +383,7 @@ interface AbilityCallContext {
 
 ### AbilityLookupContext (declare hooks, invoke factories)
 
-`onParamSet`, `declareParamChange`, `declareSubtype`, and factory `invoke` receive a trailing `ctx: AbilityLookupContext`:
+`onParamSet`, `declareSubtype`, and factory `invoke` receive a trailing `ctx: AbilityLookupContext`:
 
 ```typescript
 interface AbilityLookupContext {
@@ -440,8 +498,9 @@ the engine lands them on the active planet with the native ground forces and
 returns them to space at completion. Later reinforcements do not inherit these
 grants.
 
-`declareParamChange` declares possible setup options, including Sustain
-Priority and Assign Hits Order. Runtime effects use scoped queries and
+Setup sees these effects only through `declareChanges` (see
+[Setup changes](#setup-changes)), which shapes possible setup options such as
+Sustain Priority and Assign Hits Order. Runtime effects use scoped queries and
 `isUnitCategory` instead. Starlancer XI has native ship and ground-force
 membership, like Hel-Titan's native dual category. Its special combat-end rules
 are deferred; no passive participation-rule API is provided.
@@ -860,6 +919,7 @@ entries like `getFlat` and compiles each list object once, so never mutate a
 to retain location in subsequent queries.
 Subtype declarations use plain `unitType` plus optional `surfaces` metadata.
 
-Setup category changes can declare `scope: 'system'` (Alastor) or
-`scope: 'commit'` (Matriarch/Morphwing); the default is the active surface.
-These declarations preview choices and never grant runtime participation.
+Setup changes extend these choices through their grants: a stand-in granted
+the mode's category counts on its own surface (Alastor), and the attacker's
+granted ground forces in space are committed onto the active planet
+(Matriarch/Morphwing). The preview never grants runtime participation.

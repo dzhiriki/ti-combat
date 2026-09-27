@@ -10,7 +10,8 @@ import {
   type SideAbilitiesConfig,
   type SideStateData,
 } from '@/combat'
-import { UNIT_LIMITS } from '@/constants/units'
+import { resolveUnitStats } from '@/combat/utils/resolve-unit-stats'
+import { UNIT_LIMITS, UNIT_TYPES } from '@/constants/units'
 import type {
   CollectedAbility,
   CombatSide,
@@ -23,6 +24,7 @@ import type {
   UnitBaseType,
   UnitIdList,
   UnitSelection,
+  UnitStats,
 } from '@/types'
 import {
   createDefaultSurfaces,
@@ -37,6 +39,7 @@ import {
   type UnitConfig,
 } from '@/utils/get-unit-config'
 import {
+  allowedSurfaceTypes,
   collapseSurfaceCounts,
   createEmptySurfaceCounts,
   expandSimplifiedCounts,
@@ -44,10 +47,7 @@ import {
   normalizeSurfaceCounts,
 } from '@/utils/surface-placements'
 
-import {
-  applyAbilityPlacementOverrides,
-  getAbilityPlacementOverrides,
-} from './ability-placement'
+import { applyDeclaredChanges } from './apply-declared-changes'
 import { buildSideState } from './build-side-state'
 import {
   initializeAbilityDefaults,
@@ -219,14 +219,16 @@ export class CombatSetup {
 
   getUnitConfig(side: CombatSide): Record<UnitBaseType, UnitConfig> {
     const result = buildUnitConfig(this._system, this.faction(side))
-    const overrides = getAbilityPlacementOverrides(
-      this._sideRegistered[side],
-      this._abilities[side],
-    )
-
-    for (const [unitType, allowedSurfaces] of Object.entries(overrides)) {
-      const type = unitType as UnitBaseType
-      result[type] = { ...result[type], allowedSurfaces }
+    const stats = this._stateData[side].optionMetadata?.standIns.unitStats
+    if (!stats) return result
+    for (const type of UNIT_TYPES) {
+      result[type] = {
+        ...result[type],
+        allowedSurfaces: allowedSurfaceTypes(
+          type,
+          resolveUnitStats(stats, type),
+        ),
+      }
     }
     return result
   }
@@ -362,7 +364,7 @@ export class CombatSetup {
     params: Record<string, unknown>,
   ): void {
     const changesPlacement = this._sideRegistered[side].some(
-      ability => ability.key === abilityKey && ability.unitPlacements?.length,
+      ability => ability.key === abilityKey && ability.declareChanges,
     )
     this.setParam(side, abilityKey, params)
     this.reconcile()
@@ -576,6 +578,7 @@ export class CombatSetup {
       surfaces: this._surfaces,
       activeSurfaceId: this._stateData.activeSurfaceId,
       combatMode: this._combatMode,
+      simplifiedPlanetId: this.simplifiedPlanetId,
       attacker: { ...this._stateData.attacker },
       defender: { ...this._stateData.defender },
     }
@@ -733,6 +736,13 @@ export class CombatSetup {
       : this._selectedPlanetId
   }
 
+  /** The planet `reflowSimplified` places on; undefined in the full editor. */
+  private get simplifiedPlanetId(): SurfaceId | undefined {
+    return this._editorMode === 'SIMPLIFIED'
+      ? this._selectedPlanetId
+      : undefined
+  }
+
   private placements(side: CombatSide): SideUnitPlacements {
     return {
       counts: this._surfaceCounts[side],
@@ -775,7 +785,7 @@ export class CombatSetup {
       this._abilities,
       this._sideRegistered,
       this._combatMode,
-      this._stateData,
+      { ...this._stateData, simplifiedPlanetId: this.simplifiedPlanetId },
       this._lookups,
       true,
     )
@@ -830,16 +840,30 @@ export class CombatSetup {
     )
   }
 
+  /** Placement runs before reconcile, so it applies the side's declared
+   *  changes to its current config itself. */
   private getPlacementUnitStats(side: CombatSide) {
-    return applyAbilityPlacementOverrides(
-      buildUnitStatsMap(
-        this._system,
-        this.faction(side),
-        this._upgradedTypes[side],
-      ),
-      this._sideRegistered[side],
-      this._abilities[side],
-    )
+    const faction = this.faction(side)
+    const none = { faction, unitStats: {}, config: {}, abilities: [] }
+    return applyDeclaredChanges(
+      {
+        attacker: none,
+        defender: none,
+        [side]: {
+          faction,
+          unitStats: buildUnitStatsMap(
+            this._system,
+            faction,
+            this._upgradedTypes[side],
+          ),
+          config: this._abilities[side],
+          abilities: this._sideRegistered[side],
+        },
+      },
+      this._surfaces,
+      this._combatMode,
+      this.activeSurfaceId,
+    )[side].unitStats as Record<string, UnitStats>
   }
 
   private rebuildUnits(side: CombatSide): void {
@@ -854,7 +878,7 @@ export class CombatSetup {
           this.placements(side),
           this._surfaces,
           this._abilities[side],
-          this._sideRegistered[side],
+          this.getPlacementUnitStats(side),
           gen,
         ),
       },

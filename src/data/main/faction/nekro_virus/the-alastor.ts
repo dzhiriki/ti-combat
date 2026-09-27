@@ -11,17 +11,17 @@ export const theAlastor: Ability = {
     uses: Infinity,
   },
   headerUI: 'isEnabled',
-  declareParamChange: () => [
-    { key: 'SHIPS', value: 'GROUND_FORCES', scope: 'system' },
-  ],
+  declareChanges: ctx => {
+    const selected = ctx.api.own.system
+      .getUnits()
+      .filter(id => ctx.api.own.isUnitCategory(id, 'GROUND_FORCES'))
+    ctx.api.own.grantCategory(selected, 'SHIPS')
+  },
   invoke: [
     {
       timing: 'START_OF_COMBAT',
       call: ctx => {
-        const selected = ctx.api.own.system
-          .getUnits()
-          .filter(id => ctx.api.own.isUnitCategory(id, 'GROUND_FORCES'))
-        ctx.api.own.grantCategory(selected, 'SHIPS')
+        ctx.invokeChanges()
       },
     },
   ],

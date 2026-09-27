@@ -60,12 +60,13 @@ import type {
   InvokeCollections,
 } from '../abilities-engine'
 import type { DeclaredParamValue } from '../declare-param'
-import { isDeclaredParam } from '../declare-param'
+import { extractDefaults, isDeclaredParam } from '../declare-param'
 import type { UnitOption } from '../types'
 import type {
   AbilitiesOverride,
   Ability,
   AbilityBaseParams,
+  AbilityCallContext,
   AbilityLookupContext,
   AbilityTiming,
   OwnOpponentContext,
@@ -1252,6 +1253,21 @@ export class AbilityContext {
     this._api.own._abilitiesParams = undefined
     this._api.opponent._abilityKey = undefined
     this._api.opponent._abilitiesParams = undefined
+  }
+
+  /** See AbilityCallContext.invokeChanges. Resolves through `this.this`, so
+   *  `withRunningAbility` runs another ability's changes. */
+  invokeChanges(params?: object): void {
+    const ability = this.this
+    if (!ability.declareChanges) {
+      throw new Error(`${ability.key} declares no changes`)
+    }
+    ability.declareChanges(
+      this as unknown as AbilityCallContext,
+      (params ??
+        CombatSideState.getLiveParams(this.state[this._side], ability.key) ??
+        extractDefaults(ability)) as AbilityBaseParams,
+    )
   }
 
   /** Queue a timing to run as the next script step. The triggered step
