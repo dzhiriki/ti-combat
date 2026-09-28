@@ -336,7 +336,13 @@ a check there too.
 
 - **Reconciled participating lists are wider than their controls.**
   Reconcile resolves list options with `allSurfaces` (every surface of the
-  param's mode), while `getUnitVariantsOptions` shows only the active one. UI
+  param's mode), while `getUnitVariantsOptions` shows only the fought ones:
+  the active surface, or every planet of `CombatStateData.invasion`. In
+  ground mode setup's active surface is the first planet holding units (where
+  commitment lands), not the selected tab, which only picks the planet being
+  edited. Ground participant choices are merged by type (`choosesByType`) and
+  reconcile strips the surface from stored ground entries, first entry per
+  variant winning, so this applies to space and system lists. UI
   edits that rebuild a list from the visible items must merge the hidden
   entries back (`keepHiddenEntries` in the abilities-panel list) or they
   silently delete other planets' settings. See
@@ -570,7 +576,8 @@ a check there too.
 ## UI config and data modules
 
 - **Unit selector keys are not variant/stat keys.** Scoped `declareParam` lists
-  store `UnitLocator` values containing both a variant and a surface. Use scoped
+  store `UnitLocator` values containing both a variant and a surface (ground
+  participant choices store plain variants; see above). Use scoped
   unit queries or `matchesUnitLocator` (also valid for destroyed-unit metadata),
   and use `parseUnitLocator` for both plain and qualified keys. Its `unitType`
   is the decoded variant; `baseType` and `subtypes` describe that variant, and

@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { makeUnitLocator } from '@/combat'
 import { CombatSetup } from '@/hooks/combat-setup'
-import { DEFAULT_PLANET_ID } from '@/types'
 
 import { combatTest } from '../utils/combat-test'
 import { hitOrderUnits, setAbility } from '../utils/setup-options'
@@ -105,7 +103,7 @@ describe('GHOM_SEKKUS', () => {
     setup.setFaction('attacker', 'SARDAKK_NORR')
     setup.setCombatMode('GROUND')
     setup.setUnitCount('attacker', 'INFANTRY', 1)
-    const mech = makeUnitLocator('MECH', DEFAULT_PLANET_ID)
+    const mech = 'MECH'
     setAbility(setup, 'attacker', 'GHOM_SEKKUS', { isEnabled: true })
     expect(hitOrderUnits(setup, 'GROUND')).not.toContain(mech)
 

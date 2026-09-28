@@ -21,7 +21,10 @@ import type {
   SideOptionMetadata,
   SyncSourceConfig,
 } from '@/combat/abilities-engine/types'
-import { resolveUnitOptions } from '@/combat/abilities-engine/unit-options'
+import {
+  choosesByType,
+  resolveUnitOptions,
+} from '@/combat/abilities-engine/unit-options'
 import type {
   CombatMode,
   CombatStateData,
@@ -45,7 +48,12 @@ import {
 } from './reconcile-helpers'
 
 type OptionState = Pick<CombatStateData, 'attacker' | 'defender'> &
-  Partial<Pick<CombatStateData, 'surfaces' | 'activeSurfaceId' | 'combatMode'>>
+  Partial<
+    Pick<
+      CombatStateData,
+      'surfaces' | 'activeSurfaceId' | 'invasion' | 'combatMode'
+    >
+  >
 
 type AbilitiesConfig = Record<CombatSide, SideAbilitiesConfig>
 
@@ -378,6 +386,21 @@ export function collectDeclaredSubtypes(
   return result
 }
 
+/** Unqualified entries, keeping the first entry for each variant. */
+function withoutSurfaces(
+  entries: readonly ([string] | [string, unknown])[],
+): ([string] | [string, unknown])[] {
+  const seen = new Set<string>()
+  const result: ([string] | [string, unknown])[] = []
+  for (const entry of entries) {
+    const key = parseUnitLocator(entry[0]).unitType
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push([key, ...entry.slice(1)] as [string] | [string, unknown])
+  }
+  return result
+}
+
 function sourceSide(side: CombatSide, source: SyncSourceConfig): CombatSide {
   return source.side === 'own' ? side : getOpponentSide(side)
 }
@@ -449,6 +472,7 @@ function reconcileSyncSources(
           combatMode,
           activeSurfaceId: state.activeSurfaceId,
           surfaces: state.surfaces,
+          invasion: state.invasion,
           side: targetSide,
           // Lists keep per-surface choices for every planet; a single choice
           // follows the active surface unless its mode is not being fought.
@@ -467,6 +491,10 @@ function reconcileSyncSources(
       const maxFor = source.limit
         ? (key: string) => maxima.get(key as never) ?? Infinity
         : undefined
+      // Choices made by type drop the surface stored by earlier versions.
+      const byType =
+        surfaceScoped &&
+        choosesByType(source.filter?.combatMode ?? combatMode, source.scope)
       if (Array.isArray(currentValue)) {
         // Options list only units that may fight; entries for absent units
         // stay hidden, so a unit removed and added back keeps its settings.
@@ -475,11 +503,14 @@ function reconcileSyncSources(
           surfaceScoped && !source.filter?.includeOnlyAvailable
             ? (key: string) => {
                 const { surfaceId } = parseUnitLocator(key)
-                return surfaceId !== undefined && surfaces.has(surfaceId)
+                return surfaceId === undefined
+                  ? byType
+                  : surfaces.has(surfaceId)
               }
             : undefined
+        const entries = currentValue as ([string] | [string, unknown])[]
         abilityParams[source.key] = reconcileUnitListParam(
-          currentValue as ([string] | [string, unknown])[],
+          byType ? withoutSurfaces(entries) : entries,
           validList,
           source.defaultItemValue,
           maxFor,
@@ -493,6 +524,7 @@ function reconcileSyncSources(
         const automatic =
           source.sort === 'combat-asc' || source.sort === 'combat-desc'
         const unpicked =
+          !byType &&
           automatic &&
           surfaceScoped &&
           (currentValue === extractDefaults(ability)[source.key] ||
@@ -507,10 +539,12 @@ function reconcileSyncSources(
           if (autoChoices) autoChoices[autoKey] = choice
         } else {
           abilityParams[source.key] = reconcileStringParam(
-            relocateUnitTarget(currentValue, validList),
+            byType
+              ? parseUnitLocator(currentValue).unitType
+              : relocateUnitTarget(currentValue, validList),
             validList,
           )
-          if (autoChoices && automatic) delete autoChoices[autoKey]
+          if (autoChoices && automatic && !byType) delete autoChoices[autoKey]
         }
       }
     }

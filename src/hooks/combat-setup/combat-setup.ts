@@ -8,6 +8,7 @@ import {
   extractDefaults,
   extractSyncSources,
   getOpponentSide,
+  type InvasionState,
   type SideAbilitiesConfig,
   type SideStateData,
 } from '@/combat'
@@ -272,6 +273,7 @@ export class CombatSetup {
       },
       surfaces: this._surfaces,
       activeSurfaceId: this.activeSurfaceId,
+      invasion: this.invasion,
     }
 
     this.setFaction('attacker', faction)
@@ -388,6 +390,7 @@ export class CombatSetup {
       ...this._stateData,
       combatMode: mode,
       activeSurfaceId: this.activeSurfaceId,
+      invasion: this.invasion,
     }
     this.reconcile()
     if (this._editorMode === 'SIMPLIFIED') {
@@ -422,10 +425,6 @@ export class CombatSetup {
     if (!this._surfaces.some(s => s.id === surfaceId && s.type === 'PLANET'))
       return
     this._selectedPlanetId = surfaceId
-    this._stateData = {
-      ...this._stateData,
-      activeSurfaceId: this.activeSurfaceId,
-    }
     this.rebuildAllUnits()
   }
 
@@ -752,6 +751,7 @@ export class CombatSetup {
       combatMode: this._combatMode,
       surfaces: this._surfaces,
       activeSurfaceId: this.activeSurfaceId,
+      invasion: this.invasion,
     }
 
     // Final reconcile and engine rebuild
@@ -765,10 +765,18 @@ export class CombatSetup {
     return side === 'attacker' ? this._attackerFaction : this._defenderFaction
   }
 
+  /** Where the combat starts: space, or the first planet holding units
+   *  (where ground forces are committed). The selected tab only picks the
+   *  planet being edited, so it decides only when no planet holds units. */
   private get activeSurfaceId(): SurfaceId {
-    return this._combatMode === 'SPACE'
-      ? SPACE_SURFACE_ID
-      : this._selectedPlanetId
+    if (this._combatMode === 'SPACE') return SPACE_SURFACE_ID
+    return this.invasionPlanets()[0] ?? this._selectedPlanetId
+  }
+
+  /** Two or more planets holding units are all fought over. */
+  private get invasion(): InvasionState | undefined {
+    const planets = this.invasionPlanets()
+    return planets.length > 1 ? { planets, results: [] } : undefined
   }
 
   /** Each ability's synced params, by ability key. */
@@ -924,6 +932,7 @@ export class CombatSetup {
       _nextCode: gen._nextCode,
       surfaces: this._surfaces,
       activeSurfaceId: this.activeSurfaceId,
+      invasion: this.invasion,
     }
   }
 

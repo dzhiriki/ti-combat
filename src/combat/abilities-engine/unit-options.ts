@@ -14,7 +14,11 @@ import {
   filterDeclaredSubtypes,
 } from '../combat-side-state/combat-side-state'
 import { getCombatMeta } from '../combat-state/phase-utils'
-import type { CombatMode, SideStateData } from '../combat-state/types'
+import type {
+  CombatMode,
+  InvasionState,
+  SideStateData,
+} from '../combat-state/types'
 import { parseUnitLocator } from '../utils/parse-unit-locator'
 import {
   expandWithSubtypes,
@@ -32,6 +36,8 @@ export interface UnitOptionContext {
   activeSurfaceId?: SurfaceId
   surfaces?: readonly SurfaceDefinition[]
   side: CombatSide
+  /** A multi-planet invasion fights on all its planets. */
+  invasion?: InvasionState
   /** Treat every surface of the option's mode as active. Reconcile uses this
    *  so choices for an unselected planet survive planet and mode switches. */
   allSurfaces?: boolean
@@ -44,6 +50,16 @@ type OptionSpec = Pick<
   sort?: SyncSourceConfig['sort']
   /** Key of the ability declaring the param, for `filter.withAbility`. */
   abilityKey?: string
+}
+
+/** Each ground combat is fought on one planet, so participant choices apply
+ *  by type on every planet; only a combat drawing units from several
+ *  surfaces (space) or a system-wide choice needs the surface. */
+export function choosesByType(
+  mode: CombatMode,
+  scope: SyncSourceConfig['scope'],
+): boolean {
+  return mode === 'GROUND' && scope !== 'system'
 }
 
 /** Keep the types whose units carry the ability `abilityKey`. */
@@ -123,9 +139,10 @@ export function resolveUnitOptions(
 
   const surfaceType = mode === 'SPACE' ? 'SPACE' : 'PLANET'
   const candidates = surfaces.filter(surface => surface.type === surfaceType)
+  const fought = context.invasion?.planets ?? [context.activeSurfaceId]
   const selected = context.allSurfaces
     ? candidates
-    : candidates.filter(surface => surface.id === context.activeSurfaceId)
+    : candidates.filter(surface => fought.includes(surface.id))
   const active = new Set(
     (selected.length ? selected : candidates.slice(0, 1)).map(
       surface => surface.id,
@@ -135,15 +152,20 @@ export function resolveUnitOptions(
   const category = mode === 'SPACE' ? 'SHIPS' : 'GROUND_FORCES'
   // Where a unit fights, mirroring `participatesInCombat` and commitment:
   // ships where they stand, ground forces on an active planet, and the
-  // attacker's ground forces from space on the invaded planet. System
-  // controls keep units where they stand.
+  // attacker's ground forces from space on the planet they are committed to
+  // (the first of a multi-planet invasion). System controls keep units where
+  // they stand.
+  const committedTo =
+    context.allSurfaces || !active.has(context.activeSurfaceId)
+      ? [...active]
+      : [context.activeSurfaceId]
   const fightsOn = (side: SideStateData, id: UnitId): readonly SurfaceId[] => {
     const surface = side.unitSurface[id]
     if (spec.scope === 'system') return [surface]
     if (!isUnitCategory(side, id, category, phase)) return []
     if (mode === 'SPACE') return [surface]
     if (surface === SPACE_SURFACE_ID)
-      return context.side === 'attacker' ? [...active] : []
+      return context.side === 'attacker' ? committedTo : []
     return active.has(surface) ? [surface] : []
   }
   const units = (side: SideStateData) =>
@@ -222,5 +244,25 @@ export function resolveUnitOptions(
       })
     })
   }
-  return items
+  return choosesByType(mode, spec.scope) ? mergeSurfaces(items) : items
+}
+
+/** One unqualified option per variant; a cap is the largest per-planet one,
+ *  since the choice applies to one planet's combat at a time. */
+function mergeSurfaces(items: readonly UnitOption[]): UnitOption[] {
+  const merged = new Map<UnitType, UnitOption>()
+  for (const item of items) {
+    const value = parseUnitLocator(item.value).unitType
+    const existing = merged.get(value)
+    if (!existing) {
+      merged.set(value, {
+        label: item.label,
+        value,
+        ...(item.max === undefined ? {} : { max: item.max }),
+      })
+    } else if (item.max !== undefined) {
+      existing.max = Math.max(existing.max ?? 0, item.max)
+    }
+  }
+  return [...merged.values()]
 }

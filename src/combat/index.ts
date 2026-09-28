@@ -49,6 +49,7 @@ export {
   getNextPhaseInFlow,
   GROUND_FLOW,
   type HitSource,
+  type InvasionState,
   isCombatMeta,
   type MetaPhase,
   type PhaseMarker,

@@ -949,7 +949,12 @@ confined to one surface. `source` still selects categories; `side`, `filter`,
 Scoped options have a `UnitLocator` key and surface metadata. They offer only
 the units the setup model holds: fielded units and those active abilities may
 place (see [Setup changes](#setup-changes)). Participating choices use the
-active combat surface; setup grants can expose additional surfaces. System
+active combat surface; setup grants can expose additional surfaces. In ground
+mode they are made by unit type (plain variant keys, no surface): each ground
+combat is fought on one planet, so a choice applies on every planet holding
+units. Only a combat drawing participants from several surfaces (space
+combat with Alastor or Eidolon Maximum) and system choices keep the
+surface. System
 choices use every surface a unit stands on. Explicit availability filters and
 count limits still apply. `scope: 'type'` choices (reinforcements) offer every
 type of the category. Reconciliation keeps participating list entries for every
@@ -959,7 +964,7 @@ the active one. It also keeps the entries of units no longer offered, hidden,
 so a unit removed and placed again gets its settings back; share links carry
 only the offered entries.
 Single choices follow the active surface and keep their unit type when the
-planet changes.
+planet changes; ground choices, made by type, need no move.
 `sort: 'combat-desc'` (`'combat-asc'`) orders options by the expected hits of
 their combat roll, strongest (weakest) first, with worth breaking ties; it
 reads the setup model's stats, so upgrades and declared changes count. A

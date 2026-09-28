@@ -184,7 +184,15 @@ describe('multi-planet simulation input', () => {
 
     const input = setup.toSimulationInput()!
     expect(input.invasionPlanets).toEqual([PLANET_1, PLANET_2])
-    expect(input.activeSurfaceId).toBe(PLANET_2)
+    expect(input.activeSurfaceId).toBe(PLANET_1)
+  })
+
+  it('invades the planet holding units, whichever tab is selected', () => {
+    const setup = setupTwoPlanets()
+    setup.setSurfaceUnitCount('defender', PLANET_1, 'PDS', 0)
+    setup.selectPlanet(PLANET_1)
+
+    expect(setup.toSimulationInput()!.activeSurfaceId).toBe(PLANET_2)
   })
 
   it('keeps the single-planet input otherwise', () => {

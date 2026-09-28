@@ -63,6 +63,15 @@ export function prepareSimulation(
     ],
   }
 
+  // A multi-planet invasion starts on its first planet; settings reconcile
+  // against every planet it fights on, as the panel shows them.
+  const planets = input.invasionPlanets
+  const invasion =
+    combatMode === 'GROUND' && planets && planets.length > 1
+      ? { planets: [...planets], results: [] }
+      : undefined
+  const activeSurfaceId = invasion?.planets[0] ?? input.activeSurfaceId
+
   const savedParams = snapshotConsumerParams(config, registered)
   // Materialize every registered ability's static defaults into the config so
   // `sideData.abilities` carries a base entry for all of them (uses, isEnabled,
@@ -85,7 +94,7 @@ export function prepareSimulation(
     { attacker: declaredSide('attacker'), defender: declaredSide('defender') },
     surfaces,
     combatMode,
-    input.activeSurfaceId,
+    activeSurfaceId,
   )
   const gen: { _nextCode?: number } = {}
   const state = {
@@ -108,7 +117,8 @@ export function prepareSimulation(
       gen,
     ),
     surfaces: [...surfaces],
-    activeSurfaceId: input.activeSurfaceId,
+    activeSurfaceId,
+    invasion,
     combatMode,
   }
   const metadata = reconcileAbilitiesConfig(
@@ -136,20 +146,12 @@ export function prepareSimulation(
   // per-variant caps the controls offered; clamp them in place.
   clampLimitParams(config, registered, state)
 
-  // Settings reconcile against the selected planet; a multi-planet invasion
-  // starts on its first planet.
-  const planets = input.invasionPlanets
-  const invasion =
-    combatMode === 'GROUND' && planets && planets.length > 1
-      ? { planets: [...planets], results: [] }
-      : undefined
-
   return {
     attacker: state.attacker,
     defender: state.defender,
     combatMode,
     surfaces: input.surfaces,
-    activeSurfaceId: invasion?.planets[0] ?? input.activeSurfaceId,
+    activeSurfaceId,
     invasion,
     abilities: registered,
     unitAbilityKeys: {
