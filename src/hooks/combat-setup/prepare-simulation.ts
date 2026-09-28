@@ -136,12 +136,21 @@ export function prepareSimulation(
   // per-variant caps the controls offered; clamp them in place.
   clampLimitParams(config, registered, state)
 
+  // Settings reconcile against the selected planet; a multi-planet invasion
+  // starts on its first planet.
+  const planets = input.invasionPlanets
+  const invasion =
+    combatMode === 'GROUND' && planets && planets.length > 1
+      ? { planets: [...planets], results: [] }
+      : undefined
+
   return {
     attacker: state.attacker,
     defender: state.defender,
     combatMode,
     surfaces: input.surfaces,
-    activeSurfaceId: input.activeSurfaceId,
+    activeSurfaceId: invasion?.planets[0] ?? input.activeSurfaceId,
+    invasion,
     abilities: registered,
     unitAbilityKeys: {
       attacker: gameData.getUnitDefinitionAbilityKeys(factions.attacker),

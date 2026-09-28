@@ -25,7 +25,9 @@ import type { Precision } from '@/hooks/use-settings'
 import { useSimulation } from '@/hooks/use-simulation'
 import { useUrlSync } from '@/hooks/use-url-sync'
 import type { CombatSide, UnitBaseType } from '@/types'
+import { getCombatResult } from '@/utils/get-combat-result'
 import { getGameData } from '@/utils/get-game-data'
+import { getPlanetReports } from '@/utils/get-planet-reports'
 
 import { ButtonIconPlain } from '../ui/button-icon-plain'
 import { Divider } from '../ui/divider'
@@ -214,26 +216,14 @@ export function CombatSimulator({
     // oxlint-disable-next-line react/exhaustive-deps
   }, [stateData])
 
-  const combatResult = useMemo(() => {
-    if (!outcomes) return null
-    let attackerWin = 0
-    let draw = 0
-    let defenderWin = 0
-    for (const o of outcomes) {
-      switch (o.winner) {
-        case 'attacker':
-          attackerWin += o.probability
-          break
-        case 'defender':
-          defenderWin += o.probability
-          break
-        case 'draw':
-          draw += o.probability
-          break
-      }
-    }
-    return { attackerWin, draw, defenderWin }
-  }, [outcomes])
+  const combatResult = useMemo(
+    () => (outcomes ? getCombatResult(outcomes) : null),
+    [outcomes],
+  )
+  const planetReports = useMemo(
+    () => (outcomes ? getPlanetReports(outcomes, surfaces) : []),
+    [outcomes, surfaces],
+  )
 
   const handleUpgradeToggle = (side: CombatSide, unit: UnitBaseType) => {
     setUpgraded(side, unit, !isUpgraded(side, unit))
@@ -372,6 +362,7 @@ export function CombatSimulator({
           defenderConfig={defenderConfig}
           combatResult={combatResult}
           outcomes={outcomes}
+          planetReports={planetReports}
           unitPriority={unitPriority}
           participatingTypes={participatingTypes}
           isComputing={isComputing}

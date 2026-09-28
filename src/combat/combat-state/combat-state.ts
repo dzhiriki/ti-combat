@@ -59,6 +59,7 @@ import type {
   PendingStep,
   PhaseStep,
   PhaseStepGroup,
+  InvasionState,
   PhaseTransitionTarget,
   SideStateData,
   UnitAbilityMeta,
@@ -102,6 +103,15 @@ function resyncSide(data: CombatStateData, side: CombatSide): void {
   )
 }
 
+/** State-hash segment for a multi-planet invasion: the unit segments are
+ *  relative to the active planet, so without the cursor two planets' states
+ *  could collide. Empty for every other combat. */
+function invasionHash(data: CombatStateData): string {
+  const invasion = data.invasion
+  if (invasion === undefined) return ''
+  return `|${data.activeSurfaceId}:${invasion.results.join(',')}`
+}
+
 /** AFB-context AFTER_UNIT_ABILITY_ROLL abilities (e.g. RAID_FORMATION) need
  *  to read excess-hit counts; clamping would hide them. Gate per-side. */
 function hasAfbAfterRollInvokes(
@@ -118,6 +128,8 @@ export interface SimulationSetup {
   combatMode: CombatMode
   surfaces: SurfaceDefinition[]
   activeSurfaceId: SurfaceId
+  /** Multi-planet invasions only; `activeSurfaceId` is its first planet. */
+  invasion?: InvasionState
   abilities: Record<CombatSide, RegisteredAbility[]>
   unitAbilityKeys: Record<CombatSide, ReadonlySet<string>>
   factionOwnedKeys: Record<CombatSide, ReadonlySet<string>>
@@ -218,6 +230,7 @@ export class CombatState {
       combatMode: setup.combatMode,
       surfaces: setup.surfaces,
       activeSurfaceId: setup.activeSurfaceId,
+      invasion: setup.invasion,
       _nextCode: setup.nextCode,
     }
 
@@ -389,12 +402,12 @@ export class CombatState {
 
   getUnitsHash(): string {
     const d = this.data
-    return `${CombatSideState.getUnitsHash(d.attacker, d.activeSurfaceId)}|${CombatSideState.getUnitsHash(d.defender, d.activeSurfaceId)}`
+    return `${CombatSideState.getUnitsHash(d.attacker, d.activeSurfaceId)}|${CombatSideState.getUnitsHash(d.defender, d.activeSurfaceId)}${invasionHash(d)}`
   }
 
   getHash(): string {
     const d = this.data
-    return `${CombatSideState.getHash(d.attacker, d.activeSurfaceId)}|${CombatSideState.getHash(d.defender, d.activeSurfaceId)}`
+    return `${CombatSideState.getHash(d.attacker, d.activeSurfaceId)}|${CombatSideState.getHash(d.defender, d.activeSurfaceId)}${invasionHash(d)}`
   }
 
   /**
@@ -534,8 +547,29 @@ export class CombatState {
           { kind: 'timing', timing: 'CLEANUP', phase },
         ]
 
-      case 'SPACE_CANNON_DEFENSE':
-        return [{ kind: 'timing', timing: 'SPACE_CANNON_DEFENSE_STEP', phase }]
+      case 'SPACE_CANNON_DEFENSE': {
+        const planets = this.data.invasion?.planets
+        if (!planets)
+          return [
+            { kind: 'timing', timing: 'SPACE_CANNON_DEFENSE_STEP', phase },
+          ]
+        // Every planet's defense resolves before any ground combat, then the
+        // first planet's combat starts.
+        return [
+          ...planets.map((planet): PhaseStep => ({
+            kind: 'method',
+            fn: CombatState.prototype._spaceCannonDefenseOn,
+            phase,
+            payload: planet,
+          })),
+          {
+            kind: 'method',
+            fn: CombatState.prototype._activatePlanetStep,
+            phase,
+            payload: planets[0],
+          },
+        ]
+      }
 
       case 'SPACE_COMBAT':
       case 'GROUND_COMBAT': {
@@ -624,6 +658,55 @@ export class CombatState {
     }
     CombatSideState.moveUnits(attacker, moving, data.activeSurfaceId)
     this.resyncParticipating('attacker')
+  }
+
+  /** Multi-planet Space Cannon Defense: fire from `planet` at the ground
+   *  forces committed there; a planet without them gets no roll. */
+  private _spaceCannonDefenseOn(phase: MetaPhase[], planet: unknown): void {
+    this._activatePlanet(planet as SurfaceId)
+    if (!CombatSideState.hasParticipatingUnits(this.data.attacker)) return
+    this.pushScript([
+      { kind: 'timing', timing: 'SPACE_CANNON_DEFENSE_STEP', phase },
+    ])
+  }
+
+  private _activatePlanetStep(_phase: MetaPhase[], planet: unknown): void {
+    this._activatePlanet(planet as SurfaceId)
+  }
+
+  /** Move the invasion to `planet`: participation and surface-scoped
+   *  restrictions follow the active surface. */
+  private _activatePlanet(planet: SurfaceId): void {
+    const d = this.data
+    if (d.activeSurfaceId === planet) return
+    d.activeSurfaceId = planet
+    d.attacker._resolvedRestrictions = undefined
+    d.defender._resolvedRestrictions = undefined
+    resyncSide(d, 'attacker')
+    resyncSide(d, 'defender')
+  }
+
+  /** Whether a finished planet combat is followed by another planet's. */
+  public hasNextCombat(): boolean {
+    const invasion = this.data.invasion
+    return (
+      invasion !== undefined &&
+      invasion.results.length < invasion.planets.length
+    )
+  }
+
+  /** Multi-planet invasions resolve one ground combat per planet. Once a
+   *  planet's combat has finished, activate the next planet and reopen the
+   *  flow after the shared steps. Returns the meta the scheduler resumes
+   *  from as if its script had just drained, or undefined when no planet is
+   *  left. Schedulers must restart their round count for the new combat. */
+  public beginNextCombat(): MetaPhase | undefined {
+    if (!this.isFinished() || !this.hasNextCombat()) return undefined
+    const d = this.data
+    d.isFinished = false
+    d.winnerSide = undefined
+    this._activatePlanet(d.invasion!.planets[d.invasion!.results.length])
+    return 'SPACE_CANNON_DEFENSE'
   }
 
   /** Swap the two sides' pending hit pools. Queued inside a self-targeting
@@ -756,10 +839,16 @@ export class CombatState {
   }
 
   private _finish(): void {
-    this.data.winnerSide = this._deriveWinner()
-    for (const side of returnCommittedFighters(this.data))
+    const d = this.data
+    d.winnerSide = this._deriveWinner()
+    for (const side of returnCommittedFighters(d))
       this.resyncParticipating(side)
-    this.data.isFinished = true
+    if (d.invasion)
+      d.invasion = {
+        ...d.invasion,
+        results: [...d.invasion.results, d.winnerSide],
+      }
+    d.isFinished = true
   }
 
   /** Rebuild membership from native categories and explicit instance grants. */

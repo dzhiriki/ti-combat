@@ -1,18 +1,12 @@
 import { clsx } from 'clsx'
 import { useState } from 'react'
 
-import type { CombatOutcome } from '@/combat'
+import type { CombatOutcome, CombatResult } from '@/combat'
 import type { SurfaceDefinition } from '@/types'
 
 import { DetailedOutcomes } from '../detailed-outcomes'
 
 import styles from './combat-result-bar.module.css'
-
-export interface CombatResult {
-  attackerWin: number
-  draw: number
-  defenderWin: number
-}
 
 interface UnitPriority {
   attacker: string[]
@@ -20,8 +14,13 @@ interface UnitPriority {
 }
 
 interface CombatResultBarProps {
+  /** Shown above the bar when there are several reports. */
+  title?: string
+  /** Label of the middle segment. */
+  drawLabel?: string
   result: CombatResult | null
-  outcomes: CombatOutcome[] | null
+  /** Outcomes for the Detailed table; `undefined` hides the button. */
+  outcomes: CombatOutcome[] | null | undefined
   unitPriority: UnitPriority
   participatingTypes: UnitPriority
   surfaces?: readonly SurfaceDefinition[]
@@ -29,6 +28,8 @@ interface CombatResultBarProps {
 }
 
 export function CombatResultBar({
+  title,
+  drawLabel = 'Draw',
   result,
   outcomes,
   unitPriority,
@@ -37,10 +38,11 @@ export function CombatResultBar({
   isComputing,
 }: CombatResultBarProps) {
   const [showDetailed, setShowDetailed] = useState(false)
-  const segments = buildSegments(result)
+  const segments = buildSegments(result, drawLabel)
 
   return (
     <div className={styles.wrapper}>
+      {title && <h3 className={styles.title}>{title}</h3>}
       <div className={clsx(styles.resultBar, isComputing && styles.loading)}>
         {segments.map(({ key, percent, percentRound, label, segmentClass }) => (
           <div
@@ -57,14 +59,16 @@ export function CombatResultBar({
         ))}
       </div>
 
-      <button
-        type="button"
-        className={styles.detailedButton}
-        disabled={!outcomes || outcomes.length === 0}
-        onClick={() => setShowDetailed(v => !v)}
-      >
-        {showDetailed ? 'Hide' : 'Detailed'}
-      </button>
+      {outcomes !== undefined && (
+        <button
+          type="button"
+          className={styles.detailedButton}
+          disabled={!outcomes || outcomes.length === 0}
+          onClick={() => setShowDetailed(v => !v)}
+        >
+          {showDetailed ? 'Hide' : 'Detailed'}
+        </button>
+      )}
 
       {showDetailed && outcomes && outcomes.length > 0 && (
         <DetailedOutcomes
@@ -96,7 +100,7 @@ function roundToSum100(values: number[]): number[] {
   return floored
 }
 
-function buildSegments(result: CombatResult | null) {
+function buildSegments(result: CombatResult | null, drawLabel: string) {
   const values = result || {
     attackerWin: 0,
     draw: 1,
@@ -121,7 +125,7 @@ function buildSegments(result: CombatResult | null) {
       key: 'draw',
       percentRound: drawPct,
       percent: values.draw * 100,
-      label: 'Draw',
+      label: drawLabel,
     },
     {
       key: 'defender',

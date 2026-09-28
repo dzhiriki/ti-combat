@@ -416,6 +416,37 @@ a check there too.
   `tests/abilities/claire-gibson+indoctrination.test.ts`, and
   `tests/surfaces.test.ts`.
 
+- **A multi-planet invasion chains one combat per planet.**
+  `CombatStateData.invasion` (set only when `invasionPlanets` names two or
+  more planets) runs one bombardment and commitment onto `planets[0]`,
+  Space Cannon Defense on every planet (skipped where the attacker has no
+  ground forces), then a ground combat per planet. Each planet's combat ends
+  like any other (end script → `_finish`, which appends the winner to
+  `invasion.results`) and sets `isFinished`; the schedulers (`CombatEngine`,
+  the test harness) then call `beginNextCombat()` and restart their round
+  count, so `START_OF_COMBAT` fires per planet. COMPLETE handling itself is
+  unchanged, so `_loadEndScriptIfFlowExhausted` needs no mirror. State,
+  uses and unit stats carry over. `invasion` is shared by branch clones:
+  replace it, never mutate it. Moving the active planet must resync both
+  sides and drop `_resolvedRestrictions` (`_activatePlanet`), and the state
+  hash appends the planet cursor only while `invasion` is set — the unit
+  segments are relative to the active surface, so two planets' states would
+  otherwise collide. Known gaps until per-planet selectors: Plasma Scoring,
+  Custodia Vigilia and Geoform add dice to every planet's SCD roll. See
+  `tests/engine/multi-planet-invasion.test.ts`.
+
+- **"On this planet" effects must not be side-wide.** With several planets a
+  blanket restriction or config change leaks into the other planets' combats.
+  Restrict the units standing on the planet with a surface-scoped restriction
+  (Moll Terminus passes the mech's planet, or the invaded planet when the
+  attacker commits it from space). An effect about the planet being attacked
+  rather than where units stand can't be surface-scoped: apply it at the
+  planet's `START_OF_COMBAT` (context `GROUND_COMBAT`) when its source stands
+  on the active planet, and undo it at `END_OF_COMBAT` (Planetary Shield,
+  which also sets it at PREPARE for the shared bombardment; Annihilator;
+  Shield Paling). The undo is a unit-sourced invoke, so it needs a surviving
+  carrier.
+
 - **The `[0.0.1]` assignHits fast path compares base types, not locators.**
   Surface-qualified tiers are equivalent only when they name one surface and
   every pooled unit stands on it (`fitsFighterFastPath`); Alastor pools span

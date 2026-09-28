@@ -224,8 +224,14 @@ export class CombatTest {
     return this._log
   }
 
+  /** True once the whole combat is over — in a multi-planet invasion, the
+   *  last planet's combat. */
   isFinished(): boolean {
-    return this._cs.isFinished()
+    return this._isOver()
+  }
+
+  private _isOver(): boolean {
+    return this._cs.isFinished() && !this._cs.hasNextCombat()
   }
 
   // --- Phase control ---
@@ -240,7 +246,7 @@ export class CombatTest {
 
     for (let i = 0; i < MAX_ITERATIONS; i++) {
       if (meta === 'COMPLETE') {
-        if (this._cs.isFinished()) break
+        if (this._isOver()) break
         if (!this._ensureScriptLoaded()) break
       } else {
         if (!this._ensureScriptLoaded()) break
@@ -313,7 +319,7 @@ export class CombatTest {
       isCombatMeta(step.phase[step.phase.length - 1])
 
     for (let i = 0; i < MAX_ITERATIONS; i++) {
-      if (this._cs.isFinished()) return this
+      if (this._isOver()) return this
       if (!this._ensureScriptLoaded()) return this
       if (isCombatMeta(this._currentMeta)) break
 
@@ -325,6 +331,8 @@ export class CombatTest {
 
     const entryRound = this._round
     for (let i = 0; i < MAX_ITERATIONS; i++) {
+      // Stops when this planet's combat finishes; the next call continues
+      // on the next planet of a multi-planet invasion.
       if (this._cs.isFinished()) break
       if (!this._ensureScriptLoaded()) break
       if (this._round > entryRound) break
@@ -352,7 +360,7 @@ export class CombatTest {
   advance(): StateWithProbability[] {
     const MAX_ITERATIONS = 500
     for (let i = 0; i < MAX_ITERATIONS; i++) {
-      if (this._cs.isFinished()) return [{ state: this._cs, probability: 1 }]
+      if (this._isOver()) return [{ state: this._cs, probability: 1 }]
       if (!this._ensureScriptLoaded()) {
         return [{ state: this._cs, probability: 1 }]
       }
@@ -414,7 +422,14 @@ export class CombatTest {
    *  phases repeat only while both sides can enter them; exhausted flow loads
    *  the normal end-of-combat timings. */
   private _ensureScriptLoaded(): boolean {
-    if (this._cs.isFinished()) return false
+    if (this._cs.isFinished()) {
+      // Multi-planet invasion: start the next planet's combat, round 1.
+      const next = this._cs.beginNextCombat()
+      if (next === undefined) return false
+      this._currentMeta = next
+      this._loadedForPhase = next
+      this._round = 0
+    }
     if (this._cs.pendingSteps.length > 0) return true
 
     if (this._loadedForPhase === this._currentMeta) {
@@ -624,7 +639,13 @@ export function transitionAndLoad(
   currentMeta: MetaPhase,
   round: number,
 ): MetaPhase | null {
-  if (state.isFinished()) return null
+  if (state.isFinished()) {
+    const resumed = state.beginNextCombat()
+    if (resumed === undefined) return null
+    // The next planet's combat starts at its first round.
+    currentMeta = resumed
+    round = 1
+  }
   const next = state.getNextPhase(currentMeta)
   if (next === 'COMPLETE') {
     state.loadEndScript(currentMeta)

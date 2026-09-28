@@ -2,6 +2,17 @@
   /* Container for combat result */
 }
 
+.title {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-main);
+  text-align: center;
+  font-family: var(--font-heading);
+  font-size: var(--text-sm);
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .emptyState {
   display: flex;
   height: 3.5rem;

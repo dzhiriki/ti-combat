@@ -2,7 +2,7 @@ import { LoopIcon, TrashIcon } from '@radix-ui/react-icons'
 import { clsx } from 'clsx'
 import type { ReactNode } from 'react'
 
-import type { CombatMode, CombatOutcome } from '@/combat'
+import type { CombatMode, CombatOutcome, CombatResult } from '@/combat'
 import { ButtonIcon } from '@/components/ui/button-icon'
 import { ButtonIconPlain } from '@/components/ui/button-icon-plain'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -25,13 +25,11 @@ import type {
   UnitSelection,
 } from '@/types'
 import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
+import type { PlanetReport } from '@/utils/get-planet-reports'
 import type { UnitConfig } from '@/utils/get-unit-config'
 
 import { Divider } from '../ui/divider'
-import {
-  type CombatResult,
-  CombatResultBar,
-} from './components/combat-result-bar'
+import { CombatResultBar } from './components/combat-result-bar'
 import { FactionSelect } from './components/faction-select'
 import { type SideUnitControls, UnitRowDual } from './components/unit-row-dual'
 
@@ -77,6 +75,8 @@ interface BattleCardProps {
   defenderConfig: Record<UnitBaseType, UnitConfig>
   combatResult: CombatResult | null
   outcomes: CombatOutcome[] | null
+  /** One report per planet of a multi-planet invasion, else empty. */
+  planetReports: PlanetReport[]
   unitPriority: { attacker: string[]; defender: string[] }
   participatingTypes: { attacker: string[]; defender: string[] }
   isComputing?: boolean
@@ -130,6 +130,7 @@ export function BattleCard({
   defenderConfig,
   combatResult,
   outcomes,
+  planetReports,
   unitPriority,
   participatingTypes,
   isComputing,
@@ -150,6 +151,7 @@ export function BattleCard({
   const space = surfaces.find(surface => surface.type === 'SPACE')!
   const planet = surfaces.find(surface => surface.id === selectedPlanetId)!
   const planets = surfaces.filter(surface => surface.type === 'PLANET')
+  const multiPlanet = planetReports.length > 0
 
   const planetTabs = (
     <nav className={styles.planetTabs} aria-label="Planets">
@@ -350,14 +352,30 @@ export function BattleCard({
         <Divider className="theme-defender" />
       </div>
 
-      <CombatResultBar
-        result={combatResult}
-        outcomes={outcomes}
-        unitPriority={unitPriority}
-        participatingTypes={participatingTypes}
-        surfaces={editorMode === 'FULL' ? surfaces : undefined}
-        isComputing={isComputing}
-      />
+      <div className={styles.results}>
+        <CombatResultBar
+          title={multiPlanet ? 'All planets' : undefined}
+          drawLabel={multiPlanet ? 'Mixed' : undefined}
+          result={combatResult}
+          outcomes={multiPlanet ? undefined : outcomes}
+          unitPriority={unitPriority}
+          participatingTypes={participatingTypes}
+          surfaces={editorMode === 'FULL' ? surfaces : undefined}
+          isComputing={isComputing}
+        />
+        {planetReports.map(report => (
+          <CombatResultBar
+            key={report.surface.id}
+            title={report.surface.name}
+            result={report.result}
+            outcomes={report.outcomes}
+            unitPriority={unitPriority}
+            participatingTypes={participatingTypes}
+            surfaces={[report.surface]}
+            isComputing={isComputing}
+          />
+        ))}
+      </div>
     </GlassCard>
   )
 }

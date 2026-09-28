@@ -559,17 +559,35 @@ export class CombatSetup {
       ),
     )
     if (!hasUnits) return null
+    const invasionPlanets = this.invasionPlanets()
     return {
       system: this._system,
       attackerFaction: this._attackerFaction,
       defenderFaction: this._defenderFaction,
       surfaces: this._surfaces,
       activeSurfaceId: this.activeSurfaceId,
+      ...(invasionPlanets.length > 1 && { invasionPlanets }),
       attackerPlacements: this.placements('attacker'),
       defenderPlacements: this.placements('defender'),
       combatMode: this._combatMode,
       abilities: this._abilities,
     }
+  }
+
+  /** GROUND mode: every planet holding a unit of either side, in tab order. */
+  private invasionPlanets(): SurfaceId[] {
+    if (this._combatMode !== 'GROUND') return []
+    return this._surfaces
+      .filter(
+        surface =>
+          surface.type === 'PLANET' &&
+          (['attacker', 'defender'] as const).some(side =>
+            Object.values(this._surfaceCounts[side][surface.id] ?? {}).some(
+              count => count > 0,
+            ),
+          ),
+      )
+      .map(surface => surface.id)
   }
 
   toSerializedConfig(): SerializedConfig {

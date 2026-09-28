@@ -52,6 +52,22 @@ setups default to TI4). For Neutral vs Neutral in Twilight's Fall, pass
 `system: 'TF'`. Direct `buildCombatState` callers must always pass
 `system`; both factions must belong to that system.
 
+### Surfaces and multi-planet invasions
+
+`units` puts ships in space, structures on the first planet and everything
+else on the active surface. For explicit locations pass `surfaces`
+(`SurfaceDefinition[]`) and per-side `placements`
+(`{ [surfaceId]: { INFANTRY: 2 } }`, which replaces `units`). In ground mode
+`activeSurfaceId` picks the invaded planet; `invasionPlanets: [P1, P2]`
+instead runs a multi-planet invasion (see `docs/engine-gotchas.md`).
+
+The harness walks planet boundaries: `advanceRound` stops when the current
+planet's combat ends, `advanceTo('GROUND_COMBAT')` from there starts the next
+planet's first round, `advanceTo('COMPLETE')` runs every planet, and
+`isFinished()` is true only after the last one. `t.state.invasion.results`
+lists the finished planets' winners. See
+`tests/engine/multi-planet-invasion.test.ts`.
+
 ### Ability params shorthand
 
 - `ABILITY_KEY: true` expands to `{ isEnabled: true }`

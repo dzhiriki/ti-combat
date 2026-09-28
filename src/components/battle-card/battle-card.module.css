@@ -180,3 +180,9 @@
   align-items: center;
   gap: var(--space-1);
 }
+
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}

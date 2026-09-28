@@ -39,6 +39,8 @@ export interface CombatStateConfig {
   mode: CombatMode
   surfaces?: SurfaceDefinition[]
   activeSurfaceId?: SurfaceId
+  /** Planets fought over in order; two or more run a multi-planet invasion. */
+  invasionPlanets?: readonly SurfaceId[]
   attacker: SideConfig
   defender: SideConfig
   customAbilities?: import('../../combat/abilities-engine/types').Ability[]
@@ -118,6 +120,7 @@ export function buildCombatState(config: CombatStateConfig): CombatState {
       defenderFaction: config.defender.faction,
       surfaces,
       activeSurfaceId,
+      invasionPlanets: config.invasionPlanets,
       attackerPlacements: adaptTestPlacements(
         config.attacker,
         surfaces,

@@ -167,6 +167,37 @@ describe('surface editor conversion', () => {
   })
 })
 
+describe('multi-planet simulation input', () => {
+  const setupTwoPlanets = () => {
+    const setup = new CombatSetup('FULL')
+    setup.setCombatMode('GROUND')
+    setup.addPlanet()
+    setup.setSurfaceUnitCount('attacker', SPACE_SURFACE_ID, 'INFANTRY', 2)
+    setup.setSurfaceUnitCount('defender', PLANET_2, 'INFANTRY', 1)
+    setup.setSurfaceUnitCount('defender', PLANET_1, 'PDS', 1)
+    return setup
+  }
+
+  it('invades every planet holding units, in tab order', () => {
+    const setup = setupTwoPlanets()
+    setup.selectPlanet(PLANET_2)
+
+    const input = setup.toSimulationInput()!
+    expect(input.invasionPlanets).toEqual([PLANET_1, PLANET_2])
+    expect(input.activeSurfaceId).toBe(PLANET_2)
+  })
+
+  it('keeps the single-planet input otherwise', () => {
+    const setup = setupTwoPlanets()
+    setup.setSurfaceUnitCount('defender', PLANET_1, 'PDS', 0)
+    expect(setup.toSimulationInput()!.invasionPlanets).toBeUndefined()
+
+    setup.setSurfaceUnitCount('defender', PLANET_1, 'PDS', 1)
+    setup.setCombatMode('SPACE')
+    expect(setup.toSimulationInput()!.invasionPlanets).toBeUndefined()
+  })
+})
+
 describe('surface combat behavior', () => {
   it('commits eligible attackers from space to the selected planet only', () => {
     const t = combatTest({

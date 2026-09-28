@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
+import { SPACE_SURFACE_ID } from '@/types'
+
 import { combatTest } from '../utils/combat-test'
+import { PLANET_1, PLANET_2, TWO_PLANET_INVASION } from '../utils/surface-units'
 
 describe('MOLL_TERMINUS', () => {
   it('does not disable sustain in space combat', () => {
@@ -128,5 +131,49 @@ describe('MOLL_TERMINUS', () => {
     expect(
       t.defender.unitAbilityRestrictions?.cannotBeUsed?.SUSTAIN_DAMAGE,
     ).toBeFalsy()
+  })
+
+  it('disables sustain for a mech committed from space', () => {
+    const t = combatTest({
+      mode: 'GROUND',
+      attacker: {
+        faction: 'MENTAK_COALITION',
+        units: {},
+        placements: { [SPACE_SURFACE_ID]: { MECH: 1, INFANTRY: 1 } },
+      },
+      defender: {
+        faction: 'FEDERATION_OF_SOL',
+        units: {},
+        placements: { [PLANET_1]: { MECH: 1 } },
+      },
+    })
+
+    t.advanceTo('GROUND_COMBAT')
+    t.advanceRound({ defender: 1 })
+
+    expect(t.defender.units.MECH).toBeUndefined()
+  })
+
+  it('disables sustain only on its own planet', () => {
+    const t = combatTest({
+      ...TWO_PLANET_INVASION,
+      attacker: {
+        faction: 'FEDERATION_OF_SOL',
+        units: {},
+        placements: { [PLANET_2]: { MECH: 1 } },
+      },
+      defender: {
+        faction: 'MENTAK_COALITION',
+        units: {},
+        placements: { [PLANET_1]: { MECH: 1 }, [PLANET_2]: { INFANTRY: 2 } },
+      },
+    })
+
+    // Nothing fights on planet 1, where the Mentak mech stands.
+    t.advanceTo('GROUND_COMBAT')
+    expect(t.state.activeSurfaceId).toBe(PLANET_2)
+    t.advanceRound({ attacker: 1 })
+
+    expect(t.attacker.units.MECH![0].isDamaged).toBe(true)
   })
 })

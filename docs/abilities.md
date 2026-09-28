@@ -510,7 +510,9 @@ Native `UnitStats.CATEGORIES` defaults to the base type's categories.
 Participation follows categories alone: ships (native or granted) join space
 combat wherever they stand in the system, and ground forces join ground combat
 on the invaded planet (the attacker's are committed there from space),
-including newly placed units. Hel-Titans natively belong to both `STRUCTURES`
+including newly placed units. A multi-planet invasion moves the active
+surface: bombardment and commitment use the first planet, then each planet's
+Space Cannon Defense and ground combat run with that planet active. Hel-Titans natively belong to both `STRUCTURES`
 and `GROUND_FORCES`; Eidolon Maximum mechs are ships and ground forces, so one
 on a planet fights in space combat too.
 

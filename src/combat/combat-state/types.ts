@@ -348,14 +348,28 @@ export function isDiceRollContext(ctx: unknown): ctx is DiceRollContext {
   )
 }
 
+/** A ground combat fought over several planets: one shared bombardment and
+ *  commitment (onto `planets[0]`), Space Cannon Defense on every planet, then
+ *  one ground combat per planet in order. */
+export interface InvasionState {
+  readonly planets: readonly SurfaceId[]
+  /** Winners of the finished planet combats, in `planets` order, so its
+   *  length is the index of the planet whose ground combat is current. */
+  readonly results: readonly (CombatSide | 'draw')[]
+}
+
 /** Complete combat state data */
 export interface CombatStateData {
   attacker: SideStateData
   defender: SideStateData
   combatMode: CombatMode
   surfaces: SurfaceDefinition[]
-  /** Space for SPACE mode, or the planet whose invasion is being resolved. */
+  /** Space for SPACE mode, or the planet whose invasion step (Space Cannon
+   *  Defense or ground combat) is being resolved. */
   activeSurfaceId: SurfaceId
+  /** Set only for multi-planet invasions. Branch clones share it, so it is
+   *  replaced on write, never mutated. */
+  invasion?: InvasionState
   /** The scheduler's current meta, set when its script loads; undefined
    *  during PREPARE. Nested metas (AFB) keep the enclosing combat's. Selects
    *  the phase-scoped `CATEGORIES` entries that apply. */
