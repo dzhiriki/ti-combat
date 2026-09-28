@@ -40,6 +40,9 @@ export const dunlainReaper: Ability<Params> = {
     }),
   },
   headerUI: 'uses',
+  declareChanges: (ctx, params) => {
+    if (params.availableMechs > 0) ctx.api.own.placeUnits({ MECH: 1 })
+  },
   invoke: [
     {
       timing: 'START_OF_COMBAT_ROUND',
@@ -56,7 +59,7 @@ export const dunlainReaper: Ability<Params> = {
           ctx.utils.getFlat(params.targetPriority),
         )!
         ctx.api.own.removeUnits(target)
-        ctx.api.own.placeUnits({ MECH: 1 })
+        ctx.invokeChanges()
         ctx.api.own.updateAbilityConfig({
           availableMechs: params.availableMechs - 1,
         })

@@ -41,6 +41,11 @@ export const alarum: Ability<Params> = {
     }),
   },
   headerUI: 'isEnabled',
+  declareChanges: (ctx, params) => {
+    for (const [variantKey, count] of params.availableUnits) {
+      if (count > 0) ctx.api.own.placeUnits({ [variantKey]: 1 })
+    }
+  },
   uiConfig: ctx => [
     {
       key: 'availableUnits',

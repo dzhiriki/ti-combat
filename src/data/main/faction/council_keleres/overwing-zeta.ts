@@ -43,6 +43,9 @@ export const overwingZeta: Ability<Params> = {
     }),
   },
   headerUI: 'isEnabled',
+  declareChanges: (ctx, params) => {
+    ctx.api.own.placeUnits(getShipsToPlace(ctx.utils.getRecord(params.ships)))
+  },
   invoke: [
     {
       timing: 'START_OF_COMBAT_ROUND',
@@ -80,9 +83,8 @@ export const overwingZeta: Ability<Params> = {
 
         return true
       },
-      call: (ctx, params) => {
-        const toPlace = getShipsToPlace(ctx.utils.getRecord(params.ships))
-        ctx.api.own.placeUnits(toPlace)
+      call: ctx => {
+        ctx.invokeChanges()
       },
     },
   ],

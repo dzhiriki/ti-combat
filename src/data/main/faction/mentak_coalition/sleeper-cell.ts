@@ -52,6 +52,17 @@ export const sleeperCell: Ability<Params> = {
     }),
   },
   headerUI: 'isEnabled',
+  // Captures the types of the opponent's ships.
+  declareChanges: (ctx, params) => {
+    const available = new Map(params.availableShips)
+    for (const type of ctx.api.opponent.system.getUnitTypes()) {
+      if (
+        ctx.api.own.isUnitTypeCategory(type, 'SHIPS') &&
+        (available.get(type) ?? 0) > 0
+      )
+        ctx.api.own.placeUnits({ [type]: 1 })
+    }
+  },
   uiConfig: ctx => [
     {
       key: 'availableShips',

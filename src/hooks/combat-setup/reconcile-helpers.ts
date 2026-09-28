@@ -31,7 +31,8 @@ function inheritedValue(
 }
 
 /** Reconcile a `UnitList<V>` (tuple-array) param against a fresh validList.
- *  - Drops entries whose key is no longer valid.
+ *  - Drops entries whose key is no longer valid, unless `keep` holds for
+ *    it: those stay in place, hidden from the controls.
  *  - Preserves user-set order and per-key value for entries that survive.
  *  - Adds missing keys at their natural validList position. Subtype
  *    variants inherit their parent's value when the parent is present;
@@ -45,6 +46,7 @@ export function reconcileUnitListParam(
   validList: readonly string[],
   defaultItemValue?: unknown,
   maxFor?: (variantKey: string) => number,
+  keep?: (key: string) => boolean,
 ): UnitListEntry[] {
   // Order-mode lists round-trip through the URL as flat string arrays —
   // normalize those to 1-tuples here so reconcile treats both shapes
@@ -53,7 +55,9 @@ export function reconcileUnitListParam(
     typeof entry === 'string' ? [entry] : (entry as UnitListEntry),
   )
   const validSet = new Set(validList)
-  const kept = normalized.filter(entry => validSet.has(entry[0]))
+  const kept = normalized.filter(
+    entry => validSet.has(entry[0]) || keep?.(entry[0]),
+  )
   const keptKeys = new Set(kept.map(entry => entry[0]))
   const newKeys = validList.filter(key => !keptKeys.has(key))
 

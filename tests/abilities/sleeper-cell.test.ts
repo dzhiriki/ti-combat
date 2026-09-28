@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
+import { makeUnitLocator } from '@/combat'
 import { UNIT_LIMITS } from '@/constants/units'
+import { CombatSetup } from '@/hooks/combat-setup'
+import { SPACE_SURFACE_ID } from '@/types'
 
 import { combatTest } from '../utils/combat-test'
+import { hitOrderUnits, setAbility } from '../utils/setup-options'
 
 describe.forEachSide('SLEEPER_CELL', () => {
   it('places a copy of each destroyed opponent ship', () => {
@@ -274,5 +278,20 @@ describe.forEachSide('SLEEPER_CELL', () => {
     const availableShips =
       t.state.attacker.abilities.SLEEPER_CELL?.availableShips
     expect(availableShips).toContainEqual(['CRUISER', UNIT_LIMITS.CRUISER - 2])
+  })
+
+  it("declares the opponent's ship types for the hit order", () => {
+    const setup = new CombatSetup()
+    setup.setFaction('attacker', 'MENTAK_COALITION')
+    setup.setUnitCount('attacker', 'CRUISER', 1)
+    setup.setUnitCount('defender', 'DREADNOUGHT', 1)
+    const dreadnought = makeUnitLocator('DREADNOUGHT', SPACE_SURFACE_ID)
+    expect(hitOrderUnits(setup, 'SPACE')).not.toContain(dreadnought)
+
+    setAbility(setup, 'attacker', 'SLEEPER_CELL', { isEnabled: true })
+    expect(hitOrderUnits(setup, 'SPACE')).toContain(dreadnought)
+    expect(hitOrderUnits(setup, 'SPACE')).not.toContain(
+      makeUnitLocator('CARRIER', SPACE_SURFACE_ID),
+    )
   })
 })

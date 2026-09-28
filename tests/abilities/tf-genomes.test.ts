@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import { makeUnitLocator } from '@/combat'
+import { CombatSetup } from '@/hooks/combat-setup'
+import { SPACE_SURFACE_ID } from '@/types'
+
 import { combatTest, unitsByBaseType } from '../utils/combat-test'
+import { hitOrderUnits, setAbility } from '../utils/setup-options'
 
 describe('TF genomes', () => {
   it('Mirror Genome blocks opponent Space Cannon Offense', () => {
@@ -147,5 +152,16 @@ describe('TF genomes', () => {
     expect(t.attacker.units.CRUISER).toBeUndefined()
     expect(t.abilityLog('TF_VALIANT_GENOME')).toHaveLength(0)
     expect(t.defender.units.FIGHTER).toHaveLength(1)
+  })
+
+  it('Splitting Genome declares its fighters for the hit order', () => {
+    const setup = new CombatSetup()
+    setup.setSystem('TF')
+    setup.setUnitCount('attacker', 'CRUISER', 1)
+    const fighters = makeUnitLocator('FIGHTER', SPACE_SURFACE_ID)
+    expect(hitOrderUnits(setup, 'SPACE')).not.toContain(fighters)
+
+    setAbility(setup, 'attacker', 'TF_SPLITTING_GENOME', { isEnabled: true })
+    expect(hitOrderUnits(setup, 'SPACE')).toContain(fighters)
   })
 })

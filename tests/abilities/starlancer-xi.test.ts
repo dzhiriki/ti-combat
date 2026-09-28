@@ -208,11 +208,12 @@ describe('TF_STARLANCER_XI', () => {
       ['UNIT_PRIORITY', 'spaceUnitPriority'],
       ['SUSTAIN_DAMAGE', 'spacePriority'],
     ]) {
-      expect(keys(ability, param)).toEqual(
-        expect.arrayContaining([
-          makeUnitLocator('MECH', SPACE_SURFACE_ID),
-          makeUnitLocator('MECH', DEFAULT_PLANET_ID),
-        ]),
+      expect(keys(ability, param)).toContain(
+        makeUnitLocator('MECH', DEFAULT_PLANET_ID),
+      )
+      // No mech stands in the space area.
+      expect(keys(ability, param)).not.toContain(
+        makeUnitLocator('MECH', SPACE_SURFACE_ID),
       )
     }
   })

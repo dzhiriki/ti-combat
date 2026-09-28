@@ -55,6 +55,7 @@ describe.forEachSide('EXOTRIREME', () => {
   it('lists dreadnoughts for sacrifice before they are upgraded', () => {
     const setup = new CombatSetup()
     setup.setFaction('attacker', 'SARDAKK_NORR')
+    setup.setUnitCount('attacker', 'DREADNOUGHT', 1)
 
     const { sacrificePriority } = setup.abilities.attacker.EXOTRIREME as {
       sacrificePriority: UnitList<boolean>

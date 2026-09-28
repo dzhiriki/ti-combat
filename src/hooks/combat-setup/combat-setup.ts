@@ -6,6 +6,7 @@ import {
   type CombatStateData,
   createLookups,
   extractDefaults,
+  extractSyncSources,
   getOpponentSide,
   type SideAbilitiesConfig,
   type SideStateData,
@@ -219,7 +220,7 @@ export class CombatSetup {
 
   getUnitConfig(side: CombatSide): Record<UnitBaseType, UnitConfig> {
     const result = buildUnitConfig(this._system, this.faction(side))
-    const stats = this._stateData[side].optionMetadata?.standIns.unitStats
+    const stats = this._stateData[side].optionMetadata?.model.unitStats
     if (!stats) return result
     for (const type of UNIT_TYPES) {
       result[type] = {
@@ -578,7 +579,6 @@ export class CombatSetup {
       surfaces: this._surfaces,
       activeSurfaceId: this._stateData.activeSurfaceId,
       combatMode: this._combatMode,
-      simplifiedPlanetId: this.simplifiedPlanetId,
       attacker: { ...this._stateData.attacker },
       defender: { ...this._stateData.defender },
     }
@@ -607,8 +607,16 @@ export class CombatSetup {
       dsu: serializeSurfaceCounts(this._surfaceCounts.defender),
       aup: [...this._upgradedTypes.attacker],
       dup: [...this._upgradedTypes.defender],
-      aa: serializeAbilities(this._abilities.attacker, freshAbilities.attacker),
-      da: serializeAbilities(this._abilities.defender, freshAbilities.defender),
+      aa: serializeAbilities(
+        this._abilities.attacker,
+        freshAbilities.attacker,
+        this.unitListParams('attacker'),
+      ),
+      da: serializeAbilities(
+        this._abilities.defender,
+        freshAbilities.defender,
+        this.unitListParams('defender'),
+      ),
     }
   }
 
@@ -736,11 +744,14 @@ export class CombatSetup {
       : this._selectedPlanetId
   }
 
-  /** The planet `reflowSimplified` places on; undefined in the full editor. */
-  private get simplifiedPlanetId(): SurfaceId | undefined {
-    return this._editorMode === 'SIMPLIFIED'
-      ? this._selectedPlanetId
-      : undefined
+  /** Each ability's synced params, by ability key. */
+  private unitListParams(side: CombatSide): Record<string, string[]> {
+    const result: Record<string, string[]> = {}
+    for (const ability of this._sideRegistered[side]) {
+      const sources = extractSyncSources(ability)
+      if (sources) result[ability.key] = sources.map(source => source.key)
+    }
+    return result
   }
 
   private placements(side: CombatSide): SideUnitPlacements {
@@ -785,7 +796,7 @@ export class CombatSetup {
       this._abilities,
       this._sideRegistered,
       this._combatMode,
-      { ...this._stateData, simplifiedPlanetId: this.simplifiedPlanetId },
+      this._stateData,
       this._lookups,
       true,
     )

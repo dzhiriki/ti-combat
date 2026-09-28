@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import { makeUnitLocator } from '@/combat'
+import { CombatSetup } from '@/hooks/combat-setup'
+import { DEFAULT_PLANET_ID } from '@/types'
+
 import { combatTest } from '../utils/combat-test'
+import { hitOrderUnits, setAbility } from '../utils/setup-options'
 
 describe('GHOM_SEKKUS', () => {
   it('adds configured units during COMMIT_UNITS', () => {
@@ -93,5 +98,23 @@ describe('GHOM_SEKKUS', () => {
       u.subtypes?.includes('Galvanized'),
     )
     expect(galvanized).toHaveLength(2)
+  })
+
+  it('declares the committed units for the hit order', () => {
+    const setup = new CombatSetup()
+    setup.setFaction('attacker', 'SARDAKK_NORR')
+    setup.setCombatMode('GROUND')
+    setup.setUnitCount('attacker', 'INFANTRY', 1)
+    const mech = makeUnitLocator('MECH', DEFAULT_PLANET_ID)
+    setAbility(setup, 'attacker', 'GHOM_SEKKUS', { isEnabled: true })
+    expect(hitOrderUnits(setup, 'GROUND')).not.toContain(mech)
+
+    setAbility(setup, 'attacker', 'GHOM_SEKKUS', {
+      units: [
+        ['MECH', 1],
+        ['INFANTRY', 0],
+      ],
+    })
+    expect(hitOrderUnits(setup, 'GROUND')).toContain(mech)
   })
 })

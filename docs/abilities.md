@@ -241,37 +241,61 @@ export const theAlastor: Ability = {
 ```
 
 Setup runs the changes of every active ability (enabled, with its `headerUI`
-param set) in registration order, attacker first, against a model holding one
-stand-in unit of every type on every surface, then keeps the stand-ins on
-surfaces their type may stand on. Reconcile stores that model as
-`optionMetadata.standIns`, and setup reads it like any combat state:
+param set), attacker first, against a model holding the fielded units of both
+sides. Reconcile stores that model as `optionMetadata.model`, and setup reads it
+like any combat state:
 
 - **Placement** — `ALLOWED_SURFACES` (Miniaturization, Nekro unit copies).
-- **Option lists** — unit categories (Eidolon Maximum, Hel-Titan) and grants
-  (Alastor, Z-Grav Eidolon, Matriarch). A stand-in stands for every unit of
-  its type on its surface, placed or not; placed units only supply counts and
-  caps.
+- **Option lists** — unit categories (Eidolon Maximum, Hel-Titan), grants
+  (Alastor, Z-Grav Eidolon, Matriarch) and the units an ability may place.
+  Lists of units that fight show only the units the model holds; fielded units
+  alone supply counts and caps.
+
+An ability that may place units declares them with `placeUnits` in its changes
+(Brother Milor, Indoctrination, Overwing Zeta, Sleeper Cell, …):
+
+```typescript
+declareChanges: ctx => {
+  ctx.api.own.placeUnits({ FIGHTER: 2 }, SPACE_SURFACE_ID)
+},
+```
+
+In setup, `placeUnits` only makes each variant present on the surface: it adds
+one unit where none stands yet and the unit limit leaves room, enforces nothing
+else, and places nothing for an ability whose `context` is the other combat
+mode. Declare what the ability may place, even if it might not: listing a unit
+that never arrives is harmless, while a placed unit missing from the lists
+takes hits last and can't sustain. Changes run in passes until one places
+nothing new, so a change sees units declared by abilities registered after it
+and by the opponent (Sleeper Cell captures the opponent's ship types).
 
 The engine never runs `declareChanges` on its own. An invoke applying the same
 effect calls `ctx.invokeChanges()` (params default to the ability's current
-config) instead of repeating the code. TF Hel-Titan keeps its plain stats
-invoke for Janovet and declares `declareChanges: statsInvoke.call` instead.
+config) instead of repeating the code; there `placeUnits` places for real. TF
+Hel-Titan keeps its plain stats invoke for Janovet and declares
+`declareChanges: statsInvoke.call` instead.
 
 - Put in `declareChanges` only what setup must see; keep combat-only or
   conditional effects in the invoke (Z-Grav Eidolon's change grants SHIPS to
   the mechs in space; its START_OF_COMBAT invoke also rewrites combat values).
-- Changes see stand-ins: don't count units or rely on which units exist, and
-  don't place, move or remove units, add subtypes, write ability config, or
-  check `isEnabled` (setup already gates on it).
-- A change that reads what another change sets must register after it (Nekro's
-  unit copies precede its flagship's Alastor).
+- Changes see the fielded and declared units, not the combat that follows:
+  don't move or remove units, add subtypes, write ability config, or check
+  `isEnabled` (setup already gates on it).
+- An invoke whose placement matches the declaration calls
+  `ctx.invokeChanges()` instead of repeating it (Brother Milor, Overwing Zeta,
+  Dunlain Reaper after removing its infantry). Call `placeUnits` directly only
+  when the invoke needs the placed ids or a surface setup can't know
+  (Indoctrination, Moyin's Ashes).
 - Declaring changes moves the ability's PREPARE ahead of other PREPAREs, so
   unit copies and transformations set stats before Capacity and Fleet Pool
   enforce.
 - A copier runs its target's changes as the target:
   `withRunningAbility(ctx, target, () => ctx.invokeChanges(params))`
-  (Technological Singularity, which then restores placement surfaces because
-  the copy is gained mid-combat).
+  (Technological Singularity, Ssruu, Clever Genome; Technological
+  Singularity then restores placement surfaces because the copy is gained
+  mid-combat). Forward only changes that still matter once the copy is
+  gained: TF Singularity forwards none, since the Abilities that declare
+  changes act before it can trigger.
 
 ## Timing System
 
@@ -920,14 +944,18 @@ confined to one surface. `source` still selects categories; `side`, `filter`,
 `sort`, and `limit` still apply.
 
 `getUnitVariantsOptions(paramKey)` and reconciliation use the same resolver.
-Scoped options have a `UnitLocator` key and surface metadata. All eligible types
-are offered even when none are fielded yet, so later placements inherit their
-configured priorities. Participating choices use the active combat surface;
-setup declarations can expose additional surfaces. System choices use every
-legal surface. Explicit availability filters and count limits still apply.
-Reconciliation keeps participating list entries for every surface of the
-param's mode (each planet for `GROUND`), so settings for an unselected planet
-survive planet and mode switches while the control shows only the active one.
+Scoped options have a `UnitLocator` key and surface metadata. They offer only
+the units the setup model holds: fielded units and those active abilities may
+place (see [Setup changes](#setup-changes)). Participating choices use the
+active combat surface; setup grants can expose additional surfaces. System
+choices use every surface a unit stands on. Explicit availability filters and
+count limits still apply. `scope: 'type'` choices (reinforcements) offer every
+type of the category. Reconciliation keeps participating list entries for every
+surface of the param's mode (each planet for `GROUND`), so settings for an
+unselected planet survive planet and mode switches while the control shows only
+the active one. It also keeps the entries of units no longer offered, hidden,
+so a unit removed and placed again gets its settings back; share links carry
+only the offered entries.
 Single choices follow the active surface and keep their unit type when the
 planet changes. Give every participating param a `filter.combatMode`; without
 one, the other mode resolves a different catalog and reconcile resets it.
@@ -942,7 +970,7 @@ active planet; the build-time clamp uses the same caps.
 the ability declaring the param, matched by key so re-keyed copies keep
 working. Exotrireme's sacrifice list uses it, so every dreadnought carrying
 the text and The Faces of Janovet (which copies it) can be picked. Setup never
-runs PREPARE, so the filter reads the stand-ins: an ability attached to units
+runs PREPARE, so the filter reads the setup model: an ability attached to units
 at PREPARE must also be attached by a `declareChanges` to be offered. Reconcile
 lists the holders as if the ability were switched on and its unit upgraded (an
 ability in a unit's `FACTION_<UNIT>` slot counts that unit), so the control
@@ -963,7 +991,7 @@ entries like `getFlat` and compiles each list object once, so never mutate a
 to retain location in subsequent queries.
 Subtype declarations use plain `unitType` plus optional `surfaces` metadata.
 
-Setup changes extend these choices through their grants: a stand-in granted
-the mode's category counts on its own surface (Alastor), and the attacker's
+Setup changes extend these choices through their grants: a unit granted the
+mode's category counts on its own surface (Alastor), and the attacker's
 granted ground forces in space are committed onto the active planet
 (Matriarch/Morphwing). The preview never grants runtime participation.

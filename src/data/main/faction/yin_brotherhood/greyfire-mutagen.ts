@@ -32,6 +32,9 @@ export const greyfireMutagen: Ability<Params> = {
     }),
   },
   headerUI: 'isEnabled',
+  declareChanges: ctx => {
+    ctx.api.own.placeUnits({ INFANTRY: 1 })
+  },
   invoke: [
     {
       timing: 'START_OF_COMBAT',
@@ -50,7 +53,7 @@ export const greyfireMutagen: Ability<Params> = {
         )
         if (target === undefined) return
         ctx.api.opponent.removeUnits(target)
-        ctx.api.own.placeUnits({ INFANTRY: 1 })
+        ctx.invokeChanges()
       },
     },
   ],

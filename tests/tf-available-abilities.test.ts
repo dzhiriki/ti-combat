@@ -9,6 +9,7 @@ import { getGameData } from '@/utils/get-game-data'
 import { matchesAbilitySlot } from '@/utils/matches-ability-slot'
 
 import { combatTest } from './utils/combat-test'
+import { setupOptions } from './utils/setup-options'
 
 describe("Twilight's Fall available abilities", () => {
   it('hides Galvanized Units — there is no Galvanize mechanic in TF', () => {
@@ -213,10 +214,11 @@ describe("Twilight's Fall available abilities", () => {
 
     // Sanity: a plain TF faction gets neither
     setup.setFaction('attacker', 'AVARICE_REX')
-    const plain = setup.abilities.attacker
-    const plainPriority = (
-      plain.UNIT_PRIORITY.spaceUnitPriority as [string][]
-    ).map(e => parseUnitLocator(Array.isArray(e) ? e[0] : e).unitType)
+    const plainPriority = setupOptions(
+      setup,
+      'UNIT_PRIORITY',
+      'spaceUnitPriority',
+    ).map(item => parseUnitLocator(item.value).unitType)
     expect(plainPriority).not.toContain('MECH')
   })
 

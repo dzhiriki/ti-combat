@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import { makeUnitLocator } from '@/combat'
+import { CombatSetup } from '@/hooks/combat-setup'
+import { SPACE_SURFACE_ID } from '@/types'
+
 import { combatTest } from '../utils/combat-test'
+import { hitOrderUnits, setAbility } from '../utils/setup-options'
 
 describe.forEachSide('FRAGMENT_REALITY', () => {
   it('places configured ships at start of space combat', () => {
@@ -192,5 +197,19 @@ describe.forEachSide('FRAGMENT_REALITY', () => {
     // Carrier is unlisted and removed; Destroyer fills the remaining fleet slot
     expect(t.attacker.units.CARRIER).toBeUndefined()
     expect(t.attacker.units.DESTROYER).toHaveLength(1)
+  })
+
+  it('declares the ships on the card for the hit order', () => {
+    const setup = new CombatSetup()
+    setup.setFaction('attacker', 'CRIMSON_REBELLION')
+    setup.setUnitCount('attacker', 'CRUISER', 1)
+    const dreadnought = makeUnitLocator('DREADNOUGHT', SPACE_SURFACE_ID)
+    setAbility(setup, 'attacker', 'FRAGMENT_REALITY', { isEnabled: true })
+    expect(hitOrderUnits(setup, 'SPACE')).not.toContain(dreadnought)
+
+    setAbility(setup, 'attacker', 'FRAGMENT_REALITY', {
+      ships: [['DREADNOUGHT', 1]],
+    })
+    expect(hitOrderUnits(setup, 'SPACE')).toContain(dreadnought)
   })
 })

@@ -46,8 +46,8 @@ export interface ParamFilter {
   includeOnlyAvailable?: boolean
   /** When true, only unit types whose stats carry the ability declaring the
    *  param (matched by key, so re-keyed copies keep working). Reads the
-   *  setup stand-ins, so an ability attached at PREPARE must also be
-   *  attached by a `declareChanges` to be offered (TF Exotrireme, Janovet). */
+   *  setup model, so an ability attached at PREPARE must also be attached
+   *  by a `declareChanges` to be offered (TF Exotrireme, Janovet). */
   withAbility?: boolean
 }
 
@@ -109,10 +109,9 @@ export interface DeclaredSubtype {
 
 /** Setup option metadata written by reconcile. Only option lists read it. */
 export interface SideOptionMetadata {
-  /** One unit of every type on every surface it may stand on, once the
-   *  active abilities' `declareChanges` applied. Each stands for all units
-   *  of its type on its surface. */
-  standIns: SideStateData
+  /** The fielded units plus those active abilities may place, once the
+   *  active abilities' `declareChanges` applied. */
+  model: SideStateData
   subtypes: DeclaredSubtype[]
   /** Unit types carrying each ability with a `filter.withAbility` list, as
    *  if that ability were switched on: its list keeps its options and order
@@ -532,11 +531,11 @@ export interface Ability<Params extends Record<string, unknown> = any> {
   /** Abilities sharing the same exclusiveGroup are mutually exclusive — enabling one disables others in the group. */
   exclusiveGroup?: string
   /** The effect setup must see before any invoke runs: unit stats (categories,
-   *  placement surfaces) and category grants. Setup runs it for every active
-   *  ability against one stand-in unit of every type on every surface and
-   *  derives placement and option lists from the result, so a grant on a
-   *  stand-in covers that unit type on that surface. The engine never runs
-   *  it on its own; an invoke applies it with `ctx.invokeChanges()`. */
+   *  placement surfaces), category grants, and the units the ability may
+   *  place (`placeUnits` declares them there). Setup runs it for every active
+   *  ability against the fielded units and derives placement and option
+   *  lists from the result. The engine never runs it on its own; an invoke
+   *  applies it with `ctx.invokeChanges()`. */
   declareChanges?: (
     ctx: AbilityCallContext,
     params: AbilityBaseParams & Params,

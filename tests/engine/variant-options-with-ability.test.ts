@@ -50,7 +50,7 @@ describe('getUnitVariantOptions — withAbility', () => {
   it('reads the stand-ins, which carry the declared changes', () => {
     const side = makeSide({ DREADNOUGHT: {} })
     side.optionMetadata = {
-      standIns: makeSide({ DREADNOUGHT: { ABILITIES: [exotrireme] } }),
+      model: makeSide({ DREADNOUGHT: { ABILITIES: [exotrireme] } }),
       subtypes: [],
     }
 
@@ -67,7 +67,7 @@ describe('getUnitVariantOptions — withAbility', () => {
   it('prefers the holders reconcile lists as if the ability were on', () => {
     const side = makeSide({ DREADNOUGHT: {}, FLAGSHIP: {} })
     side.optionMetadata = {
-      standIns: makeSide({ DREADNOUGHT: {}, FLAGSHIP: {} }),
+      model: makeSide({ DREADNOUGHT: {}, FLAGSHIP: {} }),
       subtypes: [],
       abilityHolders: { [exotrireme.key]: ['FLAGSHIP'] },
     }

@@ -14,12 +14,15 @@ export const claireGibson: Ability = {
     uses: Infinity,
   },
   headerUI: 'isEnabled',
+  declareChanges: ctx => {
+    ctx.api.own.placeUnits({ INFANTRY: 1 })
+  },
   invoke: [
     {
       timing: 'START_OF_COMBAT',
       context: 'GROUND_COMBAT',
       call: ctx => {
-        ctx.api.own.placeUnits({ INFANTRY: 1 })
+        ctx.invokeChanges()
       },
     },
   ],

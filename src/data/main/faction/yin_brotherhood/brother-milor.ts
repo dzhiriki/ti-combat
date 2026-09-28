@@ -12,6 +12,13 @@ export const brotherMilor: Ability = {
     uses: 1,
   },
   headerUI: 'isEnabled',
+  declareChanges: ctx => {
+    if (ctx.state.combatMode === 'SPACE') {
+      ctx.api.own.placeUnits({ FIGHTER: 2 })
+    } else {
+      ctx.api.own.placeUnits({ INFANTRY: 2 })
+    }
+  },
   invoke: [
     {
       timing: 'AFTER_DESTROY',
@@ -20,11 +27,7 @@ export const brotherMilor: Ability = {
       isCallable: (_params, ctx, ids) =>
         ids.some(id => !!ctx.api.own.getUnitVariantKey(id)),
       call: ctx => {
-        if (ctx.state.combatMode === 'SPACE') {
-          ctx.api.own.placeUnits({ FIGHTER: 2 })
-        } else {
-          ctx.api.own.placeUnits({ INFANTRY: 2 })
-        }
+        ctx.invokeChanges()
       },
     },
   ],

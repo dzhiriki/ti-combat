@@ -6,6 +6,7 @@ import { CombatSetup } from '@/hooks/combat-setup'
 import type { UnitList } from '@/types'
 
 import { combatTest } from '../utils/combat-test'
+import { setupOptions } from '../utils/setup-options'
 
 /** The attacker's Exotrireme card config. */
 function cardParams(setup: CombatSetup) {
@@ -156,6 +157,8 @@ describe('TF_UPGRADE_EXOTRIREME + TF_FACES_OF_JANOVET', () => {
     const setup = new CombatSetup()
     setup.setSystem('TF')
     setup.setFaction('attacker', 'EL_NEN_JANOVET')
+    setup.setUnitCount('attacker', 'FLAGSHIP', 1)
+    setup.setUnitCount('attacker', 'DREADNOUGHT', 1)
 
     // Listed as if the card were on, so it can be set up before enabling.
     expect(sacrificeTypes(setup)).toEqual(['DREADNOUGHT', 'FLAGSHIP'])
@@ -178,7 +181,11 @@ describe('TF_UPGRADE_EXOTRIREME + TF_FACES_OF_JANOVET', () => {
     // single option stays hidden.
     setup.setFaction('attacker', 'AVARICE_REX')
 
-    expect(sacrificeTypes(setup)).toEqual(['DREADNOUGHT'])
+    expect(
+      setupOptions(setup, 'TF_UPGRADE_EXOTRIREME', 'sacrificePriority').map(
+        item => parseUnitLocator(item.value).unitType,
+      ),
+    ).toEqual(['DREADNOUGHT'])
     expect(controls(setup)).toMatchObject({
       uses: { max: 5 },
       sacrificePriority: { visible: false },

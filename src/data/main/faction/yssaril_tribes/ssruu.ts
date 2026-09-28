@@ -1,6 +1,7 @@
 import { z } from 'zod/mini'
 
 import yssarilTribesIcon from '@/assets/faction/yssaril_tribes.svg?raw'
+import { withRunningAbility } from '@/combat/abilities-engine/api/ability-api'
 import { extractDefaults } from '@/combat/abilities-engine/declare-param'
 import { resolveInvokes } from '@/combat/abilities-engine/resolve-invokes'
 import type {
@@ -69,6 +70,13 @@ export const ssruu: Ability<Params> = {
     return agent.declareSubtype(
       merged as Parameters<NonNullable<Ability['declareSubtype']>>[0],
       { abilities: ctx.abilities, this: agent },
+    )
+  },
+  declareChanges: (ctx, params) => {
+    const agent = findAgent(ctx, params.agentKey)
+    if (!agent?.declareChanges) return
+    withRunningAbility(ctx, agent, () =>
+      ctx.invokeChanges(withAgentDefaults(agent, params)),
     )
   },
   uiConfig: (ctx, params) => {

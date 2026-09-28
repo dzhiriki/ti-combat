@@ -51,12 +51,12 @@ function filterAbilityHolders(
   if (abilityKey === undefined)
     throw new Error('filter.withAbility needs the declaring ability key')
   // Reconcile lists the holders as if the ability were switched on;
-  // otherwise the stand-ins carry the declared changes: upgrade cards and
-  // copies.
+  // otherwise the setup model carries the declared changes: upgrade cards
+  // and copies.
   const holders =
     s.optionMetadata?.abilityHolders?.[abilityKey] ??
     CombatSideState.getUnitTypesWithAbility(
-      s.optionMetadata?.standIns ?? s,
+      s.optionMetadata?.model ?? s,
       abilityKey,
     )
   const baseTypes = new Set(
@@ -134,18 +134,23 @@ export function resolveUnitOptions(
   }
   const units = (side: SideStateData) =>
     [...side.participatingUnits, ...side.nonParticipatingUnits] as UnitId[]
-  // Choices describe units that may exist later, not just the starting
-  // force: a stand-in of every type on every surface it may stand on decides
-  // where the units it stands for fight.
-  const standIns = s.optionMetadata?.standIns ?? s
+  // Choices describe the units that may fight, not just the starting force:
+  // the setup model adds the units active abilities may place, and its units
+  // decide where the units of their type on their surface fight.
+  const model = s.optionMetadata?.model ?? s
   const offered = new Set(types)
   const reach = new Map<UnitBaseType, Map<SurfaceId, readonly SurfaceId[]>>()
-  for (const id of units(standIns)) {
-    const base = parseUnitLocator(standIns.unitType[id]).baseType
+  for (const id of units(model)) {
+    const base = parseUnitLocator(model.unitType[id]).baseType
     if (!offered.has(base)) continue
     let bySurface = reach.get(base)
     if (!bySurface) reach.set(base, (bySurface = new Map()))
-    bySurface.set(standIns.unitSurface[id], fightsOn(standIns, id))
+    const fights = fightsOn(model, id)
+    const known = bySurface.get(model.unitSurface[id])
+    bySurface.set(
+      model.unitSurface[id],
+      known ? [...new Set([...known, ...fights])] : fights,
+    )
   }
   // Fielded units supply the caps.
   const projected = new Map<SurfaceId, Map<UnitBaseType, Set<UnitId>>>()

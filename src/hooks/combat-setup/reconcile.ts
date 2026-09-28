@@ -34,7 +34,6 @@ import {
   type CombatSide,
   createDefaultSurfaces,
   SPACE_SURFACE_ID,
-  type SurfaceId,
   type UnitType,
 } from '@/types'
 import { factionSlot } from '@/utils/faction-slot'
@@ -46,12 +45,7 @@ import {
 } from './reconcile-helpers'
 
 type OptionState = Pick<CombatStateData, 'attacker' | 'defender'> &
-  Partial<
-    Pick<CombatStateData, 'surfaces' | 'activeSurfaceId' | 'combatMode'>
-  > & {
-    /** Set by the simplified editor: options cover only what it can put. */
-    simplifiedPlanetId?: SurfaceId
-  }
+  Partial<Pick<CombatStateData, 'surfaces' | 'activeSurfaceId' | 'combatMode'>>
 
 type AbilitiesConfig = Record<CombatSide, SideAbilitiesConfig>
 
@@ -98,27 +92,22 @@ export function reconcileAbilitiesConfig(
       unitStats: state[side].unitStats,
       config: changed[side],
       abilities: abilities[side],
+      units: state[side],
     })
     return applyDeclaredChanges(
       { attacker: input('attacker'), defender: input('defender') },
       state.surfaces ?? createDefaultSurfaces(),
       combatMode,
       state.activeSurfaceId ?? SPACE_SURFACE_ID,
-      state.simplifiedPlanetId,
     )
   }
-  const standIns = applyChanges(config)
-  const holders = collectAbilityHolders(
-    config,
-    abilities,
-    standIns,
-    applyChanges,
-  )
+  const model = applyChanges(config)
+  const holders = collectAbilityHolders(config, abilities, model, applyChanges)
   let metadata = collectOptionMetadata(
     config,
     abilities,
     lookups,
-    standIns,
+    model,
     holders,
   )
   reconcileSyncAll(
@@ -134,7 +123,7 @@ export function reconcileAbilitiesConfig(
     config,
     abilities,
     lookups,
-    standIns,
+    model,
     holders,
   )
   // JSON skips the subtypes' stats factories, which never differ here.
@@ -163,11 +152,11 @@ function collectOptionMetadata(
   config: AbilitiesConfig,
   abilities: Record<CombatSide, RegisteredAbility[]>,
   lookups: SideLookups,
-  standIns: Record<CombatSide, SideStateData>,
+  model: Record<CombatSide, SideStateData>,
   holders: Record<CombatSide, Record<string, UnitType[]>>,
 ): OptionMetadata {
   const sideMetadata = (side: CombatSide): SideOptionMetadata => ({
-    standIns: standIns[side],
+    model: model[side],
     subtypes: collectDeclaredSubtypes(
       abilities[side],
       config[side],
@@ -187,7 +176,7 @@ function collectOptionMetadata(
 function collectAbilityHolders(
   config: AbilitiesConfig,
   abilities: Record<CombatSide, RegisteredAbility[]>,
-  standIns: Record<CombatSide, SideStateData>,
+  model: Record<CombatSide, SideStateData>,
   applyChanges: (config: AbilitiesConfig) => Record<CombatSide, SideStateData>,
 ): Record<CombatSide, Record<string, UnitType[]>> {
   const holders: Record<CombatSide, Record<string, UnitType[]>> = {
@@ -200,14 +189,14 @@ function collectAbilityHolders(
         source => source.filter?.withAbility,
       )
       if (!listsHolders) continue
-      const model = isSwitchedOn(ability, config[side])
-        ? standIns
+      const switchedOn = isSwitchedOn(ability, config[side])
+        ? model
         : applyChanges({
             ...config,
             [side]: switchOn(ability, abilities[side], config[side]),
           })
       const carriers = CombatSideState.getUnitTypesWithAbility(
-        model[side],
+        switchedOn[side],
         ability.key,
       )
       // An ability in a unit's slot belongs to that unit: Exotrireme II
@@ -468,11 +457,22 @@ function reconcileSyncSources(
         ? (key: string) => maxima.get(key as never) ?? Infinity
         : undefined
       if (Array.isArray(currentValue)) {
+        // Options list only units that may fight; entries for absent units
+        // stay hidden, so a unit removed and added back keeps its settings.
+        const surfaces = new Set(state.surfaces?.map(surface => surface.id))
+        const keepAbsent =
+          surfaceScoped && !source.filter?.includeOnlyAvailable
+            ? (key: string) => {
+                const { surfaceId } = parseUnitLocator(key)
+                return surfaceId !== undefined && surfaces.has(surfaceId)
+              }
+            : undefined
         abilityParams[source.key] = reconcileUnitListParam(
           currentValue as ([string] | [string, unknown])[],
           validList,
           source.defaultItemValue,
           maxFor,
+          keepAbsent,
         )
       } else if (typeof currentValue === 'string') {
         abilityParams[source.key] = reconcileStringParam(

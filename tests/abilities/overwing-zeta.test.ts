@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import { makeUnitLocator } from '@/combat'
+import { CombatSetup } from '@/hooks/combat-setup'
+import { SPACE_SURFACE_ID } from '@/types'
+
 import { combatTest } from '../utils/combat-test'
+import { hitOrderUnits, setAbility } from '../utils/setup-options'
 
 describe.forEachSide('OVERWING_ZETA', () => {
   it('places flagship and cruisers at start of combat (IMMEDIATELY)', () => {
@@ -241,5 +246,27 @@ describe.forEachSide('OVERWING_ZETA', () => {
     t.advanceRound()
 
     expect(t.abilityLog('OVERWING_ZETA')).toHaveLength(0)
+  })
+
+  it('declares its ships for the space hit order only', () => {
+    const setup = new CombatSetup()
+    setup.setFaction('attacker', 'COUNCIL_KELERES')
+    setup.setUnitCount('attacker', 'CARRIER', 1)
+    setAbility(setup, 'attacker', 'OVERWING_ZETA', { isEnabled: true })
+
+    expect(hitOrderUnits(setup, 'SPACE')).toEqual(
+      expect.arrayContaining([
+        makeUnitLocator('FLAGSHIP', SPACE_SURFACE_ID),
+        makeUnitLocator('CRUISER', SPACE_SURFACE_ID),
+      ]),
+    )
+    expect(hitOrderUnits(setup, 'SPACE')).not.toContain(
+      makeUnitLocator('DESTROYER', SPACE_SURFACE_ID),
+    )
+    // Ground combat never runs the card, so it places no ships on the planet.
+    setup.setCombatMode('GROUND')
+    expect(hitOrderUnits(setup, 'SPACE')).not.toContain(
+      makeUnitLocator('FLAGSHIP', SPACE_SURFACE_ID),
+    )
   })
 })

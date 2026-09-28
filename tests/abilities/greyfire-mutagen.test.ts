@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import { makeUnitLocator } from '@/combat'
+import { CombatSetup } from '@/hooks/combat-setup'
+import { DEFAULT_PLANET_ID } from '@/types'
+
 import { combatTest } from '../utils/combat-test'
+import { hitOrderUnits, setAbility } from '../utils/setup-options'
 
 describe.forEachSide('GREYFIRE_MUTAGEN', () => {
   it('replaces 1 opponent infantry with own infantry', () => {
@@ -147,5 +152,17 @@ describe.forEachSide('GREYFIRE_MUTAGEN', () => {
     expect(t.attacker.units.INFANTRY).toHaveLength(2)
     expect(t.defender.units.INFANTRY).toBeUndefined()
     expect(t.defender.units.MECH).toHaveLength(1)
+  })
+
+  it('declares its infantry for the hit order', () => {
+    const setup = new CombatSetup()
+    setup.setFaction('attacker', 'YIN_BROTHERHOOD')
+    setup.setCombatMode('GROUND')
+    setup.setUnitCount('attacker', 'MECH', 1)
+    const infantry = makeUnitLocator('INFANTRY', DEFAULT_PLANET_ID)
+    expect(hitOrderUnits(setup, 'GROUND')).not.toContain(infantry)
+
+    setAbility(setup, 'attacker', 'GREYFIRE_MUTAGEN', { isEnabled: true })
+    expect(hitOrderUnits(setup, 'GROUND')).toContain(infantry)
   })
 })

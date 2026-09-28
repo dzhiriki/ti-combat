@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import { makeUnitLocator } from '@/combat'
+import { CombatSetup } from '@/hooks/combat-setup'
+import { DEFAULT_PLANET_ID } from '@/types'
+
 import { combatTest } from '../utils/combat-test'
+import { hitOrderUnits, setAbility } from '../utils/setup-options'
 
 describe.forEachSide('DUNLAIN_REAPER', () => {
   it('replaces infantry with mech at start of combat round', () => {
@@ -134,5 +139,20 @@ describe.forEachSide('DUNLAIN_REAPER', () => {
 
     expect(t.attacker.units.MECH).toBeUndefined()
     expect(t.state.attacker.abilities.DUNLAIN_REAPER?.availableMechs).toBe(1)
+  })
+
+  it('declares its mech for the hit order while mechs remain', () => {
+    const setup = new CombatSetup()
+    setup.setFaction('attacker', 'BARONY_OF_LETNEV')
+    setup.setCombatMode('GROUND')
+    setup.setUnitCount('attacker', 'INFANTRY', 2)
+    const mech = makeUnitLocator('MECH', DEFAULT_PLANET_ID)
+    expect(hitOrderUnits(setup, 'GROUND')).not.toContain(mech)
+
+    setAbility(setup, 'attacker', 'DUNLAIN_REAPER', { uses: 1 })
+    expect(hitOrderUnits(setup, 'GROUND')).toContain(mech)
+
+    setAbility(setup, 'attacker', 'DUNLAIN_REAPER', { availableMechs: 0 })
+    expect(hitOrderUnits(setup, 'GROUND')).not.toContain(mech)
   })
 })

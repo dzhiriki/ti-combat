@@ -290,7 +290,7 @@ a check there too.
   same effect as `declareChanges` (`declareChanges: statsInvoke.call`) or
   setup options and placement miss it.
 
-- **`filter.withAbility` lists read the stand-ins' stats.** Setup runs no
+- **`filter.withAbility` lists read the setup model's stats.** Setup runs no
   PREPARE, so a unit that gains an ability there is not offered unless a
   `declareChanges` attaches the ability too: TF Exotrireme declares its stat
   block, and The Faces of Janovet declares its copy. A switched-off ability's
@@ -303,25 +303,36 @@ a check there too.
   declaring ability's key (`abilityKey`), which reconcile and
   `getUnitVariantsOptions` pass; without it the filter throws.
 
-- **Setup runs changes against stand-ins, not placed units.** One unit of
-  every type stands on every surface, so a change must not count units or
-  depend on which exist; a grant on a stand-in marks that type on that
-  surface (`optionMetadata.standIns`). Changes run in registration order with
-  no PREPARE run: one reading categories another change sets must register
-  later. Reconcile applies them once, before syncing, so they must not read
-  `declareParam` unit lists. The setup's placement runs one side's changes without the
-  opponent's abilities, so `ctx.abilities.opponent` may be empty. After the
-  changes run, the simplified editor keeps each type's stand-in only on the
-  surface `simplifiedSurfaceId` places it on, so its options never offer a
-  surface it cannot fill (Alastor infantry on the planet in space combat). See
+- **Setup runs changes against the fielded units plus declared ones.** The
+  model (`optionMetadata.model`) holds both sides' fielded units; `placeUnits`
+  in a change adds one unit per variant and surface (within unit limits, no
+  Fleet Pool enforcement, nothing for an ability whose `context` is the other
+  mode). Changes run in registration order with no PREPARE run, in passes on a
+  fresh model until a pass places nothing new, so a grant sees units declared
+  by later abilities or the opponent; a change reading categories another
+  change sets must still register later. Reconcile applies them before
+  syncing, so a `declareParam` unit list they read has its stored value (user
+  counts survive; synced entries may be missing). The setup's placement runs
+  one side's changes without units or the opponent's abilities, so
+  `ctx.abilities.opponent` may be empty. See
   `tests/engine/declare-changes.test.ts`.
 
 - **`declareParam` sourced params sync only at reconcile, and those values
-  survive into the engine run.** Include eligible types even when none are
-  fielded yet: later placements need their priority, sustain, and repair
-  settings. Change grants extend the possible surfaces without requiring a
-  fielded host. A runtime source-list edit does not update dependent priorities. Use the reconciled priorities to order candidates,
-  and scoped unit queries to determine runtime eligibility.
+  survive into the engine run.** Surface-scoped lists offer only the units the
+  setup model holds, so an ability that places units mid-combat must declare
+  them in `declareChanges`; otherwise the placed units get no priority,
+  sustain, or repair entry (they take hits last and can't sustain). Reconcile
+  keeps entries for units no longer offered, hidden, and `toSerializedConfig`
+  drops them from links. A runtime source-list edit does not update dependent
+  priorities. Use the reconciled priorities to order candidates, and scoped
+  unit queries to determine runtime eligibility.
+
+- **Ssruu and Clever Genome wrap copied invokes without switching the running
+  ability.** Inside such an invoke `ctx.invokeChanges()` resolves the wrapper,
+  so the wrappers declare changes that forward to the copied ability's, as
+  that ability and with the wrapper's merged params. A wrapper that copies
+  invokes must do the same, or a copied `ctx.invokeChanges()` throws (see
+  `tests/abilities/ssruu+brother-milor.test.ts`).
 
 - **Reconciled participating lists are wider than their controls.**
   Reconcile resolves list options with `allSurfaces` (every surface of the

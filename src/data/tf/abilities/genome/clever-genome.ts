@@ -7,7 +7,7 @@ import type {
   AbilityLookupContext,
   AbilityReadContext,
 } from '@/combat'
-import { extractDefaults, resolveInvokes } from '@/combat'
+import { extractDefaults, resolveInvokes, withRunningAbility } from '@/combat'
 import type { AbilityInvoke, SelectItem } from '@/combat/abilities-engine/types'
 
 type Params = {
@@ -71,6 +71,13 @@ export const cleverGenome: Ability<Params> = {
     return genome.declareSubtype(
       merged as Parameters<NonNullable<Ability['declareSubtype']>>[0],
       { abilities: ctx.abilities, this: genome },
+    )
+  },
+  declareChanges: (ctx, params) => {
+    const genome = findGenome(ctx, params.genomeKey)
+    if (!genome?.declareChanges) return
+    withRunningAbility(ctx, genome, () =>
+      ctx.invokeChanges(withGenomeDefaults(genome, params)),
     )
   },
   uiConfig: (ctx, params) => {

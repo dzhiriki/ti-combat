@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import { makeUnitLocator } from '@/combat'
+import { CombatSetup } from '@/hooks/combat-setup'
+import { DEFAULT_PLANET_ID } from '@/types'
+
 import { combatTest } from '../utils/combat-test'
+import { hitOrderUnits, setAbility } from '../utils/setup-options'
 
 describe.forEachSide('Alarum', () => {
   it('adds infantry at the end of a ground combat round', () => {
@@ -182,5 +187,18 @@ describe.forEachSide('Alarum', () => {
       .availableUnits as Array<[string, number]>
     const mechRemaining = remaining.find(([k]) => k === 'MECH')?.[1]
     expect(mechRemaining).toBe(1) // 3 - 2 = 1; if double-firing happened, would be 0
+  })
+
+  it('declares the available units for the hit order', () => {
+    const setup = new CombatSetup()
+    setup.setFaction('attacker', 'RAL_NEL')
+    setup.setCombatMode('GROUND')
+    setup.setUnitCount('attacker', 'INFANTRY', 1)
+    const mech = makeUnitLocator('MECH', DEFAULT_PLANET_ID)
+    setAbility(setup, 'attacker', 'ALARUM', { isEnabled: true })
+    expect(hitOrderUnits(setup, 'GROUND')).not.toContain(mech)
+
+    setAbility(setup, 'attacker', 'ALARUM', { availableUnits: [['MECH', 2]] })
+    expect(hitOrderUnits(setup, 'GROUND')).toContain(mech)
   })
 })

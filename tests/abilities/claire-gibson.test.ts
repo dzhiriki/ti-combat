@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import { makeUnitLocator } from '@/combat'
+import { CombatSetup } from '@/hooks/combat-setup'
+import { DEFAULT_PLANET_ID } from '@/types'
+
 import { combatTest } from '../utils/combat-test'
+import { hitOrderUnits, setAbility } from '../utils/setup-options'
 
 describe('Claire Gibson', () => {
   it('places 1 infantry at start of ground combat', () => {
@@ -65,5 +70,16 @@ describe('Claire Gibson', () => {
 
     // Attacker should not gain infantry
     expect(t.attacker.units.INFANTRY).toHaveLength(2)
+  })
+
+  it('declares its infantry for the hit order', () => {
+    const setup = new CombatSetup()
+    setup.setCombatMode('GROUND')
+    setup.setUnitCount('defender', 'MECH', 1)
+    const infantry = makeUnitLocator('INFANTRY', DEFAULT_PLANET_ID)
+    expect(hitOrderUnits(setup, 'GROUND', 'defender')).not.toContain(infantry)
+
+    setAbility(setup, 'defender', 'CLAIRE_GIBSON', { isEnabled: true })
+    expect(hitOrderUnits(setup, 'GROUND', 'defender')).toContain(infantry)
   })
 })

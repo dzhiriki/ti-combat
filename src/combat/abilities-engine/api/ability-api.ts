@@ -1,4 +1,4 @@
-import type { UnitCategory } from '@/constants/units'
+import { type UnitCategory, UNIT_LIMITS } from '@/constants/units'
 import type {
   CombatSide,
   DiceGroup,
@@ -61,6 +61,7 @@ import type {
 } from '../abilities-engine'
 import type { DeclaredParamValue } from '../declare-param'
 import { extractDefaults, isDeclaredParam } from '../declare-param'
+import { countUnitsByBaseType } from '../param-limit'
 import type { UnitOption } from '../types'
 import type {
   AbilitiesOverride,
@@ -488,6 +489,8 @@ export class SideApi {
     surfaceId?: SurfaceId,
   ): Record<UnitType, UnitId[]> {
     const destination = surfaceId ?? this.state.activeSurfaceId
+    if (this._ctx.declaringChanges)
+      return this._declarePlacement(unitsToAdd, destination)
     const placed = CombatSideState.placeUnits(
       this._sideData,
       this.state,
@@ -506,6 +509,38 @@ export class SideApi {
     }
     enforceFleetPool(this)
     return placed as Record<UnitType, UnitId[]>
+  }
+
+  /** Setup's `placeUnits`: the model only needs each variant present on the
+   *  surface, so it places one unit where none stands yet and room is left
+   *  under the unit limit, and enforces nothing else. An ability limited to
+   *  the other combat mode never runs, so it places nothing. */
+  private _declarePlacement(
+    unitsToAdd: Partial<Record<UnitType, number>>,
+    destination: SurfaceId,
+  ): Record<UnitType, UnitId[]> {
+    const context = this._ctx.ability?.context
+    if (context && context !== this.state.combatMode)
+      return {} as Record<UnitType, UnitId[]>
+    const s = this._sideData
+    const ids = [...s.participatingUnits, ...s.nonParticipatingUnits]
+    const missing: Partial<Record<UnitType, number>> = {}
+    for (const [variantKey, count] of Object.entries(unitsToAdd)) {
+      if (!count || count <= 0) continue
+      const present = ids.some(
+        id =>
+          s.unitType[id] === variantKey && s.unitSurface[id] === destination,
+      )
+      const baseType = parseUnitLocator(variantKey as UnitType).baseType
+      if (!present && countUnitsByBaseType(s, baseType) < UNIT_LIMITS[baseType])
+        missing[variantKey as UnitType] = 1
+    }
+    return CombatSideState.placeUnits(
+      s,
+      this.state,
+      missing,
+      destination,
+    ) as Record<UnitType, UnitId[]>
   }
 
   moveUnits(unitIds: UnitId | UnitId[], surfaceId?: SurfaceId): void {
@@ -1050,6 +1085,9 @@ export class AbilityContext {
    *  `pushModifier` to tag emitted modifiers so the dice-math kernel can
    *  bill `uses` only when the declaration actually survives. */
   isDeclarationInvoke?: boolean
+  /** True while setup runs `declareChanges` on its model: `placeUnits` then
+   *  declares the units an ability may place. */
+  declaringChanges?: boolean
 
   _abilitiesParams: AbilitiesEngine
   private _side: CombatSide

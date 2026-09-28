@@ -10,6 +10,10 @@ export const moyinsAshes: Ability = {
     uses: Infinity,
   },
   headerUI: 'isEnabled',
+  // Replaces the infantry Indoctrination places on the active planet.
+  declareChanges: ctx => {
+    ctx.api.own.placeUnits({ MECH: 1 })
+  },
   invoke: [
     {
       timing: 'WHEN_INDOCTRINATION',

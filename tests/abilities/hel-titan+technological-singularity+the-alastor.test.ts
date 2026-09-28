@@ -6,6 +6,7 @@ import { CombatSetup } from '@/hooks/combat-setup'
 import { DEFAULT_PLANET_ID, SPACE_SURFACE_ID } from '@/types'
 
 import { combatTest } from '../utils/combat-test'
+import { setupOptions } from '../utils/setup-options'
 
 const HEL_TITAN = 'NEKRO_UNIT_TITANS_OF_UL_PDS'
 
@@ -87,18 +88,14 @@ describe('HEL_TITAN + TECHNOLOGICAL_SINGULARITY + THE_ALASTOR', () => {
       ...setup.abilities.attacker[HEL_TITAN],
       isEnabled: false,
     })
-    const disabledPriority = setup.abilities.attacker
-      .UNIT_PRIORITY as UnitPriorityConfig
-    expect(
-      disabledPriority.groundUnitPriority.map(
-        ([unit]) => parseUnitLocator(unit).unitType,
-      ),
-    ).not.toContain('PDS')
-    expect(
-      disabledPriority.spaceUnitPriority.map(
-        ([unit]) => parseUnitLocator(unit).unitType,
-      ),
-    ).not.toContain('PDS')
+    // The PDS keeps its hidden entries but is no longer offered.
+    for (const param of ['groundUnitPriority', 'spaceUnitPriority']) {
+      expect(
+        setupOptions(setup, 'UNIT_PRIORITY', param).map(
+          item => parseUnitLocator(item.value).unitType,
+        ),
+      ).not.toContain('PDS')
+    }
   })
 
   it('TS-picked Hel Titan II propagates its wrapper declarations to hit and Sustain order', () => {

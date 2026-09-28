@@ -35,9 +35,13 @@ export function serializeSurfaceCounts(
   return result
 }
 
+/** `unitLists` names each ability's synced unit-list params. Reconcile keeps
+ *  their entries for absent units hidden; links carry only the entries the
+ *  reconciled defaults offer. */
 export function serializeAbilities(
   config: Record<string, Record<string, unknown>>,
   reconciledDefaults: Record<string, Record<string, unknown>>,
+  unitLists: Readonly<Record<string, readonly string[]>> = {},
 ): Record<string, Record<string, unknown>> {
   const result: Record<string, Record<string, unknown>> = {}
   for (const [key, params] of Object.entries(config)) {
@@ -45,8 +49,11 @@ export function serializeAbilities(
     if (!defaults) continue
     const diff: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(params)) {
-      if (!isDeepEqual(v, defaults[k])) {
-        diff[k] = v
+      const value = unitLists[key]?.includes(k)
+        ? withoutHiddenEntries(v, defaults[k])
+        : v
+      if (!isDeepEqual(value, defaults[k])) {
+        diff[k] = value
       }
     }
     if (Object.keys(diff).length > 0) {
@@ -54,4 +61,14 @@ export function serializeAbilities(
     }
   }
   return result
+}
+
+function entryKey(entry: unknown): unknown {
+  return Array.isArray(entry) ? entry[0] : entry
+}
+
+function withoutHiddenEntries(value: unknown, defaults: unknown): unknown {
+  if (!Array.isArray(value) || !Array.isArray(defaults)) return value
+  const offered = new Set(defaults.map(entryKey))
+  return value.filter(entry => offered.has(entryKey(entry)))
 }

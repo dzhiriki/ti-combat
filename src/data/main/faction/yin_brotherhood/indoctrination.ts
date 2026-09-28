@@ -37,6 +37,9 @@ export const indoctrination: Ability<Params> = {
     }),
   },
   headerUI: 'isEnabled',
+  declareChanges: ctx => {
+    ctx.api.own.placeUnits({ INFANTRY: 1 })
+  },
   invoke: [
     {
       timing: 'START_OF_COMBAT',

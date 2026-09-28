@@ -32,16 +32,19 @@ export const fragmentReality: Ability<Params> = {
     }),
   },
   headerUI: 'isEnabled',
+  declareChanges: (ctx, params) => {
+    const toPlace: Partial<Record<UnitBaseType, number>> = {}
+    for (const [type, count] of params.ships) {
+      if (count > 0) toPlace[type] = count
+    }
+    ctx.api.own.placeUnits(toPlace)
+  },
   invoke: [
     {
       timing: 'START_OF_COMBAT',
       isCallable: (params, ctx) => ctx.utils.getFlat(params.ships).length > 0,
-      call: (ctx, params) => {
-        const toPlace: Partial<Record<UnitBaseType, number>> = {}
-        for (const [type, count] of params.ships) {
-          if (count > 0) toPlace[type as UnitBaseType] = count
-        }
-        ctx.api.own.placeUnits(toPlace)
+      call: ctx => {
+        ctx.invokeChanges()
       },
     },
   ],

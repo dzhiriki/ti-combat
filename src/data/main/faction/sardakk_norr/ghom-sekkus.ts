@@ -39,16 +39,19 @@ export const ghomSekkus: Ability<Params> = {
     }),
   },
   headerUI: 'isEnabled',
+  declareChanges: (ctx, params) => {
+    const toPlace: Partial<Record<UnitType, number>> = {}
+    for (const [key, count] of params.units) {
+      if (count > 0) toPlace[key] = count
+    }
+    ctx.api.own.placeUnits(toPlace)
+  },
   invoke: [
     {
       timing: 'COMMIT_UNITS',
       isCallable: (params, ctx) => ctx.utils.getFlat(params.units).length > 0,
-      call: (ctx, params) => {
-        const toPlace: Partial<Record<UnitType, number>> = {}
-        for (const [key, count] of params.units) {
-          if (count > 0) toPlace[key as UnitType] = count
-        }
-        ctx.api.own.placeUnits(toPlace)
+      call: ctx => {
+        ctx.invokeChanges()
       },
     },
   ],
