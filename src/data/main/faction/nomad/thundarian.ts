@@ -1,9 +1,6 @@
 import nomadIcon from '@/assets/faction/nomad.svg?raw'
 import type { Ability } from '@/combat/abilities-engine/types'
-import {
-  buildCombatDiceRollGroup,
-  buildUnitAbilityDiceRollGroup,
-} from '@/combat/combat-state'
+import { buildCombatDiceRollGroup } from '@/combat/combat-state'
 import {
   buildRerollStrategy,
   type RerollStrategy,
@@ -86,14 +83,10 @@ export const thundarian: Ability<Params> = {
           : ownMatch || opponentMatch
       },
       call: ctx => {
-        const group = ctx.currentDiceRollIsUnitAbility
-          ? buildUnitAbilityDiceRollGroup({
-              phase: ctx.currentDiceRollPhase,
-              firing: ctx.currentDiceRollFiring,
-              hitSource: ctx.currentDiceRollHitSource,
-              selfTarget: ctx.currentDiceRollSelfTarget,
-            })
-          : buildCombatDiceRollGroup({ phase: ctx.currentDiceRollPhase })
+        // AFTER_DICE_ROLL_STEP only fires in combat-round rolls.
+        const group = buildCombatDiceRollGroup({
+          phase: ctx.currentDiceRollPhase,
+        })
         ctx.api.own.discardCurrentGroupScript()
         ctx.api.own.pushSteps([group])
         ctx.logger?.child(ctx.this.key).child('RESTART').log()

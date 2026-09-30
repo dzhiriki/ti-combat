@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest'
 
+import { getGameData } from '@/utils/get-game-data'
+
 import { combatTest } from '../utils/combat-test'
+
+describe('Quantum Manipulator registration', () => {
+  it('warns about simplified mech placement', () => {
+    const ability = getGameData('TI4')
+      .getAvailableAbilities('attacker', 'NOMAD')
+      .find(candidate => candidate.key === 'QUANTUM_MANIPULATOR')
+
+    expect(ability?.warning).toContain(
+      'all Nomad mechs are placed in the space area',
+    )
+  })
+})
 
 describe.forEachSide('QUANTUM_MANIPULATOR', () => {
   it('mech absorbs a hit produced against ships in space', () => {

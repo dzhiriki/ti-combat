@@ -18,12 +18,10 @@ export const preDamaged: Ability<Params> = {
     isEnabled: true,
     uses: Infinity,
     damagedUnits: declareParam<UnitList<number>>({
-      source: 'units',
-      default: [],
-      // Without this, reconciliation fills unlisted units in as bare `[type]`
-      // 1-tuples, which the URL codec can't tell from an order-mode list —
-      // the damage counts are then lost on refresh or through a shared link.
+      scope: 'system',
       defaultItemValue: 0,
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
+      default: [],
       filter: { exclude: ['FIGHTER'], includeOnlyAvailable: true },
       limit: 'IN_COMBAT',
     }),
@@ -42,9 +40,7 @@ export const preDamaged: Ability<Params> = {
       call: (ctx, params) => {
         for (const [unitType, count] of params.damagedUnits) {
           if (count <= 0) continue
-          const ids = ctx.api.own.getUnits(unitType as UnitType, {
-            includeVariants: false,
-          })
+          const ids = ctx.api.own.system.getUnits(unitType as UnitType)
           const max = Math.min(count, ids.length)
           for (let i = 0; i < max; i++) {
             ctx.api.own.modifyUnitState(ids[i], { isDamaged: true })

@@ -37,13 +37,13 @@ export const supercharge: Ability<Params> = {
     uses: Infinity,
     spacePriority: declareParam<UnitList>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
       sort: 'worth-desc',
       filter: { combatMode: 'SPACE' },
     }),
     groundPriority: declareParam<UnitList>({
       default: [],
-      source: 'groundCombatParticipating',
+      source: 'GROUND_FORCES',
       sort: 'worth-desc',
       filter: { combatMode: 'GROUND' },
     }),
@@ -69,14 +69,13 @@ export const supercharge: Ability<Params> = {
           ctx.state.combatMode === 'GROUND'
             ? params.groundPriority
             : params.spacePriority
-        const target = ctx.api.own.findUnitByPriority(
+        const target = ctx.api.own.participating.findUnitByPriority(
           ctx.utils.getFlat(priority),
-          { includeVariants: false },
         )
         if (target === undefined) return
         const variantKey = ctx.api.own.getUnitVariantKey(target)
         if (!variantKey) return
-        ctx.api.own.applyBonusToResult(2, { singleUnit: variantKey })
+        ctx.api.own.applyBonusToResult(2, { unitId: target })
       },
     },
   ],

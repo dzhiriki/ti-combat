@@ -5,7 +5,8 @@ import { stateDestroyScore } from './state-destroy-score'
 
 /**
  * Canonicalize per-variant state assignments by permuting `unitState`
- * VALUES across UnitIds. Within each variant pool, lowest UnitId ends
+ * VALUES across UnitIds with the same variant, surface, and combat grants.
+ * Within each equivalent pool, lowest UnitId ends
  * up owning the worst-state value (highest destroyScore); highest
  * UnitId owns the best (clean) value.
  *
@@ -14,41 +15,73 @@ import { stateDestroyScore } from './state-destroy-score'
  * worst-state owner without a state-aware secondary sort.
  *
  * Sparse-map convention: a `{}`-equivalent state (destroyScore=0) is
- * stored as a missing entry rather than `{ isDamaged: false, ... }` —
- * matches how `getUnitsHash` filters falsy fields and keeps the in-memory
- * representation aligned with the hash.
+ * stored as a missing entry rather than `{ isDamaged: false, ... }`.
+ * `getUnitsHash` distinguishes an entry from no entry, so keeping the map
+ * canonical is what lets equivalent states hash equal.
  *
- * Mutates `s.unitState` in place. Caller must invoke
- * `ensureUnitStateOwned` first if CoW protection is needed.
+ * Owns the state map before permutation so sibling branches are isolated.
  */
 export function canonicalizeUnitState(
   s: SideStateData,
   types?: ReadonlySet<UnitType>,
 ): void {
   s._needsCanonicalize = undefined
-  const pools = collectVariantPools(s, types)
-  for (const type in pools) {
-    const ids = pools[type as UnitType]
-    if (ids) canonicalizePool(s, ids)
+  if (s._unitStateShared) {
+    s.unitState = { ...s.unitState }
+    s._unitStateShared = false
   }
+  for (const ids of collectVariantPools(s, types)) canonicalizePool(s, ids)
 }
 
 function collectVariantPools(
   s: SideStateData,
   types?: ReadonlySet<UnitType>,
-): Partial<Record<UnitType, UnitId[]>> {
-  const pools: Partial<Record<UnitType, UnitId[]>> = {}
-  const collect = (pool: string) => {
-    for (const id of pool) {
+): UnitId[][] {
+  const pools: UnitId[][] = []
+  // Participating and non-participating units never share a pool.
+  const collect = (list: string) => {
+    const byType = new Map<UnitType, UnitId[]>()
+    for (const id of list) {
       const type = s.unitType[id]
       if (!type) continue
       if (types && !types.has(type)) continue
-      ;(pools[type] ??= []).push(id as UnitId)
+      const ids = byType.get(type)
+      if (ids) ids.push(id as UnitId)
+      else byType.set(type, [id as UnitId])
     }
+    for (const ids of byType.values()) splitByPlacement(s, ids, pools)
   }
   collect(s.participatingUnits)
   collect(s.nonParticipatingUnits)
   return pools
+}
+
+/** Split one variant's ids by surface and combat grants. They usually all
+ *  match, so per-unit keys are only built when they actually differ. */
+function splitByPlacement(
+  s: SideStateData,
+  ids: UnitId[],
+  pools: UnitId[][],
+): void {
+  if (ids.length <= 1) return
+  const surface = s.unitSurface[ids[0]]
+  const grant = s.unitGrants?.[ids[0]]
+  if (
+    ids.every(
+      id => s.unitSurface[id] === surface && s.unitGrants?.[id] === grant,
+    )
+  ) {
+    pools.push(ids)
+    return
+  }
+  const groups = new Map<string, UnitId[]>()
+  for (const id of ids) {
+    const key = `${s.unitSurface[id] ?? ''}\0${s.unitGrants?.[id] ?? ''}`
+    const group = groups.get(key)
+    if (group) group.push(id)
+    else groups.set(key, [id])
+  }
+  for (const group of groups.values()) pools.push(group)
 }
 
 function canonicalizePool(s: SideStateData, ids: UnitId[]): void {

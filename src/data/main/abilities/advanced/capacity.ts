@@ -4,14 +4,14 @@ import {
   type Ability,
   type AbilityCallContext,
   collectFreeCargo,
-  parseVariantId,
 } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { UNIT_TYPES } from '@/constants/units'
 import type { UnitBaseType, UnitList, UnitType } from '@/types'
 import { UnitListSchema } from '@/types'
 
 type Params = {
-  removePriority: UnitList
+  removePriority: UnitList<never, UnitType>
 }
 
 declare global {
@@ -30,7 +30,10 @@ export const capacity: Ability<Params> = {
   params: {
     isEnabled: false,
     uses: Infinity,
-    removePriority: [['FIGHTER'], ['INFANTRY'], ['MECH']] as UnitList,
+    removePriority: [['FIGHTER'], ['INFANTRY'], ['MECH']] as UnitList<
+      never,
+      UnitType
+    >,
   },
   headerUI: 'isEnabled',
   invoke: [
@@ -81,7 +84,9 @@ export function computeTotalCapacity(ctx: AbilityCallContext): number {
     // Skip zero-count types BEFORE multiplying: an infinite-capacity stat
     // (A Strangled Whisper) times a count of 0 would poison the total with
     // NaN once the carrier is destroyed.
-    const count = api.countUnits(baseType, { includeVariants: true })
+    const count = api.surface.countUnits(baseType, {
+      includeVariants: true,
+    })
     if (count > 0) totalCapacity += cap * count
   }
   return totalCapacity
@@ -94,7 +99,7 @@ function enforceCapacity(
   const api = ctx.api.own
 
   const totalCapacity = computeTotalCapacity(ctx)
-  const freeCargo = collectFreeCargo(api)
+  const freeCargo = collectFreeCargo(api, api.surface)
 
   // Collect carried units (CAPACITY_COST != null). Exempt from enforcement:
   // free cargo (a living carrier holds them free), and units with a fleet
@@ -111,7 +116,9 @@ function enforceCapacity(
     const stats = api.getUnitStats(baseType)
     if (!stats || stats.CAPACITY_COST == null) continue
     if (typeof stats.FLEET_POOL_COST === 'number') continue
-    const count = api.countUnits(baseType, { includeVariants: true })
+    const count = api.surface.countUnits(baseType, {
+      includeVariants: true,
+    })
     if (count === 0) continue
     carriedTypes.push({
       baseType,
@@ -124,7 +131,9 @@ function enforceCapacity(
   // If no capacity at all, remove all (non-exempt) carried units
   if (totalCapacity === 0) {
     for (const { baseType } of carriedTypes) {
-      const units = api.getUnits(baseType, { includeVariants: true })
+      const units = api.surface.getUnits(baseType, {
+        includeVariants: true,
+      })
       for (const unitId of units) {
         api.removeUnits(unitId)
       }
@@ -135,7 +144,11 @@ function enforceCapacity(
   // Compute total cost
   let totalCost = 0
   for (const { baseType, cost } of carriedTypes) {
-    totalCost += cost * api.countUnits(baseType, { includeVariants: true })
+    totalCost +=
+      cost *
+      api.surface.countUnits(baseType, {
+        includeVariants: true,
+      })
   }
 
   if (totalCost <= totalCapacity) return
@@ -147,7 +160,7 @@ function enforceCapacity(
   for (const priorityType of removePriority) {
     if (excess <= 0) break
 
-    const { type: baseType } = parseVariantId(priorityType)
+    const { baseType } = parseUnitLocator(priorityType)
     const info = carriedTypes.find(
       c => c.baseType === baseType || c.baseType === priorityType,
     )
@@ -156,7 +169,7 @@ function enforceCapacity(
     if (!stats || stats.CAPACITY_COST == null) continue
 
     while (excess > 0) {
-      const units = api.getUnits(priorityType, { includeVariants: false })
+      const units = api.surface.getUnits(priorityType)
       if (units.length === 0) break
       api.removeUnits(units[0])
       excess -= stats.CAPACITY_COST

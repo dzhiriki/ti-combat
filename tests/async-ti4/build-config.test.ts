@@ -10,6 +10,13 @@ import {
   type WebData,
   WebDataSchema,
 } from '@/async-ti4/types'
+import { makeUnitLocator } from '@/combat'
+import { CombatSetup } from '@/hooks/combat-setup'
+import { SPACE_SURFACE_ID, type SurfaceId } from '@/types'
+
+const SPACE = SPACE_SURFACE_ID
+const P1 = 'planet-1' as SurfaceId
+const P2 = 'planet-2' as SurfaceId
 
 function loadFixture(name: string) {
   return WebDataSchema.parse(
@@ -47,6 +54,12 @@ function importAt(id: string, attacker: string, defender: string) {
     attacker,
     defender,
   })
+}
+
+function tfImportAt(id: string, attacker: string, defender: string) {
+  const location = listBattleLocations(tfData).find(l => l.id === id)
+  if (!location) throw new Error(`No location "${id}" in TF fixture`)
+  return buildImportConfig(tfData, { location, attacker, defender })
 }
 
 describe('parseGameId', () => {
@@ -223,17 +236,20 @@ describe('a game paused mid-combat', () => {
 
   it('imports a side that is in the fight without holding the system', () => {
     const location = listBattleLocations(activeData)[0]
-    const { config } = buildImportConfig(activeData, {
+    const { config, notes } = buildImportConfig(activeData, {
       location,
       attacker: 'yellowtf',
       defender: 'redtf',
     })
     // Yellow holds the space; Red's ships are gone and only its structures on
-    // Phlegethon remain, firing space cannon into the battle.
-    expect(config.au.CARRIER).toEqual([1, 0])
-    expect(config.au.FIGHTER).toEqual([6, 0])
-    expect(config.du.PDS).toEqual([1, 0])
-    expect(config.du.SPACE_DOCK).toEqual([1, 0])
+    // Phlegethon remain, firing space cannon into the battle. Yellow's own
+    // infantry on Lethe brings that planet along too.
+    expect(config.asu.space).toEqual({ CARRIER: 1, FIGHTER: 6, CRUISER: 1 })
+    expect(config.asu[P1]).toEqual({ INFANTRY: 1 })
+    expect(config.dsu.space).toBeUndefined()
+    expect(config.dsu[P2]).toEqual({ SPACE_DOCK: 1, MECH: 1, PDS: 1 })
+    expect(config.p).toEqual([P1, P2])
+    expect(notes).toContain('Planet 1 is Lethe, Planet 2 is Phlegethon')
   })
 })
 
@@ -244,9 +260,8 @@ describe('buildImportConfig', () => {
     expect(config.af).toBe('VUILRAITH_CABAL')
     expect(config.df).toBe('DEEPWROUGHT_SCHOLARATE')
     expect(config.m).toBe('S')
-    expect(config.au.WAR_SUN).toEqual([1, 0])
-    expect(config.au.CRUISER).toEqual([2, 0])
-    expect(config.au.FIGHTER).toEqual([3, 0])
+    expect(config.asu.space).toEqual({ WAR_SUN: 1, CRUISER: 2, FIGHTER: 3 })
+    expect(config.aup).toEqual([])
     // Assault Cannon is researched by both sides in this game.
     expect(config.aa.ASSAULT_CANNON).toEqual({ isEnabled: true })
     expect(config.da.ASSAULT_CANNON).toEqual({ isEnabled: true })
@@ -255,33 +270,68 @@ describe('buildImportConfig', () => {
   it('carries damaged and galvanized stacks over as pre-set unit state', () => {
     // The Cabal war sun at frac4 is sustained: unitStates [0, 1, 0, 0].
     const { config } = importAt('frac4', 'cabal', 'deepwrought')
-    expect(config.aa.PRE_DAMAGED).toEqual({ damagedUnits: [['WAR_SUN', 1]] })
+    expect(config.aa.PRE_DAMAGED).toEqual({
+      damagedUnits: [[makeUnitLocator('WAR_SUN', SPACE), 1]],
+    })
 
     // Two Bastion cruisers at 104, one of them galvanized: [1, 0, 1, 0].
     const bastion = importAt('104', 'bastion', 'sardakk').config
-    expect(bastion.au.CRUISER).toEqual([2, 1]) // Cruiser II is researched
+    expect(bastion.asu.space?.CRUISER).toBe(2)
+    expect(bastion.aup).toContain('CRUISER') // Cruiser II is researched
     expect(bastion.aa.PRE_GALVANIZED).toEqual({
-      galvanizedUnits: [['CRUISER', 1]],
+      galvanizedUnits: [[makeUnitLocator('CRUISER', SPACE), 1]],
       reinforcementTokens: 4,
     })
   })
 
-  it('pulls structures on the system planets into a space battle', () => {
-    // Sardakk holds the space at 106; Bastion has only 2 PDS down on Lodor.
-    const { config } = importAt('106', 'sardakk', 'bastion')
-    expect(config.au.DREADNOUGHT).toEqual([2, 1]) // Exotrireme II
-    expect(config.du.PDS).toEqual([2, 1]) // PDS II
-    expect(config.du.INFANTRY).toBeUndefined()
+  it('keys pre-set state by the surface the unit stands on', () => {
+    // The calculator tells a damaged mech on the planet from one riding in
+    // the fleet, and only offers surface-qualified keys for it: a bare type
+    // would be dropped on load and the damage quietly lost.
+    const { config } = tfImportAt('101/atlas', 'yellowtf', 'yellowtf')
+    expect(config.aa.PRE_DAMAGED).toEqual({
+      damagedUnits: [[makeUnitLocator('MECH', P1), 2]],
+    })
+
+    const setup = new CombatSetup()
+    setup.loadConfig(config)
+    expect(setup.editorMode).toBe('FULL')
+    expect(setup.abilities.attacker.PRE_DAMAGED.damagedUnits).toContainEqual([
+      makeUnitLocator('MECH', P1),
+      2,
+    ])
+    expect(setup.surfaceSelections.attacker[P1].MECH.count).toBe(2)
+    expect(setup.surfaceSelections.attacker.space.DREADNOUGHT.count).toBe(4)
   })
 
-  it('takes every unit on the planet for a ground battle', () => {
+  it('places structures on the planets their space cannon fires from', () => {
+    // Sardakk holds the space at 106; Bastion has only 2 PDS down on Lodor.
+    // They stay on the planet — the engine is what brings their space cannon
+    // to bear on a space battle — with the infantry beside them, out of it.
+    const { config } = importAt('106', 'sardakk', 'bastion')
+    expect(config.asu.space?.DREADNOUGHT).toBe(2)
+    expect(config.aup).toContain('DREADNOUGHT') // Exotrireme II
+    expect(config.dsu.space).toBeUndefined()
+    expect(config.dsu[P1]).toEqual({ INFANTRY: 5, MECH: 1, PDS: 2 })
+    expect(config.dup).toContain('PDS') // PDS II
+  })
+
+  it('fights a ground battle on Planet 1, with the fleet in orbit', () => {
+    // Sardakk holds the space at 106 with 2 fighters and 2 dreadnoughts —
+    // the ships that carry the invasion and fire the bombardment — and
+    // Bastion has everything on Lodor.
     const { config } = importAt('106/lodor', 'sardakk', 'bastion')
     expect(config.m).toBe('G')
-    expect(config.du.INFANTRY).toEqual([5, 0])
-    expect(config.du.MECH).toEqual([1, 0])
-    expect(config.du.PDS).toEqual([2, 1])
+    expect(config.e).toBe('F')
+    expect(config.p).toEqual([P1])
+    expect(config.sp).toBe(P1)
+    expect(config.asu.space).toEqual({ FIGHTER: 2, DREADNOUGHT: 2 })
+    expect(config.aup).toEqual(
+      expect.arrayContaining(['FIGHTER', 'DREADNOUGHT']),
+    )
+    expect(config.dsu[P1]).toEqual({ INFANTRY: 5, MECH: 1, PDS: 2 })
     expect(config.da.PRE_GALVANIZED).toEqual({
-      galvanizedUnits: [['MECH', 1]],
+      galvanizedUnits: [[makeUnitLocator('MECH', P1), 1]],
       reinforcementTokens: 4,
     })
     // Magen Defense Grid ΩΩ is a ground card Bastion holds.
@@ -291,28 +341,67 @@ describe('buildImportConfig', () => {
   it('records researched upgrades for units the side has none of here', () => {
     const { config } = importAt('106', 'sardakk', 'bastion')
     // Sardakk has Cruiser II but no cruisers at 106.
-    expect(config.au.CRUISER).toEqual([0, 1])
-  })
-
-  it('adds the fleet overhead to a ground battle', () => {
-    // Sardakk holds the space at 106 with 2 fighters and 2 dreadnoughts —
-    // the ships that carry the invasion and fire the bombardment.
-    const { config } = importAt('106/lodor', 'sardakk', 'bastion')
-    expect(config.au.FIGHTER).toEqual([2, 1])
-    expect(config.au.DREADNOUGHT).toEqual([2, 1])
+    expect(config.aup).toContain('CRUISER')
+    expect(config.asu.space?.CRUISER).toBeUndefined()
   })
 
   it('keeps ground forces riding in the space area of a space battle', () => {
     // Bastion has an infantry up in the space at 104, aboard the fleet.
     const { config } = importAt('104', 'bastion', 'sardakk')
-    expect(config.au.INFANTRY).toEqual([1, 0])
+    expect(config.asu.space?.INFANTRY).toBe(1)
   })
 
-  it('leaves units on the planet out of a space battle', () => {
-    // Bastion's infantry and mech are down on Lodor, not in the fight.
-    const { config } = importAt('106', 'sardakk', 'bastion')
-    expect(config.du.INFANTRY).toBeUndefined()
-    expect(config.du.MECH).toBeUndefined()
+  it('brings only the planets somebody in the fight is standing on', () => {
+    // 317 has Hercalor, held with units, and Tiamat, held but empty. A space
+    // battle there needs Hercalor for its space dock and nothing from Tiamat.
+    const space = importAt('317', 'bastion', 'sardakk')
+    expect(space.config.p).toEqual([P1])
+    expect(space.config.asu[P1]).toEqual({
+      INFANTRY: 3,
+      SPACE_DOCK: 1,
+      MECH: 1,
+    })
+    expect(space.notes).toEqual([])
+
+    // Landing on Tiamat makes it Planet 1 whatever else is in the system,
+    // and Hercalor follows it, since the numbering has to be explained.
+    const ground = importAt('317/tiamat', 'sardakk', 'bastion')
+    expect(ground.config.p).toEqual([P1, P2])
+    expect(ground.config.sp).toBe(P1)
+    expect(ground.config.dsu[P1]).toBeUndefined()
+    expect(ground.config.dsu[P2]).toEqual({
+      INFANTRY: 3,
+      SPACE_DOCK: 1,
+      MECH: 1,
+    })
+    expect(ground.notes).toContain('Planet 1 is Tiamat, Planet 2 is Hercalor')
+  })
+
+  it('gives a system with nothing on its planets one to land on', () => {
+    // 104 has no planets at all; the calculator still needs one.
+    const { config } = importAt('104', 'bastion', 'sardakk')
+    expect(config.p).toEqual([P1])
+    expect(config.sp).toBe(P1)
+    expect(config.asu[P1]).toBeUndefined()
+  })
+
+  it('caps a stack at the calculator\u2019s limit where it stands', () => {
+    const doctored = structuredClone(data)
+    doctored.tileUnitData.frac4.space!.cabal.push({
+      entityType: 'unit',
+      entityId: 'dn',
+      count: 7,
+      unitStates: [5, 2, 0, 0],
+    })
+    const { config, notes } = buildImportConfig(doctored, {
+      location: locationAt('frac4'),
+      attacker: 'cabal',
+      defender: 'deepwrought',
+    })
+    expect(config.asu.space?.DREADNOUGHT).toBe(5)
+    expect(notes.join(' ')).toContain(
+      '7 DREADNOUGHT capped at the 5 this calculator allows',
+    )
   })
 
   it('imports faction technologies, not just the generic deck', () => {
@@ -471,20 +560,14 @@ describe('Twilight\u2019s Fall games', () => {
     expect(tiles.has('204')).toBe(false)
   })
 
-  function tfImport(id: string, attacker: string, defender: string) {
-    const location = listBattleLocations(tfData).find(l => l.id === id)
-    if (!location) throw new Error(`No location "${id}" in TF fixture`)
-    return buildImportConfig(tfData, { location, attacker, defender })
-  }
-
   it('maps the colour ids upstream uses to the TF faction sheets', () => {
-    const { config } = tfImport('313/acheron', 'yellowtf', 'purpletf')
+    const { config } = tfImportAt('313/acheron', 'yellowtf', 'purpletf')
     expect(config.af).toBe('AVARICE_REX')
     expect(config.df).toBe('IL_NA_VIROSET')
   })
 
   it('takes unit upgrades from the owned cards, not the techs', () => {
-    const { config } = tfImport('313/acheron', 'yellowtf', 'purpletf')
+    const { config } = tfImportAt('313/acheron', 'yellowtf', 'purpletf')
     // Neither player has a single unit-upgrade tech; the cards are all in
     // `unitsOwned`.
     expect(config.aa.TF_UPGRADE_DAWNCRUSHER).toEqual({ isEnabled: true })
@@ -496,17 +579,18 @@ describe('Twilight\u2019s Fall games', () => {
   })
 
   it('imports the TF shared ability deck', () => {
-    const { config } = tfImport('313/acheron', 'yellowtf', 'purpletf')
+    const { config } = tfImportAt('313/acheron', 'yellowtf', 'purpletf')
     // Il Na Viroset holds Valkyrie Particle Weave and Non-Euclidean Shielding.
     expect(config.da.VALKYRIE_PARTICLE_WEAVE).toEqual({ isEnabled: true })
     expect(config.da.NON_EUCLIDEAN_SHIELDING).toEqual({ isEnabled: true })
   })
 
   it('carries the fleet and the damaged mechs into a ground battle', () => {
-    const { config } = tfImport('101/atlas', 'yellowtf', 'yellowtf')
-    expect(config.au.MECH).toEqual([2, 0])
-    expect(config.au.CRUISER).toEqual([1, 0])
-    expect(config.au.DREADNOUGHT).toEqual([4, 0])
-    expect(config.aa.PRE_DAMAGED).toEqual({ damagedUnits: [['MECH', 2]] })
+    const { config } = tfImportAt('101/atlas', 'yellowtf', 'yellowtf')
+    expect(config.asu[P1]).toEqual({ MECH: 2, INFANTRY: 1 })
+    expect(config.asu.space).toEqual({ CRUISER: 1, DREADNOUGHT: 4 })
+    expect(config.aa.PRE_DAMAGED).toEqual({
+      damagedUnits: [[makeUnitLocator('MECH', P1), 2]],
+    })
   })
 })

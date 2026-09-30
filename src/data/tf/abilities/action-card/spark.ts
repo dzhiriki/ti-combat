@@ -22,20 +22,18 @@ export const spark: Ability<Params> = {
   params: {
     isEnabled: true,
     uses: 0,
-    // Sourced from the participation lists (not `nonFighterShips` /
-    // `groundForces`) so units granted space participation by other cards —
-    // e.g. Starlancer XI mechs — stay targetable; fighters and infantry are
-    // excluded as they can never sustain.
+    // Candidate lists include units that abilities can bring into combat.
+    // Fighters and infantry are excluded as they cannot sustain.
     spaceTargets: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
       side: 'opponent',
       defaultItemValue: true,
       filter: { combatMode: 'SPACE', exclude: ['FIGHTER'] },
     }),
     groundTargets: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundCombatParticipating',
+      source: 'GROUND_FORCES',
       side: 'opponent',
       defaultItemValue: true,
       filter: { combatMode: 'GROUND', exclude: ['INFANTRY'] },
@@ -61,12 +59,11 @@ export const spark: Ability<Params> = {
         if (!ctx.api.opponent.hasUnit(unitId)) return false
         const variant = ctx.api.opponent.getUnitVariantKey(unitId)
         if (!variant) return false
-        const targets = ctx.utils.getFlat(
+        const targets =
           ctx.state.combatMode === 'GROUND'
             ? params.groundTargets
-            : params.spaceTargets,
-        )
-        if (!targets.includes(variant)) return false
+            : params.spaceTargets
+        if (!ctx.api.opponent.matchesUnitList(unitId, targets)) return false
         return !ctx.api.opponent.getUnitStats(unitId)?.DIRECT_HIT_IMMUNE
       },
       call: (ctx, _params, unitId) => {

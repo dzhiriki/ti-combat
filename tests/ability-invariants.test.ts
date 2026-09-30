@@ -132,7 +132,7 @@ describe('engine invariants', () => {
 // Evaluate every panel-visible ability's uiConfig with a real read context
 // (the same way AbilityConfig does), across every faction of both systems,
 // with all unit types fielded and upgraded so unit-list sources are
-// populated. Abilities with neither headerUI nor uiConfig (e.g. SETTINGS)
+// populated. Abilities with neither headerUI nor uiConfig
 // are filtered out by the panel and skipped here too.
 
 interface UiItem {

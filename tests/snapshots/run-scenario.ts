@@ -1,5 +1,6 @@
 import { CombatEngine, type SurvivorSide } from '@/combat'
 import type { CombatMode } from '@/combat/combat-state/types'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { UNIT_SHORT_NAMES, UNIT_TYPES } from '@/constants/units'
 import {
   buildCombatState,
@@ -37,15 +38,15 @@ function formatSide(side: SurvivorSide): string {
     ([, units]) => units && units.length > 0,
   )
   entries.sort(([a], [b]) => {
-    const aBase = a.split(':')[0] as UnitBaseType
-    const bBase = b.split(':')[0] as UnitBaseType
+    const aBase = parseUnitLocator(a).baseType
+    const bBase = parseUnitLocator(b).baseType
     return (BASE_PRIORITY[aBase] ?? 999) - (BASE_PRIORITY[bBase] ?? 999)
   })
 
   const parts: string[] = []
   for (const [unitType, units] of entries) {
     if (!units) continue
-    const baseType = unitType.split(':')[0] as UnitBaseType
+    const baseType = parseUnitLocator(unitType).baseType
     const name = UNIT_SHORT_NAMES[baseType] ?? unitType
 
     const groups = new Map<string, { healthy: number; damaged: number }>()

@@ -1,5 +1,5 @@
-import { parseVariantId } from '@/combat'
 import type { Ability } from '@/combat/abilities-engine/types'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import type { UnitType } from '@/types'
 
 export const zerozeroone: Ability = {
@@ -26,7 +26,7 @@ export const zerozeroone: Ability = {
         const fighters: UnitType[] = []
         for (const [key] of priority) {
           const target = key as UnitType
-          if (parseVariantId(target).type === 'FIGHTER') {
+          if (parseUnitLocator(target).baseType === 'FIGHTER') {
             fighters.push(target)
           } else {
             nonFighters.push(target)

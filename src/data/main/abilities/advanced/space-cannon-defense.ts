@@ -1,7 +1,13 @@
-import { type AbilitiesOverride, type Ability, parseVariantId } from '@/combat'
-import type { UnitList, UnitType } from '@/types'
+import { type AbilitiesOverride, type Ability, declareParam } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
+import type { UnitLocator } from '@/types'
+import type { UnitList } from '@/types'
 
-type Params = { disableSustainDamage: boolean }
+type Params = {
+  customPriority: boolean
+  unitPriority: UnitList
+  disableSustainDamage: boolean
+}
 
 declare global {
   interface AbilityConfigMap {
@@ -9,8 +15,7 @@ declare global {
   }
 }
 
-const isMech = ([v]: [UnitType]) =>
-  parseVariantId(v as UnitType).type === 'MECH'
+const isMech = ([v]: [UnitLocator]) => parseUnitLocator(v).baseType === 'MECH'
 
 /** Reorder a priority list so mechs sort first (Converge's defense clause:
  *  Space Cannon Defense hits must be assigned to mechs if able). Mirrors
@@ -28,6 +33,13 @@ export const spaceCannonDefense: Ability<Params> = {
   params: {
     isEnabled: true,
     uses: Infinity,
+    customPriority: false,
+    unitPriority: declareParam<UnitList>({
+      scope: 'type',
+      default: [],
+      source: 'GROUND_FORCES',
+      side: 'opponent',
+    }),
     disableSustainDamage: false,
   },
   headerUI: 'isEnabled',
@@ -47,15 +59,18 @@ export const spaceCannonDefense: Ability<Params> = {
         // mechs sort first (same mechanism as Graviton Laser System in SCO).
         const convergeEnabled =
           ctx.api.own.getAbilityConfig('TF_CONVERGE')?.isEnabled === true
-        const priority = convergeEnabled
-          ? mechsFirst(
-              ctx.api.opponent.getAbilityConfig('UNIT_PRIORITY')
-                .groundUnitPriority ?? [],
-            )
-          : undefined
+        const basePriority = params.customPriority
+          ? params.unitPriority
+          : (ctx.api.opponent.getAbilityConfig('UNIT_PRIORITY')
+              .groundUnitPriority ?? [])
+        const priority = convergeEnabled ? mechsFirst(basePriority) : undefined
 
         const override: AbilitiesOverride = {}
-        if (priority) override.UNIT_PRIORITY = { groundUnitPriority: priority }
+        if (priority)
+          override.SPACE_CANNON_DEFENSE = {
+            customPriority: true,
+            unitPriority: priority,
+          }
         if (params.disableSustainDamage) override.SUSTAIN_DAMAGE = false
 
         ctx.resolveStep('SPACE_CANNON_DEFENSE', {

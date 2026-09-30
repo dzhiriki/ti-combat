@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { DEFAULT_PLANET_ID, SPACE_SURFACE_ID } from '@/types'
+
 import { combatTest } from '../utils/combat-test'
 
 describe('EIDOLON_MAXIMUM', () => {
@@ -20,6 +22,27 @@ describe('EIDOLON_MAXIMUM', () => {
 
     // Eidolon Maximum: [4, 4]
     expect(pool.attacker).toContainDice('MECH', [4, 4])
+  })
+
+  it('mech on a planet fights in space combat as a ship', () => {
+    const t = combatTest({
+      mode: 'SPACE',
+      attacker: {
+        faction: 'NAAZ_ROKHA_ALLIANCE',
+        units: {},
+        placements: {
+          [SPACE_SURFACE_ID]: { CRUISER: 1 },
+          [DEFAULT_PLANET_ID]: { MECH: 1 },
+        },
+        abilities: { EIDOLON_MAXIMUM: true },
+      },
+      defender: { faction: 'ARBOREC', units: { CRUISER: 1 } },
+    })
+
+    t.advanceTo('SPACE_COMBAT')
+    t.advanceRound()
+
+    expect(t.dicePool().attacker).toContainDice('MECH', [4, 4])
   })
 
   it('mech has [4, 4] stats in ground combat', () => {

@@ -1,5 +1,7 @@
+import { UNIT_ABILITIES } from '@/constants/units'
 import type {
   CombatSide,
+  UnitAbility,
   UnitBaseType,
   UnitId,
   UnitIdList,
@@ -18,13 +20,12 @@ import type {
   SideStateData,
 } from '../combat-state/types'
 import { Logger } from '../logger'
+import { parseUnitLocator } from '../utils/parse-unit-locator'
 import { resolveUnitStats } from '../utils/resolve-unit-stats'
-import { parseVariantId } from '../utils/unit-variant'
 import {
   type AbilityBranch,
   AbilityBranchInterrupt,
   AbilityContext,
-  withRunningAbility,
 } from './api/ability-api'
 import { hasStaticInvokes, resolveInvokes } from './resolve-invokes'
 import { createRuntimeAbilityList } from './runtime-ability-list'
@@ -64,6 +65,8 @@ const SORT_KEY_BY_TIMING = new Map<AbilityTiming, string>()
 for (const group of TIMING_GROUPS) {
   for (const t of group.timings) SORT_KEY_BY_TIMING.set(t, group.paramKey)
 }
+
+const UNIT_ABILITY_KEYS = new Set<string>(UNIT_ABILITIES)
 
 /** Timings whose entries are collected in a "parent" bucket so a single call
  *  (e.g. `runAbilities('START_OF_COMBAT')` in round 1) fires both the parent
@@ -293,6 +296,18 @@ function sortPreSortedBuckets(
   sideConfig: Record<string, Record<string, unknown>>,
 ): void {
   for (const bucket of side.values()) {
+    // Unit copies and transformations (abilities declaring changes) must
+    // establish their stats before setup enforcement such as Capacity or
+    // Fleet Pool reads those stats. Array.sort is stable, so registration
+    // order remains authoritative within the modifier and non-modifier groups.
+    const prepare = bucket.get('PREPARE')
+    if (prepare && prepare.length > 1) {
+      prepare.sort(
+        (a, b) =>
+          Number(Boolean(b.ability.declareChanges)) -
+          Number(Boolean(a.ability.declareChanges)),
+      )
+    }
     for (const timing of PRE_SORTED_BUCKETS) {
       const entries = bucket.get(timing)
       if (entries && entries.length > 1) sortBucket(entries, sideConfig, timing)
@@ -729,7 +744,7 @@ export class AbilitiesEngine {
         if (!key) continue
         const stats = resolveUnitStats(sideState.unitStats, key)
         if (!stats?.ABILITIES) continue
-        const { type: unitType } = parseVariantId(key)
+        const { baseType: unitType } = parseUnitLocator(key)
 
         for (const ability of stats.ABILITIES) {
           entries.push({
@@ -758,7 +773,7 @@ export class AbilitiesEngine {
       const stats = resolveUnitStats(sideState.unitStats, key as UnitType)
       const deploy = stats?.UNIT_ABILITIES?.DEPLOY
       if (!deploy) continue
-      const { type: baseType } = parseVariantId(key as UnitType)
+      const { baseType } = parseUnitLocator(key as UnitType)
       if (seen.has(baseType as UnitBaseType)) continue
       seen.add(baseType as UnitBaseType)
       entries.push({ ability: deploy, unitType: baseType as UnitBaseType })
@@ -968,28 +983,16 @@ export class AbilitiesEngine {
 
       if (sideTracker.has(entry.trackerKey)) continue
 
-      if (source.type === 'deploy') {
-        if (
-          CombatSideState.isRestricted(
-            state,
-            side,
-            'lost',
-            'DEPLOY',
-            source.unitType,
-          )
+      if (
+        source.type === 'deploy' &&
+        CombatSideState.isUnitAbilityDisabled(
+          state,
+          side,
+          'DEPLOY',
+          source.unitType,
         )
-          continue
-        if (
-          CombatSideState.isRestricted(
-            state,
-            side,
-            'cannotBeUsed',
-            'DEPLOY',
-            source.unitType,
-          )
-        )
-          continue
-      }
+      )
+        continue
 
       const liveOverlay = state[side].liveAbilities[ability.key]
       const override = (
@@ -1031,6 +1034,22 @@ export class AbilitiesEngine {
         canCall = inv.isCallable(freshParams, ctx, context)
       } else {
         canCall = true
+      }
+
+      // Lost or blocked unit abilities never fire. Checked after the
+      // read-only guard, which rejects most candidates first (e.g. Sustain
+      // Damage without pending hits), to keep the lookup off the hot path.
+      if (
+        canCall &&
+        source.type === 'unit' &&
+        UNIT_ABILITY_KEYS.has(ability.key)
+      ) {
+        canCall = !CombatSideState.isUnitAbilityDisabled(
+          state,
+          side,
+          ability.key as UnitAbility,
+          source.unitId,
+        )
       }
 
       if (canCall) {
@@ -1299,7 +1318,7 @@ export class AbilitiesEngine {
     // Add new candidates for the new variant's abilities.
     const stats = resolveUnitStats(sideState.unitStats, variantKey as UnitType)
     if (stats?.ABILITIES) {
-      const { type: baseType } = parseVariantId(variantKey as UnitType)
+      const { baseType } = parseUnitLocator(variantKey as UnitType)
       for (const ability of stats.ABILITIES) {
         if (ability.context && ability.context !== state.combatMode) continue
         affectedKeys.add(ability.key)
@@ -1433,35 +1452,6 @@ export class AbilitiesEngine {
   hasDynamicInvokes(side: CombatSide, key: string): boolean {
     const ability = this.abilityForKey(side, key)
     return ability !== undefined && !hasStaticInvokes(ability)
-  }
-
-  invokeOnParamSet(
-    side: CombatSide,
-    targetKey: string,
-    changedKeys: string[],
-    draft: CombatStateData,
-  ): void {
-    const ability = this.abilityForKey(side, targetKey)
-    if (!ability?.onParamSet) return
-    // Give onParamSet a mutable merged view. It writes derived fields back
-    // (e.g. ships → nonFighterShips/spaceCombatParticipating). Capture any
-    // mutations via a before/after diff and persist them in liveAbilities
-    // so subsequent reads see the derived values.
-    const params = { ...CombatSideState.getLiveParams(draft[side], targetKey) }
-    const before = { ...params }
-    const ctx = this.context(side)
-    withRunningAbility(ctx, ability, () => {
-      for (const key of changedKeys) {
-        ability.onParamSet!(params, key, params[key], ctx)
-      }
-    })
-    let liveEntry: Record<string, unknown> | undefined
-    for (const key of Object.keys(params)) {
-      if (params[key] !== before[key]) {
-        if (!liveEntry) liveEntry = cowLiveAbilityEntry(draft, side, targetKey)
-        liveEntry[key] = params[key]
-      }
-    }
   }
 
   /** Resolve invoke entries for `timing` on `side`, scoped to `phase`.

@@ -21,7 +21,7 @@ export const watchfulOjz: Ability<Params> = {
     uses: Infinity,
     shipConfig: declareParam<UnitList<number>>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
       defaultItemValue: 0,
       filter: { combatMode: 'SPACE' },
       limit: 'IN_COMBAT',
@@ -47,9 +47,7 @@ export const watchfulOjz: Ability<Params> = {
           if (toRetreat.length >= 2) break
           if (maxCount <= 0) continue
           let retreatedForType = 0
-          const ids = ctx.api.own.getUnits(variantId as UnitType, {
-            includeVariants: false,
-          })
+          const ids = ctx.api.own.participating.getUnits(variantId as UnitType)
           for (const id of ids) {
             if (toRetreat.length >= 2) break
             if (retreatedForType >= maxCount) break

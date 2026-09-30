@@ -4,12 +4,12 @@ import type { Ability } from '@/combat'
 import { buildCombatState } from '@/hooks/combat-setup/build-combat-state'
 
 describe('declare hooks receive the lookup context', () => {
-  it('declareSubtype, declareParamChange and onParamSet see ctx.this and ctx.abilities', () => {
+  it('declareSubtype and declareChanges see ctx.this and ctx.abilities', () => {
     const seen: string[] = []
     const probe: Ability = {
       key: 'PROBE',
       name: 'Probe',
-      params: { isEnabled: true, uses: Infinity, flag: false },
+      params: { isEnabled: true, uses: Infinity },
       headerUI: 'isEnabled',
       declareSubtype: (_params, ctx) => {
         seen.push(
@@ -17,24 +17,12 @@ describe('declare hooks receive the lookup context', () => {
         )
         return []
       },
-      declareParamChange: (_params, _settings, ctx) => {
+      declareChanges: ctx => {
         seen.push(
           `change:${ctx.this.key}:${ctx.abilities.opponent.all.length > 0}`,
         )
-        return []
       },
-      onParamSet: (params, key, _value, ctx) => {
-        seen.push(`set:${key}:${ctx.this.key}`)
-        return params
-      },
-      invoke: [
-        {
-          timing: 'PREPARE',
-          call: ctx => {
-            ctx.api.own.updateAbilityConfig({ flag: true })
-          },
-        },
-      ],
+      invoke: [],
     }
 
     buildCombatState({
@@ -51,7 +39,5 @@ describe('declare hooks receive the lookup context', () => {
 
     expect(seen).toContain('subtype:PROBE:true')
     expect(seen).toContain('change:PROBE:true')
-    // The PREPARE update goes through the engine's invokeOnParamSet.
-    expect(seen).toContain('set:flag:PROBE')
   })
 })

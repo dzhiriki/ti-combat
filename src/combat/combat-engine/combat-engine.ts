@@ -1,10 +1,6 @@
 import { CombatState } from '../combat-state/combat-state'
-import {
-  getInitialMetaPhase,
-  getNextPhaseInFlow,
-  isCombatMeta,
-} from '../combat-state/phase-utils'
-import type { CombatMode, MetaPhase } from '../combat-state/types'
+import { getInitialMetaPhase, isCombatMeta } from '../combat-state/phase-utils'
+import type { MetaPhase } from '../combat-state/types'
 import type { CombatOutcome } from '../types'
 import { extractSurvivors } from './utils/extract-survivors'
 import type { OutcomeRecord } from './utils/types'
@@ -214,11 +210,15 @@ export class CombatEngine {
       }
 
       if (!state.isFinished() && state.pendingSteps.length === 0) {
-        if (isCombatMeta(currentMeta)) {
-          const res = enterCombatRound()
-          if (res !== 'enter') return finalize(res)
+        if (state.data.winnerSide !== undefined) {
+          state.loadEndScript(currentMeta)
+        } else {
+          if (isCombatMeta(currentMeta)) {
+            const res = enterCombatRound()
+            if (res !== 'enter') return finalize(res)
+          }
+          state.loadPhaseScript(currentMeta, round)
         }
-        state.loadPhaseScript(currentMeta, round)
       }
 
       while (true) {
@@ -232,9 +232,12 @@ export class CombatEngine {
         }
 
         if (state.pendingSteps.length === 0) {
-          const nextPhase = resolveNextPhase(currentMeta, mode)
+          const nextPhase = state.getNextPhase(currentMeta)
+          if (nextPhase === 'COMPLETE') {
+            state.loadEndScript(currentMeta)
+            continue
+          }
           currentMeta = nextPhase
-          if (state.isFinished()) continue
           if (isCombatMeta(nextPhase)) {
             const res = enterCombatRound()
             if (res !== 'enter') return finalize(res)
@@ -289,7 +292,10 @@ export class CombatEngine {
     }
 
     if (initialState.isFinished()) {
-      return outcomeRecordToArray(makeLeafOutcome(initialState))
+      return outcomeRecordToArray(
+        makeLeafOutcome(initialState),
+        initialState.data.surfaces,
+      )
     }
     const result = expandNode(initialState, 0, initialMeta)
     if ('cycleTo' in result) return []
@@ -298,27 +304,14 @@ export class CombatEngine {
       console.log('Unique nodes =', nodes)
       console.log('Final nodes =', finalNodes)
     }
-    return outcomeRecordToArray(result.outcomes)
+    return outcomeRecordToArray(result.outcomes, initialState.data.surfaces)
   }
-}
-
-/** Decide the next meta-phase when the current script drains. Combat metas
- *  loop back to themselves; non-combat metas advance through the flow.
- *  Completion is owned entirely by combat-state — when it pushes the
- *  END_OF_COMBAT sequence, the outer loop sees `isFinished` flip on the
- *  next iteration. */
-function resolveNextPhase(currentMeta: MetaPhase, mode: CombatMode): MetaPhase {
-  if (isCombatMeta(currentMeta)) {
-    return currentMeta
-  }
-
-  return getNextPhaseInFlow(currentMeta, mode) as MetaPhase
 }
 
 /** Build the leaf outcome for a finished (or maxRounds-aborted) state.
- *  `winnerSide` is normally set by `_triggerCompletion` before `_setComplete`
- *  flips `isFinished`. The maxRounds escape hatch is the one path that
- *  reaches here without a completion script having run, so fall back */
+ *  `winnerSide` is normally derived when phase flow is exhausted, before the
+ *  end script flips `isFinished`. The maxRounds escape hatch is the one path
+ *  that reaches here without the end script, so fall back. */
 function makeLeafOutcome(state: CombatState): OutcomeRecord {
   const winnerSide = state.data.winnerSide ?? 'draw'
   const key = state.getUnitsHash()
@@ -332,15 +325,20 @@ function makeLeafOutcome(state: CombatState): OutcomeRecord {
   return record
 }
 
-function outcomeRecordToArray(record: OutcomeRecord): CombatOutcome[] {
+function outcomeRecordToArray(
+  record: OutcomeRecord,
+  surfaces: CombatState['data']['surfaces'],
+): CombatOutcome[] {
   const results: CombatOutcome[] = []
   for (const [, o] of record) {
-    const attacker = extractSurvivors(o.attackerData)
-    const defender = extractSurvivors(o.defenderData)
+    const attacker = extractSurvivors(o.attackerData, surfaces)
+    const defender = extractSurvivors(o.defenderData, surfaces)
 
     results.push({
-      attacker,
-      defender,
+      attacker: attacker.aggregate,
+      defender: defender.aggregate,
+      attackerSurfaces: attacker.bySurface,
+      defenderSurfaces: defender.bySurface,
       winner: o.winnerSide,
       probability: o.probability,
     })

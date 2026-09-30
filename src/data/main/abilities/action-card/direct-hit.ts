@@ -16,11 +16,12 @@ export const directHit: Ability<Params> = {
     uses: 0,
     targets: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'nonFighterShips',
+      source: 'SHIPS',
       side: 'opponent',
       defaultItemValue: true,
       filter: {
         combatMode: 'SPACE',
+        exclude: ['FIGHTER'],
       },
     }),
   },
@@ -37,10 +38,13 @@ export const directHit: Ability<Params> = {
     {
       timing: 'AFTER_SUSTAIN_DAMAGE_USE',
       isCallable: (params, ctx, unitId) => {
-        if (!ctx.api.opponent.hasUnit(unitId)) return false
-        const variant = ctx.api.opponent.getUnitVariantKey(unitId)!
-        const targets = ctx.utils.getFlat(params.targets)
-        if (!targets.includes(variant)) return false
+        if (
+          !ctx.api.opponent.hasUnit(unitId) ||
+          !ctx.api.opponent.isUnitCategory(unitId, 'SHIPS')
+        )
+          return false
+        if (!ctx.api.opponent.matchesUnitList(unitId, params.targets))
+          return false
         const stats = ctx.api.opponent.getUnitStats(unitId)!
         if (stats.DIRECT_HIT_IMMUNE) return false
         return true

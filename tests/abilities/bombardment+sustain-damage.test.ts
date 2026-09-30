@@ -55,4 +55,55 @@ describe('BOMBARDMENT + SUSTAIN_DAMAGE', () => {
     expect(t.defender.units.MECH).toHaveLength(2)
     expect(t.defender.units.MECH!.some(m => m.isDamaged)).toBe(true)
   })
+
+  it('inherits the target ground UNIT_PRIORITY', () => {
+    const t = combatTest({
+      mode: 'GROUND',
+      attacker: {
+        faction: 'ARBOREC',
+        units: { DREADNOUGHT: 1, INFANTRY: 1 },
+        abilities: { BOMBARDMENT: { disableSustainDamage: true } },
+      },
+      defender: {
+        faction: 'SARDAKK_NORR',
+        units: { MECH: 1, INFANTRY: 1 },
+        abilities: {
+          UNIT_PRIORITY: {
+            groundUnitPriority: [['MECH'], ['INFANTRY']],
+          },
+        },
+      },
+    })
+
+    t.advanceTo('SPACE_CANNON_DEFENSE', { defender: 1 })
+
+    expect(t.defender.units.MECH).toBeUndefined()
+    expect(t.defender.units.INFANTRY).toHaveLength(1)
+  })
+
+  it('uses an outgoing custom priority as the eligibility list', () => {
+    const t = combatTest({
+      mode: 'GROUND',
+      attacker: {
+        faction: 'ARBOREC',
+        units: { DREADNOUGHT: 1, INFANTRY: 1 },
+        abilities: {
+          BOMBARDMENT: {
+            customPriority: true,
+            unitPriority: [['INFANTRY']],
+            disableSustainDamage: true,
+          },
+        },
+      },
+      defender: {
+        faction: 'SARDAKK_NORR',
+        units: { MECH: 1, INFANTRY: 1 },
+      },
+    })
+
+    t.advanceTo('SPACE_CANNON_DEFENSE', { defender: 1 })
+
+    expect(t.defender.units.INFANTRY).toBeUndefined()
+    expect(t.defender.units.MECH).toHaveLength(1)
+  })
 })

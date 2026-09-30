@@ -46,6 +46,15 @@ a check there too.
   object it came from — dedupe by `key` instead. Invoke objects are shared by
   the copy, so invoke-identity dedup is unaffected.
 
+- **A unit-attached ability's `sort` and params come from the registered
+  ability with its key.** `applyUnitSourceSort` looks the hook up with
+  `abilityForKey`, never on the object in `ABILITIES`. Params are filled
+  only for registered abilities and those units carry when the engine is
+  built, so an ability attached later (at PREPARE) under a key nothing
+  registered never fires. A card that attaches its text to units (TF
+  Exotrireme) must therefore share the text's key and carry its `sort`.
+  Nekro's unit-copy wrapper carries none, so its copies fire in pool order.
+
 - **TF clones never share a key with their TI4 source.** Every `cloneAbility`
   call passes its own `TF_<NAME>` key, so a TF session addresses Altruistic
   Genome as `TF_ALTRUISTIC_GENOME`, not `TELLURIAN`. Anything
@@ -157,6 +166,20 @@ a check there too.
   reads only the completed roster and catalog. Nekro uses the context's faction
   keys and excludes itself from its copy sources.
 
+- **Declaring changes moves an ability's PREPARE first.**
+  `sortPreSortedBuckets` (`abilities-engine.ts`) runs the PREPARE invokes of
+  abilities with `declareChanges` before the rest (Nekro unit copies,
+  Miniaturization, Eidolon Maximum), so copied or transformed stats are in
+  place before Capacity and Fleet Pool enforce. Don't give an ability
+  `declareChanges` if its PREPARE must keep its registration position.
+
+- **Copiers replay another ability's invokes as that ability.** Technological
+  Singularity and TF Singularity run a gained ability's PREPARE inside
+  `withRunningAbility`, so its `invokeChanges` and `ctx.this.key` restriction
+  reasons resolve to the copy (a gained Fourth Moon's DESTROY removal then
+  matches its PREPARE). `withRunningAbility` doesn't swap `SideApi`'s ability
+  key: a one-argument `updateAbilityConfig` still writes the copier's config.
+
 - **Config abilities resolve before unit-attached abilities within a timing
   pass.** A unit ability's PREPARE cannot pre-empt an ADVANCED phase driver's
   PREPARE — e.g. a flagship text zeroing `CAPACITY_COST` runs AFTER the
@@ -185,20 +208,16 @@ a check there too.
   first — the TAIL dies first.** The unit spared by cancelling one hit is
   `result[0]`, not `result[n-1]` (see Divinity's `savedByHitCancel`).
 
-- **Out-of-band ability hits need their own wipe check.** When `addHits`
-  creates a hit pool outside a dice-roll group, `CombatState.assignHits`
-  queues both assignment and `_postAssignHits`. Keep that completion check
-  after the destruction cascade; otherwise a Magen Defense Grid wipe resumes
-  `START_OF_COMBAT` and rolls combat dice before ending the combat.
+- **Out-of-band ability hits queue assignment and a combat-phase end check.**
+  `CombatState.assignHits` drains hit assignment and its destruction cascade,
+  then aborts the remaining combat phase if either side has no participants.
+  Top-level pre-combat phases are not aborted by participant state.
 
-- **Direct unit removal must park, drain destruction effects, then check for
-  a wipe.** `removeUnits` and `destroyUnits` queue a completion check before
-  their ability timing resumes; when already inside a destruction cascade,
-  that check belongs at the end of the active group so `AFTER_DESTROY`
-  abilities such as Brother Milor still fire. Parking must compare the actual
-  next step (`peekStep`), not the next timing (`currentStep`), because a queued
-  method-only check otherwise leaves the invoking timing in place and repeats
-  it indefinitely (Fragment Reality + Fleet Pool).
+- **Direct unit removal must park, drain destruction effects, then check the
+  combat phase.** `destroyUnits` pushes its destruction cascade so
+  `AFTER_DESTROY` abilities such as Brother Milor can restore or replace units
+  before participant loss is evaluated. Parking must compare the actual next
+  step (`peekStep`), not merely the next timing (`currentStep`).
 
 - **A blanket restriction stops being blanket once anything is immune to
   it.** `setUnitAbilityRestrictionImmunity(reason, unitType)` makes a
@@ -225,13 +244,31 @@ a check there too.
   phase drivers (AFB, Space Cannon, Bombardment, Retreat, Fleet Pool,
   Capacity) — never hide it, even for Twilight's Fall.
 
-- **Winning SPACE combat requires participating units.** `_postAssignHits`
-  uses `hasAnyUnits` for non-combat metas (so SCO/AFB wipes end things),
-  but a would-be winner whose remaining units are all non-participating
-  (ferried ground forces, structures) is downgraded to 'draw' in SPACE
-  mode — only ship-mechs (Eidolon Maximum, Starlancer XI with ships
-  fielded) win via participation. Combat-round wipes and GROUND mode are
-  untouched (see `tests/engine/space-combat-winner-participation.test.ts`).
+- **Participation follows categories; only ground combat is local.** Any
+  ship (native, phase-scoped or granted) fights a space combat from any surface
+  of the system; a ground force fights a ground combat only on the invaded
+  planet (the attacker's are committed there). A type-wide `CATEGORIES` change
+  therefore reaches mechs on planets too: an effect limited to some units
+  (Z-Grav Eidolon is a ship only in the space area) grants the category to
+  those units instead, like Alastor. `participatesInCombat`, the `placeUnits`
+  split and `fightsOn` in `unit-options.ts` share the rule.
+
+- **Winning and entering SPACE combat require participating units.** A combat
+  phase starts only when both sides already have participants for it,
+  phase-scoped categories of that phase included (Starlancer XI alone starts a
+  space combat); a `START_OF_COMBAT` effect cannot bootstrap admission. Base
+  Z-Grav Eidolon therefore does not transform when its side has no native ship.
+  When flow is exhausted, a side whose remaining units are ferried ground forces
+  or structures cannot win; Eidolon Maximum can because it participates
+  natively, Starlancer XI cannot because it is a ship only during space combat.
+  See `tests/engine/space-combat-winner-participation.test.ts`.
+
+- **During PREPARE every unit is still a participant, and no meta is set.**
+  `buildSideState` puts every unit in `participatingUnits`, and
+  `forSimulation` splits out the non-participants after PREPARE, unless a
+  PREPARE effect resyncs the side earlier (grants, placements, moves, category
+  or subtype changes). Guards on `isParticipating` or `participating` queries
+  see the whole force until then, and phase-scoped categories never apply.
 
 ## Reconcile and config
 
@@ -245,37 +282,79 @@ a check there too.
   `system: 'TF'` explicitly. See
   `tests/game-system.test.ts` for URL and worker regression coverage.
 
-- **`resetSettingsToBase` intentionally does NOT re-apply
-  `declareParamChange`.** The asymmetry with `resetBaseGroups` is
-  load-bearing (Alastor/Eidolon tests). If an ability needs its
-  participation change to survive into the engine run, restore it at
-  runtime in its PREPARE (see Hel-Titan's `onPrepare`).
+- **`declareChanges` only shapes setup unless an invoke runs it.** Native
+  `CATEGORIES` and `grantCategory` determine runtime participation;
+  Hel-Titan and Starlancer XI inherit their categories from native stats,
+  including when the first unit is placed after PREPARE. A stats invoke that
+  changes `CATEGORIES` or `ALLOWED_SURFACES` (TF Hel-Titan) must expose the
+  same effect as `declareChanges` (`declareChanges: statsInvoke.call`) or
+  setup options and placement miss it.
 
-- **`declareParamChange` additions to DERIVED settings groups survive only
-  because `resetBaseGroups` re-applies them after `onParamSet`.** The
-  derivation (`ships` → `spaceCombatParticipating`, etc.) recomputes derived
-  groups from the base groups, clobbering anything pushed into them earlier
-  in the pass. Base-group targets (Hel-Titan's `groundForces`) never hit
-  this; derived-group targets (Starlancer XI's `spaceCombatParticipating`)
-  rely on the post-derivation re-apply — don't remove it.
+- **`filter.withAbility` lists read the stand-ins' stats.** Setup runs no
+  PREPARE, so a unit that gains an ability there is not offered unless a
+  `declareChanges` attaches the ability too: TF Exotrireme declares its stat
+  block, and The Faces of Janovet declares its copy. A switched-off ability's
+  changes don't run there, so reconcile reruns the changes once per such
+  ability with it switched on (and the rest of its exclusive group off) and
+  stores the holders in `optionMetadata.abilityHolders`; otherwise its list
+  would empty out and lose its order. The unit type whose `FACTION_<UNIT>`
+  slot holds the ability counts too, as if upgraded (Exotrireme II lists
+  dreadnoughts before the upgrade is toggled). `resolveUnitOptions` needs the
+  declaring ability's key (`abilityKey`), which reconcile and
+  `getUnitVariantsOptions` pass; without it the filter throws.
 
-- **`declareParam` sourced params sync only at reconcile — but the reconciled
-  value SURVIVES into the engine run.** A runtime `updateAbilityConfig` to a
-  source list (e.g. `SETTINGS.spaceCombatParticipating`) does not propagate to
-  params sourced from it (fleet pool, sustain priorities, unit priority).
-  When the addition came from a `declareParamChange` at reconcile, the
-  dependent lists already contain it and `resetSettingsToBase` does not touch
-  them — only the SETTINGS group itself needs the runtime restore (Starlancer
-  XI restores `spaceCombatParticipating` in PREPARE and nothing else). Update
-  a dependent ability's config at runtime only for additions that never went
-  through reconcile.
+- **Setup runs changes against stand-ins, not placed units.** One unit of
+  every type stands on every surface, so a change must not count units or
+  depend on which exist; a grant on a stand-in marks that type on that
+  surface (`optionMetadata.standIns`). Changes run in registration order with
+  no PREPARE run: one reading categories another change sets must register
+  later. Reconcile applies them once, before syncing, so they must not read
+  `declareParam` unit lists. The setup's placement runs one side's changes without the
+  opponent's abilities, so `ctx.abilities.opponent` may be empty. After the
+  changes run, the simplified editor keeps each type's stand-in only on the
+  surface `simplifiedSurfaceId` places it on, so its options never offer a
+  surface it cannot fill (Alastor infantry on the planet in space combat). See
+  `tests/engine/declare-changes.test.ts`.
 
-- **`SETTINGS.ships` and `SETTINGS.spaceCombatParticipating` are distinct.**
-  `ships` cascades (via `onParamSet`) into `nonFighterShips`,
-  `spaceCombatParticipating`, and SCO targets; setting
-  `spaceCombatParticipating` directly grants combat participation WITHOUT
-  ship-ness (fleet pool, capacity, SCO targeting untouched) — that's how
-  Starlancer XI mechs fight in space from the ground.
+- **`declareParam` sourced params sync only at reconcile, and those values
+  survive into the engine run.** Include eligible types even when none are
+  fielded yet: later placements need their priority, sustain, and repair
+  settings. Change grants extend the possible surfaces without requiring a
+  fielded host. A runtime source-list edit does not update dependent priorities. Use the reconciled priorities to order candidates,
+  and scoped unit queries to determine runtime eligibility.
+
+- **Reconciled participating lists are wider than their controls.**
+  Reconcile resolves list options with `allSurfaces` (every surface of the
+  param's mode), while `getUnitVariantsOptions` shows only the active one. UI
+  edits that rebuild a list from the visible items must merge the hidden
+  entries back (`keepHiddenEntries` in the abilities-panel list) or they
+  silently delete other planets' settings. See
+  `tests/surface-unit-settings.test.ts`.
+
+- **Reconcile drops list entries whose key is not among the offered options,
+  and a `scope: 'system'` list offers only surface-qualified keys.** Config
+  built outside the UI (the AsyncTI4 import, hand-written test configs) must
+  key `PRE_DAMAGED`/`PRE_GALVANIZED` entries with `makeUnitLocator(type,
+surfaceId)`; a bare `['DREADNOUGHT', 1]` is silently discarded on load and
+  replaced by the `defaultItemValue`. See `tests/url-sync.test.ts`.
+
+- **A `null` param default means "nothing chosen" — reconcile never fills
+  it.** Apollo's `heroUnit` relies on this; auto-selecting the first option
+  would designate a hero the player never picked.
+
+- **An empty `DeclaredSubtype.surfaces` hides the subtype everywhere.** Omit
+  the field (`undefined`) for "any eligible surface"; pre-galvanized does so for
+  unselected types so mid-combat Galvanized units stay selectable.
+
+- **Phase-scoped categories follow the scheduler's meta.**
+  `CombatStateData.meta` is set by `loadPhaseScript` (every top-level entry,
+  engine and test harness); nested metas keep the combat's. On a meta change,
+  sides with scoped entries re-split their pools and both restriction caches
+  reset, and `getNextPhase` admits a combat phase by the participants it would
+  have. Readers without a meta (setup option lists, the participating filter)
+  pass their mode's combat meta (`getCombatMeta`); a new category reader must
+  pass a phase too, or scoped entries never apply. `categoryHash` serializes
+  scoped entries. Starlancer XI's special combat-end rules are deferred.
 
 - **Capacity and Fleet Pool split Fighter-II-style cargo between them.**
   Units with BOTH `CAPACITY_COST` and `FLEET_POOL_COST` (Fighter II, the TF
@@ -287,9 +366,23 @@ a check there too.
   Capacity enforcement toggle is off (the toggle governs removal of illegal
   cargo, not how much capacity the ships have).
 
+- **The engine owns lost/cannotBeUsed for unit-sourced unit abilities.**
+  `AbilitiesEngine.tryResolveOne` rejects a unit-sourced invoke whose
+  `ability.key` is in `UNIT_ABILITIES` (SUSTAIN_DAMAGE, AFB, …) after
+  `isCallable` when the source unit's ability is lost or cannotBeUsed,
+  surface-scoped restrictions included. Their guards must not re-check it (see
+  `sustain-damage.ts`); a re-keyed clone outside `UNIT_ABILITIES` must add
+  the check itself. Pinned by
+  `tests/engine/surface-scoped-sustain-restriction.test.ts`.
+
+- **`matchesUnitList` caches by list identity.** `SideApi.matchesUnitList`
+  compiles each `UnitList` object once (WeakMap), so `UnitList` params must
+  be replaced, never mutated in place. A malformed `@` locator throws when
+  the list is first compiled, even if an earlier entry would match.
+
 - **Sustain Damage has per-mode allow-lists.** A unit sustains only if its
   variant is in `SUSTAIN_DAMAGE.spacePriority` / `groundPriority` (sourced
-  from `nonFighterShips` / `groundForces`). A unit added to combat outside
+  from non-fighter ships / ground forces). A unit added to combat outside
   those lists silently cannot sustain in that mode.
 
 - **Hit-assignment order: the FRONT of `UNIT_PRIORITY.*UnitPriority` takes
@@ -300,6 +393,64 @@ a check there too.
   `fightersLast` moves fighters to the end to PROTECT them.)
 
 ## Combat engine
+
+- **Participant loss ends the active combat phase; the scheduler owns what
+  follows.** After destruction reactions drain, a combat-phase check discards
+  remaining abilities and rolls, then the scheduler advances through the
+  ordered flow. Because Bombardment is a pre-combat phase, wiping defenders
+  there still allows commitment and Space Cannon Defense; losing the last unit
+  during `GROUND_COMBAT` ends combat immediately because no phase follows.
+  Before entering or repeating a combat phase, both sides must already have
+  participants. After an early phase end or `forceOutcome`,
+  `_loadEndScriptIfFlowExhausted` (queued behind `CLEANUP_ROUND`) applies
+  the scheduler's own `getNextPhase` rule in place, so a finished combat
+  does not cost an extra `advance()`; any non-COMPLETE result is left to the
+  scheduler. It relies on `phase[0]` being the scheduler's current meta
+  (phase stacks run outer to inner and only unit-ability metas nest), and
+  any change to the scheduler's COMPLETE handling
+  (`CombatEngine` / test harness) must be mirrored there. See `tests/abilities/claire-gibson.test.ts`,
+  `tests/abilities/claire-gibson+indoctrination.test.ts`, and
+  `tests/surfaces.test.ts`.
+
+- **The `[0.0.1]` assignHits fast path compares base types, not locators.**
+  Surface-qualified tiers are equivalent only when they name one surface and
+  every pooled unit stands on it (`fitsFighterFastPath`); Alastor pools span
+  planets, so mixed lists must fall back to `pickTargetsForCustom`.
+
+- **Side state objects must keep one hidden class.** `forSimulation`
+  rebuilds each `SideStateData` with every field present
+  (`withAllSideFields`), and `cloneStateForBranch` spreads it per branch.
+  V8 only bulk-copies a spread when it sees few source shapes; lazily added
+  optional fields (`_metaHash`, `hitPool`, …) arriving in path-dependent
+  order made that spread and every side-data read megamorphic (~40% slower
+  engine). A new `SideStateData` field is a compile error there until listed;
+  never attach ad-hoc properties to side objects, and avoid conditional
+  spreads (`...(x && { x })`) in per-branch literals.
+
+- **Surface membership is derived from the two packed unit pools and
+  `unitSurface`.** Keep location metadata for destroyed IDs because reactions
+  can inspect their former surface. Commitment scans the living pools; final
+  survivor extraction groups living IDs by surface in one pass. Never mutate
+  `unitSurface` in place because branches share it until a movement or
+  placement clones it.
+
+- **Surface-scoped restrictions resolve to the ids on that surface.**
+  `buildResolvedForSide` expands an entry with a `surfaceId` into the unit
+  ids standing there (no type keys, never `'ALL'`), so type-level queries
+  such as DEPLOY's ignore it, and `moveUnits` must drop
+  `_resolvedRestrictions`. Such an entry never disables its ability as a
+  restriction source. Pinned by `ability-api.test.ts` and
+  `tests/engine/surface-scoped-sustain-restriction.test.ts`.
+
+- **State-hash caches are validated by reference.** `_metaHash` (location,
+  native categories and grants) and the `categoryHashes` WeakMap assume
+  `unitSurface`, `unitStats` and `unitGrants` are replaced, never mutated
+  in place, on every write. The location part lists every id off the active
+  surface, destroyed ones included; they keep their last surface, so it only
+  changes when units are placed or moved. `getUnitsHash` writes ASCII
+  `0`/`1` damage flags and `@`/`#`/`&` markers right after ids, so UnitIds
+  must stay at or above 0x80, and surface ids and variant keys must not
+  contain `!`, `,`, `=`, `@`, `#`, `&`, `;`, `|` or `+`.
 
 - **Unlimited-use repair is the only thing that makes the state graph
   cyclic.** Without it, combat state decreases monotonically (units are
@@ -373,7 +524,25 @@ a check there too.
   assert `expect(payload).toEqual('SHOW')` and read the diff, or write a
   temporary `_probe.test.ts` (delete it afterwards).
 
+- **Test files share one module cache per thread.** The npm test scripts run
+  `--no-isolate`, so a module's top-level code runs once per thread, and a
+  later file's `await import()` gets the cached module without rerunning it.
+  Never test through import side effects, such as `combat.worker.ts` binding
+  `self.onmessage` to a stubbed `self`; call `runSimulation` directly. Which
+  files share a thread depends on the core count, so such tests pass locally
+  and fail on CI; reproduce with `--maxWorkers=1`.
+
 ## UI config and data modules
+
+- **Unit selector keys are not variant/stat keys.** Scoped `declareParam` lists
+  store `UnitLocator` values containing both a variant and a surface. Use scoped
+  unit queries or `matchesUnitLocator` (also valid for destroyed-unit metadata),
+  and use `parseUnitLocator` for both plain and qualified keys. Its `unitType`
+  is the decoded variant; `baseType` and `subtypes` describe that variant, and
+  `surfaceId` carries the optional location. Preserve the surface when adding a
+  subtype with `locatorWithSubtype`. Setup participant
+  options project commitment onto its destination; system options retain the
+  original placement. See `tests/surface-unit-settings.test.ts`.
 
 - **`select` uiConfig item values must be NON-EMPTY strings.** Store the
   param as a string union (`'1' | '2' | '3'`) and `Number()` it at the use
@@ -389,6 +558,8 @@ a check there too.
   the native stat blocks exposed by `createStatsInvoke` through the runtime
   `UNIT_UPGRADE_<TYPE>` lookups — one slot per unit type (`isStatsInvoke`
   narrows the tagged entries). Reading
-  `getUnitStats` instead would also copy unrelated PREPARE modifiers. Keep
-  shared text helpers independent of faction/deck modules to avoid import
-  cycles (see `faces-of-janovet.ts` and `janovet-inherits.ts`).
+  `getUnitStats` instead would also copy unrelated PREPARE modifiers. The
+  copy includes the block's `ABILITIES` (the Exotrireme, Strike Wing Alpha
+  and Linkship texts) and runs as `declareChanges`, so setup lists see the
+  flagship carrying them. Cards never check for Janovet: a text that belongs
+  to the upgraded unit rides in the stat block (see `faces-of-janovet.ts`).

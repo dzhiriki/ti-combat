@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { extractDefaults, withRunningAbility } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { UNIT_DISPLAY_NAMES } from '@/constants/units'
 import { CombatSetup } from '@/hooks/combat-setup'
 import type { UnitBaseType } from '@/types'
@@ -197,16 +198,17 @@ describe("Twilight's Fall available abilities", () => {
     const setup = new CombatSetup()
     setup.setSystem('TF')
     setup.setFaction('attacker', 'IL_NA_VIROSET')
+    setup.setUnitCount('attacker', 'MECH', 1)
 
     const config = setup.abilities.attacker
     const priorityKeys = (
       config.UNIT_PRIORITY.spaceUnitPriority as [string][]
-    ).map(e => (Array.isArray(e) ? e[0] : e))
+    ).map(e => parseUnitLocator(Array.isArray(e) ? e[0] : e).unitType)
     expect(priorityKeys).toContain('MECH')
 
     const sustainKeys = (
       config.SUSTAIN_DAMAGE.spacePriority as [string, boolean][]
-    ).map(([k]) => k)
+    ).map(([k]) => parseUnitLocator(k).unitType)
     expect(sustainKeys).toContain('MECH')
 
     // Sanity: a plain TF faction gets neither
@@ -214,7 +216,7 @@ describe("Twilight's Fall available abilities", () => {
     const plain = setup.abilities.attacker
     const plainPriority = (
       plain.UNIT_PRIORITY.spaceUnitPriority as [string][]
-    ).map(e => (Array.isArray(e) ? e[0] : e))
+    ).map(e => parseUnitLocator(Array.isArray(e) ? e[0] : e).unitType)
     expect(plainPriority).not.toContain('MECH')
   })
 

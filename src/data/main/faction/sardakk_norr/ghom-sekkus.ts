@@ -7,7 +7,7 @@ import { UnitListNumberSchema } from '@/types'
 
 type Params = {
   isEnabled: boolean
-  units: UnitList<number>
+  units: UnitList<number, UnitType>
 }
 
 export const ghomSekkus: Ability<Params> = {
@@ -24,9 +24,10 @@ export const ghomSekkus: Ability<Params> = {
   params: {
     isEnabled: false,
     uses: Infinity,
-    units: declareParam<UnitList<number>>({
+    units: declareParam<UnitList<number, UnitType>>({
+      scope: 'type',
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       sort: 'worth-desc',
       defaultItemValue: 0,
       filter: {

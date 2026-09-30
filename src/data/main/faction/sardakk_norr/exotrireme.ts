@@ -1,6 +1,7 @@
 import { z } from 'zod/mini'
 
 import { type Ability, declareParam } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { UNIT_LIMITS } from '@/constants/units'
 import type { UnitId, UnitList } from '@/types'
 import { UnitListBooleanSchema } from '@/types'
@@ -20,33 +21,34 @@ export const exotrireme: Ability<Params> = {
     sacrificePriority: UnitListBooleanSchema,
     targetPriority: UnitListBooleanSchema,
   }),
+  // On by default: its uses (0 = none) are the sacrifices to make.
   params: {
-    isEnabled: false,
+    isEnabled: true,
     uses: 0,
+    // Every unit carrying this ability may be sacrificed: the dreadnoughts
+    // and anything that copies their text (The Faces of Janovet).
     sacrificePriority: declareParam({
       default: [] as UnitList<boolean>,
-      source: 'ships',
+      source: 'SHIPS',
       side: 'own',
       defaultItemValue: true,
-      filter: { include: ['DREADNOUGHT'], combatMode: 'SPACE' },
+      filter: { withAbility: true, combatMode: 'SPACE' },
     }),
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'opponent',
       sort: 'worth-desc',
       defaultItemValue: true,
       filter: { combatMode: 'SPACE' },
     }),
   },
-  headerUI: 'isEnabled',
+  headerUI: 'uses',
   sort: (params, ctx, unitIds) => {
     const remaining = new Set(unitIds)
     const result: UnitId[] = []
     for (const variantId of ctx.utils.getFlat(params.sacrificePriority)) {
-      for (const id of ctx.api.own.getUnits(variantId, {
-        includeVariants: false,
-      })) {
+      for (const id of ctx.api.own.participating.getUnits(variantId)) {
         if (remaining.has(id)) {
           result.push(id)
           remaining.delete(id)
@@ -63,24 +65,22 @@ export const exotrireme: Ability<Params> = {
       timing: 'AFTER_COMBAT_ROUND',
       isCallable: (params, ctx) => {
         if (
-          ctx.api.opponent.findUnitByPriority(
+          ctx.api.opponent.participating.findUnitByPriority(
             ctx.utils.getFlat(params.targetPriority),
-            { includeVariants: false },
           ) === undefined
         ) {
           return false
         }
-        const variantKey = ctx.api.own.getUnitVariantKey(ctx.getUnit())
-        return (
-          variantKey !== undefined &&
-          ctx.utils.getFlat(params.sacrificePriority).includes(variantKey)
+        return ctx.api.own.matchesUnitList(
+          ctx.getUnit(),
+          params.sacrificePriority,
         )
       },
       call: (ctx, params) => {
         const self = ctx.getUnit()
-        const targets = ctx.api.opponent.findUnitByPriority(
+        const targets = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false, amount: 2 },
+          { amount: 2 },
         )
 
         if (targets.length > 0) ctx.api.opponent.destroyUnits(targets)
@@ -88,29 +88,45 @@ export const exotrireme: Ability<Params> = {
       },
     },
   ],
-  uiConfig: ctx => [
-    {
-      key: 'uses',
-      label: 'Uses',
-      type: 'number',
-      min: 0,
-      max: UNIT_LIMITS.DREADNOUGHT,
-    },
-    {
-      key: 'sacrificePriority',
-      label: 'Sacrifice Priority',
-      type: 'unit-list',
-      mode: 'checkbox',
-      sortable: true,
-      items: ctx.api.own.getUnitVariantsOptions('sacrificePriority'),
-    },
-    {
-      key: 'targetPriority',
-      label: 'Target Priority',
-      type: 'unit-list',
-      mode: 'checkbox',
-      sortable: true,
-      items: ctx.api.opponent.getUnitVariantsOptions('targetPriority'),
-    },
-  ],
+  uiConfig: ctx => {
+    const sacrifices = ctx.api.own.getUnitVariantsOptions('sacrificePriority')
+    // One use per sacrifice: up to every unit that carries this ability.
+    const carriers = new Set(
+      sacrifices.map(item => parseUnitLocator(item.value).baseType),
+    )
+    const maxUses = [...carriers].reduce(
+      (sum, type) => sum + UNIT_LIMITS[type],
+      0,
+    )
+
+    return [
+      {
+        key: 'uses',
+        label: 'Uses',
+        type: 'number',
+        min: 0,
+        max: maxUses,
+        // In the header here; copies switched on by their own header (the TF
+        // card, Nekro's copy) set their uses in this control.
+        visible: ctx.this.headerUI !== 'uses',
+      },
+      {
+        key: 'sacrificePriority',
+        label: 'Sacrifice Priority',
+        type: 'unit-list',
+        mode: 'checkbox',
+        sortable: true,
+        items: sacrifices,
+        visible: sacrifices.length > 1,
+      },
+      {
+        key: 'targetPriority',
+        label: 'Target Priority',
+        type: 'unit-list',
+        mode: 'checkbox',
+        sortable: true,
+        items: ctx.api.opponent.getUnitVariantsOptions('targetPriority'),
+      },
+    ]
+  },
 }

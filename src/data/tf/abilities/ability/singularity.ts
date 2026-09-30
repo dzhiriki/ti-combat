@@ -4,7 +4,7 @@ import type {
   AbilityCallContext,
   AbilityLookupContext,
 } from '@/combat'
-import { resolveInvokes } from '@/combat'
+import { resolveInvokes, withRunningAbility } from '@/combat'
 
 const NONE = 'none'
 
@@ -74,15 +74,16 @@ export function createSingularity(
               target.key as Parameters<typeof ctx.api.own.getAbilityConfig>[0],
             ) as Record<string, unknown>) ?? {}
           // Apply any PREPARE-timing effect the copied card would normally
-          // run once at setup, then enable it so its combat-timing invokes
-          // fire from here on.
-          for (const inv of resolveInvokes(target, copiedParams, ctx)) {
-            if (inv.timing !== 'PREPARE') continue
-            ;(inv.call as (c: typeof ctx, p: Record<string, unknown>) => void)(
-              ctx,
-              copiedParams,
-            )
-          }
+          // run once at setup, as that card, then enable it so its
+          // combat-timing invokes fire from here on.
+          withRunningAbility(ctx, target, () => {
+            for (const inv of resolveInvokes(target, copiedParams, ctx)) {
+              if (inv.timing !== 'PREPARE') continue
+              ;(
+                inv.call as (c: typeof ctx, p: Record<string, unknown>) => void
+              )(ctx, copiedParams)
+            }
+          })
           ctx.api.own.updateAbilityConfig(target.key, { isEnabled: true })
         },
       },

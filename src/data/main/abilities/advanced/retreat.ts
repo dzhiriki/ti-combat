@@ -66,7 +66,10 @@ export function retreatUnits(ctx: AbilityCallContext, unitIds: UnitId[]): void {
 
   // Store in RETREAT's config (not the calling ability's config)
   ctx.api.own.updateAbilityConfig('RETREAT', {
-    _saved: { savedUnits: mergedUnits, savedUnitState: mergedState },
+    _saved: {
+      savedUnits: mergedUnits,
+      savedUnitState: mergedState,
+    },
   })
 }
 
@@ -95,6 +98,7 @@ export function restoreRetreatedUnits(
   // participating when retreat saved them) and merge type lookups.
   sideState.participatingUnits = (sideState.participatingUnits +
     restoredIds) as UnitIdList
+  // Removal keeps `unitSurface`, so restored units are back where they were.
   sideState.unitType = { ...sideState.unitType, ...restoredTypes }
 
   sideState.unitState = { ...sideState.unitState }
@@ -134,8 +138,12 @@ export const retreat: Ability<Params> = {
       isCallable: params => params._currentRound >= params.rounds,
       call: ctx => {
         const allIds: UnitId[] = []
-        for (const type of ctx.api.own.getActiveBaseTypes()) {
-          allIds.push(...ctx.api.own.getUnits(type, { includeVariants: true }))
+        for (const type of ctx.api.own.participating.getUnitTypes()) {
+          allIds.push(
+            ...ctx.api.own.participating.getUnits(type, {
+              includeVariants: true,
+            }),
+          )
         }
 
         ctx.transitionTo('COMPLETE', 'LOST')

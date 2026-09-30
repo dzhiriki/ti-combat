@@ -1,22 +1,23 @@
+import type { UnitCategory } from '@/constants/units'
+
 import type { ParamLimit } from './param-limit'
 import type {
   Ability,
   ParamFilter,
-  SettingsParams,
   SyncSortSpec,
   SyncSourceConfig,
+  UnitSelectorScope,
 } from './types'
 
 export type { ParamLimit } from './param-limit'
 
 const DECLARED_PARAM = Symbol('declaredParam')
 
-interface DeclaredParamOptions<
-  T,
-  K extends keyof SettingsParams = keyof SettingsParams,
-> {
+interface DeclaredParamOptions<T> {
   default: T
-  source?: K
+  /** Defaults to participating units; use system or type for other choices. */
+  scope?: UnitSelectorScope
+  source?: UnitCategory | readonly UnitCategory[]
   side?: 'own' | 'opponent'
   sort?: SyncSortSpec
   /** For `UnitList<V>` params, the value used when reconcile adds a new
@@ -26,7 +27,6 @@ interface DeclaredParamOptions<
    *  parent is present, falling back to this only when there is no
    *  parent. Omit for order-mode lists (single-element tuples). */
   defaultItemValue?: unknown
-  compute?: (value: SettingsParams[K]) => T
   /** Variant-list filter. Same shape as `getUnitVariantsOptions`'s filter
    *  argument — reconcile applies it to the synced valid list, and
    *  `getUnitVariantsOptions(paramKey)` reuses it to render the matching UI
@@ -47,43 +47,28 @@ interface DeclaredParamOptions<
   limit?: ParamLimit
 }
 
-export interface DeclaredParamValue<T> {
+export interface DeclaredParamValue<T> extends Omit<
+  SyncSourceConfig,
+  'key' | 'source'
+> {
   [DECLARED_PARAM]: true
   default: T
-  source?: keyof SettingsParams
-  side: 'own' | 'opponent'
-  sort: SyncSortSpec
-  defaultItemValue?: unknown
-  compute?: (value: SettingsParams[keyof SettingsParams]) => T
-  filter?: ParamFilter
-  /** Per-variant cap for `UnitList<number, V>` params.
-   *  - `'UNIT_LIMIT'` caps at `UNIT_LIMITS[baseType]`.
-   *  - `'IN_COMBAT'` caps at the count of all units of the same base type on
-   *    the side (participating + non-participating, subtypes pooled with
-   *    their base).
-   *  - `'EXTRA'` caps at the remaining reinforcement headroom
-   *    (`UNIT_LIMITS[baseType] - IN_COMBAT`, never below 0).
-   *  Surfaces in the UI as `items[].max` and clamps stored values during
-   *  reconcile. Ignored for non-`UnitList<number>` shapes. */
-  limit?: ParamLimit
+  source?: SyncSourceConfig['source']
 }
 
 /**
- * Mark a param as synced from a SETTINGS group.
+ * Mark a param as synced from one or more unit categories.
  * Returns `T` at the type level so `params` matches the `Params` generic.
  */
-export function declareParam<
-  T,
-  K extends keyof SettingsParams = keyof SettingsParams,
->(options: DeclaredParamOptions<T, K>): T {
+export function declareParam<T>(options: DeclaredParamOptions<T>): T {
   return {
     [DECLARED_PARAM]: true,
     default: options.default,
     source: options.source,
+    scope: options.scope ?? 'participating',
     side: options.side ?? 'own',
     sort: options.sort ?? 'worth-asc',
     defaultItemValue: options.defaultItemValue,
-    compute: options.compute,
     filter: options.filter,
     limit: options.limit,
   } as unknown as T
@@ -133,11 +118,11 @@ export function extractSyncSources(
     if (isDeclaredParam(value) && value.source) {
       result.push({
         key,
-        group: value.source,
+        source: value.source,
+        scope: value.scope,
         side: value.side,
         sort: value.sort,
         defaultItemValue: value.defaultItemValue,
-        compute: value.compute,
         filter: value.filter,
         limit: value.limit,
       })

@@ -1,4 +1,5 @@
 import type { StateWithProbability } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import type { CombatSide, UnitBaseType } from '@/types'
 
 /** Combine multiple branch extractors into one that returns a tuple of their
@@ -91,11 +92,11 @@ export function unitCount(
     let n = 0
     for (const id of s.participatingUnits) {
       const variantKey = s.unitType[id as string]
-      if (variantKey && variantKey.split(':')[0] === baseType) n++
+      if (variantKey && parseUnitLocator(variantKey).baseType === baseType) n++
     }
     for (const id of s.nonParticipatingUnits) {
       const variantKey = s.unitType[id as string]
-      if (variantKey && variantKey.split(':')[0] === baseType) n++
+      if (variantKey && parseUnitLocator(variantKey).baseType === baseType) n++
     }
     return n
   }

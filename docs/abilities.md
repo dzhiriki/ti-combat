@@ -6,7 +6,7 @@ Data is split by game system: `src/data/main/` (Twilight Imperium 4) and `src/da
 
 ```
 src/data/main/abilities/
-  general/          — core/unit abilities (SETTINGS, UNIT_PRIORITY, PRE_DAMAGED, PRE_GALVANIZED, SUSTAIN_DAMAGE, PLANETARY_SHIELD, DISABLE_PLANETARY_SHIELD)
+  general/          — core/unit abilities (UNIT_PRIORITY, PRE_DAMAGED, PRE_GALVANIZED, SUSTAIN_DAMAGE, PLANETARY_SHIELD, DISABLE_PLANETARY_SHIELD)
   advanced/         — phase/system abilities (ANTI_FIGHTER_BARRAGE, BOMBARDMENT, SPACE_CANNON_OFFENSE/DEFENSE, RETREAT, ABILITY_ORDER, CAPACITY, FLEET_POOL)
   technology/       — tech cards (ASSAULT_CANNON, PLASMA_SCORING, ...)
   action-card/      — action cards (BUNKER, MORALE_BOOST, SOLAR_FLARE, ...)
@@ -39,8 +39,8 @@ interface Ability<Params extends Record<string, unknown>> {
   context?: CombatMode // Restrict to SPACE or GROUND combat
   sync?: boolean // Both sides share identical config
   exclusiveGroup?: string // Mutually exclusive abilities sharing same group
-  onParamSet?: (params, key, value) => params | void // Callback for param changes
-  declareParamChange?: (params, settings: SettingsParams) => ParamChange[]
+  onParamSet?: (params, key, value, ctx) => params | void // Setup: react to a UI param edit
+  declareChanges?: (ctx, params) => void // Setup-visible effect; invokes reuse it via ctx.invokeChanges()
   declareSubtype?: (params) => DeclaredSubtype[] // Declare variant subtypes (e.g. Cavalry)
   sort?: (params, ctx, unitIds) => UnitId[] // Pre-sort this ability's unit invokes
   preventDestroy?: (params, ids, api) => UnitId[] // Spare units from opponent direct destroys
@@ -214,6 +214,65 @@ invoke: (params, ctx) => {
 
 Factories must be pure and cheap. Only config abilities may use this form; unit-attached abilities keep the array (see engine-gotchas). Use `resolveInvokes(ability, params, ctx)` from `@/combat` to read another ability's list, and `hasStaticInvokes(ability)` when you need the array itself.
 
+## Setup changes
+
+Setup never runs PREPARE, so an effect it must show before combat — a unit's
+categories, where it may be placed, or which units a grant makes ships — is
+written once in `declareChanges`. It has exactly the API of an invoke `call`:
+
+```typescript
+export const theAlastor: Ability = {
+  // ...
+  declareChanges: ctx => {
+    const selected = ctx.api.own.system
+      .getUnits()
+      .filter(id => ctx.api.own.isUnitCategory(id, 'GROUND_FORCES'))
+    ctx.api.own.grantCategory(selected, 'SHIPS')
+  },
+  invoke: [
+    {
+      timing: 'START_OF_COMBAT',
+      call: ctx => {
+        ctx.invokeChanges()
+      },
+    },
+  ],
+}
+```
+
+Setup runs the changes of every active ability (enabled, with its `headerUI`
+param set) in registration order, attacker first, against a model holding one
+stand-in unit of every type on every surface, then keeps the stand-ins on
+surfaces their type may stand on. Reconcile stores that model as
+`optionMetadata.standIns`, and setup reads it like any combat state:
+
+- **Placement** — `ALLOWED_SURFACES` (Miniaturization, Nekro unit copies).
+- **Option lists** — unit categories (Eidolon Maximum, Hel-Titan) and grants
+  (Alastor, Z-Grav Eidolon, Matriarch). A stand-in stands for every unit of
+  its type on its surface, placed or not; placed units only supply counts and
+  caps.
+
+The engine never runs `declareChanges` on its own. An invoke applying the same
+effect calls `ctx.invokeChanges()` (params default to the ability's current
+config) instead of repeating the code. TF Hel-Titan keeps its plain stats
+invoke for Janovet and declares `declareChanges: statsInvoke.call` instead.
+
+- Put in `declareChanges` only what setup must see; keep combat-only or
+  conditional effects in the invoke (Z-Grav Eidolon's change grants SHIPS to
+  the mechs in space; its START_OF_COMBAT invoke also rewrites combat values).
+- Changes see stand-ins: don't count units or rely on which units exist, and
+  don't place, move or remove units, add subtypes, write ability config, or
+  check `isEnabled` (setup already gates on it).
+- A change that reads what another change sets must register after it (Nekro's
+  unit copies precede its flagship's Alastor).
+- Declaring changes moves the ability's PREPARE ahead of other PREPAREs, so
+  unit copies and transformations set stats before Capacity and Fleet Pool
+  enforce.
+- A copier runs its target's changes as the target:
+  `withRunningAbility(ctx, target, () => ctx.invokeChanges(params))`
+  (Technological Singularity, which then restores placement surfaces because
+  the copy is gained mid-combat).
+
 ## Timing System
 
 Timings define when abilities fire. They run in this order during combat:
@@ -325,7 +384,7 @@ interface AbilityCallContext {
 
 ### AbilityLookupContext (declare hooks, invoke factories)
 
-`onParamSet`, `declareParamChange`, `declareSubtype`, and factory `invoke` receive a trailing `ctx: AbilityLookupContext`:
+`onParamSet`, `declareSubtype`, and factory `invoke` receive a trailing `ctx: AbilityLookupContext`:
 
 ```typescript
 interface AbilityLookupContext {
@@ -354,33 +413,60 @@ call: ctx => {
 
 ## SideApi
 
-Used in both `isCallable` and `call` contexts. The same `SideApi` class is used for both read and write — write methods are only available during `call` (Immer draft context).
+Used in both `isCallable` and `call` contexts. The same `SideApi` class is used for both read and write — write methods are only available during `call` (mutable combat context).
 
 ### Read Methods
 
-`GetUnitsOptions` is `{ includeVariants: boolean }` and is **required** wherever it appears.
+Unit queries are grouped by scope. `system` sees every living unit across all
+surfaces in the active system, `surface` sees only the active combat surface,
+and `participating` sees the derived combat-participant pool regardless of
+surface. Effects that choose or affect combatants use `participating` in both
+space and ground combat, even when their text says “in the active system”;
+explicit planet or space-area effects use `surface`; effects that refer to
+general units throughout the active system use `system`.
+
+`UnitQueryOptions` is `{ includeVariants?: boolean }`; without it a plain type
+matches only that exact variant key. The namespace selects the pool;
+`participating` already contains the units admitted to combat. Queries do not
+filter by category. When an effect needs a category within `system` or
+`surface`, check each ID with `isUnitCategory`.
 
 ```typescript
+class UnitQuery {
+  getUnits(unitType?: UnitLocator, options?: UnitQueryOptions): UnitId[]  // no type: every unit in scope
+  hasUnitType(unitType: UnitLocator, options?: UnitQueryOptions): boolean
+  countUnits(filter?: UnitLocator | UnitLocator[], options?: UnitQueryOptions): number
+  findUnitByPriority(priority: UnitLocator[], options?: FindUnitOptions): UnitId | undefined
+  findUnitByPriority(priority: UnitLocator[], options: FindUnitsOptions): UnitId[]  // with `amount`
+  getUnitTypes(): UnitBaseType[]
+}
+
+system: UnitQuery
+surface: UnitQuery
+participating: UnitQuery
+
+getAssignHitsTargets(hits: number): UnitId[]  // Participants `hits` would destroy
 getFaction(): string
 getCombatMode(): CombatMode  // for hooks that receive only a SideApi (e.g. preventDestroy)
-getUnits(unitType: UnitType, options: GetUnitsOptions): UnitId[]
 hasUnit(unitId: UnitId): boolean
-hasUnitType(unitType: UnitType, options: GetUnitsOptions): boolean
-countUnits(filter: UnitType | UnitType[] | undefined, options: GetUnitsOptions): number
 getPendingHits(filter?: { base?: true; bonus?: true }): number
-getHitPoolValidTargets(): UnitType[]
-getActiveBaseTypes(): UnitBaseType[]
-getParticipatingUnitTypes(options?: { combatMode?: CombatMode }): UnitType[]
+canAssignHitToUnit(unitId: UnitId): boolean  // Includes phase and unit-ability hit restrictions
+isParticipating(unitId: UnitId): boolean
+matchesUnitLocator(unitId: UnitId, locator: UnitLocator): boolean
+matchesUnitList(unitId: UnitId, list: UnitList): boolean  // Any enabled entry; skips false/0 like getFlat
+isUnitCategory(unitId: UnitId, category: UnitCategory): boolean  // During the current meta
+isUnitTypeCategory(unitType: UnitType, category: UnitCategory): boolean  // Native categories, for production choices
 getUnitVariantsOptions(filter?: ParamFilter): { label: string, value: string }[]
 getUnitVariantsOptions(paramKey: string): { label: string, value: string }[]   // reads filter/limit from the declareParam
-findUnitByPriority(priority: UnitType[]): UnitId | undefined
 getUnitStats(unitTypeOrId: string | UnitId): UnitStats
+getUnitTypesWithAbility(abilityKey: string): UnitType[]  // Variant keys whose stats carry the ability, fielded or not
 getUnitVariantKey(unitId: UnitId): string | undefined
 getUnitState(unitId: UnitId): UnitState
 getUnitBaseType(unitId: UnitId): UnitBaseType
 getAbilityConfig(key: string): Record<string, unknown>
-isUnitAbilityLost(ability: UnitAbility, unitType: UnitType): boolean
-isUnitAbilityCannotBeUsed(ability: UnitAbility, unitType: UnitType): boolean
+isUnitAbilityLost(ability: UnitAbility, unitId: UnitId): boolean
+isUnitAbilityCannotBeUsed(ability: UnitAbility, unitId: UnitId): boolean
+isUnitAbilityDisabled(ability: UnitAbility, unitId: UnitId): boolean  // lost or cannot be used
 ```
 
 ### Write Methods (available in `call` only)
@@ -388,39 +474,82 @@ isUnitAbilityCannotBeUsed(ability: UnitAbility, unitType: UnitType): boolean
 #### Unit Operations
 
 ```typescript
-destroyUnits(target: UnitBaseType | UnitId | UnitId[]): void  // Destroy by type (first found), UnitId, or UnitId[]; array variant fires destroy abilities once
-removeUnits(target: UnitBaseType | UnitId | UnitId[]): void   // Remove without triggering destroy abilities
+destroyUnits(target: UnitId | UnitId[]): void  // Array variant fires destroy abilities once
+removeUnits(target: UnitId | UnitId[]): void   // Remove without triggering destroy abilities
 placeUnits(unitsToAdd: Partial<Record<UnitType, number>>): Record<UnitType, UnitId[]>  // Returns the placed UnitIds (keyed by variant key)
 modifyUnitType(key: UnitType, updates: Partial<UnitStats>): void   // Modify stats for all units of a type
 modifyUnitState(unitId: UnitId, updates: Partial<UnitState>): void // Modify per-unit mutable state
+grantCategory(ids: UnitId | readonly UnitId[], category: UnitCategory): void
 ```
+
+Native `UnitStats.CATEGORIES` defaults to the base type's categories.
+Participation follows categories alone: ships (native or granted) join space
+combat wherever they stand in the system, and ground forces join ground combat
+on the invaded planet (the attacker's are committed there from space),
+including newly placed units. Hel-Titans natively belong to both `STRUCTURES`
+and `GROUND_FORCES`; Eidolon Maximum mechs are ships and ground forces, so one
+on a planet fights in space combat too.
+
+A `CATEGORIES` entry may be limited to meta phases:
+`{ category: 'SHIPS', phase: 'SPACE_COMBAT' }` (or a list of phases) holds only
+while the scheduler's current meta (`CombatStateData.meta`) is one of them.
+Nested metas such as AFB count as the combat they run in; PREPARE has no meta,
+and setup option lists use their mode's combat meta (`getCombatMeta`).
+Starlancer XI is a ground force that is a ship during space combat: its mechs
+fight in space combat from a planet too, but are no ships during Space Cannon
+Offense or ground combat. No invoke is involved.
+
+`grantCategory` applies only to the selected IDs: each counts as a member of the
+category for the rest of the combat and takes part in its combat like a native
+member. A unit holds at most one grant. The categories are `SHIPS`, `GROUND_FORCES`, and
+`STRUCTURES`. Non-fighter ships are ships whose base type is not `FIGHTER`;
+they are not a separate category. Base types and variants remain unchanged.
+
+Alastor snapshots its chosen ground forces and grants them `SHIPS`; Z-Grav
+Eidolon grants `SHIPS` to the mechs in the space area when it flips, because
+it is a ship only there (changing the mech's `CATEGORIES` would make every mech
+a ship). Matriarch
+and Morphwing grant `GROUND_FORCES` to the fighters in space at commitment;
+the engine lands them on the active planet with the native ground forces and
+returns them to space at completion. Later reinforcements do not inherit these
+grants.
+
+Setup sees these effects only through `declareChanges` (see
+[Setup changes](#setup-changes)), which shapes possible setup options such as
+Sustain Priority and Assign Hits Order. Runtime effects use scoped queries and
+`isUnitCategory` instead. Starlancer XI's membership is a phase-scoped native
+entry (see above). Its special combat-end rules are deferred.
 
 #### Hit Operations
 
 ```typescript
 reduceHits(amount: number): void
-addHits(hits: number): void                       // Unrestricted hits on the landing side
-addHits(hits: number, validTargets: UnitType[]): void  // Restricted; throws if the landing side's hitPool is non-empty
+addHits(hits: number): void                       // Ordinary hits on the landing side
+addHits(hits: number, priority: UnitType[]): void  // Type-restricted; throws if the landing side's hitPool is non-empty
 
 // Apply a flat +/- to each combat roll result for this dice-roll group.
-// target omitted = all of this side's dice; { singleUnit } = one unit type;
-// { exclude } = all but the listed base types.
+// target omitted = all of this side's dice; { exclude } = all but the listed base types; unitId selects one actual unit.
 applyBonusToResult(
   amount: number,
-  target?: UnitType | { exclude: UnitBaseType[] } | { singleUnit: UnitType },
+  target?: UnitType | { exclude: UnitBaseType[] }
+    | { unitId: UnitId },
 ): void
 ```
+
+`addHits` and `reduceHits` do not carry category or unit-ability metadata. The
+participating pool and the assignment phase determine eligible casualties.
+Effects that select a sustaining unit must check `canAssignHitToUnit` first.
 
 #### Unit Ability Restrictions
 
 Two-layer system — **lost** (ability removed) vs **cannotBeUsed** (ability present but blocked):
 
 ```typescript
-// Disable ability for all units, specific type, or category
-setUnitAbilityLost(ability: UnitAbility, reason: string, target?: UnitBaseType | UnitCategory): void
-removeUnitAbilityLost(ability: UnitAbility, reason: string, target?: UnitBaseType | UnitCategory): void
-setUnitAbilityCannotBeUsed(ability: UnitAbility, reason: string, target?: UnitBaseType | UnitCategory): void
-removeUnitAbilityCannotBeUsed(ability: UnitAbility, reason: string, target?: UnitBaseType | UnitCategory): void
+// Disable ability for all units, a specific base type, or a category
+setUnitAbilityLost(ability: UnitAbility, reason: string, target?: UnitBaseType | UnitCategory, surfaceId?: SurfaceId): void
+removeUnitAbilityLost(ability: UnitAbility, reason: string, target?: UnitBaseType | UnitCategory, surfaceId?: SurfaceId): void
+setUnitAbilityCannotBeUsed(ability: UnitAbility, reason: string, target?: UnitBaseType | UnitCategory, surfaceId?: SurfaceId): void
+removeUnitAbilityCannotBeUsed(ability: UnitAbility, reason: string, target?: UnitBaseType | UnitCategory, surfaceId?: SurfaceId): void
 
 // Carve one unit type back OUT of every restriction (both layers) coming from `reason`
 setUnitAbilityRestrictionImmunity(reason: string, unitType: UnitBaseType): void
@@ -429,7 +558,11 @@ removeUnitAbilityRestrictionImmunity(reason: string, unitType: UnitBaseType): vo
 
 `reason` is the ability key that caused the restriction. Used to cleanly remove restrictions without affecting other abilities' restrictions.
 
-`target` can be a specific `UnitBaseType` (e.g., `'MECH'`) or a `UnitCategory` (`'SHIPS'`, `'NON_FIGHTER_SHIPS'`, `'GROUND_FORCES'`, `'STRUCTURES'`). Categories are resolved at check time, so changes to category membership are automatically reflected.
+`target` can be a specific `UnitBaseType` such as `'MECH'` or a `UnitCategory`
+(`'SHIPS'`, `'GROUND_FORCES'`, or `'STRUCTURES'`). Categories are resolved
+against individual units, so category grants are reflected. Omit the target to
+apply the restriction to every unit in scope. A `surfaceId` limits it to the
+units standing on that surface (Ral Nel Miniaturization's structures in space).
 
 **Immunity** is the inverse of a restriction: `setUnitAbilityRestrictionImmunity('ENTROPIC_SCAR', 'FLAGSHIP')` makes flagships ignore every restriction that scar added, blanket ones included. It resolves lazily alongside the restrictions themselves, so it can be declared before or after the restricting ability's PREPARE (see the Il Na Viroset flagship, `il_na_viroset/enigma.ts`).
 
@@ -557,7 +690,24 @@ PREPARE work, call its stats invoke inside that same handler and retain
 
 Stats invokes expose their `unitType` and `stats`, narrowed by `isStatsInvoke`
 from `@/utils/is-stats-invoke`. Janovet uses these to inherit printed upgrade
-abilities without depending on factory metadata or runtime unit modifications.
+abilities without depending on factory metadata or runtime unit modifications,
+copying the block's `ABILITIES` onto the flagship along with its unit
+abilities.
+
+A card whose text belongs to the upgraded unit ("destroy this unit") puts that
+text in its stat block's `ABILITIES` under the card's own key, so it fires per
+unit and reads the card's config; Janovet copies it like any other block
+ability, so cards never check for the flagship. TF Exotrireme and Strike Wing
+Alpha are the Sardakk N'orr Exotrireme II and Argent Flight Strike Wing Alpha
+II re-keyed this way; Linkship has its own text, gated on the retreating unit
+(`unitId === ctx.getUnit()`). The registered card spreads the text to carry
+its params, controls, and `sort` (the engine reads `sort` from the registered
+ability), keeps only the stats invoke, and drops the text's ability-level
+`context` so the stat block applies in both modes. Exotrireme also declares
+`declareChanges: statsInvoke.call` so its sacrifice list sees which units
+carry the text. The Sardakk ability is on by default with `uses` in its header; the card
+restores an `isEnabled` header, off by default, since switching it on means
+holding the upgrade.
 
 ### Lazy faction data
 
@@ -760,3 +910,60 @@ invoke: [
 9. Register in the category's `index.ts` (or faction's `index.ts`)
 10. Write tests (see `docs/testing.md`)
 11. Mark ability as `[x]` in `docs/abilities-list.md`
+
+### Surface-aware unit selectors
+
+`declareParam` defaults to `scope: 'participating'`; omit it for parameters
+selecting participating units. Use `scope: 'system'` for units throughout the
+system, or `scope: 'type'` for type-only choices, reinforcements, and controls
+confined to one surface. `source` still selects categories; `side`, `filter`,
+`sort`, and `limit` still apply.
+
+`getUnitVariantsOptions(paramKey)` and reconciliation use the same resolver.
+Scoped options have a `UnitLocator` key and surface metadata. All eligible types
+are offered even when none are fielded yet, so later placements inherit their
+configured priorities. Participating choices use the active combat surface;
+setup declarations can expose additional surfaces. System choices use every
+legal surface. Explicit availability filters and count limits still apply.
+Reconciliation keeps participating list entries for every surface of the
+param's mode (each planet for `GROUND`), so settings for an unselected planet
+survive planet and mode switches while the control shows only the active one.
+Single choices follow the active surface and keep their unit type when the
+planet changes. Give every participating param a `filter.combatMode`; without
+one, the other mode resolves a different catalog and reconcile resets it.
+Ordered controls stay flat and suffix duplicate names with their surface.
+Independent controls are grouped by surface only when a unit type appears on
+multiple surfaces.
+Otherwise, they stay flat without headings. `IN_COMBAT` limits count the units
+the control offers on that surface, including commitments projected onto the
+active planet; the build-time clamp uses the same caps.
+
+`filter: { withAbility: true }` offers only the unit types whose stats carry
+the ability declaring the param, matched by key so re-keyed copies keep
+working. Exotrireme's sacrifice list uses it, so every dreadnought carrying
+the text and The Faces of Janovet (which copies it) can be picked. Setup never
+runs PREPARE, so the filter reads the stand-ins: an ability attached to units
+at PREPARE must also be attached by a `declareChanges` to be offered. Reconcile
+lists the holders as if the ability were switched on and its unit upgraded (an
+ability in a unit's `FACTION_<UNIT>` slot counts that unit), so the control
+keeps its options and order meanwhile.
+`SideApi.getUnitTypesWithAbility(key)` answers the same question at runtime
+from the current stats.
+
+`UnitLocator` accepts legacy `UnitType` values as well as qualified keys from
+`makeUnitLocator(type, surfaceId)`. Unit queries, priority helpers, and
+`SideApi.matchesUnitLocator(id, locator)` respect both parts. For per-unit
+allow-lists use `SideApi.matchesUnitList(id, list)` instead of
+`getFlat(list).some(t => matchesUnitLocator(id, t))`: it skips `false`/`0`
+entries like `getFlat` and compiles each list object once, so never mutate a
+`UnitList` param in place.
+`parseUnitLocator(locator)` returns `unitType` (decoded variant), `baseType`,
+`subtypes`, and optional `surfaceId` for both qualified and legacy values. Use
+`unitType` for variant/stat work and `locatorWithSubtype(locator, subtype)`
+to retain location in subsequent queries.
+Subtype declarations use plain `unitType` plus optional `surfaces` metadata.
+
+Setup changes extend these choices through their grants: a stand-in granted
+the mode's category counts on its own surface (Alastor), and the attacker's
+granted ground forces in space are committed onto the active planet
+(Matriarch/Morphwing). The preview never grants runtime participation.

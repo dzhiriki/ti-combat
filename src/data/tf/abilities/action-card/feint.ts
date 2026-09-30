@@ -32,8 +32,12 @@ export const feint: Ability = {
       },
       call: ctx => {
         const allIds: UnitId[] = []
-        for (const type of ctx.api.own.getActiveBaseTypes()) {
-          allIds.push(...ctx.api.own.getUnits(type, { includeVariants: true }))
+        for (const type of ctx.api.own.participating.getUnitTypes()) {
+          allIds.push(
+            ...ctx.api.own.participating.getUnits(type, {
+              includeVariants: true,
+            }),
+          )
         }
 
         ctx.transitionTo('COMPLETE', 'LOST')

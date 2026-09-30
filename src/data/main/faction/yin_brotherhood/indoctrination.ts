@@ -29,7 +29,7 @@ export const indoctrination: Ability<Params> = {
     uses: Infinity,
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       side: 'opponent',
       defaultItemValue: true,
       sort: 'worth-desc',
@@ -41,14 +41,12 @@ export const indoctrination: Ability<Params> = {
     {
       timing: 'START_OF_COMBAT',
       isCallable: (params, ctx) =>
-        ctx.api.opponent.findUnitByPriority(
+        ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false },
         ) !== undefined,
       call: (ctx, params) => {
-        const target = ctx.api.opponent.findUnitByPriority(
+        const target = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false },
         )
         if (target === undefined) return
         ctx.api.opponent.removeUnits(target)

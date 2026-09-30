@@ -4,7 +4,7 @@ import {
   type CombatMode,
   declareParam,
 } from '@/combat'
-import type { UnitId, UnitList, UnitType } from '@/types'
+import type { UnitId, UnitList, UnitLocator } from '@/types'
 
 type Params = {
   spaceTriggers: UnitList<boolean>
@@ -24,12 +24,16 @@ function modeKeys(mode: CombatMode) {
 function maxTriggeredCost(
   ctx: AbilityReadContext,
   ids: UnitId[],
-  triggers: string[],
+  triggers: UnitLocator[],
 ): number | undefined {
   let max: number | undefined
   for (const id of ids) {
     const key = ctx.api.own.getUnitVariantKey(id)
-    if (!key || !triggers.includes(key)) continue
+    if (
+      !key ||
+      !triggers.some(target => ctx.api.own.matchesUnitLocator(id, target))
+    )
+      continue
     const cost = ctx.api.own.getUnitStats(key)?.COST
     if (typeof cost === 'number' && (max === undefined || cost > max)) {
       max = cost
@@ -42,13 +46,13 @@ function maxTriggeredCost(
  *  living unit and COST ≤ `threshold` wins (Vos Hollow's pattern). */
 function findOpponentTarget(
   ctx: AbilityReadContext,
-  priority: UnitType[],
+  priority: UnitLocator[],
   threshold: number,
 ): UnitId | undefined {
   for (const variant of priority) {
     const cost = ctx.api.opponent.getUnitStats(variant)?.COST
     if (typeof cost !== 'number' || cost > threshold) continue
-    const [unit] = ctx.api.opponent.getUnits(variant, {
+    const [unit] = ctx.api.opponent.system.getUnits(variant, {
       includeVariants: true,
     })
     if (unit) return unit
@@ -58,8 +62,7 @@ function findOpponentTarget(
 
 // Twilight's Fall action card. When one of your units is destroyed, destroy an
 // opponent unit in the same system whose cost is equal to or lower than the
-// lost unit's. Single-system calculator, so "in its system" is every
-// participating unit. The trigger list picks which of your losses are worth
+// lost unit's. The trigger list picks which of your losses are worth
 // the card (don't burn it on a fighter); the target list is a drag-ordered
 // priority — the first checked type that fits under the cost threshold is
 // destroyed (defaults to most-valuable-first).
@@ -72,34 +75,38 @@ export const lash: Ability<Params> = {
     isEnabled: false,
     uses: 1,
     spaceTriggers: declareParam<UnitList<boolean>>({
+      scope: 'system',
       default: [],
-      source: 'spaceCombatParticipating',
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       side: 'own',
       defaultItemValue: true,
-      filter: { combatMode: 'SPACE' },
+      filter: { combatMode: 'SPACE', includeNonParticipating: true },
     }),
     groundTriggers: declareParam<UnitList<boolean>>({
+      scope: 'system',
       default: [],
-      source: 'groundCombatParticipating',
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       side: 'own',
       defaultItemValue: true,
-      filter: { combatMode: 'GROUND' },
+      filter: { combatMode: 'GROUND', includeNonParticipating: true },
     }),
     spaceTargetPriority: declareParam<UnitList<boolean>>({
+      scope: 'system',
       default: [],
-      source: 'spaceCombatParticipating',
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       side: 'opponent',
       sort: 'worth-desc',
       defaultItemValue: true,
-      filter: { combatMode: 'SPACE' },
+      filter: { combatMode: 'SPACE', includeNonParticipating: true },
     }),
     groundTargetPriority: declareParam<UnitList<boolean>>({
+      scope: 'system',
       default: [],
-      source: 'groundCombatParticipating',
+      source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
       side: 'opponent',
       sort: 'worth-desc',
       defaultItemValue: true,
-      filter: { combatMode: 'GROUND' },
+      filter: { combatMode: 'GROUND', includeNonParticipating: true },
     }),
   },
   headerUI: 'isEnabled',

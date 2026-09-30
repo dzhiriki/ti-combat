@@ -38,6 +38,9 @@ npm run test:run
 
 # Preview production build locally
 npm run preview
+
+# Compare engine performance against HEAD (or a given ref: npm run bench -- main)
+npm run bench
 ```
 
 ## Tech Stack

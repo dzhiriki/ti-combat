@@ -1,6 +1,8 @@
+import type { UnitCategory } from '@/constants/units'
 import type {
   CombatSide,
   DiceGroup,
+  SurfaceId,
   UnitBaseType,
   UnitId,
   UnitStats,
@@ -11,8 +13,8 @@ import type {
 import type {
   CombatMode,
   CombatStateData,
-  HitSource,
   MetaPhase,
+  SideStateData,
   UnitAbilityMeta,
 } from '../combat-state/types'
 import type { Logger } from '../logger'
@@ -42,13 +44,32 @@ export interface ParamFilter {
    *  `declareParam`) resolves to 0 are dropped. No-op when `limit` is unset
    *  or when the filter is used standalone (no associated paramKey). */
   includeOnlyAvailable?: boolean
+  /** When true, only unit types whose stats carry the ability declaring the
+   *  param (matched by key, so re-keyed copies keep working). Reads the
+   *  setup stand-ins, so an ability attached at PREPARE must also be
+   *  attached by a `declareChanges` to be offered (TF Exotrireme, Janovet). */
+  withAbility?: boolean
 }
 
-export interface SyncSourceConfig<
-  K extends keyof SettingsParams = keyof SettingsParams,
-> {
+export type UnitSelectorScope = 'participating' | 'system' | 'type'
+
+/** Location of a surface-qualified option, for grouping and labels. */
+export interface SurfaceOptionMeta {
+  surfaceId?: SurfaceId
+  surfaceName?: string
+  surfaceOrder?: number
+}
+
+export interface UnitOption extends SurfaceOptionMeta {
+  label: string
+  value: import('@/types').UnitLocator
+  max?: number
+}
+
+export interface SyncSourceConfig {
+  scope: UnitSelectorScope
   key: string
-  group: K
+  source: UnitCategory | readonly UnitCategory[]
   side: 'own' | 'opponent'
   sort: SyncSortSpec
   /** Default for the value slot when reconcile adds a new tuple entry to a
@@ -56,7 +77,6 @@ export interface SyncSourceConfig<
    *  `DREADNOUGHT` for `DREADNOUGHT:Galvanized`) takes precedence; this
    *  is the fallback. Omit for order-mode lists. */
   defaultItemValue?: unknown
-  compute?: (value: SettingsParams[K]) => unknown
   filter?: ParamFilter
   /** See `declareParam.limit`. Threaded through so reconcile can clamp
    *  stored values to the per-variant max. */
@@ -66,6 +86,8 @@ export interface SyncSourceConfig<
 export interface DeclaredSubtype {
   name: UnitVariantId
   unitType: UnitType
+  /** Setup availability of this subtype; omitted means any eligible surface. */
+  surfaces?: readonly SurfaceId[]
   /** When false, the subtype is registered but treated as inactive: UI
    *  consumers (`getUnitVariantsOptions`) and `declareParam(source: ...)`
    *  reconciliation hide it unless the caller passes
@@ -85,29 +107,18 @@ export interface DeclaredSubtype {
   source?: string
 }
 
-export type SettingsParams = {
-  nonFighterShips: UnitBaseType[]
-  ships: UnitBaseType[]
-  groundForces: UnitBaseType[]
-  structures: UnitBaseType[]
-  units: UnitBaseType[]
-  spaceCombatParticipating: UnitBaseType[]
-  groundCombatParticipating: UnitBaseType[]
-  validTargetsSpaceCannonOffense: UnitBaseType[]
-  validTargetsBombardment: UnitBaseType[]
-  validTargetsSpaceCannonDefense: UnitBaseType[]
-  validTargetsAntiFighterBarrage: UnitBaseType[]
+/** Setup option metadata written by reconcile. Only option lists read it. */
+export interface SideOptionMetadata {
+  /** One unit of every type on every surface it may stand on, once the
+   *  active abilities' `declareChanges` applied. Each stands for all units
+   *  of its type on its surface. */
+  standIns: SideStateData
   subtypes: DeclaredSubtype[]
+  /** Unit types carrying each ability with a `filter.withAbility` list, as
+   *  if that ability were switched on: its list keeps its options and order
+   *  while the ability is off. */
+  abilityHolders?: Readonly<Record<string, readonly UnitType[]>>
 }
-
-type ParamChangeKey = Exclude<keyof SettingsParams, 'subtypes'>
-
-export type ParamChange = {
-  [K in ParamChangeKey]: {
-    key: K
-    value: SettingsParams[K] extends (infer E)[] ? E : SettingsParams[K]
-  }
-}[ParamChangeKey]
 
 // Sided context (external API - attacker/defender perspective)
 export interface SidedContext<T> {
@@ -167,13 +178,9 @@ declare global {
     COMMIT_UNITS: void
   }
 
-  /** Per-ability params registry. Each ability file augments this with its
-   *  own `Params` type so `getAbilityConfig(key)` returns the correct shape.
-   *  The returned value is also intersected with `AbilityBaseParams`
-   *  (`isEnabled`, `uses`) by the API signature. */
-  interface AbilityConfigMap {
-    SETTINGS: SettingsParams
-  }
+  /** Per-ability params registry. Ability files augment this interface. */
+  // oxlint-disable-next-line typescript/no-empty-object-type
+  interface AbilityConfigMap {}
 }
 
 export type AbilityTiming = keyof TimingContextMap
@@ -233,14 +240,6 @@ export interface AbilityReadContext {
   isOwner(): boolean
   /** Phase stack of the current dice-roll group. Throws outside a dice-roll group. */
   readonly currentDiceRollPhase: MetaPhase[]
-  /** Sides firing in the current dice-roll group. Throws outside one. */
-  readonly currentDiceRollFiring: CombatSide[]
-  /** Hit source of the current dice-roll group. Throws outside one. */
-  readonly currentDiceRollHitSource: HitSource
-  /** Whether the current dice-roll group is a Proxima-style self-target roll. Throws outside one. */
-  readonly currentDiceRollSelfTarget: boolean
-  /** Whether the current dice-roll group is a unit-ability roll. Throws outside one. */
-  readonly currentDiceRollIsUnitAbility: boolean
   /** Own/opponent base-hit snapshot for strategy gating at
    *  AFTER_DICE_ROLL_STEP. `own` = hits THIS side produced (landing on the
    *  opponent); `opponent` = hits the other side produced. Totals read
@@ -273,6 +272,11 @@ export interface AbilityCallContext {
   logger?: Logger
   /** Run abilities for the given timing inline during this call */
   trigger<K extends AbilityTiming>(name: K, context: TimingContextMap[K]): void
+  /** Run the running ability's `declareChanges`, so an invoke applies the
+   *  effect setup already previews without repeating its code. `params`
+   *  default to the ability's current config. Throws when the ability
+   *  declares no changes. */
+  invokeChanges(params?: object): void
   /** UnitId the ability is attached to, or `undefined` for config-sourced
    *  candidates (including the external-invoke no-unit fallback). */
   readonly unitSource: UnitId | undefined
@@ -286,14 +290,6 @@ export interface AbilityCallContext {
   isOwner(): boolean
   /** Phase stack of the current dice-roll group. Throws outside a dice-roll group. */
   readonly currentDiceRollPhase: MetaPhase[]
-  /** Sides firing in the current dice-roll group. Throws outside one. */
-  readonly currentDiceRollFiring: CombatSide[]
-  /** Hit source of the current dice-roll group. Throws outside one. */
-  readonly currentDiceRollHitSource: HitSource
-  /** Whether the current dice-roll group is a Proxima-style self-target roll. Throws outside one. */
-  readonly currentDiceRollSelfTarget: boolean
-  /** Whether the current dice-roll group is a unit-ability roll. Throws outside one. */
-  readonly currentDiceRollIsUnitAbility: boolean
   /** Own/opponent base-hit snapshot for strategy gating at
    *  AFTER_DICE_ROLL_STEP. `own` = hits THIS side produced (landing on the
    *  opponent); `opponent` = hits the other side produced. Totals read
@@ -357,12 +353,8 @@ export interface AbilityCallContext {
    *                one dice-roll group, each side's hits landing on its
    *                natural opponent. Relative sides are mapped to attacker /
    *                defender within `resolveStep`.
-   *   - `deferCompletionCheck` — when true, omit the post-assign-hits
-   *                wipe-out check at the end of this step. Use to chain
-   *                multiple `resolveStep` calls as one transaction so an
-   *                early wipe in step N can't preempt step N+1 (e.g.
-   *                Proxima's opp-target bomb must not end combat before
-   *                the paired self-target bomb runs).
+   *   - `deferPhaseEndCheck` — defer participant loss detection to a paired
+   *                resolution or the enclosing phase driver.
    *
    *  Composition: multiple `resolveStep` calls in one `call` execute in
    *  reverse call-order (LIFO): the last push sits on top of the script
@@ -373,7 +365,7 @@ export interface AbilityCallContext {
       dice?: DiceGroup[]
       target?: 'OWN' | 'OPPONENT'
       firing?: ('OWN' | 'OPPONENT')[]
-      deferCompletionCheck?: boolean
+      deferPhaseEndCheck?: boolean
       /** Ability params overrides for this resolution only — immutable and
        *  applied over base + live params. Boolean shorthand = `{ isEnabled }`.
        *  e.g. `{ SUSTAIN_DAMAGE: false }` to skip Sustain for this step. */
@@ -460,7 +452,7 @@ interface UIConfigNumber<
   max?: number
 }
 
-export type SelectItem = { label: string; value: string }
+export type SelectItem = { label: string; value: string } & SurfaceOptionMeta
 export type SelectGroup = {
   group: string
   items: { label: string; value: string }[]
@@ -481,12 +473,12 @@ interface UIConfigUnitList<
   type: 'unit-list'
   mode: UnitListMode
   sortable?: boolean
-  items: {
+  items: ({
     label: string
     value: string
     max?: number
     stable?: boolean
-  }[]
+  } & SurfaceOptionMeta)[]
 }
 
 export type UIConfigItem<TParams = Record<string, unknown>> =
@@ -539,6 +531,16 @@ export interface Ability<Params extends Record<string, unknown> = any> {
   sync?: boolean
   /** Abilities sharing the same exclusiveGroup are mutually exclusive — enabling one disables others in the group. */
   exclusiveGroup?: string
+  /** The effect setup must see before any invoke runs: unit stats (categories,
+   *  placement surfaces) and category grants. Setup runs it for every active
+   *  ability against one stand-in unit of every type on every surface and
+   *  derives placement and option lists from the result, so a grant on a
+   *  stand-in covers that unit type on that surface. The engine never runs
+   *  it on its own; an invoke applies it with `ctx.invokeChanges()`. */
+  declareChanges?: (
+    ctx: AbilityCallContext,
+    params: AbilityBaseParams & Params,
+  ) => void
   /** Called when a user changes a param. Can modify other params in response.
    *  Receives the params with the new value already applied, the changed key,
    *  the value, and a lookup context (`ctx.this` is this ability; `ctx.abilities`
@@ -550,15 +552,6 @@ export interface Ability<Params extends Record<string, unknown> = any> {
     value: unknown,
     ctx: AbilityLookupContext,
   ) => (AbilityBaseParams & Params) | void
-  /** Declare param changes (subtypes, group additions) based on ability params.
-   *  `settings` contains the current SETTINGS values (ships, groundForces, etc.) during reconciliation.
-   *  `ctx` is a lookup context (`ctx.this` is this ability; `ctx.abilities` the
-   *  registered abilities per side). */
-  declareParamChange?: (
-    params: AbilityBaseParams & Params,
-    settings: SettingsParams,
-    ctx: AbilityLookupContext,
-  ) => ParamChange[]
   /** Declare subtype variants this ability registers. Called during reconcile.
    *  Each entry's `statsFactory` is invoked once at config time to compute the
    *  variant's stats from its parent variant's stats. Subtypes are surfaced in

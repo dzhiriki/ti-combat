@@ -13,7 +13,7 @@ import type { AsyncEntity, BattleLocation, WebData } from './types'
 
 type EntityGroups = Record<string, AsyncEntity[]>
 
-function isModelledUnit(entity: AsyncEntity): boolean {
+export function isModelledUnit(entity: AsyncEntity): boolean {
   return (
     entity.entityType === 'unit' && entity.entityId in UNIT_TYPE_BY_ASYNC_ID
   )
@@ -89,7 +89,7 @@ export function factionLabel(asyncFactionId: string): string {
 
 /** A planet's printed name. AsyncTI4 keys planets by a squashed identifier,
  *  so `mrte` has to become `Mecatol Rex` rather than `Mrte`. */
-function planetName(planet: string): string {
+export function planetName(planet: string): string {
   return (
     PLANET_NAMES[planet] ?? planet.charAt(0).toUpperCase() + planet.slice(1)
   )
@@ -223,7 +223,7 @@ export function listBattleLocations(data: WebData): BattleLocation[] {
  *  it just starts empty. */
 export function entitiesAt(
   data: WebData,
-  location: BattleLocation,
+  location: Pick<BattleLocation, 'tile' | 'planet'>,
   asyncFactionId: string,
 ): AsyncEntity[] {
   const tileData = data.tileUnitData[location.tile]

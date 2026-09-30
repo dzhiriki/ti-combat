@@ -16,27 +16,24 @@ export function enforceFleetPool(api: SideApi): void {
 
   // Types riding free on a living carrier (A Strangled Whisper) neither
   // consume capacity nor spill into the fleet pool.
-  const freeCargo = collectFreeCargo(api)
+  const freeCargo = collectFreeCargo(api, api.participating)
 
   // "Fighters in excess of your ships' capacity count against your fleet
   // pool" — the excess is measured against the ships' printed capacity from
   // the stats, independent of whether the CAPACITY enforcement toggle is on
   // (the toggle controls removal of illegal cargo, not how much capacity
   // the ships actually have).
-  const settings = api.getAbilityConfig('SETTINGS')
-  const allTypes = [
-    ...settings.ships,
-    ...settings.groundForces,
-    ...settings.structures,
-  ]
+  const activeTypes = api.participating.getUnitTypes()
 
   let totalCapacity = 0
-  for (const baseType of allTypes) {
+  for (const baseType of activeTypes) {
     const stats = api.getUnitStats(baseType)
     if (!stats || stats.CAPACITY_COST != null) continue
     const cap = stats.CAPACITY
     if (cap == null || cap <= 0) continue
-    const count = api.countUnits(baseType, { includeVariants: true })
+    const count = api.participating.countUnits(baseType, {
+      includeVariants: true,
+    })
     if (count > 0) totalCapacity += cap * count
   }
 
@@ -44,7 +41,7 @@ export function enforceFleetPool(api: SideApi): void {
   // share first (player-optimal: carried units that CAN spill into the
   // fleet pool yield the capacity to the ones that can't).
   let capacityUsedByNonFP = 0
-  for (const baseType of allTypes) {
+  for (const baseType of activeTypes) {
     if (freeCargo.has(baseType)) continue
     const stats = api.getUnitStats(baseType)
     if (
@@ -54,19 +51,23 @@ export function enforceFleetPool(api: SideApi): void {
     )
       continue
     capacityUsedByNonFP +=
-      stats.CAPACITY_COST * api.countUnits(baseType, { includeVariants: true })
+      stats.CAPACITY_COST *
+      api.participating.countUnits(baseType, {
+        includeVariants: true,
+      })
   }
 
   const remainingCapacity = Math.max(0, totalCapacity - capacityUsedByNonFP)
 
   // Sum fleet pool cost across all units using FLEET_POOL_COST stat
   let totalCost = 0
-  const activeTypes = api.getActiveBaseTypes()
   for (const baseType of activeTypes) {
     const stats = api.getUnitStats(baseType)
     if (typeof stats?.FLEET_POOL_COST !== 'number') continue
 
-    const count = api.countUnits(baseType, { includeVariants: true })
+    const count = api.participating.countUnits(baseType, {
+      includeVariants: true,
+    })
 
     if (stats.CAPACITY_COST != null) {
       // Unit has both costs — only excess beyond capacity counts
@@ -104,12 +105,11 @@ export function enforceFleetPool(api: SideApi): void {
     const stats = api.getUnitStats(type)
     if (typeof stats?.FLEET_POOL_COST !== 'number') continue
     const cost = stats.FLEET_POOL_COST
-    const unitCount = api.countUnits(type as UnitBaseType, {
+    for (const id of api.participating.getUnits(type as UnitBaseType, {
       includeVariants: true,
-    })
-    const toRemove = Math.min(Math.ceil(excess / cost), unitCount)
-    for (let i = 0; i < toRemove; i++) {
-      api.removeUnits(type as UnitBaseType)
+    })) {
+      if (excess <= 0) break
+      api.removeUnits(id)
       excess -= cost
     }
   }

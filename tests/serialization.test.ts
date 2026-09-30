@@ -1,13 +1,21 @@
 import { describe, expect, it } from 'vitest'
 
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
+import { makeUnitLocator } from '@/combat/utils/unit-locator'
 import { CombatSetup } from '@/hooks/combat-setup'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
+import { validateSerializedConfig } from '@/hooks/combat-setup/validation'
+import {
+  configToSearchString,
+  searchParamsToConfig,
+} from '@/hooks/use-url-sync'
+import { SPACE_SURFACE_ID } from '@/types'
 
 describe('toSerializedConfig', () => {
-  it('returns version 1', () => {
+  it('returns version 2', () => {
     const setup = new CombatSetup()
     const config = setup.toSerializedConfig()
-    expect(config.v).toBe(1)
+    expect(config.v).toBe(2)
   })
 
   it('serializes default factions', () => {
@@ -23,8 +31,36 @@ describe('toSerializedConfig', () => {
     setup.setUnitCount('attacker', 'DREADNOUGHT', 3)
     setup.setUpgraded('attacker', 'DREADNOUGHT', true)
     const config = setup.toSerializedConfig()
-    expect(config.au).toEqual({ DREADNOUGHT: [3, 1] })
-    expect(config.du).toEqual({})
+    expect(config.v).toBe(2)
+    if (config.v !== 2) throw new Error('expected v2')
+    expect(config.asu.space).toEqual({ DREADNOUGHT: 3 })
+    expect(config.dsu).toEqual({})
+    expect(config.aup).toContain('DREADNOUGHT')
+  })
+
+  it('round-trips a global upgrade even with zero units of that type', () => {
+    const setup = new CombatSetup('FULL')
+    setup.setUpgraded('attacker', 'CRUISER', true)
+    setup.setSurfaceUnitCount(
+      'attacker',
+      'space' as import('@/types').SurfaceId,
+      'FIGHTER',
+      1,
+    )
+    const config = setup.toSerializedConfig()
+    if (config.v !== 2) throw new Error('expected v2')
+    expect(config.aup).toContain('CRUISER')
+    expect(config.asu.space.CRUISER).toBeUndefined()
+    const restored = new CombatSetup()
+    restored.loadConfig(
+      validateSerializedConfig(
+        searchParamsToConfig(`?${configToSearchString(config)}`),
+      ).config,
+    )
+    expect(restored.isUpgraded('attacker', 'CRUISER')).toBe(true)
+    expect(restored.surfaceSelections.attacker.space.CRUISER.upgraded).toBe(
+      true,
+    )
   })
 
   it('omits abilities at default values', () => {
@@ -142,9 +178,10 @@ describe('loadConfig', () => {
 
   it('preserves URL-loaded UNIT_PRIORITY order through final reconcile', () => {
     // Reproduces the URL-restore path: spaceUnitPriority arrives as a flat
-    // `string[]` (order-mode lists round-trip without per-key values), and
-    // the reconcile pass that runs after loadConfig must preserve it
-    // instead of clobbering it with the auto-synced default order.
+    // `string[]` of surface-qualified keys (order-mode lists round-trip
+    // without per-key values), and the reconcile pass that runs after
+    // loadConfig must preserve it instead of clobbering it with the
+    // auto-synced default order.
     const setup = new CombatSetup()
     setup.setUnitCount('attacker', 'FIGHTER', 1)
     setup.setUnitCount('attacker', 'DESTROYER', 1)
@@ -155,13 +192,20 @@ describe('loadConfig', () => {
       ...base,
       da: {
         ...base.da,
-        UNIT_PRIORITY: { spaceUnitPriority: ['DESTROYER', 'FIGHTER'] },
+        UNIT_PRIORITY: {
+          spaceUnitPriority: [
+            makeUnitLocator('DESTROYER', SPACE_SURFACE_ID),
+            makeUnitLocator('FIGHTER', SPACE_SURFACE_ID),
+          ],
+        },
       },
     }
     setup.loadConfig(config)
     const priority = setup.abilities.defender['UNIT_PRIORITY']
       ?.spaceUnitPriority as ([string] | string)[]
-    const keys = priority.map(e => (typeof e === 'string' ? e : e[0]))
+    const keys = priority.map(
+      e => parseUnitLocator(typeof e === 'string' ? e : e[0]).unitType,
+    )
     // DESTROYER must come before FIGHTER — the URL-loaded order wins.
     expect(keys.indexOf('DESTROYER')).toBeLessThan(keys.indexOf('FIGHTER'))
   })
@@ -169,13 +213,18 @@ describe('loadConfig', () => {
   it('resets to default for absent abilities', () => {
     const setup = new CombatSetup()
     const config: SerializedConfig = {
-      v: 1,
+      v: 2,
       g: 'TI4',
       af: setup.attackerFaction,
       df: setup.defenderFaction,
       m: 'S',
-      au: {},
-      du: {},
+      e: 'S',
+      p: ['planet-1'],
+      sp: 'planet-1',
+      asu: {},
+      dsu: {},
+      aup: [],
+      dup: [],
       aa: {},
       da: {},
     }
@@ -183,5 +232,18 @@ describe('loadConfig', () => {
 
     // General abilities should still be initialized
     expect(setup.abilities.attacker['UNIT_PRIORITY']).toBeDefined()
+  })
+
+  it('loads legacy flat counts as simplified placements', () => {
+    const raw = searchParamsToConfig(
+      '?v=1&g=TI4&af=ARBOREC&df=ARBOREC&m=G&au.INFANTRY=2.1&du.PDS=1.0',
+    )
+    const setup = new CombatSetup('FULL')
+    setup.loadConfig(validateSerializedConfig(raw).config)
+
+    expect(setup.editorMode).toBe('SIMPLIFIED')
+    expect(setup.isUpgraded('attacker', 'INFANTRY')).toBe(true)
+    expect(setup.surfaceSelections.attacker['planet-1'].INFANTRY.count).toBe(2)
+    expect(setup.surfaceSelections.defender['planet-1'].PDS.count).toBe(1)
   })
 })

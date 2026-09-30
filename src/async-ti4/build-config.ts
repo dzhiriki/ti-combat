@@ -1,16 +1,30 @@
-import type { RegisteredAbility } from '@/combat'
+import { makeUnitLocator, type RegisteredAbility } from '@/combat'
 import { UNIT_LIMITS } from '@/constants/units'
-import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
+import type {
+  SerializedConfig,
+  SerializedSurfaceCounts,
+} from '@/hooks/combat-setup/serialization'
 import {
   buildAbilityLookup,
   resolveSerializedGameSystem,
 } from '@/hooks/combat-setup/validation'
-import type { UnitBaseType, UnitList } from '@/types'
+import {
+  SPACE_SURFACE_ID,
+  type SurfaceId,
+  type UnitBaseType,
+  type UnitList,
+  type UnitLocator,
+} from '@/types'
 import { findFaction } from '@/utils/find-faction'
 import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
 
 import { AsyncTi4Error } from './fetch-game'
-import { entitiesAt, factionLabel } from './locations'
+import {
+  entitiesAt,
+  factionLabel,
+  isModelledUnit,
+  planetName,
+} from './locations'
 import {
   ABILITY_BY_TECH,
   ABILITY_BY_TF_UNIT,
@@ -19,8 +33,8 @@ import {
   UNIT_UPGRADE_BY_TECH,
   UNMODELLED_TECHS,
 } from './mappings'
+import { SPACE_STATIONS } from './planet-names'
 import {
-  type AsyncEntity,
   type AsyncPlayer,
   type BattleLocation,
   EXPECTED_SCHEMA_VERSION,
@@ -40,66 +54,62 @@ export interface ImportResult {
   notes: string[]
 }
 
-type UnitCounts = Partial<Record<UnitBaseType, number>>
+/** One surface of the calculator's system and the AsyncTI4 planet it stands
+ *  for. Space has no planet; a placeholder planet has none either. */
+interface ImportSurface {
+  id: SurfaceId
+  planet?: string
+}
 
 interface SideData {
   faction: string
-  units: Record<string, [number, 0 | 1]>
+  counts: SerializedSurfaceCounts
+  upgrades: UnitBaseType[]
   abilities: Record<string, Record<string, unknown>>
 }
 
-function increment(counts: UnitCounts, type: UnitBaseType, by: number): void {
-  if (by > 0) counts[type] = (counts[type] ?? 0) + by
-}
-
-function toUnitList(counts: UnitCounts): UnitList<number> {
-  return Object.entries(counts).map(([type, count]) => [
-    type,
-    count,
-  ]) as UnitList<number>
-}
-
-/** Structures sit on planets, so a space battle has to reach into the system's
- *  planets to find the PDS and space docks that shoot into it. */
-function structuresInSystem(
-  data: WebData,
-  tile: string,
-  asyncFactionId: string,
-): AsyncEntity[] {
-  const planets = data.tileUnitData[tile]?.planets ?? {}
-  return Object.values(planets).flatMap(planet =>
-    (planet?.entities?.[asyncFactionId] ?? []).filter(entity => {
-      const type = UNIT_TYPE_BY_ASYNC_ID[entity.entityId]
-      return type === 'PDS' || type === 'SPACE_DOCK'
-    }),
-  )
-}
-
-/** Everything a side brings to a battle at this location.
+/** The surfaces the battle is fought across: the system's space area and the
+ *  planets that matter to it.
  *
  *  Neither combat is confined to its own area of the map. A space battle is
- *  fought by the fleet in the space area — ground forces riding along in it
- *  included, since they are what an invasion commits — plus the structures on
- *  the system's planets, which is where its space cannon fire comes from. A
- *  ground battle adds the fleet overhead to whoever already holds the planet:
- *  those ships carry the invading troops and fire the bombardment. */
-function entitiesForBattle(
+ *  shot at by the structures on the system's planets, and an invasion is
+ *  carried and bombarded by the fleet overhead. The calculator models the
+ *  whole system, so every planet either side is standing on comes along, and
+ *  the engine works out who takes part. Planets nobody in the fight is on are
+ *  left out: they would only clutter the editor.
+ *
+ *  The invaded planet always comes first, so a ground battle is fought on
+ *  Planet 1. A system with no planet worth carrying still gets one, empty, so
+ *  the calculator has somewhere to land on. */
+function battleSurfaces(
   data: WebData,
   location: BattleLocation,
-  asyncFactionId: string,
-): AsyncEntity[] {
-  const inSpace = entitiesAt(
-    data,
-    { ...location, planet: undefined },
-    asyncFactionId,
+  sides: readonly string[],
+): ImportSurface[] {
+  const candidates = Object.keys(
+    data.tileUnitData[location.tile]?.planets ?? {},
+  ).filter(planet => !SPACE_STATIONS.has(planet))
+
+  const occupied = candidates.filter(
+    planet =>
+      planet === location.planet ||
+      sides.some(side =>
+        entitiesAt(data, { tile: location.tile, planet }, side).some(
+          isModelledUnit,
+        ),
+      ),
   )
-  if (location.mode === 'SPACE') {
-    return [
-      ...inSpace,
-      ...structuresInSystem(data, location.tile, asyncFactionId),
-    ]
-  }
-  return [...entitiesAt(data, location, asyncFactionId), ...inSpace]
+  const ordered =
+    location.planet && occupied.includes(location.planet)
+      ? [location.planet, ...occupied.filter(p => p !== location.planet)]
+      : occupied
+
+  const planets: ImportSurface[] = ordered.map((planet, index) => ({
+    id: `planet-${index + 1}` as SurfaceId,
+    planet,
+  }))
+  if (planets.length === 0) planets.push({ id: 'planet-1' as SurfaceId })
+  return [{ id: SPACE_SURFACE_ID }, ...planets]
 }
 
 /** Upstream aliases the Alliance promissory note `<colour>_an`. */
@@ -174,6 +184,7 @@ function borrowedFrom(data: WebData, player: AsyncPlayer): string[] {
 function buildSide(
   data: WebData,
   location: BattleLocation,
+  surfaces: readonly ImportSurface[],
   asyncFactionId: string,
   abilityLookup: Map<string, RegisteredAbility>,
   notes: Set<string>,
@@ -185,38 +196,80 @@ function buildSide(
     )
   }
 
-  const entities = entitiesForBattle(data, location, asyncFactionId)
+  // Units stay where they stand — ships and cargo in space, ground forces and
+  // structures on their planets. Pre-set state is keyed by surface as well as
+  // type, since the calculator tells a damaged mech on the planet from one
+  // riding in the fleet.
+  const counts: SerializedSurfaceCounts = {}
+  const damaged: UnitList<number> = []
+  const galvanized: UnitList<number> = []
+  const requested: Partial<Record<UnitBaseType, number>> = {}
+  const remaining = { ...UNIT_LIMITS }
 
-  const counts: UnitCounts = {}
-  const damaged: UnitCounts = {}
-  const galvanized: UnitCounts = {}
-
-  for (const entity of entities) {
-    if (entity.entityType !== 'unit') continue
-    const type = UNIT_TYPE_BY_ASYNC_ID[entity.entityId]
-    if (!type) {
-      notes.add(
-        `${factionLabel(asyncFactionId)}: "${entity.entityId}" has no equivalent here`,
-      )
+  for (const surface of surfaces) {
+    // A placeholder planet stands for nothing on the map, so nothing is on
+    // it; without the check its missing name would read as the space area.
+    if (surface.id !== SPACE_SURFACE_ID && surface.planet === undefined) {
       continue
     }
-    // `[healthy, damaged, galvanized, damaged galvanized]`, falling back to a
-    // flat stack when upstream omits the breakdown.
-    const states = entity.unitStates ?? [entity.count, 0, 0, 0]
-    increment(counts, type, entity.count)
-    increment(damaged, type, (states[1] ?? 0) + (states[3] ?? 0))
-    increment(galvanized, type, (states[2] ?? 0) + (states[3] ?? 0))
+    const entities = entitiesAt(
+      data,
+      { tile: location.tile, planet: surface.planet },
+      asyncFactionId,
+    )
+    for (const entity of entities) {
+      if (entity.entityType !== 'unit') continue
+      const type = UNIT_TYPE_BY_ASYNC_ID[entity.entityId]
+      if (!type) {
+        notes.add(
+          `${factionLabel(asyncFactionId)}: "${entity.entityId}" has no equivalent here`,
+        )
+        continue
+      }
+      requested[type] = (requested[type] ?? 0) + entity.count
+      // The calculator caps each type across the whole system, so a stack
+      // past the cap is trimmed where it stands and the rest go unplaced.
+      const count = Math.min(entity.count, remaining[type])
+      remaining[type] -= count
+      if (count <= 0) continue
+      const bySurface = (counts[surface.id] ??= {})
+      bySurface[type] = (bySurface[type] ?? 0) + count
+
+      // `[healthy, damaged, galvanized, damaged galvanized]`, falling back to
+      // a flat stack when upstream omits the breakdown.
+      const states = entity.unitStates ?? [entity.count, 0, 0, 0]
+      const locator = makeUnitLocator(type, surface.id)
+      // Fighters can't take damage, and the ability's own picker excludes them.
+      if (type !== 'FIGHTER') {
+        addPreset(damaged, locator, (states[1] ?? 0) + (states[3] ?? 0), count)
+      }
+      addPreset(galvanized, locator, (states[2] ?? 0) + (states[3] ?? 0), count)
+    }
+  }
+
+  for (const [type, total] of Object.entries(requested) as [
+    UnitBaseType,
+    number,
+  ][]) {
+    const limit = UNIT_LIMITS[type]
+    if (total > limit) {
+      notes.add(
+        `${factionLabel(asyncFactionId)}: ${total} ${type} capped at the ${limit} this calculator allows`,
+      )
+    }
   }
 
   const player = data.playerData.find(p => p.faction === asyncFactionId)
   const techs = player?.techs ?? []
 
-  const upgraded = new Set<UnitBaseType>()
+  const upgrades = new Set<UnitBaseType>()
   const abilities: Record<string, Record<string, unknown>> = {}
 
   for (const tech of techs) {
     const upgrade = UNIT_UPGRADE_BY_TECH[tech]
-    if (upgrade) upgraded.add(upgrade)
+    // Researched upgrades are recorded even where the side has none of that
+    // unit here, so the stats are already right when units get added by hand.
+    if (upgrade) upgrades.add(upgrade)
 
     const unmodelled = UNMODELLED_TECHS[tech]
     if (unmodelled) {
@@ -260,32 +313,11 @@ function buildSide(
     }
   }
 
-  const units: Record<string, [number, 0 | 1]> = {}
-  for (const [type, count] of Object.entries(counts) as [
-    UnitBaseType,
-    number,
-  ][]) {
-    const limit = UNIT_LIMITS[type]
-    if (count > limit) {
-      notes.add(
-        `${factionLabel(asyncFactionId)}: ${count} ${type} capped at the ${limit} this calculator allows`,
-      )
-    }
-    units[type] = [Math.min(count, limit), upgraded.has(type) ? 1 : 0]
+  if (damaged.length > 0) {
+    abilities['PRE_DAMAGED'] = { damagedUnits: damaged }
   }
-  // Researched upgrades are recorded even where the side has none of that unit
-  // here, so the stats are already right when units get added by hand.
-  for (const type of upgraded) {
-    units[type] ??= [0, 1]
-  }
-
-  // Fighters can't take damage, and the ability's own picker excludes them.
-  delete damaged.FIGHTER
-  if (Object.keys(damaged).length > 0) {
-    abilities['PRE_DAMAGED'] = { damagedUnits: toUnitList(damaged) }
-  }
-  if (Object.keys(galvanized).length > 0) {
-    abilities['PRE_GALVANIZED'] = { galvanizedUnits: toUnitList(galvanized) }
+  if (galvanized.length > 0) {
+    abilities['PRE_GALVANIZED'] = { galvanizedUnits: galvanized }
   }
   const tokens = player?.galvanizeTokensReinf ?? 0
   if (tokens > 0) {
@@ -295,7 +327,22 @@ function buildSide(
     }
   }
 
-  return { faction, units, abilities }
+  return { faction, counts, upgrades: [...upgrades], abilities }
+}
+
+/** Record `count` more units in a pre-set state on one surface, no more than
+ *  actually stand there once the cap has been applied. */
+function addPreset(
+  list: UnitList<number>,
+  locator: UnitLocator,
+  count: number,
+  placed: number,
+): void {
+  const value = Math.min(count, placed)
+  if (value <= 0) return
+  const existing = list.find(([key]) => key === locator)
+  if (existing) existing[1] += value
+  else list.push([locator, value])
 }
 
 /** Turn a chosen location and pair of players into a config the calculator can
@@ -325,9 +372,14 @@ export function buildImportConfig(
       `AsyncTI4 data format is v${data.versionSchema}, this import expects v${EXPECTED_SCHEMA_VERSION} — some of it may be out of date`,
     )
   }
+  const surfaces = battleSurfaces(data, location, [
+    selection.attacker,
+    selection.defender,
+  ])
   const attacker = buildSide(
     data,
     location,
+    surfaces,
     selection.attacker,
     abilityLookup,
     notes,
@@ -335,10 +387,25 @@ export function buildImportConfig(
   const defender = buildSide(
     data,
     location,
+    surfaces,
     selection.defender,
     abilityLookup,
     notes,
   )
+
+  // The calculator numbers its planets rather than naming them, so once there
+  // is more than one the user needs telling which is which.
+  const planets = surfaces.filter(surface => surface.planet !== undefined)
+  if (planets.length > 1) {
+    notes.add(
+      planets
+        .map(
+          (surface, index) =>
+            `Planet ${index + 1} is ${planetName(surface.planet!)}`,
+        )
+        .join(', '),
+    )
+  }
 
   // A nebula or an entropic scar is a property of the system, so it applies to
   // whoever fights there. Both sides get it: the scar syncs across them, and
@@ -352,9 +419,13 @@ export function buildImportConfig(
     }
   }
 
+  // The full editor is the one that shows a system's planets, and the
+  // invaded planet is first in the list. The whole system was imported, so
+  // the editor mode is the one the import needs rather than a preference.
+  const planetIds = surfaces.slice(1).map(surface => surface.id)
   return {
     config: {
-      v: 1,
+      v: 2,
       g: resolveSerializedGameSystem({
         af: attacker.faction,
         df: defender.faction,
@@ -362,8 +433,13 @@ export function buildImportConfig(
       af: attacker.faction,
       df: defender.faction,
       m: location.mode === 'SPACE' ? 'S' : 'G',
-      au: attacker.units,
-      du: defender.units,
+      e: 'F',
+      p: planetIds,
+      sp: planetIds[0],
+      asu: attacker.counts,
+      dsu: defender.counts,
+      aup: attacker.upgrades,
+      dup: defender.upgrades,
       aa: attacker.abilities,
       da: defender.abilities,
     },

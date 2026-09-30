@@ -7,6 +7,8 @@ import {
 import { clsx } from 'clsx'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { CombatSideState } from '@/combat/combat-side-state/combat-side-state'
+import { getCombatMeta } from '@/combat/combat-state/phase-utils'
 import {
   AbilitiesPanel,
   type AbilityFilterMode,
@@ -18,13 +20,13 @@ import { ButtonIcon } from '@/components/ui/button-icon'
 import { GlassCard } from '@/components/ui/glass-card'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { ToggleGroup } from '@/components/ui/toggle-group'
+import type { UnitEditorMode } from '@/hooks/combat-setup/combat-setup'
 import { useCombatSetup } from '@/hooks/use-combat-setup'
 import type { Precision } from '@/hooks/use-settings'
 import { useSimulation } from '@/hooks/use-simulation'
 import { useUrlSync } from '@/hooks/use-url-sync'
 import type { CombatSide, UnitBaseType } from '@/types'
 import { getGameData } from '@/utils/get-game-data'
-import { getUnitConfig } from '@/utils/get-unit-config'
 
 import { ButtonIconPlain } from '../ui/button-icon-plain'
 import { Divider } from '../ui/divider'
@@ -62,11 +64,15 @@ function loadFilterMode(side: CombatSide): AbilityFilterMode {
 interface CombatSimulatorProps {
   className?: string
   precision: Precision
+  preferredEditorMode: UnitEditorMode
+  onEditorModePreferenceChange: (mode: UnitEditorMode) => void
 }
 
 export function CombatSimulator({
   className,
   precision,
+  preferredEditorMode,
+  onEditorModePreferenceChange,
 }: CombatSimulatorProps) {
   const {
     system,
@@ -74,8 +80,14 @@ export function CombatSimulator({
     defenderFaction,
     attackerSelections,
     defenderSelections,
+    editorMode,
+    surfaces,
+    selectedPlanetId,
+    surfaceSelections,
     combatMode,
     abilities,
+    attackerConfig,
+    defenderConfig,
     stateData,
     getReadContext,
     getAvailableAbilities,
@@ -89,13 +101,27 @@ export function CombatSimulator({
     setUpgraded,
     setAbilityParam,
     setCombatMode,
+    setEditorMode,
+    selectPlanet,
+    addPlanet,
+    setSurfaceUnitCount,
     resetUnits,
     resetAbilities,
     swap,
-  } = useCombatSetup()
+  } = useCombatSetup(preferredEditorMode)
 
   const { toast } = useToast()
-  useUrlSync(serializedConfig, loadConfig, toast)
+  const loadUrlConfig = (config: Parameters<typeof loadConfig>[0]) => {
+    const loadedEditorMode = loadConfig(config)
+    onEditorModePreferenceChange(loadedEditorMode)
+  }
+  useUrlSync(serializedConfig, loadUrlConfig, toast)
+
+  useEffect(() => {
+    if (editorMode !== preferredEditorMode) {
+      setEditorMode(preferredEditorMode)
+    }
+  }, [editorMode, preferredEditorMode, setEditorMode])
 
   const [attackerSheetOpen, setAttackerSheetOpen] = useState(false)
   const [defenderSheetOpen, setDefenderSheetOpen] = useState(false)
@@ -134,15 +160,6 @@ export function CombatSimulator({
       if (!next.attacker && !next.defender) setSearchQuery('')
       return next
     })
-
-  const attackerConfig = useMemo(
-    () => getUnitConfig(system, attackerFaction),
-    [system, attackerFaction],
-  )
-  const defenderConfig = useMemo(
-    () => getUnitConfig(system, defenderFaction),
-    [system, defenderFaction],
-  )
 
   const attackerAbilities = useMemo(
     () => getAvailableAbilities('attacker'),
@@ -188,14 +205,12 @@ export function CombatSimulator({
   }, [stateData])
 
   const participatingTypes = useMemo(() => {
-    const key =
-      combatMode === 'GROUND'
-        ? 'groundCombatParticipating'
-        : 'spaceCombatParticipating'
-    const read = (side: 'attacker' | 'defender'): string[] => {
-      const list = abilities[side]['SETTINGS']?.[key]
-      return Array.isArray(list) ? (list as string[]) : []
-    }
+    const read = (side: 'attacker' | 'defender'): string[] =>
+      CombatSideState.getCategoryOptionTypes(
+        stateData[side],
+        combatMode === 'GROUND' ? 'GROUND_FORCES' : 'SHIPS',
+        getCombatMeta(combatMode),
+      )
     return { attacker: read('attacker'), defender: read('defender') }
     // oxlint-disable-next-line react/exhaustive-deps
   }, [stateData])
@@ -350,6 +365,10 @@ export function CombatSimulator({
           defenderFaction={defenderFaction}
           attackerSelections={attackerSelections}
           defenderSelections={defenderSelections}
+          editorMode={editorMode}
+          surfaces={surfaces}
+          selectedPlanetId={selectedPlanetId}
+          surfaceSelections={surfaceSelections}
           attackerConfig={attackerConfig}
           defenderConfig={defenderConfig}
           combatResult={combatResult}
@@ -359,12 +378,15 @@ export function CombatSimulator({
           isComputing={isComputing}
           combatMode={combatMode}
           onCombatModeChange={setCombatMode}
+          onPlanetChange={selectPlanet}
+          onAddPlanet={addPlanet}
           onFactionChange={setFaction}
           onSwap={swap}
           onUnitCountChange={setUnitCount}
+          onSurfaceUnitCountChange={setSurfaceUnitCount}
           onUpgradeToggle={handleUpgradeToggle}
           onResetUnits={resetUnits}
-          topActions={<ImportDialog onImport={loadConfig} />}
+          topActions={<ImportDialog onImport={loadUrlConfig} />}
           attackerActions={
             <ButtonIcon
               className={clsx(styles.gearButton, 'theme-attacker')}

@@ -20,6 +20,7 @@ export const arcSecundus: Ability = {
     },
     {
       timing: 'START_OF_COMBAT_ROUND',
+      isCallable: (_params, ctx) => ctx.api.own.isParticipating(ctx.getUnit()),
       call: ctx => {
         const unitId = ctx.getUnit()
         ctx.api.own.modifyUnitState(unitId, {

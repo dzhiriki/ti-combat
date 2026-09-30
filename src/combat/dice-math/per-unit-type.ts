@@ -1,7 +1,8 @@
+import type { UnitLocator } from '@/types'
 import type { CombatSide, UnitType } from '@/types'
 
 import type { MetaPhase } from '../combat-state/types'
-import { parseVariantId } from '../utils/unit-variant'
+import { parseUnitLocator } from '../utils/parse-unit-locator'
 import type { DiceMathBranch, PendingEffect } from './branch-accumulator'
 import {
   makeEmptyPendingHitPool,
@@ -14,7 +15,6 @@ import {
 import { collapseBranches } from './phases/collapse-branches'
 import { collapseSideOutcomes } from './phases/collapse-side-outcomes'
 import type { PreSplit, SideBuckets } from './pre-split'
-import { sortValidTargetsByPriority } from './sort-valid-targets'
 import type {
   CollectedDice,
   ConditionalModifier,
@@ -36,11 +36,7 @@ interface PerUnitTypeInput {
   dice: CollectedDice
   preSplit: PreSplit
   modifiers: Modifier[]
-  validTargets: { attacker: UnitType[]; defender: UnitType[] }
-  priorityList: {
-    attacker: UnitType[] | undefined
-    defender: UnitType[] | undefined
-  }
+  unitAbilityPriority?: { attacker: UnitLocator[]; defender: UnitLocator[] }
   meta: MetaPhase
   /** True for a self-targeting roll (Proxima self-bomb): flip reroll specs
    *  so "reroll misses" becomes "reroll hits" against the firer's own dice. */
@@ -61,10 +57,9 @@ interface PerUnitTypeInput {
  * modifiers.
  *
  * Final assembly (step 7): for each combined attacker×defender side
- * outcome, sum per-source hits within each Step-4 bucket. Rest buckets
- * feed the primary HitPool with the side's default validTargets; siphon
- * buckets feed their spec's `transform(count)` and the result is
- * appended to the landing side's pools.
+ * outcome, sum per-source hits within each Step-4 bucket. Rest-bucket
+ * unit-ability hits use the resolved landing-side priority for eligibility
+ * and order; siphon buckets use their own transformed priorities.
  */
 export function runPerUnitTypeMode(input: PerUnitTypeInput): DiceMathBranch[] {
   const sourceMaps: Record<CombatSide, Record<Source, FlatSource>> = {
@@ -203,16 +198,14 @@ export function runPerUnitTypeMode(input: PerUnitTypeInput): DiceMathBranch[] {
         emitPools(
           j.attackerHits,
           input.preSplit.attacker,
-          input.validTargets[input.preSplit.attacker.landingSide],
-          input.priorityList[input.preSplit.attacker.landingSide],
+          input.unitAbilityPriority?.[input.preSplit.attacker.landingSide],
           input.meta,
           pools,
         )
         emitPools(
           j.defenderHits,
           input.preSplit.defender,
-          input.validTargets[input.preSplit.defender.landingSide],
-          input.priorityList[input.preSplit.defender.landingSide],
+          input.unitAbilityPriority?.[input.preSplit.defender.landingSide],
           input.meta,
           pools,
         )
@@ -220,7 +213,6 @@ export function runPerUnitTypeMode(input: PerUnitTypeInput): DiceMathBranch[] {
           probability: jointProb,
           pendingHitPool: pools,
           usesDelta: j.usesDelta,
-          destroyedUnits: new Set(),
           pendingEffects: [...a.pendingEffects, ...d.pendingEffects],
         })
       }
@@ -797,14 +789,14 @@ function matchedSourcesByUnits(
   // stated as a variant key (e.g. 'FLAGSHIP:Galvanized') or a base type
   // ('FLAGSHIP'); expand each entry to its base type so both forms match.
   const allowedBaseTypes = new Set<UnitType>(
-    units.map(u => parseVariantId(u).type as UnitType),
+    units.map(u => parseUnitLocator(u).baseType as UnitType),
   )
   return sources.filter(s => {
     const key = sourceMap[s]?.variant
     if (key === undefined) return false
     if (units.includes(key)) return true
     if (allowedBaseTypes.has(key)) return true
-    const baseType = parseVariantId(key).type as UnitType
+    const baseType = parseUnitLocator(key).baseType as UnitType
     return units.includes(baseType) || allowedBaseTypes.has(baseType)
   })
 }
@@ -976,8 +968,7 @@ function serializeUses(uses: Map<string, number>): string {
 function emitPools(
   hits: Record<Source, number>,
   side: SideBuckets,
-  validTargets: UnitType[],
-  priorityList: UnitType[] | undefined,
+  unitAbilityPriority: UnitLocator[] | undefined,
   meta: MetaPhase,
   pools: Record<CombatSide, PendingHitPool>,
 ): void {
@@ -996,11 +987,11 @@ function emitPools(
         base: entry.base,
         unitPriority: entry.unitPriority,
       })
-    } else if (validTargets.length > 0) {
+    } else if (unitAbilityPriority !== undefined) {
       pool.custom.push({
         key: meta,
         base: count,
-        unitPriority: sortValidTargetsByPriority(validTargets, priorityList),
+        unitPriority: unitAbilityPriority,
       })
     } else {
       pool.base += count

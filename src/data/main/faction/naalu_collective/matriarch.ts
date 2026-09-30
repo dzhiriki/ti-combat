@@ -1,5 +1,5 @@
 import type { Ability } from '@/combat'
-import type { UnitBaseType } from '@/types'
+import { commitFighters } from '@/combat/abilities-engine/api/commit-fighters'
 
 export const matriarch: Ability = {
   key: 'MATRIARCH',
@@ -13,14 +13,12 @@ export const matriarch: Ability = {
     uses: Infinity,
   },
   headerUI: 'isEnabled',
-  declareParamChange: () => [{ key: 'groundForces', value: 'FIGHTER' }],
+  declareChanges: commitFighters,
   invoke: [
     {
       timing: 'COMMIT_UNITS',
       call: ctx => {
-        ctx.api.own.updateAbilityConfig('SETTINGS', {
-          groundForces: (current: UnitBaseType[]) => [...current, 'FIGHTER'],
-        })
+        ctx.invokeChanges()
       },
     },
   ],

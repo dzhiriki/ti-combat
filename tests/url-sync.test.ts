@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { makeUnitLocator } from '@/combat'
 import { CombatSetup } from '@/hooks/combat-setup'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
 import { validateSerializedConfig } from '@/hooks/combat-setup/validation'
@@ -7,16 +8,22 @@ import {
   configToSearchString,
   searchParamsToConfig,
 } from '@/hooks/use-url-sync'
+import { SPACE_SURFACE_ID } from '@/types'
 
 function baseConfig(): SerializedConfig {
   return {
-    v: 1,
+    v: 2,
     g: 'TI4',
     af: 'ARBOREC',
     df: 'ARBOREC',
     m: 'S',
-    au: { FIGHTER: [1, 0] },
-    du: { FIGHTER: [1, 0] },
+    e: 'S',
+    p: ['planet-1'],
+    sp: 'planet-1',
+    asu: { space: { FIGHTER: 1 } },
+    dsu: { space: { FIGHTER: 1 } },
+    aup: [],
+    dup: [],
     aa: {},
     da: {},
   }
@@ -106,14 +113,18 @@ describe('URL round-trip', () => {
     // has no `defaultItemValue` it fills them in as bare `[type]` 1-tuples —
     // indistinguishable from an order-mode list once encoded, so the counts
     // are dropped on the way back. PRE_GALVANIZED declares one; PRE_DAMAGED
-    // did not, and lost its damage on every refresh until it did.
+    // did not, and lost its damage on every refresh until it did. Both are
+    // system-scoped, so their keys carry the surface: a bare type is not an
+    // option and reconciliation drops it.
+    const dreadnought = makeUnitLocator('DREADNOUGHT', SPACE_SURFACE_ID)
+    const cruiser = makeUnitLocator('CRUISER', SPACE_SURFACE_ID)
     const setup = new CombatSetup()
     setup.setFaction('attacker', 'SARDAKK_NORR')
     setup.setUnitCount('attacker', 'DREADNOUGHT', 2)
     setup.setUnitCount('attacker', 'CRUISER', 1)
     setup.setAbilityParam('attacker', 'PRE_DAMAGED', {
       ...setup.abilities.attacker['PRE_DAMAGED'],
-      damagedUnits: [['DREADNOUGHT', 1]],
+      damagedUnits: [[dreadnought, 1]],
     })
 
     const search = configToSearchString(setup.toSerializedConfig())
@@ -124,8 +135,8 @@ describe('URL round-trip', () => {
     const restored = new CombatSetup()
     restored.loadConfig(result.config)
     expect(restored.abilities.attacker['PRE_DAMAGED'].damagedUnits).toEqual([
-      ['CRUISER', 0],
-      ['DREADNOUGHT', 1],
+      [cruiser, 0],
+      [dreadnought, 1],
     ])
   })
 
@@ -157,5 +168,39 @@ describe('URL round-trip', () => {
       (decoded.da as Record<string, Record<string, unknown>>)['UNIT_PRIORITY']
         ?.spaceUnitPriority,
     ).toEqual(['FIGHTER', 'DESTROYER', 'CRUISER'])
+  })
+
+  it('round-trips surface editor state and placements', () => {
+    const config: SerializedConfig = {
+      ...baseConfig(),
+      v: 2,
+      e: 'F',
+      p: ['planet-1', 'planet-2'],
+      sp: 'planet-2',
+      aup: ['INFANTRY'],
+      dup: [],
+      asu: {
+        space: { CRUISER: 1 },
+        'planet-2': { INFANTRY: 2 },
+      },
+      dsu: {
+        'planet-1': { PDS: 1 },
+      },
+    }
+
+    const decoded = searchParamsToConfig(`?${configToSearchString(config)}`)
+    const result = validateSerializedConfig(decoded)
+
+    expect(result.warnings).toEqual([])
+    expect(result.config).toMatchObject({
+      v: 2,
+      e: 'F',
+      p: ['planet-1', 'planet-2'],
+      sp: 'planet-2',
+      aup: ['INFANTRY'],
+      dup: [],
+      asu: config.v === 2 ? config.asu : {},
+      dsu: config.v === 2 ? config.dsu : {},
+    })
   })
 })

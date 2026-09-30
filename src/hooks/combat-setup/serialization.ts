@@ -1,27 +1,36 @@
 import { isDeepEqual } from 'remeda'
 
-import type { GameSystem, UnitBaseType, UnitSelection } from '@/types'
+import type { GameSystem, SurfaceUnitCounts, UnitBaseType } from '@/types'
 
+export type SerializedSurfaceCounts = Record<string, Record<string, number>>
+
+/** Share-link config. Validation converts older (v1) links to this form. */
 export interface SerializedConfig {
-  v: 1
+  v: 2
   g: GameSystem
   af: string
   df: string
   m: 'S' | 'G'
-  au: Record<string, [number, 0 | 1]>
-  du: Record<string, [number, 0 | 1]>
+  e: 'S' | 'F'
+  p: string[]
+  sp: string
+  asu: SerializedSurfaceCounts
+  dsu: SerializedSurfaceCounts
+  aup: UnitBaseType[]
+  dup: UnitBaseType[]
   aa: Record<string, Record<string, unknown>>
   da: Record<string, Record<string, unknown>>
 }
 
-export function serializeUnits(
-  selections: Record<UnitBaseType, UnitSelection>,
-): Record<string, [number, 0 | 1]> {
-  const result: Record<string, [number, 0 | 1]> = {}
-  for (const [type, sel] of Object.entries(selections)) {
-    if (sel.count > 0) {
-      result[type] = [sel.count, sel.upgraded ? 1 : 0]
-    }
+export function serializeSurfaceCounts(
+  counts: SurfaceUnitCounts,
+): SerializedSurfaceCounts {
+  const result: SerializedSurfaceCounts = {}
+  for (const [surfaceId, byType] of Object.entries(counts)) {
+    const present = Object.fromEntries(
+      Object.entries(byType).filter(([, count]) => count > 0),
+    )
+    if (Object.keys(present).length > 0) result[surfaceId] = present
   }
   return result
 }
@@ -32,7 +41,6 @@ export function serializeAbilities(
 ): Record<string, Record<string, unknown>> {
   const result: Record<string, Record<string, unknown>> = {}
   for (const [key, params] of Object.entries(config)) {
-    if (key === 'SETTINGS') continue
     const defaults = reconciledDefaults[key]
     if (!defaults) continue
     const diff: Record<string, unknown> = {}

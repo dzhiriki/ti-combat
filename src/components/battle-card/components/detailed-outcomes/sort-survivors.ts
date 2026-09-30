@@ -1,4 +1,7 @@
 import type { SurvivorSide } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
+import { unitLocatorRank } from '@/combat/utils/unit-locator'
+import type { SurfaceId, UnitType } from '@/types'
 
 export interface SurvivorEntry {
   variantKey: string
@@ -11,6 +14,7 @@ export interface SurvivorEntry {
 export function sortSurvivors(
   side: SurvivorSide,
   priority: readonly string[],
+  surfaceId?: SurfaceId,
 ): SurvivorEntry[] {
   const entries: SurvivorEntry[] = []
 
@@ -36,12 +40,17 @@ export function sortSurvivors(
     }
   }
 
+  const rank = new Map<string, number>()
+  priority.forEach((key, index) => {
+    // Without a surface, qualified duplicates collapse to one type; the
+    // earliest entry ranks it.
+    const rankKey =
+      surfaceId === undefined ? parseUnitLocator(key).unitType : key
+    if (!rank.has(rankKey)) rank.set(rankKey, index)
+  })
   const rankOf = (entry: SurvivorEntry): number => {
-    const exact = priority.indexOf(entry.variantKey)
-    if (exact !== -1) return exact
-    const base = priority.indexOf(entry.base)
-    if (base !== -1) return base
-    return -1
+    const value = unitLocatorRank(rank, entry.variantKey as UnitType, surfaceId)
+    return value === Infinity ? -1 : value
   }
 
   entries.sort((a, b) => rankOf(b) - rankOf(a))

@@ -23,13 +23,15 @@ export const revealPrototype: Ability<Params> = {
     isEnabled: false,
     uses: 1,
     spacePriority: declareParam<UnitList<boolean>>({
-      source: 'spaceCombatParticipating',
+      scope: 'type',
+      source: 'SHIPS',
       defaultItemValue: false,
       default: [],
       filter: { includeOnlyBaseTypes: true, combatMode: 'SPACE' },
     }),
     groundPriority: declareParam<UnitList<boolean>>({
-      source: 'groundCombatParticipating',
+      scope: 'type',
+      source: 'GROUND_FORCES',
       defaultItemValue: false,
       default: [],
       filter: { includeOnlyBaseTypes: true, combatMode: 'GROUND' },
@@ -115,7 +117,8 @@ function pickTarget(
     // (e.g. by Viscount running first via ABILITY_ORDER) is still found.
     // modifyUnitType then upgrades the base entry; subtype factories
     // re-evaluate against it lazily.
-    if (!ctx.api.own.hasUnitType(type, { includeVariants: true })) continue
+    if (!ctx.api.own.participating.hasUnitType(type, { includeVariants: true }))
+      continue
     const upgraded = faction[type]?.UPGRADED
     if (!upgraded || Object.keys(upgraded).length === 0) continue
     const current = ctx.api.own.getUnitStats(type)

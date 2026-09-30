@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
-import type { UnitBaseType, UnitId, UnitIdList, UnitStats } from '@/types'
+import {
+  createDefaultSurfaces,
+  SPACE_SURFACE_ID,
+  type UnitBaseType,
+  type UnitId,
+  type UnitIdList,
+  type UnitStats,
+} from '@/types'
 
 import { CombatState } from '../combat-state/combat-state'
 import type { CombatStateData, SideStateData } from '../combat-state/types'
+import { parseUnitLocator } from '../utils/parse-unit-locator'
 import { nextUnitIds } from '../utils/unit-id'
-import { parseVariantId } from '../utils/unit-variant'
 import { AbilitiesEngine } from './abilities-engine'
 import type { Ability, AbilityCallContext } from './types'
 
@@ -15,6 +22,11 @@ import type { Ability, AbilityCallContext } from './types'
 // advancing across tests is fine.
 const idGen: { _nextCode?: number } = {}
 
+const SPACE_COMBAT_SURFACES = {
+  surfaces: createDefaultSurfaces(),
+  activeSurfaceId: SPACE_SURFACE_ID,
+}
+
 /** Helper to build compact SideStateData from unit specs */
 function buildSide(
   faction: SideStateData['faction'],
@@ -23,12 +35,14 @@ function buildSide(
   let participatingUnits = ''
   const unitType: SideStateData['unitType'] = {}
   const unitStats = {} as SideStateData['unitStats']
+  const unitSurface: SideStateData['unitSurface'] = {}
   for (const [key, spec] of Object.entries(unitSpecs)) {
     const k = key as import('@/types').UnitType
     const ids = nextUnitIds(spec.count, idGen)
     for (const id of ids) {
       participatingUnits += id
       unitType[id] = k
+      unitSurface[id] = 'space' as import('@/types').SurfaceId
     }
     unitStats[k] = spec.stats
   }
@@ -36,6 +50,8 @@ function buildSide(
     faction,
     participatingUnits: participatingUnits as UnitIdList,
     nonParticipatingUnits: '' as UnitIdList,
+
+    unitSurface,
     unitType,
     unitState: {},
     unitStats,
@@ -50,6 +66,8 @@ const emptySide = (
   faction,
   participatingUnits: '' as UnitIdList,
   nonParticipatingUnits: '' as UnitIdList,
+
+  unitSurface: {},
   unitType: {},
   unitState: {},
   unitStats: {} as SideStateData['unitStats'],
@@ -65,7 +83,7 @@ function unitsByBaseType(
     for (const id of pool) {
       const key = sideData.unitType[id]
       if (!key) continue
-      const { type } = parseVariantId(key)
+      const { baseType: type } = parseUnitLocator(key)
       const arr = result[type] ?? (result[type] = [])
       arr.push(id as UnitId)
     }
@@ -108,6 +126,7 @@ describe('collectUnitAbilities', () => {
       }),
       defender: emptySide(),
       combatMode: 'SPACE',
+      ...SPACE_COMBAT_SURFACES,
     }
 
     const result = AbilitiesEngine.collectUnitAbilities(state, 'attacker')
@@ -132,6 +151,7 @@ describe('collectUnitAbilities', () => {
       }),
       defender: emptySide(),
       combatMode: 'SPACE',
+      ...SPACE_COMBAT_SURFACES,
     }
 
     const result = AbilitiesEngine.collectUnitAbilities(state, 'attacker')
@@ -166,6 +186,7 @@ describe('collectUnitAbilities', () => {
       }),
       defender: emptySide(),
       combatMode: 'SPACE',
+      ...SPACE_COMBAT_SURFACES,
     }
 
     const result = AbilitiesEngine.collectUnitAbilities(state, 'attacker')
@@ -206,6 +227,7 @@ describe('unit ability invocation', () => {
       }),
       defender: emptySide(),
       combatMode: 'SPACE',
+      ...SPACE_COMBAT_SURFACES,
     }
 
     runAndDrain(CombatState.fromDataStandalone(state), 'START_OF_COMBAT_ROUND')
@@ -226,7 +248,11 @@ describe('AFTER_DESTROY triggered by destroyUnits', () => {
         {
           timing: 'START_OF_COMBAT_ROUND',
           call: (ctx: AbilityCallContext) => {
-            ctx.api.opponent.destroyUnits('FIGHTER')
+            ctx.api.opponent.destroyUnits(
+              ctx.api.opponent.system.getUnits('FIGHTER', {
+                includeVariants: true,
+              })[0],
+            )
           },
         },
       ],
@@ -272,6 +298,7 @@ describe('AFTER_DESTROY triggered by destroyUnits', () => {
         },
       }),
       combatMode: 'SPACE',
+      ...SPACE_COMBAT_SURFACES,
     }
 
     runAndDrain(CombatState.fromDataStandalone(state), 'START_OF_COMBAT_ROUND')
@@ -330,6 +357,7 @@ describe('AFTER_DESTROY triggered by destroyUnits', () => {
         FIGHTER: { count: 1, stats: { COMBAT: [9, 1], UNIT_ABILITIES: {} } },
       }),
       combatMode: 'SPACE',
+      ...SPACE_COMBAT_SURFACES,
     }
 
     runAndDrain(CombatState.fromDataStandalone(state), 'START_OF_COMBAT_ROUND')
@@ -348,7 +376,11 @@ describe('AFTER_DESTROY triggered by destroyUnits', () => {
         {
           timing: 'START_OF_COMBAT_ROUND',
           call: (ctx: AbilityCallContext) => {
-            ctx.api.opponent.destroyUnits('FIGHTER')
+            ctx.api.opponent.destroyUnits(
+              ctx.api.opponent.system.getUnits('FIGHTER', {
+                includeVariants: true,
+              })[0],
+            )
           },
         },
       ],
@@ -366,7 +398,11 @@ describe('AFTER_DESTROY triggered by destroyUnits', () => {
           call: (ctx: AbilityCallContext) => {
             afterDestroyCalls.push('called')
             // From defender's FIGHTER perspective, own = defender side
-            ctx.api.own.destroyUnits('CRUISER')
+            ctx.api.own.destroyUnits(
+              ctx.api.own.system.getUnits('CRUISER', {
+                includeVariants: true,
+              })[0],
+            )
           },
         },
       ],
@@ -395,6 +431,7 @@ describe('AFTER_DESTROY triggered by destroyUnits', () => {
         CRUISER: { count: 1, stats: { COMBAT: [7, 1], UNIT_ABILITIES: {} } },
       }),
       combatMode: 'SPACE',
+      ...SPACE_COMBAT_SURFACES,
     }
 
     runAndDrain(CombatState.fromDataStandalone(state), 'START_OF_COMBAT_ROUND')
@@ -452,6 +489,7 @@ describe('merged START_OF_COMBAT bucket', () => {
       }),
       defender: emptySide(),
       combatMode: 'SPACE',
+      ...SPACE_COMBAT_SURFACES,
     }
 
     CombatState.fromDataStandalone(state).params.runAbilities('START_OF_COMBAT')
@@ -487,6 +525,7 @@ describe('merged START_OF_COMBAT bucket', () => {
       }),
       defender: emptySide(),
       combatMode: 'SPACE',
+      ...SPACE_COMBAT_SURFACES,
     }
 
     runAndDrain(CombatState.fromDataStandalone(state), 'START_OF_COMBAT_ROUND')

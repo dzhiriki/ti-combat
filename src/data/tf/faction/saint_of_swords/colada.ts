@@ -14,7 +14,11 @@ function capacityTargets(ctx: AbilityReadContext): UnitBaseType[] {
     if (stats.CAPACITY_COST != null || capacity == null || capacity <= 0) {
       continue
     }
-    if (ctx.api.own.countUnits(baseType, { includeVariants: true }) === 0) {
+    if (
+      ctx.api.own.participating.countUnits(baseType, {
+        includeVariants: true,
+      }) === 0
+    ) {
       continue
     }
     targets.push(baseType)

@@ -1,8 +1,8 @@
 import type { UnitId } from '@/types'
 
 // Start above the ASCII range so that a UnitId, appearing as a single
-// char in a packed string, never collides with separators (`!`, `|`) or
-// JSON characters used in `getUnitsHash`.
+// char in a packed string, never collides with the separators, markers or
+// damage flags used in `getUnitsHash`.
 const INITIAL_CODE = 0x80
 
 /** Container that owns a UnitId allocation counter. `SideStateData`

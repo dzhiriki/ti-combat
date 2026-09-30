@@ -27,11 +27,13 @@ export const unitPriority: Ability<Params> = {
     uses: Infinity,
     spaceUnitPriority: declareParam<UnitList>({
       default: [],
-      source: 'spaceCombatParticipating',
+      source: 'SHIPS',
+      filter: { combatMode: 'SPACE' },
     }),
     groundUnitPriority: declareParam<UnitList>({
       default: [],
-      source: 'groundCombatParticipating',
+      source: 'GROUND_FORCES',
+      filter: { combatMode: 'GROUND' },
     }),
   },
   invoke: [],

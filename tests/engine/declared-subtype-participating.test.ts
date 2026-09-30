@@ -7,13 +7,12 @@ import {
   type SideStateData,
 } from '@/combat'
 import type { DeclaredSubtype } from '@/combat/abilities-engine/types'
-import { CombatSideState } from '@/combat/combat-side-state/combat-side-state'
-import { settings as settingsAbility } from '@/data/main'
+import { resolveUnitOptions } from '@/combat/abilities-engine/unit-options'
 import { reconcileAbilitiesConfig } from '@/hooks/combat-setup/reconcile'
 import type { UnitList } from '@/types'
 
-/** Build a minimal SideStateData with the supplied participating units and
- *  a SETTINGS abilities entry containing the supplied declared subtypes.
+/** Build a minimal SideStateData where the supplied base types count as
+ *  ships and ground forces, with declared subtype metadata.
  *  Anything not exercised by the variant-options path is left empty. */
 function makeSide(opts: {
   baseTypes: string[]
@@ -24,23 +23,14 @@ function makeSide(opts: {
     nonParticipatingUnits: [],
     unitType: {},
     unitState: {},
-    unitStats: {},
-    abilities: {
-      SETTINGS: {
-        units: opts.baseTypes,
-        spaceCombatParticipating: opts.baseTypes,
-        groundCombatParticipating: opts.baseTypes,
-        ships: opts.baseTypes,
-        groundForces: opts.baseTypes,
-        nonFighterShips: opts.baseTypes,
-        structures: [],
-        validTargetsSpaceCannonOffense: [],
-        validTargetsBombardment: [],
-        validTargetsSpaceCannonDefense: [],
-        validTargetsAntiFighterBarrage: [],
-        subtypes: opts.subtypes,
-      },
-    },
+    unitStats: Object.fromEntries(
+      opts.baseTypes.map(type => [
+        type,
+        { CATEGORIES: ['SHIPS', 'GROUND_FORCES'] },
+      ]),
+    ),
+    abilities: {},
+    optionMetadata: { subtypes: opts.subtypes },
     liveAbilities: {},
   } as unknown as SideStateData
 }
@@ -65,7 +55,11 @@ describe('getUnitVariantOptions — participating flag', () => {
       ] as unknown as DeclaredSubtype[],
     })
 
-    const opts = CombatSideState.getUnitVariantOptions(side, 'SPACE')
+    const opts = resolveUnitOptions(
+      side,
+      { combatMode: 'SPACE', side: 'attacker' },
+      { source: 'SHIPS', scope: 'type' },
+    )
 
     const values = opts.map(o => o.value)
     expect(values).toContain('CRUISER:Galvanized')
@@ -91,9 +85,15 @@ describe('getUnitVariantOptions — participating flag', () => {
       ] as unknown as DeclaredSubtype[],
     })
 
-    const opts = CombatSideState.getUnitVariantOptions(side, 'SPACE', {
-      includeNonParticipating: true,
-    })
+    const opts = resolveUnitOptions(
+      side,
+      { combatMode: 'SPACE', side: 'attacker' },
+      {
+        source: 'SHIPS',
+        scope: 'type',
+        filter: { includeNonParticipating: true },
+      },
+    )
 
     const values = opts.map(o => o.value)
     expect(values).toContain('CRUISER:Galvanized')
@@ -136,7 +136,7 @@ describe('declareParam source — participating flag', () => {
         items: declareParam<UnitList<number>>({
           default: [] as UnitList<number>,
           defaultItemValue: 0,
-          source: 'units',
+          source: ['SHIPS', 'GROUND_FORCES', 'STRUCTURES'],
           filter: { includeNonParticipating },
         }),
       },
@@ -147,20 +147,22 @@ describe('declareParam source — participating flag', () => {
   function runReconcile(consumer: Ability) {
     const config = {
       attacker: {
-        SETTINGS: {},
         TEST_DECLARER: { isEnabled: true, uses: Infinity },
         TEST_CONSUMER: { isEnabled: true, uses: Infinity, items: [] },
       },
-      defender: { SETTINGS: {} },
+      defender: {},
     }
     // Bare definitions, registered under one slot for the reconcile pass.
     const register = (list: Ability[]): RegisteredAbility[] =>
       list.map(ability => ({ ...ability, slot: 'OTHER' }))
     const abilities = {
-      attacker: register([settingsAbility, declarer, consumer]),
-      defender: register([settingsAbility]),
+      attacker: register([declarer, consumer]),
+      defender: [],
     }
-    reconcileAbilitiesConfig(config, abilities, 'SPACE')
+    reconcileAbilitiesConfig(config, abilities, 'SPACE', {
+      attacker: makeSide({ baseTypes: [], subtypes: [] }),
+      defender: makeSide({ baseTypes: [], subtypes: [] }),
+    })
     return (config.attacker.TEST_CONSUMER.items as UnitList<number>).map(
       ([k]) => k,
     )

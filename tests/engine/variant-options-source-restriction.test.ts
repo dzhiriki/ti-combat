@@ -1,36 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
 import { type SideStateData } from '@/combat'
-import { CombatSideState } from '@/combat/combat-side-state/combat-side-state'
+import { resolveUnitOptions } from '@/combat/abilities-engine/unit-options'
 
-/** Minimal SideStateData where ships participate (including FIGHTER) but the
- *  SETTINGS group `nonFighterShips` is restricted to non-fighter base types.
- *  Lets us drive `getUnitVariantOptions` with each source group independently. */
+/** Minimal SideStateData whose ships keep their native categories,
+ *  FIGHTER included. */
 function makeSide(): SideStateData {
-  const ships = ['CRUISER', 'DESTROYER', 'FIGHTER']
-  const nonFighter = ['CRUISER', 'DESTROYER']
   return {
     participatingUnits: [],
     nonParticipatingUnits: [],
     unitType: {},
     unitState: {},
     unitStats: {},
-    abilities: {
-      SETTINGS: {
-        units: ships,
-        spaceCombatParticipating: ships,
-        groundCombatParticipating: [],
-        ships,
-        groundForces: [],
-        nonFighterShips: nonFighter,
-        structures: [],
-        validTargetsSpaceCannonOffense: [],
-        validTargetsBombardment: [],
-        validTargetsSpaceCannonDefense: [],
-        validTargetsAntiFighterBarrage: [],
-        subtypes: [],
-      },
-    },
+    abilities: {},
     liveAbilities: {},
   } as unknown as SideStateData
 }
@@ -38,18 +20,25 @@ function makeSide(): SideStateData {
 describe('getUnitVariantOptions — source restriction', () => {
   it('includes FIGHTER by default (no source constraint)', () => {
     const side = makeSide()
-    const opts = CombatSideState.getUnitVariantOptions(side, 'SPACE')
+    const opts = resolveUnitOptions(
+      side,
+      { combatMode: 'SPACE', side: 'attacker' },
+      { source: 'SHIPS', scope: 'type' },
+    )
     const values = opts.map(o => o.value)
     expect(values).toContain('FIGHTER')
   })
 
   it('drops base types absent from the supplied sourceBaseTypes list', () => {
     const side = makeSide()
-    const opts = CombatSideState.getUnitVariantOptions(
+    const opts = resolveUnitOptions(
       side,
-      'SPACE',
-      undefined,
-      ['CRUISER', 'DESTROYER'],
+      { combatMode: 'SPACE', side: 'attacker' },
+      {
+        source: 'SHIPS',
+        scope: 'type',
+        filter: { include: ['CRUISER', 'DESTROYER'] },
+      },
     )
     const values = opts.map(o => o.value)
     expect(values).toContain('CRUISER')

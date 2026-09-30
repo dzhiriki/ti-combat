@@ -15,13 +15,17 @@ export const moyinsAshes: Ability = {
       timing: 'WHEN_INDOCTRINATION',
       isCallable: (_params, ctx) => {
         return (
-          ctx.api.own.countUnits('MECH', { includeVariants: true }) <
+          ctx.api.own.system.countUnits('MECH', { includeVariants: true }) <
           UNIT_LIMITS.MECH
         )
       },
       call: (ctx, _params, placedId) => {
+        const surface = ctx.api.own.getUnitSurface(placedId)
         ctx.api.own.removeUnits(placedId)
-        ctx.api.own.placeUnits({ MECH: 1 })
+        ctx.api.own.placeUnits(
+          { MECH: 1 },
+          surface ?? ctx.api.own.getActiveSurfaceId(),
+        )
       },
     },
   ],

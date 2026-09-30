@@ -1,6 +1,9 @@
-import type { CombatSide, UnitType } from '@/types'
+import type { UnitLocator } from '@/types'
+import type { CombatSide } from '@/types'
 
 import type { HitSource, MetaPhase, SideStateData } from '../combat-state/types'
+import { parseUnitLocator } from '../utils/parse-unit-locator'
+import { matchesUnitLocator } from '../utils/unit-locator'
 import { type DiceMathBranch, type PendingHitPool } from './branch-accumulator'
 import { collectModifiers } from './collect-modifiers'
 import { runFastMode } from './fast-mode'
@@ -37,17 +40,9 @@ interface DiceMathInput {
    *  script method), but the dice-shape `ADD_DICE_COUNT` suppression and the
    *  reroll-spec flip apply as if the firer is shooting itself. */
   selfTarget?: boolean
-  /** Per-landing-side meta-level target restriction (only set for
-   *  unit-ability rolls). Becomes the `unitPriority` of a custom entry
-   *  attached to the landing side's hit pool, ordered by `priorityList`. */
-  validTargets: { attacker: UnitType[]; defender: UnitType[] }
-  /** Per-landing-side phase-sacrifice priority — variant keys in
-   *  cheapest-first order. Used to sort `validTargets` into the custom
-   *  entry's `unitPriority`. */
-  priorityList: {
-    attacker: UnitType[] | undefined
-    defender: UnitType[] | undefined
-  }
+  /** Per-raw-landing-side priority for unit-ability hits. Each list defines
+   *  both eligibility and assignment order. Undefined for combat rolls. */
+  unitAbilityPriority?: { attacker: UnitLocator[]; defender: UnitLocator[] }
   sideData: { attacker: SideStateData; defender: SideStateData }
   /** abilityKey → uses available for conditional modifiers / one-shot decls. */
   abilityUses: Map<string, number>
@@ -129,25 +124,15 @@ export function runDiceMath(input: DiceMathInput): DiceMathResult {
   const hvAttacker: HitValueModifierDecl[] = []
   const hvDefender: HitValueModifierDecl[] = []
   for (const m of input.modifiers) {
-    if (m.type !== 'HIT_VALUE') continue
+    if (m.type !== 'HIT_VALUE' || m.unitId) continue
     if (m.side === 'attacker') hvAttacker.push(m)
     else hvDefender.push(m)
   }
   if (hvAttacker.length > 0) {
-    applyStoredHitValueModifiers(
-      dice.attacker,
-      hvAttacker,
-      input.sideData.attacker.unitStats,
-      input.hitSource,
-    )
+    applyStoredHitValueModifiers(dice.attacker, hvAttacker)
   }
   if (hvDefender.length > 0) {
-    applyStoredHitValueModifiers(
-      dice.defender,
-      hvDefender,
-      input.sideData.defender.unitStats,
-      input.hitSource,
-    )
+    applyStoredHitValueModifiers(dice.defender, hvDefender)
   }
 
   if (input.isUnitAbility) {
@@ -167,8 +152,7 @@ export function runDiceMath(input: DiceMathInput): DiceMathResult {
         dice,
         preSplit: split,
         modifiers,
-        validTargets: input.validTargets,
-        priorityList: input.priorityList,
+        unitAbilityPriority: input.unitAbilityPriority,
         meta: input.meta,
         selfTarget,
         collapseThreshold: input.collapseThreshold,
@@ -177,8 +161,7 @@ export function runDiceMath(input: DiceMathInput): DiceMathResult {
         dice,
         preSplit: split,
         modifiers,
-        validTargets: input.validTargets,
-        priorityList: input.priorityList,
+        unitAbilityPriority: input.unitAbilityPriority,
         meta: input.meta,
         selfTarget,
         collapseThreshold: input.collapseThreshold,
@@ -204,10 +187,10 @@ export function runDiceMath(input: DiceMathInput): DiceMathResult {
     selfTarget,
   )
 
-  if (input.meta === 'AFB') {
+  if (input.meta === 'AFB' && input.unitAbilityPriority) {
     branches = applyAfbClamp(
       branches,
-      input.validTargets,
+      input.unitAbilityPriority,
       input.sideData,
       input.skipAfbClampForTarget,
     )
@@ -342,7 +325,7 @@ function markDeclarationUses(
 
 function applyAfbClamp(
   branches: DiceMathBranch[],
-  validTargets: { attacker: UnitType[]; defender: UnitType[] },
+  unitAbilityPriority: { attacker: UnitLocator[]; defender: UnitLocator[] },
   sideData: { attacker: SideStateData; defender: SideStateData },
   skipForTarget: { attacker: boolean; defender: boolean } | undefined,
 ): DiceMathBranch[] {
@@ -351,7 +334,7 @@ function applyAfbClamp(
     out,
     'attacker',
     'defender',
-    validTargets,
+    unitAbilityPriority,
     sideData,
     skipForTarget,
   )
@@ -359,7 +342,7 @@ function applyAfbClamp(
     out,
     'defender',
     'attacker',
-    validTargets,
+    unitAbilityPriority,
     sideData,
     skipForTarget,
   )
@@ -370,13 +353,16 @@ function clampForFiringSide(
   branches: DiceMathBranch[],
   firingSide: CombatSide,
   targetSide: CombatSide,
-  validTargets: { attacker: UnitType[]; defender: UnitType[] },
+  unitAbilityPriority: { attacker: UnitLocator[]; defender: UnitLocator[] },
   sideData: { attacker: SideStateData; defender: SideStateData },
   skipForTarget: { attacker: boolean; defender: boolean } | undefined,
 ): DiceMathBranch[] {
-  if (!isFighterOnlyTargets(validTargets[targetSide])) return branches
+  if (!isFighterOnlyPriority(unitAbilityPriority[targetSide])) return branches
   if (skipForTarget?.[firingSide]) return branches
-  const maxFighters = countParticipatingFighters(sideData[targetSide])
+  const maxFighters = countParticipatingFighters(
+    sideData[targetSide],
+    unitAbilityPriority[targetSide],
+  )
   let any = false
   for (const b of branches) {
     const clamped = clampFighterHitPool(
@@ -391,16 +377,26 @@ function clampForFiringSide(
   return any ? collapseBranches(branches) : branches
 }
 
-function isFighterOnlyTargets(targets: UnitType[]): boolean {
-  return targets.length === 1 && targets[0] === 'FIGHTER'
+function isFighterOnlyPriority(priority: UnitLocator[]): boolean {
+  return (
+    priority.length > 0 &&
+    priority.every(type => parseUnitLocator(type).baseType === 'FIGHTER')
+  )
 }
 
-function countParticipatingFighters(side: SideStateData): number {
+function countParticipatingFighters(
+  side: SideStateData,
+  priority: UnitLocator[],
+): number {
   let n = 0
   for (const id of side.participatingUnits) {
     const t = side.unitType[id]
     if (!t) continue
-    if (t === 'FIGHTER' || t.startsWith('FIGHTER:')) n++
+    if (
+      (t === 'FIGHTER' || t.startsWith('FIGHTER:')) &&
+      priority.some(target => matchesUnitLocator(side, id, target, true))
+    )
+      n++
   }
   return n
 }

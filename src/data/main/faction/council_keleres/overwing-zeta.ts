@@ -24,6 +24,7 @@ export const overwingZeta: Ability<Params> = {
     uses: 1,
     strategy: 'IMMEDIATELY',
     ships: declareParam({
+      scope: 'type',
       // Default to the on-card maximum — the flagship plus 2 cruisers — so
       // enabling the card does something without further configuration.
       // Shared by the TF paradigm rebrand (Artemiris Ascendant).
@@ -31,7 +32,7 @@ export const overwingZeta: Ability<Params> = {
         ['FLAGSHIP', 1],
         ['CRUISER', 2],
       ],
-      source: 'ships',
+      source: 'SHIPS',
       defaultItemValue: 0,
       filter: {
         include: ['FLAGSHIP', 'CRUISER', 'DESTROYER'],
@@ -56,10 +57,10 @@ export const overwingZeta: Ability<Params> = {
 
           // Sum current fleet pool cost
           let currentCost = 0
-          for (const baseType of ctx.api.own.getActiveBaseTypes()) {
+          for (const baseType of ctx.api.own.participating.getUnitTypes()) {
             const stats = ctx.api.own.getUnitStats(baseType)
             if (typeof stats?.FLEET_POOL_COST !== 'number') continue
-            const count = ctx.api.own.countUnits(baseType, {
+            const count = ctx.api.own.participating.countUnits(baseType, {
               includeVariants: true,
             })
             currentCost += count * stats.FLEET_POOL_COST

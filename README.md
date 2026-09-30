@@ -45,7 +45,7 @@ src/
   types/           shared type definitions
 functions/         Cloudflare Pages Functions (URL shortener)
 docs/              architecture and contribution guides
-tests/             ability, snapshot, and profiling tests
+tests/             ability, snapshot, and benchmark tests
 ```
 
 ## Testing
@@ -55,8 +55,18 @@ npm run test            # unit/ability tests (watch mode)
 npm run test:run        # single run
 npm run test:shuffle    # re-run with shuffled order to catch ordering bugs
 npm run test:snapshots  # snapshot tests
-npm run profile         # performance profiling
+npm run bench           # compare performance against HEAD (or: -- <ref>)
 ```
+
+`npm run bench` doesn't use stored baselines, because timings depend on the
+machine. It extracts `src/` of the base ref, bundles it and the working tree
+with the same harness from `tests/bench/`, and runs them in alternating rounds.
+Only the per-round head/base ratio is reported. A scenario counts as slower or
+faster only if the change exceeds `--threshold` (default 5%) and its 90%
+confidence interval excludes zero. In CI, pushes to `main` are compared with
+where `main` pointed before the push. Other branches and pull requests are
+compared with the commit they forked from `main`. See `npm run bench -- --help`
+for options.
 
 Because results are computed by exact enumeration rather than sampling, tests
 assert precise probabilities — there is no statistical flakiness to retry

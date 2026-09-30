@@ -6,12 +6,13 @@ import { Input } from '@/components/ui/input'
 
 import styles from './unit-controls.module.css'
 
-interface UnitControlsProps {
+export interface UnitControlsProps {
   count: number
   upgraded: boolean
   hasUpgrade: boolean
   limit: number
   flipped?: boolean
+  disabled?: boolean
   onCountChange: (count: number) => void
   onUpgradeToggle: () => void
   className?: string
@@ -23,6 +24,7 @@ export function UnitControls({
   hasUpgrade,
   limit,
   flipped,
+  disabled,
   onCountChange,
   onUpgradeToggle,
   className,
@@ -45,6 +47,7 @@ export function UnitControls({
               upgraded && styles.upgradeButton_active,
             )}
             onClick={onUpgradeToggle}
+            disabled={disabled}
             title={upgraded ? 'Upgraded' : 'Click to upgrade'}
           >
             <ArrowUpIcon className={styles.upgradeIcon} />
@@ -53,7 +56,7 @@ export function UnitControls({
       </div>
       <ButtonIcon
         onClick={() => onCountChange(Math.max(0, count - 1))}
-        disabled={count === 0}
+        disabled={disabled || count === 0}
         tabIndex={-1}
       >
         <MinusIcon />
@@ -66,12 +69,13 @@ export function UnitControls({
           max={limit}
           onChange={onCountChange}
           steppers={false}
+          disabled={disabled}
         />
       </div>
 
       <ButtonIcon
         onClick={() => onCountChange(count + 1)}
-        disabled={atLimit}
+        disabled={disabled || atLimit}
         tabIndex={-1}
       >
         <PlusIcon />

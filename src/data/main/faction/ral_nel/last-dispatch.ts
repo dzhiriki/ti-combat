@@ -1,5 +1,5 @@
 import { type Ability, type AbilityReadContext, declareParam } from '@/combat'
-import type { UnitId, UnitList, UnitType } from '@/types'
+import type { UnitId, UnitList } from '@/types'
 
 type Params = {
   targetPriority: UnitList<boolean>
@@ -16,10 +16,11 @@ export const lastDispatch: Ability<Params> = {
     uses: Infinity,
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'opponent',
       sort: 'worth-desc',
       defaultItemValue: true,
+      filter: { combatMode: 'SPACE' },
     }),
   },
   headerUI: 'isEnabled',
@@ -30,20 +31,14 @@ export const lastDispatch: Ability<Params> = {
         if (unitId !== ctx.getUnit()) return false
 
         // Check there's at least 1 eligible opponent ship
-        const { ships } = ctx.api.opponent.getAbilityConfig('SETTINGS')
-        for (const shipType of ships) {
-          const ids = ctx.api.opponent.getUnits(shipType as UnitType, {
-            includeVariants: true,
-          })
-          for (const id of ids) {
-            if (isEligibleTarget(ctx, id)) return true
-          }
+        for (const id of ctx.api.opponent.participating.getUnits()) {
+          if (isEligibleTarget(ctx, id)) return true
         }
         return false
       },
       call: (ctx, params) => {
         for (const variantId of ctx.utils.getFlat(params.targetPriority)) {
-          const ids = ctx.api.opponent.getUnits(variantId, {
+          const ids = ctx.api.opponent.participating.getUnits(variantId, {
             includeVariants: true,
           })
           for (const id of ids) {
@@ -73,8 +68,5 @@ function isEligibleTarget(ctx: AbilityReadContext, unitId: UnitId) {
   // Has sustain in stats, but check if it's been restricted (lost/disabled)
   const variantKey = ctx.api.opponent.getUnitVariantKey(unitId)
   if (!variantKey) return false
-  return (
-    ctx.api.opponent.isUnitAbilityLost('SUSTAIN_DAMAGE', variantKey) ||
-    ctx.api.opponent.isUnitAbilityCannotBeUsed('SUSTAIN_DAMAGE', variantKey)
-  )
+  return ctx.api.opponent.isUnitAbilityDisabled('SUSTAIN_DAMAGE', unitId)
 }

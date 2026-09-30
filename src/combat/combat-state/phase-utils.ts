@@ -54,3 +54,8 @@ export function getInitialMetaPhase(mode: CombatMode): MetaPhase {
 export function isCombatMeta(meta: MetaPhase): boolean {
   return meta === 'SPACE_COMBAT' || meta === 'GROUND_COMBAT'
 }
+
+/** The looping combat meta of a combat mode. */
+export function getCombatMeta(mode: CombatMode): MetaPhase {
+  return mode === 'SPACE' ? 'SPACE_COMBAT' : 'GROUND_COMBAT'
+}

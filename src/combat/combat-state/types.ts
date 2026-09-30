@@ -3,17 +3,21 @@ import type {
   CombatSide,
   UnitAbility,
   UnitBaseType,
+  UnitId,
   UnitIdList,
   UnitState,
   UnitStats,
   UnitType,
+  UnitLocator,
 } from '@/types'
+import type { SurfaceDefinition, SurfaceId } from '@/types'
 
 import type {
   AbilitiesOverride,
   AbilityPassFrame,
   AbilityTiming,
 } from '../abilities-engine'
+import type { SideOptionMetadata } from '../abilities-engine/types'
 import type { HitsDist } from '../dice-math/reroll-strategy'
 import type { ModifierDecl } from '../dice-math/types'
 // `PhaseStep` references `CombatState` in its method `fn` signature; the
@@ -86,21 +90,23 @@ export type PhaseMarker = 'START' | 'DICE_ROLL' | 'ASSIGN_HITS' | 'END'
 export interface CustomHitPool {
   key: string
   base: number
-  unitPriority: UnitType[]
+  unitPriority: UnitLocator[]
 }
 
 /** A pool of unassigned hits.
  *  `base` = from dice rolls; `additional` = from abilities.
  *  X-89-style hit doubling only doubles `base`.
- *  The main pool (`base` + `additional`) is always unrestricted — it
- *  drains by tail-slice on the side's pre-sorted `participatingUnits`.
- *  All target-restricted hits live in `custom` entries, each carrying
- *  its own `unitPriority`. Custom entries drain after the main pool,
- *  in declaration order. */
+ *  `unitAbilityTargets`, when present, belongs to the assignment phase and
+ *  applies to the main pool and every custom entry. Custom entries
+ *  additionally carry their own `unitPriority` and drain after the main
+ *  pool, in declaration order. */
 export interface HitPool {
   base: number
   additional: number
   custom: CustomHitPool[]
+  /** Set for unit-ability hits: only units matching one of these locators
+   *  and not `UNIT_ABILITY_HIT_IMMUNE` may be assigned them. */
+  unitAbilityTargets?: readonly UnitLocator[]
 }
 
 /** A single restriction entry explaining why an ability is restricted */
@@ -108,6 +114,8 @@ export interface RestrictionEntry {
   reason: string
   unitType?: UnitBaseType
   category?: UnitCategory
+  /** Omitted restrictions apply globally. */
+  surfaceId?: SurfaceId
 }
 
 /** "This unit type ignores every restriction coming from `reason`."
@@ -127,13 +135,14 @@ export interface UnitAbilityRestrictions {
   immune?: RestrictionImmunity[]
 }
 
-/** Resolved form of `UnitAbilityRestrictions`, derived from the raw
- *  entries + current unit composition + live SETTINGS. Stored per layer
- *  per ability: either `'ALL'` (blanket restriction, applies to every
- *  unit type) or a `Set` of restricted variant keys / base types.
- *  Lookup is O(1) — built lazily on first read after any mutation
- *  that could affect restriction outcomes. */
-export type ResolvedRestrictionsLayer = Map<UnitAbility, Set<UnitType> | 'ALL'>
+/** Resolved form of `UnitAbilityRestrictions`, derived from the raw entries,
+ *  current unit composition, category membership and (for surface-scoped
+ *  entries) unit location. Per layer per ability: either `'ALL'` (blanket)
+ *  or the restricted variant keys, base types and unit ids. */
+export type ResolvedRestrictionsLayer = Map<
+  UnitAbility,
+  Set<UnitType | UnitId> | 'ALL'
+>
 export interface ResolvedRestrictions {
   cannotBeUsed: ResolvedRestrictionsLayer
   lost: ResolvedRestrictionsLayer
@@ -145,9 +154,22 @@ export type UnitStatsEntry = UnitStats | ((parentStats: UnitStats) => UnitStats)
 /** Ability configuration for one side (key → params). */
 export type SideAbilitiesConfig = Record<string, Record<string, unknown>>
 
+/** `unitMetaHash` result with the inputs it was built from. */
+export interface UnitMetaHashCache {
+  unitSurface: SideStateData['unitSurface']
+  unitStats: SideStateData['unitStats']
+  unitGrants: SideStateData['unitGrants']
+  activeSurfaceId: SurfaceId
+  value: string
+}
+
 /** State data for one side of combat */
 export interface SideStateData {
   faction: string
+
+  /** Unit location. Retains the last location of destroyed ids so destroy
+   *  reactions can still inspect where their source was. */
+  unitSurface: Record<string, SurfaceId>
   /** Participating UnitIds packed into a `UnitIdList` (one UTF-16 char
    *  per UnitId), pre-sorted by combat-mode priority. Highest priority
    *  first, lowest last. `slice(0, -N)` keeps the N highest-priority
@@ -167,8 +189,14 @@ export interface SideStateData {
   unitType: Record<string, UnitType>
   /** UnitId → per-unit mutable state (flat map, sparse — only entries with non-default state) */
   unitState: Record<string, UnitState>
+  /** Sparse, copy-on-write category grants: the unit counts as a member of
+   *  that category (Alastor's and Z-Grav Eidolon's ships, committed
+   *  fighters). Retained for destroy reactions. */
+  unitGrants?: Readonly<Record<string, UnitCategory>>
   /** Variant key → shared stats template (may be a factory for subtypes) */
   unitStats: Record<UnitType, UnitStatsEntry>
+  /** Setup option metadata; only option lists read it. */
+  optionMetadata?: SideOptionMetadata
   /** The side's pending hit pool, or undefined when no hits are queued.
    *  At most one pool is alive at a time; abilities that produce
    *  type-restricted hits via `addHits(n, types)` must do so when the
@@ -197,10 +225,14 @@ export interface SideStateData {
    *  with another SideStateData; mutations must clone first via
    *  `ensureHitPoolOwned`. */
   _hitPoolShared?: boolean
+  /** Cached location/category/grant segment of the state hash
+   *  (`unitMetaHash`), valid while its copy-on-write inputs are unchanged. */
+  _metaHash?: UnitMetaHashCache
+
   /** Derived O(1) lookup cache for `unitAbilityRestrictions`, rebuilt
    *  lazily on first read after any mutation that could affect
    *  restriction outcomes (entries added/removed, unit composition
-   *  change, SETTINGS live-param change, or cross-side restriction
+   *  change, live-param change, or cross-side restriction
    *  change that affects source-disable cascades). Not serialized;
    *  always derivable from the raw fields. */
   _resolvedRestrictions?: ResolvedRestrictions
@@ -262,9 +294,10 @@ export type PendingStep = PhaseStep | PhaseStepGroup
 
 /** Group context for a dice-roll group (combat or unit-ability).
  *  Seeded by the group builder with invariant params; `_collectDice`
- *  populates `diceCollection` / `unitIndex` / `validTargets`; BEFORE
- *  timing abilities read/mutate the collection via the SideApi (no direct
- *  pool access); `_rollDice` hands the collection to the math kernel. */
+ *  populates `diceCollection`; BEFORE timing abilities read/mutate the
+ *  collection via the SideApi (no direct pool access); `_rollDice` resolves
+ *  each firing side's unit-ability priority and hands both to the math
+ *  kernel. */
 export interface DiceRollContext {
   hitSource: HitSource
   firing: CombatSide[]
@@ -277,7 +310,8 @@ export interface DiceRollContext {
     attacker: import('../dice-math/types').SideDiceCollection
     defender: import('../dice-math/types').SideDiceCollection
   }
-  allowedUnitTypes?: ReadonlySet<UnitBaseType>
+  /** Restrict dice-producing units to this physical surface. */
+  sourceSurfaceId?: SurfaceId
   isUnitAbility: boolean
   /** Per-side dice collection in the kernel-native format. Populated by
    *  `_collectDice`; mutated in place by BEFORE-timing API calls. */
@@ -285,7 +319,6 @@ export interface DiceRollContext {
     attacker: import('../dice-math/types').SideDiceCollection
     defender: import('../dice-math/types').SideDiceCollection
   }
-  validTargets?: { attacker: UnitType[]; defender: UnitType[] }
   /** Per-landing-side marginal of main base hits, captured by
    *  `_branchesFromMathKernel` after the math kernel runs. Read at
    *  AFTER_DICE_ROLL_STEP by abilities that gate on the realized roll's
@@ -320,15 +353,20 @@ export interface CombatStateData {
   attacker: SideStateData
   defender: SideStateData
   combatMode: CombatMode
-  /** The side that won, or 'draw'. Set whenever a side is wiped (via
-   *  `_removeOne` or `_postAssignHits`) or via an ability's `transitionTo`.
-   *  Guaranteed to be defined whenever `isFinished` is true — combat
-   *  cannot complete without it (the completion script is only pushed by
-   *  `_triggerCompletion`, which sets this if it isn't already set). */
+  surfaces: SurfaceDefinition[]
+  /** Space for SPACE mode, or the planet whose invasion is being resolved. */
+  activeSurfaceId: SurfaceId
+  /** The scheduler's current meta, set when its script loads; undefined
+   *  during PREPARE. Nested metas (AFB) keep the enclosing combat's. Selects
+   *  the phase-scoped `CATEGORIES` entries that apply. */
+  meta?: MetaPhase
+  /** The side that won, or 'draw'. Derived when the ordered phase flow is
+   *  exhausted, or pinned earlier by an explicit `transitionTo`. Guaranteed
+   *  to be defined whenever `isFinished` is true. */
   winnerSide?: CombatSide | 'draw'
-  /** True once combat has completed — set by `_setComplete` after the
-   *  END_OF_COMBAT / CLEANUP_ROUND / CLEANUP timings run. Engine/test
-   *  harness check this instead of reading the (now-removed) `currentPhase`. */
+  /** True once combat has completed — set after the END_OF_COMBAT / CLEANUP
+   *  timings run. Engine/test harness check this instead of reading the
+   *  (now-removed) `currentPhase`. */
   isFinished?: boolean
   /** Next codepoint to mint as a `UnitId` when either side places new
    *  units. Shared across both sides so cross-side IDs never collide,

@@ -41,6 +41,7 @@ export const clan_of_saar: Faction = {
         DESCRIPTION:
           'This unit is placed in a space area instead of on a planet. This unit can move and retreat as if it were a ship. If this unit is blockaded, it is destroyed.',
         MOVE: 1,
+        ALLOWED_SURFACES: ['SPACE'],
         CAPACITY: 4,
         UNIT_ABILITIES: {
           PRODUCTION: 5,
@@ -51,6 +52,7 @@ export const clan_of_saar: Faction = {
         DESCRIPTION:
           'This unit is placed in a space area instead of on a planet. This unit can move and retreat as if it were a ship. If this unit is blockaded, it is destroyed.',
         MOVE: 2,
+        ALLOWED_SURFACES: ['SPACE'],
         CAPACITY: 5,
         UNIT_ABILITIES: {
           PRODUCTION: 7,

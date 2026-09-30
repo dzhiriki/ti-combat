@@ -3,16 +3,19 @@ import type { Precision } from '@/hooks/use-settings'
 import type {
   CombatSide,
   GameSystem,
-  UnitBaseType,
-  UnitSelection,
+  SurfaceDefinition,
+  SurfaceId,
+  SideUnitPlacements,
 } from '@/types'
 
 export interface SimulationInput {
   system: GameSystem
   attackerFaction: string
   defenderFaction: string
-  attackerSelections: Record<UnitBaseType, UnitSelection>
-  defenderSelections: Record<UnitBaseType, UnitSelection>
+  surfaces: SurfaceDefinition[]
+  activeSurfaceId: SurfaceId
+  attackerPlacements: SideUnitPlacements
+  defenderPlacements: SideUnitPlacements
   combatMode: CombatMode
   abilities: Record<CombatSide, SideAbilitiesConfig>
   /** Optional. When omitted, the simulation runs at full precision (no

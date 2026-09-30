@@ -2,12 +2,14 @@ import type { UnitCategory } from '@/constants/units'
 import type {
   CombatSide,
   DiceGroup,
+  SurfaceId,
   UnitAbility,
   UnitBaseType,
   UnitId,
   UnitState,
   UnitStats,
   UnitType,
+  UnitLocator,
   UnitVariantId,
 } from '@/types'
 
@@ -26,7 +28,6 @@ import type {
   CombatMode,
   CombatStateData,
   DiceRollContext,
-  HitSource,
   MetaPhase,
   PendingStep,
   SideStateData,
@@ -47,24 +48,32 @@ import type {
 import { getDiceOutcomes } from '../../dice-math/utils/get-dice-outcomes'
 import type { Logger } from '../../logger'
 import { canonicalizeUnitState } from '../../utils/canonicalize-unit-state'
+import { parseUnitLocator } from '../../utils/parse-unit-locator'
+import {
+  isNativeCategory,
+  isUnitCategory,
+} from '../../utils/unit-combat-properties'
+import { matchesUnitList, matchesUnitLocator } from '../../utils/unit-locator'
 import type {
   AbilitiesEngine,
   AbilityCandidate,
   InvokeCollections,
 } from '../abilities-engine'
 import type { DeclaredParamValue } from '../declare-param'
-import { isDeclaredParam } from '../declare-param'
-import { resolveVariantLimit } from '../param-limit'
+import { extractDefaults, isDeclaredParam } from '../declare-param'
+import type { UnitOption } from '../types'
 import type {
   AbilitiesOverride,
   Ability,
   AbilityBaseParams,
+  AbilityCallContext,
   AbilityLookupContext,
   AbilityTiming,
   OwnOpponentContext,
   ParamFilter,
   RuntimeAbilityList,
 } from '../types'
+import { resolveUnitOptions } from '../unit-options'
 import { type AbilityUtils, abilityUtils } from './ability-utils'
 import { enforceFleetPool } from './enforce-fleet-pool'
 
@@ -94,37 +103,95 @@ export class AbilityBranchInterrupt {
   }
 }
 
-// ============================================================================
-// PARTICIPATION RESYNC
-// ============================================================================
+export interface UnitQueryOptions {
+  /** Let a plain type also match its subtype variants. */
+  includeVariants?: boolean
+}
 
-/** Keys whose changes alter which base types participate in the
- *  current combat mode. Only `updateAbilityConfig` writes that touch
- *  these trigger a participating/non-participating re-split. */
-const SETTINGS_PARTICIPATION_KEYS = new Set([
-  'ships',
-  'groundForces',
-  'spaceCombatParticipating',
-  'groundCombatParticipating',
-])
-const UNIT_PRIORITY_PARTICIPATION_KEYS = new Set([
-  'spaceUnitPriority',
-  'groundUnitPriority',
-])
+export interface FindUnitOptions extends UnitQueryOptions {
+  predicate?: FindUnitPredicate
+}
 
-function affectsParticipating(
-  abilityKey: string,
-  updatedKeys: readonly string[],
-): boolean {
-  const set =
-    abilityKey === 'SETTINGS'
-      ? SETTINGS_PARTICIPATION_KEYS
-      : abilityKey === 'UNIT_PRIORITY'
-        ? UNIT_PRIORITY_PARTICIPATION_KEYS
-        : undefined
-  if (!set) return false
-  for (const k of updatedKeys) if (set.has(k)) return true
-  return false
+export interface FindUnitsOptions extends FindUnitOptions {
+  amount: number
+}
+
+/** Which units a `UnitQuery` sees: every living unit in the system, those
+ *  on the active combat surface, or the combat participants on any surface. */
+export type UnitQueryScope = 'system' | 'surface' | 'participating'
+
+export class UnitQuery {
+  private readonly side: CombatSide
+  private readonly ctx: AbilityContext
+  private readonly scope: UnitQueryScope
+
+  constructor(side: CombatSide, ctx: AbilityContext, scope: UnitQueryScope) {
+    this.side = side
+    this.ctx = ctx
+    this.scope = scope
+  }
+
+  private get sideData(): SideStateData {
+    return this.ctx.state[this.side]
+  }
+
+  private options<T extends UnitQueryOptions>(options: T): T & GetUnitsOptions {
+    if (this.scope === 'surface')
+      return { ...options, surfaceId: this.ctx.state.activeSurfaceId }
+    if (this.scope === 'participating')
+      return { ...options, participatingOnly: true }
+    return options
+  }
+
+  /** Omit `unitType` for every unit in scope. */
+  getUnits(unitType?: UnitLocator, options: UnitQueryOptions = {}): UnitId[] {
+    return CombatSideState.getUnits(
+      this.sideData,
+      unitType,
+      this.options(options),
+    )
+  }
+
+  hasUnitType(unitType: UnitLocator, options: UnitQueryOptions = {}): boolean {
+    return this.countUnits(unitType, options) > 0
+  }
+
+  countUnits(
+    filter?: UnitLocator | UnitLocator[],
+    options: UnitQueryOptions = {},
+  ): number {
+    return CombatSideState.countUnits(
+      this.sideData,
+      filter,
+      this.options(options),
+    )
+  }
+
+  findUnitByPriority(
+    priority: UnitLocator[],
+    options: FindUnitsOptions,
+  ): UnitId[]
+  findUnitByPriority(
+    priority: UnitLocator[],
+    options?: FindUnitOptions,
+  ): UnitId | undefined
+  findUnitByPriority(
+    priority: UnitLocator[],
+    options: FindUnitOptions | FindUnitsOptions = {},
+  ): UnitId | UnitId[] | undefined {
+    return CombatSideState.findUnitByPriority(
+      this.sideData,
+      priority,
+      this.options(options),
+    )
+  }
+
+  getUnitTypes(): UnitBaseType[] {
+    return CombatSideState.getActiveBaseTypes(
+      this.sideData,
+      this.options({ includeVariants: false }),
+    )
+  }
 }
 
 // ============================================================================
@@ -134,12 +201,21 @@ function affectsParticipating(
 export class SideApi {
   private _side: CombatSide
   private _ctx!: AbilityContext
+  /** All alive units in the active system, across every surface. */
+  readonly system: UnitQuery
+  /** Alive units physically located on the current combat surface. */
+  readonly surface: UnitQuery
+  /** Units in the derived combat-participant pool, regardless of surface. */
+  readonly participating: UnitQuery
   _abilityKey?: string
   _abilitiesParams?: AbilitiesEngine
 
   constructor(side: CombatSide, ctx: AbilityContext) {
     this._side = side
     this._ctx = ctx
+    this.system = new UnitQuery(side, ctx, 'system')
+    this.surface = new UnitQuery(side, ctx, 'surface')
+    this.participating = new UnitQuery(side, ctx, 'participating')
   }
 
   private get _sideData(): SideStateData {
@@ -161,84 +237,93 @@ export class SideApi {
     return this.state.combatMode
   }
 
-  getUnits(unitType: UnitType, options: GetUnitsOptions) {
-    return CombatSideState.getUnits(this._sideData, unitType, options)
+  getActiveSurfaceId(): SurfaceId {
+    return this.state.activeSurfaceId!
+  }
+
+  getUnitSurface(unitId: UnitId): SurfaceId | undefined {
+    return this._sideData.unitSurface[unitId]
+  }
+
+  isParticipating(unitId: UnitId): boolean {
+    return this._sideData.participatingUnits.includes(unitId)
+  }
+
+  /** The ids count as `category` members for the rest of the combat
+   *  (Alastor's ground forces and Z-Grav Eidolon's mechs in space fight as
+   *  ships; committed fighters as ground forces). */
+  grantCategory(ids: UnitId | readonly UnitId[], category: UnitCategory): void {
+    CombatSideState.grantCategory(
+      this._sideData,
+      typeof ids === 'string' ? [ids] : ids,
+      category,
+    )
+    const combat = this._abilitiesParams?.combatState
+    combat?.resyncParticipating(this._side)
+    combat?.queuePhaseEndCheck(this._ctx.phaseStack ?? [])
+  }
+
+  /** Membership during the current meta (phase-scoped categories included). */
+  isUnitCategory(id: UnitId, category: UnitCategory): boolean {
+    return isUnitCategory(this._sideData, id, category, this.state.meta)
+  }
+
+  /** Native membership for production/reinforcement choices. */
+  isUnitTypeCategory(type: UnitType, category: UnitCategory): boolean {
+    return isNativeCategory(this._sideData, type, category, this.state.meta)
+  }
+
+  canAssignHitToUnit(id: UnitId): boolean {
+    return CombatSideState.canAssignHitToUnit(this._sideData, id)
   }
 
   hasUnit(unitId: UnitId) {
     return CombatSideState.hasUnit(this._sideData, unitId)
   }
 
-  hasUnitType(unitType: UnitType, options: GetUnitsOptions) {
-    return CombatSideState.hasUnitType(this._sideData, unitType, options)
-  }
-
-  countUnits(
-    filter: UnitType | UnitType[] | undefined,
-    options: GetUnitsOptions,
-  ) {
-    return CombatSideState.countUnits(this._sideData, filter, options)
-  }
-
   getPendingHits(filter?: { base?: true; bonus?: true }) {
     return CombatSideState.getPendingHits(this._sideData, filter)
   }
 
-  getHitPoolValidTargets() {
-    return CombatSideState.getHitPoolValidTargets(this._sideData)
-  }
-
-  getActiveBaseTypes() {
-    return CombatSideState.getActiveBaseTypes(this._sideData)
-  }
-
-  getParticipatingUnitTypes(options?: { combatMode?: CombatMode }) {
-    return CombatSideState.getParticipatingUnitTypes(
-      this._sideData,
-      options?.combatMode ?? this.state.combatMode,
-    )
-  }
-
-  getUnitVariantsOptions(filter?: ParamFilter): {
-    label: string
-    value: UnitType
-  }[]
-  getUnitVariantsOptions(paramKey: string): {
-    label: string
-    value: UnitType
-    max?: number
-  }[]
-  getUnitVariantsOptions(arg?: ParamFilter | string) {
+  getUnitVariantsOptions(filter?: ParamFilter): UnitOption[]
+  getUnitVariantsOptions(paramKey: string): UnitOption[]
+  getUnitVariantsOptions(arg?: ParamFilter | string): UnitOption[] {
+    const abilityKey = this._ctx.ability?.key
     if (typeof arg === 'string') {
       const declared = this._resolveDeclaredParam(arg)
-      const filter = declared?.filter
-      const sourceBaseTypes = declared?.source
-        ? (CombatSideState.getLiveParams(this._sideData, 'SETTINGS')?.[
-            declared.source
-          ] as readonly UnitBaseType[] | undefined)
-        : undefined
-      const items = CombatSideState.getUnitVariantOptions(
-        this._sideData,
-        this.state.combatMode,
-        filter,
-        sourceBaseTypes,
-      )
-      if (!declared?.limit) return items
-      const limit = declared.limit
-      const s = this._sideData
-      const withMax = items.map(item => ({
-        ...item,
-        max: resolveVariantLimit(limit, s, item.value),
-      }))
-      return declared.filter?.includeOnlyAvailable
-        ? withMax.filter(item => item.max > 0)
-        : withMax
+      if (declared?.source)
+        return resolveUnitOptions(
+          this._sideData,
+          { ...this.state, side: this._side },
+          { ...declared, source: declared.source, abilityKey },
+        )
     }
-    return CombatSideState.getUnitVariantOptions(
+    return resolveUnitOptions(
       this._sideData,
-      this.state.combatMode,
-      arg,
+      { ...this.state, side: this._side },
+      {
+        source: this.state.combatMode === 'GROUND' ? 'GROUND_FORCES' : 'SHIPS',
+        scope: 'type',
+        filter: typeof arg === 'string' ? undefined : arg,
+        abilityKey,
+      },
     )
+  }
+
+  /** Works for retained metadata on destroyed units as well as living units. */
+  matchesUnitLocator(id: UnitId, target: UnitLocator): boolean {
+    return matchesUnitLocator(this._sideData, id, target)
+  }
+
+  /** Whether the unit matches any enabled entry of a `UnitList` param
+   *  (entries disabled via `false`/`0` are skipped, as in `getFlat`).
+   *  The list is compiled once per list object, so prefer this over
+   *  `getFlat(list).some(...)` in per-unit `isCallable` guards. */
+  matchesUnitList(
+    id: UnitId,
+    list: readonly (readonly [UnitLocator, ...unknown[]])[],
+  ): boolean {
+    return matchesUnitList(this._sideData, id, list)
   }
 
   /** Look up the wrapped `DeclaredParamValue` for `paramKey` on the running
@@ -255,51 +340,21 @@ export class SideApi {
     return raw as DeclaredParamValue<unknown>
   }
 
-  findUnitByPriority(
-    priority: UnitType[],
-    options: GetUnitsOptions & { predicate?: FindUnitPredicate },
-  ): UnitId | undefined
-  findUnitByPriority(
-    priority: UnitType[],
-    options: GetUnitsOptions & {
-      amount: number
-      predicate?: FindUnitPredicate
-    },
-  ): UnitId[]
-  findUnitByPriority(
-    priority: UnitType[],
-    options: GetUnitsOptions & {
-      amount?: number
-      predicate?: FindUnitPredicate
-    },
-  ): UnitId | UnitId[] | undefined {
-    const participating = new Set(
-      CombatSideState.getParticipatingUnitTypes(
-        this._sideData,
-        this.state.combatMode,
-      ),
-    )
-    return CombatSideState.findUnitByPriority(
-      this._sideData,
-      priority,
-      participating,
-      options,
-    )
-  }
-
-  /** Simulate resolving N unrestricted hits against this side's current
-   *  units — returns the UnitIds that would be destroyed, in sacrifice
-   *  order. Non-destructive. */
-  getAssignHitsTargets(hits: number): UnitId[] {
-    const dirty = this._sideData._needsCanonicalize
-    if (dirty) {
-      canonicalizeUnitState(this._sideData, dirty)
-    }
-    return CombatSideState.getAssignHitsTargets(this._sideData, hits)
-  }
-
   getUnitStats(unitTypeOrId: string | UnitId) {
-    return CombatSideState.getUnitStats(this._sideData, unitTypeOrId)
+    return CombatSideState.getUnitStats(
+      this._sideData,
+      unitTypeOrId.startsWith('@')
+        ? parseUnitLocator(unitTypeOrId).unitType
+        : unitTypeOrId,
+    )
+  }
+
+  /** Variant keys whose current stats carry the ability `abilityKey`, e.g.
+   *  `ctx.api.own.getUnitTypesWithAbility(ctx.this.key)`. Setup applies no
+   *  PREPARE or declared changes to these stats; build setup lists with
+   *  `filter.withAbility`, which reads the stand-ins. */
+  getUnitTypesWithAbility(abilityKey: string): UnitType[] {
+    return CombatSideState.getUnitTypesWithAbility(this._sideData, abilityKey)
   }
 
   getUnitVariantKey(unitId: UnitId) {
@@ -314,23 +369,33 @@ export class SideApi {
     return CombatSideState.getUnitBaseType(this._sideData, unitId)
   }
 
-  isUnitAbilityLost(ability: UnitAbility, unitType: UnitType) {
+  isUnitAbilityLost(ability: UnitAbility, unitId: UnitId) {
     return CombatSideState.isRestricted(
       this.state,
       this._side,
       'lost',
       ability,
-      unitType,
+      unitId,
     )
   }
 
-  isUnitAbilityCannotBeUsed(ability: UnitAbility, unitType: UnitType) {
+  isUnitAbilityCannotBeUsed(ability: UnitAbility, unitId: UnitId) {
     return CombatSideState.isRestricted(
       this.state,
       this._side,
       'cannotBeUsed',
       ability,
-      unitType,
+      unitId,
+    )
+  }
+
+  /** Lost or cannot be used. */
+  isUnitAbilityDisabled(ability: UnitAbility, unitId: UnitId) {
+    return CombatSideState.isUnitAbilityDisabled(
+      this.state,
+      this._side,
+      ability,
+      unitId,
     )
   }
 
@@ -341,29 +406,24 @@ export class SideApi {
     return CombatSideState.getLiveParams(this._sideData, key)
   }
 
+  /** Participants that `hits` would destroy, in pool order (the most
+   *  protected first). */
+  getAssignHitsTargets(hits: number): UnitId[] {
+    const s = this._sideData
+    const dirty = s._needsCanonicalize
+    if (dirty) canonicalizeUnitState(s, dirty)
+    return CombatSideState.getAssignHitsTargets(s, hits)
+  }
+
   /** Destroy one or more units and fire DESTROY/WHEN_DESTROY/AFTER_DESTROY
    *  exactly once for the combined set (simultaneous destruction). */
-  destroyUnits(target: UnitBaseType | UnitId | UnitId[]): void {
+  destroyUnits(target: UnitId | UnitId[]): void {
     const s = this._sideData
     const destroyed: UnitId[] = []
 
-    if (target === undefined) {
-      return
-    } else if (Array.isArray(target)) {
-      for (const id of target) {
-        if (!CombatSideState.findVariantKey(s, id)) continue
-        destroyed.push(id)
-      }
-    } else if (target.length > 1) {
-      // UnitId is a single-char packed token; UnitBaseType is a
-      // multi-char tag like "CRUISER". Distinguish by length.
-      const found = CombatSideState.findFirstUnitId(s, target as UnitBaseType)
-      if (!found) return
-      destroyed.push(found.unitId)
-    } else {
-      const unitId = target as UnitId
-      if (!CombatSideState.findVariantKey(s, unitId)) return
-      destroyed.push(unitId)
+    if (target === undefined) return
+    for (const id of Array.isArray(target) ? target : [target]) {
+      if (CombatSideState.findVariantKey(s, id)) destroyed.push(id)
     }
 
     if (destroyed.length === 0) return
@@ -378,8 +438,9 @@ export class SideApi {
     }
 
     CombatSideState.removeUnits(s, destroyed)
-    const combatState = this._abilitiesParams?.combatState
-    combatState?.queueCompletionCheck(this._ctx.phaseStack ?? [])
+    this._abilitiesParams?.combatState.queuePhaseEndCheck(
+      this._ctx.phaseStack ?? [],
+    )
 
     if (this._abilitiesParams) {
       this._ctx.runDestroyAbilities(destroyed)
@@ -415,20 +476,23 @@ export class SideApi {
     }
   }
 
-  removeUnits(target: UnitBaseType | UnitId | UnitId[]): void {
+  removeUnits(target: UnitId | UnitId[]): void {
     CombatSideState.removeUnits(this._sideData, target)
-    const combatState = this._abilitiesParams?.combatState
-    combatState?.queueCompletionCheck(this._ctx.phaseStack ?? [])
+    this._abilitiesParams?.combatState.queuePhaseEndCheck(
+      this._ctx.phaseStack ?? [],
+    )
   }
 
   placeUnits(
     unitsToAdd: Partial<Record<UnitType, number>>,
+    surfaceId?: SurfaceId,
   ): Record<UnitType, UnitId[]> {
+    const destination = surfaceId ?? this.state.activeSurfaceId
     const placed = CombatSideState.placeUnits(
       this._sideData,
-      this.state.combatMode,
-      unitsToAdd,
       this.state,
+      unitsToAdd,
+      destination,
     )
 
     const abilitiesParams = this._abilitiesParams
@@ -439,10 +503,22 @@ export class SideApi {
       // placeUnits appends to the tail of participatingUnits; resort so the
       // configured UNIT_PRIORITY governs hit assignment for the new units.
       abilitiesParams.combatState.resyncParticipating(this._side)
-      abilitiesParams.combatState.syncWinnerSide()
     }
     enforceFleetPool(this)
     return placed as Record<UnitType, UnitId[]>
+  }
+
+  moveUnits(unitIds: UnitId | UnitId[], surfaceId?: SurfaceId): void {
+    const destination = surfaceId ?? this.state.activeSurfaceId
+    if (!this.state.surfaces.some(surface => surface.id === destination)) {
+      throw new Error(`Unknown surface: ${destination}`)
+    }
+    CombatSideState.moveUnits(
+      this._sideData,
+      Array.isArray(unitIds) ? unitIds : [unitIds],
+      destination,
+    )
+    this._abilitiesParams?.combatState.resyncParticipating(this._side)
   }
 
   modifyUnitType(key: UnitType, updates: Partial<UnitStats>): void {
@@ -458,6 +534,8 @@ export class SideApi {
         abilitiesParams.addUnitInvokes(this._side, vKey, ids)
       }
     }
+    if ('CATEGORIES' in updates)
+      abilitiesParams?.combatState.resyncParticipating(this._side)
   }
 
   modifyUnitState(unitId: UnitId, updates: Partial<UnitState>): void {
@@ -473,7 +551,7 @@ export class SideApi {
   resortUnits(unitId: UnitId): void {
     const type = this._sideData.unitType[unitId]
     if (!type) return
-    const set = this._sideData._needsCanonicalize ?? new Set<UnitType>()
+    const set = new Set(this._sideData._needsCanonicalize)
     set.add(type)
     this._sideData._needsCanonicalize = set
   }
@@ -489,32 +567,24 @@ export class SideApi {
     CombatSideState.liftHitPoolRestriction(this._sideData, abilityKey)
   }
 
-  /** Two overloads:
-   *  - `addHits(n)`: adds N unrestricted ability hits to this side's
-   *    main pool's `additional` slot (creates the pool if absent).
-   *  - `addHits(n, types)`: creates a single restricted custom entry
-   *    keyed to the calling ability, with `unitPriority = types` in the
-   *    caller-given order. The landing side's `hitPool` must be
-   *    undefined at call time (throws otherwise).
-   *  Either form, when called while no pool exists on either side,
-   *  schedules an inline assign-hits step (the `wasEmpty` path).
-   *  Otherwise the in-flight dice-roll group's existing `ASSIGN_HITS`
-   *  step drains everything together. */
+  /** Add ordinary hits. An explicit type priority creates a separate
+   *  resolution and requires an empty pool. When no hits are in flight,
+   *  schedules their assignment immediately. */
   addHits(hits: number): void
-  addHits(hits: number, validTargets: UnitType[]): void
-  addHits(hits: number, validTargets?: UnitType[]): void {
+  addHits(hits: number, unitPriority: UnitLocator[]): void
+  addHits(hits: number, unitPriority?: UnitLocator[]): void {
     const data = this.state
     const wasEmpty =
       data.attacker.hitPool === undefined && data.defender.hitPool === undefined
-    if (validTargets !== undefined && validTargets.length > 0) {
+    if (unitPriority !== undefined && unitPriority.length > 0) {
       if (this._sideData.hitPool !== undefined) {
         throw new Error(
-          'addHits(n, validTargets) requires an empty hit pool on the landing side',
+          'addHits(n, unitPriority) requires an empty hit pool on the landing side',
         )
       }
       const key = this._ctx.ability?.key ?? '__ADDED__'
       CombatSideState.addCustomHits(this._sideData, hits, key, [
-        ...validTargets,
+        ...unitPriority,
       ])
     } else {
       CombatSideState.addHits(this._sideData, hits)
@@ -528,6 +598,7 @@ export class SideApi {
     ability: UnitAbility,
     reason: string,
     target?: UnitBaseType | UnitCategory,
+    surfaceId?: SurfaceId,
   ) {
     CombatSideState.addRestriction(
       this.state,
@@ -536,6 +607,7 @@ export class SideApi {
       ability,
       reason,
       target,
+      surfaceId,
     )
   }
 
@@ -543,6 +615,7 @@ export class SideApi {
     ability: UnitAbility,
     reason: string,
     target?: UnitBaseType | UnitCategory,
+    surfaceId?: SurfaceId,
   ) {
     CombatSideState.removeRestriction(
       this.state,
@@ -551,6 +624,7 @@ export class SideApi {
       ability,
       reason,
       target,
+      surfaceId,
     )
   }
 
@@ -558,6 +632,7 @@ export class SideApi {
     ability: UnitAbility,
     reason: string,
     target?: UnitBaseType | UnitCategory,
+    surfaceId?: SurfaceId,
   ) {
     CombatSideState.addRestriction(
       this.state,
@@ -566,6 +641,7 @@ export class SideApi {
       ability,
       reason,
       target,
+      surfaceId,
     )
   }
 
@@ -573,6 +649,7 @@ export class SideApi {
     ability: UnitAbility,
     reason: string,
     target?: UnitBaseType | UnitCategory,
+    surfaceId?: SurfaceId,
   ) {
     CombatSideState.removeRestriction(
       this.state,
@@ -581,6 +658,7 @@ export class SideApi {
       ability,
       reason,
       target,
+      surfaceId,
     )
   }
 
@@ -696,30 +774,6 @@ export class SideApi {
       ) {
         abilitiesParams.addAbilityInvokes(side, targetKey, state)
       }
-
-      abilitiesParams.invokeOnParamSet(
-        side,
-        targetKey,
-        Object.keys(updates),
-        state,
-      )
-    }
-
-    // Re-split participating/non-participating only when the update
-    // touches a participation-affecting field. Keeps the hot path cheap
-    // while catching Alastor / Eidolon / custom priority edits.
-    if (
-      abilitiesParams &&
-      affectsParticipating(targetKey, Object.keys(updates))
-    ) {
-      abilitiesParams.combatState.resyncParticipating(side)
-    }
-
-    // SETTINGS drives `isCategoryMember`, which feeds the resolved-
-    // restrictions cache. Drop the side's cache so the next check
-    // rebuilds with fresh category membership.
-    if (targetKey === 'SETTINGS') {
-      sideData._resolvedRestrictions = undefined
     }
   }
 
@@ -773,10 +827,6 @@ export class SideApi {
    *   - omitted — every variant on the side
    *   - `UnitType` (variant key or base type) — only that variant
    *   - `{ exclude: UnitBaseType[] }` — every variant except those listed
-   *   - `{ singleUnit: UnitType }` — exactly one unit of that variant
-   *     key (split out of the variant's bucket by matching dpu against
-   *     the variant's natural stats; useful for Gravleash-style "1 of
-   *     your ship's rolls")
    *
    *  Idempotent per `(abilityKey, target)`: a second call from the
    *  same ability with the same target is silently dropped.
@@ -787,7 +837,7 @@ export class SideApi {
    */
   applyBonusToResult(
     amount: number,
-    target?: UnitType | { exclude: UnitBaseType[] } | { singleUnit: UnitType },
+    target?: UnitType | { exclude: UnitBaseType[] } | { unitId: UnitId },
   ): void {
     const abilityKey = this._ctx.ability?.key
     if (abilityKey === undefined) {
@@ -806,11 +856,9 @@ export class SideApi {
     const list = (groupCtx.modifiers ??= [])
     const unitType =
       target !== undefined && typeof target === 'string' ? target : undefined
-    const singleUnit =
-      target !== undefined &&
-      typeof target === 'object' &&
-      'singleUnit' in target
-        ? target.singleUnit
+    const unitId =
+      typeof target === 'object' && 'unitId' in target
+        ? target.unitId
         : undefined
     const excludeUnitTypes =
       target !== undefined && typeof target === 'object' && 'exclude' in target
@@ -823,7 +871,7 @@ export class SideApi {
           m.side === this._side &&
           m.abilityKey === abilityKey &&
           m.unitType === unitType &&
-          m.singleUnit === singleUnit &&
+          m.unitId === unitId &&
           arraysEqual(m.excludeUnitTypes, excludeUnitTypes),
       )
     ) {
@@ -836,7 +884,7 @@ export class SideApi {
       abilityKey,
       amount: -amount,
       unitType,
-      singleUnit,
+      unitId,
       excludeUnitTypes,
       wasDeclaration: this._ctx.isDeclarationInvoke === true,
     })
@@ -1081,50 +1129,6 @@ export class AbilityContext {
     return step.phase
   }
 
-  /** Sides firing in the current dice-roll group. Throws outside one. */
-  get currentDiceRollFiring(): CombatSide[] {
-    const ctx = this._abilitiesParams.combatState.currentGroupData
-    if (!isDiceRollContext(ctx)) {
-      throw new Error('currentDiceRollFiring called outside a dice-roll group')
-    }
-    return ctx.firing
-  }
-
-  /** Hit source of the current dice-roll group. Throws outside one. */
-  get currentDiceRollHitSource(): HitSource {
-    const ctx = this._abilitiesParams.combatState.currentGroupData
-    if (!isDiceRollContext(ctx)) {
-      throw new Error(
-        'currentDiceRollHitSource called outside a dice-roll group',
-      )
-    }
-    return ctx.hitSource
-  }
-
-  /** Whether the current dice-roll group is a Proxima-style self-target roll.
-   *  Throws outside a dice-roll group. */
-  get currentDiceRollSelfTarget(): boolean {
-    const ctx = this._abilitiesParams.combatState.currentGroupData
-    if (!isDiceRollContext(ctx)) {
-      throw new Error(
-        'currentDiceRollSelfTarget called outside a dice-roll group',
-      )
-    }
-    return ctx.selfTarget ?? false
-  }
-
-  /** Whether the current dice-roll group is a unit-ability roll (vs. a
-   *  combat-round roll). Throws outside a dice-roll group. */
-  get currentDiceRollIsUnitAbility(): boolean {
-    const ctx = this._abilitiesParams.combatState.currentGroupData
-    if (!isDiceRollContext(ctx)) {
-      throw new Error(
-        'currentDiceRollIsUnitAbility called outside a dice-roll group',
-      )
-    }
-    return ctx.isUnitAbility
-  }
-
   getPostRollSides(): { own: RerollSide; opponent: RerollSide } {
     const cs = this._abilitiesParams.combatState
     const ctx = cs.currentGroupData
@@ -1262,6 +1266,21 @@ export class AbilityContext {
     this._api.opponent._abilitiesParams = undefined
   }
 
+  /** See AbilityCallContext.invokeChanges. Resolves through `this.this`, so
+   *  `withRunningAbility` runs another ability's changes. */
+  invokeChanges(params?: object): void {
+    const ability = this.this
+    if (!ability.declareChanges) {
+      throw new Error(`${ability.key} declares no changes`)
+    }
+    ability.declareChanges(
+      this as unknown as AbilityCallContext,
+      (params ??
+        CombatSideState.getLiveParams(this.state[this._side], ability.key) ??
+        extractDefaults(ability)) as AbilityBaseParams,
+    )
+  }
+
   /** Queue a timing to run as the next script step. The triggered step
    *  inherits this ability's active phase stack (so `context`-scoped
    *  invokes resolve correctly) and runs only after the current `call`
@@ -1297,13 +1316,10 @@ export class AbilityContext {
     if (outcome === 'LOST') {
       winner = getOpponentSide(this._side)
     }
-    // Drop the current meta's script. Trigger steps pushed after this call
-    // survive (they land on the empty stack); to keep any triggers, callers
-    // must invoke `transitionTo` before pushing them.
-    this._abilitiesParams.combatState._triggerCompletion(
-      this.phaseStack!,
-      winner,
-    )
+    // Drop the current phase. Trigger steps pushed after this call survive
+    // (they land above round cleanup); callers that need them must invoke
+    // `transitionTo` before pushing them.
+    this._abilitiesParams.combatState.forceOutcome(this.phaseStack!, winner)
   }
 
   runDestroyAbilities(destroyed: UnitId[]): void {
@@ -1455,7 +1471,7 @@ export class AbilityContext {
       dice?: DiceGroup[]
       target?: 'OWN' | 'OPPONENT'
       firing?: ('OWN' | 'OPPONENT')[]
-      deferCompletionCheck?: boolean
+      deferPhaseEndCheck?: boolean
       abilitiesOverride?: AbilitiesOverride
     },
   ): void {
@@ -1493,7 +1509,7 @@ export class AbilityContext {
       outerPhase: this.phaseStack,
       customDice,
       selfTarget,
-      deferCompletionCheck: overrides?.deferCompletionCheck,
+      deferPhaseEndCheck: overrides?.deferPhaseEndCheck,
       abilitiesOverride: overrides?.abilitiesOverride,
     })
   }

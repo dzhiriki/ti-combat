@@ -1,8 +1,8 @@
 import { UNIT_LIMITS } from '@/constants/units'
-import type { UnitBaseType, UnitType } from '@/types'
+import type { UnitBaseType, UnitLocator, SurfaceId } from '@/types'
 
 import type { SideStateData } from '../combat-state/types'
-import { parseVariantId } from '../utils/unit-variant'
+import { parseUnitLocator } from '../utils/parse-unit-locator'
 
 export type ParamLimit = 'UNIT_LIMIT' | 'IN_COMBAT' | 'EXTRA'
 
@@ -12,17 +12,20 @@ export type ParamLimit = 'UNIT_LIMIT' | 'IN_COMBAT' | 'EXTRA'
 export function countUnitsByBaseType(
   s: SideStateData,
   baseType: UnitBaseType,
+  surfaceId?: SurfaceId,
 ): number {
   let n = 0
   for (const id of s.participatingUnits) {
     const key = s.unitType[id]
-    if (!key) continue
-    if (parseVariantId(key).type === baseType) n += 1
+    if (!key || (surfaceId !== undefined && s.unitSurface[id] !== surfaceId))
+      continue
+    if (parseUnitLocator(key).baseType === baseType) n += 1
   }
   for (const id of s.nonParticipatingUnits) {
     const key = s.unitType[id]
-    if (!key) continue
-    if (parseVariantId(key).type === baseType) n += 1
+    if (!key || (surfaceId !== undefined && s.unitSurface[id] !== surfaceId))
+      continue
+    if (parseUnitLocator(key).baseType === baseType) n += 1
   }
   return n
 }
@@ -32,11 +35,15 @@ export function countUnitsByBaseType(
 export function resolveVariantLimit(
   limit: ParamLimit,
   s: SideStateData,
-  variantKey: UnitType,
+  variantKey: UnitLocator,
 ): number {
-  const base = parseVariantId(variantKey).type
+  const { baseType: base, surfaceId } = parseUnitLocator(variantKey)
   if (limit === 'UNIT_LIMIT') return UNIT_LIMITS[base]
-  const inCombat = countUnitsByBaseType(s, base)
+  const inCombat = countUnitsByBaseType(
+    s,
+    base,
+    limit === 'IN_COMBAT' ? surfaceId : undefined,
+  )
   if (limit === 'IN_COMBAT') return inCombat
   // EXTRA: reinforcement headroom — how many more units of this base type
   // could still be added without breaching UNIT_LIMITS.

@@ -16,14 +16,17 @@ import { DragHandleDots2Icon, LockClosedIcon } from '@radix-ui/react-icons'
 import { clsx } from 'clsx'
 import { useMemo } from 'react'
 
+import type { SurfaceOptionMeta } from '@/combat/abilities-engine/types'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 
+import { groupUnitOptions, labelUnitOptions } from '../unit-option-presentation'
 import { applyDragMove } from './apply-drag-move'
+import { keepHiddenEntries } from './keep-hidden-entries'
 
 import styles from './list.module.css'
 
-export interface ListItem {
+export interface ListItem extends SurfaceOptionMeta {
   label: string
   value: string
   max?: number
@@ -76,7 +79,7 @@ export function List(props: ListProps): React.ReactElement {
     if (!sortable) return [...props.items]
     const orderIndex = new Map<string, number>()
     props.value.forEach(([id], i) => orderIndex.set(id, i))
-    return [...props.items].sort(
+    return labelUnitOptions(props.items).sort(
       (a, b) =>
         (orderIndex.get(a.value) ?? Infinity) -
         (orderIndex.get(b.value) ?? Infinity),
@@ -122,12 +125,25 @@ export function List(props: ListProps): React.ReactElement {
     )
     if (newIds == null) return
     if (props.mode === 'order') {
-      props.onChange(newIds.map(id => [id]))
+      props.onChange(
+        keepHiddenEntries(
+          props.value,
+          newIds.map(id => [id]),
+        ),
+      )
     } else if (props.mode === 'checkbox') {
-      props.onChange(newIds.map(id => [id, stateMap.get(id) === true]))
+      props.onChange(
+        keepHiddenEntries(
+          props.value,
+          newIds.map(id => [id, stateMap.get(id) === true]),
+        ),
+      )
     } else {
       props.onChange(
-        newIds.map(id => [id, (stateMap.get(id) as number | undefined) ?? 0]),
+        keepHiddenEntries(
+          props.value,
+          newIds.map(id => [id, (stateMap.get(id) as number | undefined) ?? 0]),
+        ),
       )
     }
   }
@@ -202,20 +218,27 @@ export function List(props: ListProps): React.ReactElement {
   const isClickable = props.mode === 'checkbox'
   return (
     <div className={styles.list}>
-      {orderedItems.map((item, index) => (
-        <div
-          key={item.value}
-          className={clsx(
-            styles.item,
-            isActive(item.value) && styles.item_active,
-            isClickable && styles.item_clickable,
+      {groupUnitOptions(orderedItems).map(group => (
+        <div key={group.id} className={styles.surfaceGroup}>
+          {group.label && (
+            <div className={styles.surfaceLabel}>{group.label}</div>
           )}
-          onClick={isClickable ? () => handleToggle(item.value) : undefined}
-        >
-          <span className={styles.label} title={item.label}>
-            {item.label}
-          </span>
-          <div className={styles.right}>{renderRight(item, index)}</div>
+          {group.items.map((item, index) => (
+            <div
+              key={item.value}
+              className={clsx(
+                styles.item,
+                isActive(item.value) && styles.item_active,
+                isClickable && styles.item_clickable,
+              )}
+              onClick={isClickable ? () => handleToggle(item.value) : undefined}
+            >
+              <span className={styles.label} title={item.label}>
+                {item.label}
+              </span>
+              <div className={styles.right}>{renderRight(item, index)}</div>
+            </div>
+          ))}
         </div>
       ))}
     </div>

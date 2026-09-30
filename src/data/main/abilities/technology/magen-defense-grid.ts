@@ -22,7 +22,7 @@ export const magenDefenseGrid: Ability<Params> = {
     uses: Infinity,
     targetPriority: declareParam<UnitList>({
       default: [],
-      source: 'groundForces',
+      source: 'GROUND_FORCES',
       side: 'opponent',
       filter: { combatMode: 'GROUND' },
     }),
@@ -32,14 +32,15 @@ export const magenDefenseGrid: Ability<Params> = {
     {
       timing: 'START_OF_COMBAT',
       isCallable: (_, ctx) => {
-        const { structures } = ctx.api.own.getAbilityConfig('SETTINGS')
-        return ctx.api.own.countUnits(structures, { includeVariants: true }) > 0
+        return ctx.api.own.surface
+          .getUnits()
+          .some(id => ctx.api.own.isUnitCategory(id, 'STRUCTURES'))
       },
       call: (ctx, params) => {
-        const target = ctx.api.opponent.findUnitByPriority(
+        const target = ctx.api.opponent.participating.findUnitByPriority(
           ctx.utils.getFlat(params.targetPriority),
-          { includeVariants: false },
-        )!
+        )
+        if (!target) return
         const type = ctx.api.opponent.getUnitBaseType(target)!
         ctx.api.opponent.addHits(1, [type])
       },

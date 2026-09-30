@@ -1,12 +1,8 @@
 import { z } from 'zod/mini'
 
 import obsidianIcon from '@/assets/faction/obsidian.svg?raw'
-import {
-  type Ability,
-  type AbilityReadContext,
-  declareParam,
-  parseVariantId,
-} from '@/combat'
+import { type Ability, type AbilityReadContext, declareParam } from '@/combat'
+import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import type { UnitBaseType, UnitId, UnitList } from '@/types'
 import { UnitListBooleanSchema } from '@/types'
 
@@ -29,7 +25,7 @@ export const vosHollow: Ability<Params> = {
     uses: 1,
     targetPriority: declareParam<UnitList<boolean>>({
       default: [],
-      source: 'ships',
+      source: 'SHIPS',
       side: 'opponent',
       defaultItemValue: true,
       filter: { combatMode: 'SPACE' },
@@ -41,44 +37,27 @@ export const vosHollow: Ability<Params> = {
       timing: 'AFTER_DESTROY',
       external: true,
       isCallable: (params, ctx, ids) => {
-        const { ships: ownShips } = ctx.api.own.getAbilityConfig('SETTINGS')
-        const { ships: opponentShips } =
-          ctx.api.opponent.getAbilityConfig('SETTINGS')
-        const ownDestroyedShips = collectOwnDestroyedShipTypes(
-          ctx,
-          ids,
-          ownShips,
-        )
-        const opponentShipsSet = new Set<UnitBaseType>(opponentShips)
+        const ownDestroyedShips = collectOwnDestroyedShipTypes(ctx, ids)
         for (const variantId of ctx.utils.getFlat(params.targetPriority)) {
-          const { type } = parseVariantId(variantId)
+          const { baseType: type } = parseUnitLocator(variantId)
           if (
             ownDestroyedShips.has(type) &&
-            opponentShipsSet.has(type) &&
-            ctx.api.opponent.hasUnitType(type, { includeVariants: false })
+            ctx.api.opponent.participating.hasUnitType(variantId)
           )
             return true
         }
         return false
       },
       call: (ctx, params, ids) => {
-        const { ships: ownShips } = ctx.api.own.getAbilityConfig('SETTINGS')
-        const { ships: opponentShips } =
-          ctx.api.opponent.getAbilityConfig('SETTINGS')
-        const ownDestroyedShips = collectOwnDestroyedShipTypes(
-          ctx,
-          ids,
-          ownShips,
-        )
-        const opponentShipsSet = new Set<UnitBaseType>(opponentShips)
+        const ownDestroyedShips = collectOwnDestroyedShipTypes(ctx, ids)
         for (const variantId of ctx.utils.getFlat(params.targetPriority)) {
-          const { type } = parseVariantId(variantId)
+          const { baseType: type } = parseUnitLocator(variantId)
           if (
             ownDestroyedShips.has(type) &&
-            opponentShipsSet.has(type) &&
-            ctx.api.opponent.hasUnitType(type, { includeVariants: false })
+            ctx.api.opponent.participating.hasUnitType(variantId)
           ) {
-            ctx.api.opponent.destroyUnits(type)
+            const [target] = ctx.api.opponent.participating.getUnits(variantId)
+            if (target) ctx.api.opponent.destroyUnits(target)
             return
           }
         }
@@ -99,15 +78,11 @@ export const vosHollow: Ability<Params> = {
 function collectOwnDestroyedShipTypes(
   ctx: AbilityReadContext,
   destroyedIds: UnitId[],
-  ships: UnitBaseType[],
 ): Set<UnitBaseType> {
-  const shipsSet = new Set<UnitBaseType>(ships)
   const types = new Set<UnitBaseType>()
   for (const id of destroyedIds) {
-    const variantKey = ctx.api.own.getUnitVariantKey(id)
-    if (!variantKey) continue
-    const { type } = parseVariantId(variantKey)
-    if (shipsSet.has(type)) types.add(type)
+    const type = ctx.api.own.getUnitBaseType(id)
+    if (type && ctx.api.own.isUnitCategory(id, 'SHIPS')) types.add(type)
   }
   return types
 }
