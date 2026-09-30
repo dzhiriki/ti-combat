@@ -331,6 +331,13 @@ a check there too.
   silently delete other planets' settings. See
   `tests/surface-unit-settings.test.ts`.
 
+- **Reconcile drops list entries whose key is not among the offered options,
+  and a `scope: 'system'` list offers only surface-qualified keys.** Config
+  built outside the UI (the AsyncTI4 import, hand-written test configs) must
+  key `PRE_DAMAGED`/`PRE_GALVANIZED` entries with `makeUnitLocator(type,
+surfaceId)`; a bare `['DREADNOUGHT', 1]` is silently discarded on load and
+  replaced by the `defaultItemValue`. See `tests/url-sync.test.ts`.
+
 - **A `null` param default means "nothing chosen" — reconcile never fills
   it.** Apollo's `heroUnit` relies on this; auto-selecting the first option
   would designate a hero the player never picked.
