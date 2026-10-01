@@ -26,6 +26,7 @@ import {
   type OrderListValue,
 } from '../list'
 import { Select } from '../select'
+import { splitGroups, UnitSplit, type UnitSplitValue } from '../unit-split'
 
 import styles from './ability-config.module.css'
 
@@ -76,7 +77,8 @@ export function AbilityConfig({
     return items?.filter(
       item =>
         item.visible !== false &&
-        (item.type !== 'unit-list' || item.items.length > 0),
+        (item.type !== 'unit-list' || item.items.length > 0) &&
+        (item.type !== 'unit-split' || splitGroups(item.items).length > 0),
     )
   }, [ability, defaults, readContext, params])
 
@@ -326,6 +328,24 @@ export function AbilityConfig({
                       onChange={value => handleListChange(key, value)}
                     />
                   )}
+                </div>
+              )
+            }
+
+            if (config.type === 'unit-split') {
+              const rawValue = (params[key] ?? defaultValue ?? []) as unknown
+              return (
+                <div key={key} className={styles.configItemGroup}>
+                  {config.label && (
+                    <span className={styles.configItemText}>
+                      {config.label}
+                    </span>
+                  )}
+                  <UnitSplit
+                    items={config.items}
+                    value={rawValue as UnitSplitValue}
+                    onChange={value => handleListChange(key, value)}
+                  />
                 </div>
               )
             }

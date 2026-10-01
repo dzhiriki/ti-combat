@@ -20,6 +20,7 @@ import type {
   SideStateData,
 } from '../combat-state/types'
 import { parseUnitLocator } from '../utils/parse-unit-locator'
+import { resolveUnitStats } from '../utils/resolve-unit-stats'
 import {
   expandWithSubtypes,
   sortBaseTypes,
@@ -45,11 +46,24 @@ export interface UnitOptionContext {
 
 type OptionSpec = Pick<
   SyncSourceConfig,
-  'source' | 'filter' | 'scope' | 'limit'
+  'source' | 'filter' | 'scope' | 'limit' | 'split'
 > & {
   sort?: SyncSourceConfig['sort']
   /** Key of the ability declaring the param, for `filter.withAbility`. */
   abilityKey?: string
+}
+
+/** The planets being invaded: every planet of a multi-planet invasion, else
+ *  the active planet (the first planet outside a ground combat). */
+export function foughtPlanetIds(state: {
+  invasion?: InvasionState
+  activeSurfaceId?: SurfaceId
+  surfaces?: readonly SurfaceDefinition[]
+}): SurfaceId[] {
+  if (state.invasion) return [...state.invasion.planets]
+  const planets = (state.surfaces ?? []).filter(s => s.type === 'PLANET')
+  const active = planets.find(planet => planet.id === state.activeSurfaceId)
+  return (active ? [active] : planets.slice(0, 1)).map(planet => planet.id)
 }
 
 /** Each ground combat is fought on one planet, so participant choices apply
@@ -59,7 +73,7 @@ export function choosesByType(
   mode: CombatMode,
   scope: SyncSourceConfig['scope'],
 ): boolean {
-  return mode === 'GROUND' && scope !== 'system'
+  return mode === 'GROUND' && scope === 'participating'
 }
 
 /** Keep the types whose units carry the ability `abilityKey`. */
@@ -120,6 +134,8 @@ export function resolveUnitOptions(
         )
       : expanded
   const surfaces = context.surfaces
+  if (spec.scope === 'planet' && surfaces)
+    return planetOptions(s, spec, types, variants, surfaces, phase)
   if (spec.scope === 'type' || !surfaces || !context.activeSurfaceId) {
     return variants
       .map(value => ({
@@ -245,6 +261,84 @@ export function resolveUnitOptions(
     })
   }
   return choosesByType(mode, spec.scope) ? mergeSurfaces(items) : items
+}
+
+/** Options of a `planet` param: each variant on every planet. A split
+ *  offers the types of the units it divides, capped at their count, plus a
+ *  space entry for units that may stay. */
+function planetOptions(
+  s: SideStateData,
+  spec: OptionSpec,
+  types: readonly UnitBaseType[],
+  variants: readonly UnitType[],
+  surfaces: readonly SurfaceDefinition[],
+  phase: ReturnType<typeof getCombatMeta>,
+): UnitOption[] {
+  const option = (variant: UnitType, surfaceId: SurfaceId, max?: number) => {
+    const surfaceOrder = surfaces.findIndex(surface => surface.id === surfaceId)
+    return {
+      label: getVariantDisplayName(variant),
+      value: makeUnitLocator(variant, surfaceId),
+      surfaceId,
+      surfaceName: surfaces[surfaceOrder]?.name,
+      surfaceOrder,
+      ...(max === undefined ? {} : { max }),
+    }
+  }
+  // Any planet of the system can receive units; sending some there makes
+  // it part of the invasion.
+  const planets = surfaces
+    .filter(surface => surface.type === 'PLANET')
+    .map(surface => surface.id)
+  const split = spec.split
+  if (!split) {
+    return variants.flatMap(variant =>
+      planets.map(planet =>
+        option(
+          variant,
+          planet,
+          spec.limit ? resolveVariantLimit(spec.limit, s, variant) : undefined,
+        ),
+      ),
+    )
+  }
+  // Split units are fielded; the setup model carries declared grants
+  // (Matriarch's fighters count as ground forces).
+  const model = s.optionMetadata?.model ?? s
+  const offered = new Set(types)
+  const categories = [spec.source].flat()
+  const counts = new Map<UnitType, number>()
+  for (const id of [
+    ...s.participatingUnits,
+    ...s.nonParticipatingUnits,
+  ] as UnitId[]) {
+    if (split.from === 'space' && s.unitSurface[id] !== SPACE_SURFACE_ID)
+      continue
+    const type = s.unitType[id]
+    const base = parseUnitLocator(type).baseType
+    if (!offered.has(base)) continue
+    if (
+      !spec.filter?.includeNonParticipating &&
+      !categories.some(category => isUnitCategory(model, id, category, phase))
+    )
+      continue
+    if (
+      split.unitAbility &&
+      !resolveUnitStats(model.unitStats, type)?.UNIT_ABILITIES?.[
+        split.unitAbility
+      ]
+    )
+      continue
+    counts.set(base, (counts.get(base) ?? 0) + 1)
+  }
+  return variants.flatMap(variant => {
+    const total = counts.get(variant as UnitBaseType)
+    if (!total) return []
+    return [
+      ...planets.map(planet => option(variant, planet, total)),
+      ...(split.canStay ? [option(variant, SPACE_SURFACE_ID, total)] : []),
+    ]
+  })
 }
 
 /** One unqualified option per variant; a cap is the largest per-planet one,

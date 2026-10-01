@@ -40,6 +40,7 @@ import {
   getUnitConfig as buildUnitConfig,
   type UnitConfig,
 } from '@/utils/get-unit-config'
+import { layoutContext } from '@/utils/layout-context'
 import {
   allowedSurfaceTypes,
   collapseSurfaceCounts,
@@ -378,6 +379,8 @@ export class CombatSetup {
       if (this._editorMode === 'SIMPLIFIED') this.reflowSimplified(side)
       else this.normalizeSideCounts(side)
       this.rebuildUnits(side)
+      // Rebuilt units get new ids; the option model must describe them.
+      this.reconcile()
     }
     // Force new stateData reference so React memoization triggers
     this._stateData = { ...this._stateData }
@@ -411,6 +414,7 @@ export class CombatSetup {
       }
       this.resetSurfaces()
       this._editorMode = mode
+      this.loadAbilities()
       this.reflowSimplified('attacker', totals.attacker)
       this.reflowSimplified('defender', totals.defender)
     } else {
@@ -447,6 +451,7 @@ export class CombatSetup {
       }
     }
     this._stateData = { ...this._stateData, surfaces: this._surfaces }
+    this.loadAbilities()
     this.selectPlanet(id)
   }
 
@@ -573,19 +578,11 @@ export class CombatSetup {
     }
   }
 
-  /** GROUND mode: every planet holding a unit of either side, in tab order. */
+  /** GROUND mode: every planet, in tab order. */
   private invasionPlanets(): SurfaceId[] {
     if (this._combatMode !== 'GROUND') return []
     return this._surfaces
-      .filter(
-        surface =>
-          surface.type === 'PLANET' &&
-          (['attacker', 'defender'] as const).some(side =>
-            Object.values(this._surfaceCounts[side][surface.id] ?? {}).some(
-              count => count > 0,
-            ),
-          ),
-      )
+      .filter(surface => surface.type === 'PLANET')
       .map(surface => surface.id)
   }
 
@@ -765,15 +762,15 @@ export class CombatSetup {
     return side === 'attacker' ? this._attackerFaction : this._defenderFaction
   }
 
-  /** Where the combat starts: space, or the first planet holding units
-   *  (where ground forces are committed). The selected tab only picks the
-   *  planet being edited, so it decides only when no planet holds units. */
+  /** Where the combat starts: space, or the first planet, where ground
+   *  forces land unless split. The selected tab only picks the planet being
+   *  edited. */
   private get activeSurfaceId(): SurfaceId {
     if (this._combatMode === 'SPACE') return SPACE_SURFACE_ID
-    return this.invasionPlanets()[0] ?? this._selectedPlanetId
+    return this.invasionPlanets()[0]
   }
 
-  /** Two or more planets holding units are all fought over. */
+  /** With two or more planets, all are fought over. */
   private get invasion(): InvasionState | undefined {
     const planets = this.invasionPlanets()
     return planets.length > 1 ? { planets, results: [] } : undefined
@@ -805,8 +802,8 @@ export class CombatSetup {
     }
   }
 
-  /** Reload the abilities available to `sides` for their current factions
-   *  and upgrades. */
+  /** Reload the abilities available to `sides` for their current factions,
+   *  upgrades, and planets (the layout context). */
   private loadAbilities(
     sides: readonly CombatSide[] = ['attacker', 'defender'],
   ): void {
@@ -817,6 +814,7 @@ export class CombatSetup {
         side,
         faction,
         this._upgradedTypes[side],
+        layoutContext(this._surfaces),
       )
       this._unitAbilityKeys[side] =
         gameData.getUnitDefinitionAbilityKeys(faction)
@@ -910,6 +908,7 @@ export class CombatSetup {
       this._surfaces,
       this._combatMode,
       this.activeSurfaceId,
+      this.invasion,
     )[side].unitStats as Record<string, UnitStats>
   }
 

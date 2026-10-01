@@ -1,6 +1,6 @@
 import { createGameData } from '../create-game-data'
 import actionCard from './abilities/action-card'
-import advanced from './abilities/advanced'
+import { layoutPlanetSplits } from './abilities/advanced'
 import agenda from './abilities/agenda'
 import environment from './abilities/environment'
 import general from './abilities/general'
@@ -20,15 +20,14 @@ const gameData = createGameData({
   label: 'Twilight Imperium',
   factions,
   units,
-  abilities: {
-    GENERAL: general,
-    ADVANCED: advanced,
+  abilities: context => ({
+    ...layoutPlanetSplits(context, general),
     ENVIRONMENT: environment,
     AGENDA: agenda,
     TECHNOLOGY: technology,
     ACTION_CARD: actionCard,
     RELIC: relic,
-  },
+  }),
   slots: SLOTS,
 })
 

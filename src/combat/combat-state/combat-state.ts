@@ -1,7 +1,6 @@
 import {
   type CombatSide,
   type DiceGroup,
-  SPACE_SURFACE_ID,
   type SurfaceDefinition,
   type SurfaceId,
   type UnitAbility,
@@ -45,7 +44,6 @@ import { canonicalizeUnitState } from '../utils/canonicalize-unit-state'
 import { sortUnitsByPriority } from '../utils/sort-units-by-priority'
 import {
   hasPhaseCategories,
-  isUnitCategory,
   participatesInCombat,
 } from '../utils/unit-combat-properties'
 import { getNextPhaseInFlow, isCombatMeta } from './phase-utils'
@@ -538,8 +536,24 @@ export class CombatState {
       case 'AFB':
         return [{ kind: 'timing', timing: 'AFB_STEP', phase }]
 
-      case 'BOMBARDMENT':
-        return [{ kind: 'timing', timing: 'BOMBARDMENT_STEP', phase }]
+      case 'BOMBARDMENT': {
+        const planets = this.data.invasion?.planets
+        // A split bombardment moves between planets; commitment follows
+        // on the first.
+        return [
+          { kind: 'timing', timing: 'BOMBARDMENT_STEP', phase },
+          ...(planets
+            ? [
+                {
+                  kind: 'method' as const,
+                  fn: CombatState.prototype._activatePlanetStep,
+                  phase,
+                  payload: planets[0],
+                },
+              ]
+            : []),
+        ]
+      }
 
       case 'SPACE_CANNON_OFFENSE':
         return [
@@ -598,14 +612,13 @@ export class CombatState {
         ]
       }
 
+      // COMMIT_UNITS abilities run first so Matriarch/Morphwing-style rules
+      // make more units ground forces before the Commit Ground Forces driver
+      // lands them.
       case 'COMMIT_UNITS':
         return [
           { kind: 'timing', timing: 'COMMIT_UNITS', phase },
-          {
-            kind: 'method',
-            fn: CombatState.prototype._commitUnits,
-            phase,
-          },
+          { kind: 'timing', timing: 'COMMIT_UNITS_STEP', phase },
         ]
     }
   }
@@ -635,30 +648,6 @@ export class CombatState {
   // ===========================================================================
   // STEP METHODS (referenced by PhaseStep entries in getPhaseScript)
   // ===========================================================================
-
-  /** Land every eligible attacking unit currently in space on the selected
-   *  planet. COMMIT_UNITS abilities run first so Matriarch/Morphwing-style
-   *  rules can extend the eligible type list before movement. */
-  private _commitUnits(): void {
-    const data = this.data
-    if (data.combatMode !== 'GROUND') return
-    const attacker = data.attacker
-    const moving: UnitId[] = []
-    for (const pool of [
-      attacker.participatingUnits,
-      attacker.nonParticipatingUnits,
-    ]) {
-      for (const id of pool) {
-        if (
-          attacker.unitSurface[id] === SPACE_SURFACE_ID &&
-          isUnitCategory(attacker, id, 'GROUND_FORCES', data.meta)
-        )
-          moving.push(id as UnitId)
-      }
-    }
-    CombatSideState.moveUnits(attacker, moving, data.activeSurfaceId)
-    this.resyncParticipating('attacker')
-  }
 
   /** Multi-planet Space Cannon Defense: fire from `planet` at the ground
    *  forces committed there; a planet without them gets no roll. */
@@ -1327,6 +1316,10 @@ export class CombatState {
     /** Defer the phase-end participant check to a later paired resolution or
      *  to the enclosing phase driver. */
     deferPhaseEndCheck?: boolean
+    /** Planet to resolve against; activated before the roll. */
+    surfaceId?: SurfaceId
+    /** Only these units of the firing side roll. */
+    sourceUnits?: readonly UnitId[]
     /** Ability params overrides scoped to this resolution. Stamped onto every
      *  timing step the resolution pushes; consumed by the ability loop. */
     abilitiesOverride?: Readonly<AbilitiesOverride>
@@ -1336,6 +1329,16 @@ export class CombatState {
     const phase: MetaPhase[] =
       innermostOuter === meta ? [...outerPhase] : [...outerPhase, meta]
     const script: PendingStep[] = [
+      ...(config.surfaceId
+        ? [
+            {
+              kind: 'method' as const,
+              fn: CombatState.prototype._activatePlanetStep,
+              phase,
+              payload: config.surfaceId,
+            },
+          ]
+        : []),
       buildUnitAbilityDiceRollGroup({
         phase,
         firing,
@@ -1348,6 +1351,7 @@ export class CombatState {
           meta === 'SPACE_CANNON_DEFENSE'
             ? this.data.activeSurfaceId
             : undefined,
+        sourceUnits: config.sourceUnits,
         customDice,
         selfTarget,
         abilitiesOverride: config.abilitiesOverride,
@@ -1532,6 +1536,7 @@ export function buildUnitAbilityDiceRollGroup(args: {
   firing: CombatSide[]
   hitSource: HitSource
   sourceSurfaceId?: SurfaceId
+  sourceUnits?: readonly UnitId[]
   selfTarget?: boolean
   customDice?: { attacker: SideDiceCollection; defender: SideDiceCollection }
   abilitiesOverride?: Readonly<AbilitiesOverride>
@@ -1541,6 +1546,7 @@ export function buildUnitAbilityDiceRollGroup(args: {
     firing,
     hitSource,
     sourceSurfaceId,
+    sourceUnits,
     selfTarget,
     customDice,
     abilitiesOverride,
@@ -1553,6 +1559,7 @@ export function buildUnitAbilityDiceRollGroup(args: {
       selfTarget,
       customDice,
       sourceSurfaceId,
+      sourceUnits,
       isUnitAbility: true,
       abilitiesOverride,
     },
@@ -1612,6 +1619,7 @@ function collectSideDice(
       (mod): mod is HitValueModifierDecl =>
         mod.type === 'HIT_VALUE' && mod.side === side && !!mod.unitId,
     ),
+    ctx.sourceUnits,
   )
 }
 

@@ -107,7 +107,7 @@ There is one slot per kind of card — all agents are collected into `FACTION_AG
 
 `createGameData` collects each ability once per source into a `CollectedAbility`: the definition plus its registered `slot`, owning faction if any, and optional deployment metadata. `RegisteredAbility` is the definition plus `slot`, the shape used by engine lookups, reconcile, and the setup store. Presentation and eligibility remain in `GameData.slots`; collected abilities carry no `strategy`, `neutral`, or `display` fields.
 
-Shared decks register under slots with no strategy, faction-owned abilities under slots with a strategy; an ability no entry could ever show is a data error and throws. `getAvailableAbilities(side, faction)` walks the collected list in **registration order** and keeps abilities matching at least one slot entry's ownership and Neutral rules. The panel iterates `GameData.slots` in display order, matching available abilities by slot and owner. Category and subcategory titles, icon visibility, and title-based search all come directly from that config.
+Shared decks register under slots with no strategy, faction-owned abilities under slots with a strategy; an ability no entry could ever show is a data error and throws. `getAvailableAbilities(side, faction)` walks the collected list in **registration order** and keeps abilities matching at least one slot entry's ownership and Neutral rules. The panel iterates `GameData.slots` in display order, matching available abilities by slot and owner. With two or more planets it shows Bombardment and Commit Ground Forces under GENERAL, since their planet splits matter then (`layoutPlanetSplits`). Category and subcategory titles, icon visibility, and title-based search all come directly from that config.
 
 The one exception is the catch-all: an ability that no entry shows, but that another faction can reach across the table with (an `external` invoke), is appended to the `OTHER` slot with its owner's icon. Systems opt out by not declaring `OTHER` — Twilight's Fall has no such slot.
 
@@ -304,6 +304,7 @@ Timings define when abilities fire. They run in this order during combat:
 ```
 PREPARE               — once at combat construction
 COMMIT_UNITS          — during COMMIT_UNITS phase (ground combat unit commitment)
+COMMIT_UNITS_STEP     — the Commit Ground Forces driver lands ground forces
 START_OF_COMBAT       — before first round
 START_OF_COMBAT_ROUND — before each round (including first)
 BEFORE_UNIT_ABILITY_ROLL — before AFB / bombardment / space cannon dice
@@ -865,14 +866,20 @@ uiConfig: (ctx, params) => {
 }
 ```
 
-There are exactly four UI config item types. The list variants are all expressed as `unit-list` with a `mode`:
+There are five UI config item types. The list variants are all expressed as `unit-list` with a `mode`:
 
-| Type        | Param Type                | Use Case                                                      |
-| ----------- | ------------------------- | ------------------------------------------------------------- |
-| `checkbox`  | `boolean`                 | Toggle                                                        |
-| `number`    | `number`                  | Counter with optional `min`/`max`                             |
-| `select`    | `string`                  | Dropdown (`items: SelectItem[] \| SelectGroup[]`)             |
-| `unit-list` | `UnitList<V>` (see below) | List of units; behavior set by `mode` (+ optional `sortable`) |
+| Type         | Param Type                | Use Case                                                      |
+| ------------ | ------------------------- | ------------------------------------------------------------- |
+| `checkbox`   | `boolean`                 | Toggle                                                        |
+| `number`     | `number`                  | Counter with optional `min`/`max`                             |
+| `select`     | `string`                  | Dropdown (`items: SelectItem[] \| SelectGroup[]`)             |
+| `unit-list`  | `UnitList<V>` (see below) | List of units; behavior set by `mode` (+ optional `sortable`) |
+| `unit-split` | `UnitList<number>`        | A slider per unit type dividing a `split` param's units       |
+
+`unit-split` takes the items of a `split` param
+(`getUnitVariantsOptions(key)`): one slider per unit type whose units have
+more than one place to go, each thumb the border between two surfaces. The
+control is hidden when no type has.
 
 `unit-list` modes:
 
@@ -951,8 +958,7 @@ the units the setup model holds: fielded units and those active abilities may
 place (see [Setup changes](#setup-changes)). Participating choices use the
 active combat surface; setup grants can expose additional surfaces. In ground
 mode they are made by unit type (plain variant keys, no surface): each ground
-combat is fought on one planet, so a choice applies on every planet holding
-units. Only a combat drawing participants from several surfaces (space
+combat is fought on one planet, so a choice applies on every planet. Only a combat drawing participants from several surfaces (space
 combat with Alastor or Eidolon Maximum) and system choices keep the
 surface. System
 choices use every surface a unit stands on. Explicit availability filters and
@@ -1009,7 +1015,36 @@ entries like `getFlat` and compiles each list object once, so never mutate a
 to retain location in subsequent queries.
 Subtype declarations use plain `unitType` plus optional `surfaces` metadata.
 
+### Per-planet choices
+
+`scope: 'planet'` offers each unit type once per planet of the system,
+whether or not units stand there, with `UnitLocator` keys
+(`@planet-2/INFANTRY`). A ground invasion fights over every planet, so each
+receives what the list sends it; the runtime reads the invaded planets with
+`foughtPlanetIds(ctx.state)` (`abilities-engine/unit-options.ts`) and puts
+units listed for a planet outside the invasion on the first one. Values stored by type (earlier versions) move to the first
+planet, and a subtype never inherits its parent's count.
+
+- **Per-planet amounts** (G'hom Sek'kus: units committed onto each planet):
+  a `unit-list` in `number` mode, grouped by planet. A `limit` caps each
+  base type's total across planets.
+- **Splits** (`split: UnitSplit`): divide units the side already fields.
+  `from: 'space'` counts units in space (commitment), `from: 'system'` every
+  unit (`unitAbility` narrows them, Bombardment's `'BOMBARDMENT'`);
+  `canStay` adds a `@space` entry for units kept back. Each item's `max` is its
+  type's unit count, and reconcile keeps every type's counts adding up to it:
+  new units go to the first planet, surplus leaves space first, then the last
+  planets. Show it with `unit-split`. At runtime `splitUnits(ctx, list, ids)`
+  (`abilities-engine/api/split-units.ts`) returns the planets and the units
+  each receives, putting units the list doesn't cover on the first planet.
+
+`resolveStep(meta, { surfaceId, units })` resolves a unit ability against a
+planet with only the given units rolling: the planet becomes active (targets,
+Planetary Shield) before the roll and stays so. Calls run last-pushed first,
+so push planets in reverse (Bombardment's driver).
+
 Setup changes extend these choices through their grants: a unit granted the
 mode's category counts on its own surface (Alastor), and the attacker's
 granted ground forces in space are committed onto the active planet
-(Matriarch/Morphwing). The preview never grants runtime participation.
+(Matriarch/Morphwing), which also lists them in Commit Ground Forces'
+split. The preview never grants runtime participation.

@@ -312,6 +312,8 @@ export interface DiceRollContext {
   }
   /** Restrict dice-producing units to this physical surface. */
   sourceSurfaceId?: SurfaceId
+  /** Restrict dice-producing units to these units. */
+  sourceUnits?: readonly UnitId[]
   isUnitAbility: boolean
   /** Per-side dice collection in the kernel-native format. Populated by
    *  `_collectDice`; mutated in place by BEFORE-timing API calls. */

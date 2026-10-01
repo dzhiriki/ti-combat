@@ -1510,6 +1510,8 @@ export class AbilityContext {
       target?: 'OWN' | 'OPPONENT'
       firing?: ('OWN' | 'OPPONENT')[]
       deferPhaseEndCheck?: boolean
+      surfaceId?: SurfaceId
+      units?: readonly UnitId[]
       abilitiesOverride?: AbilitiesOverride
     },
   ): void {
@@ -1548,6 +1550,8 @@ export class AbilityContext {
       customDice,
       selfTarget,
       deferPhaseEndCheck: overrides?.deferPhaseEndCheck,
+      surfaceId: overrides?.surfaceId,
+      sourceUnits: overrides?.units,
       abilitiesOverride: overrides?.abilitiesOverride,
     })
   }

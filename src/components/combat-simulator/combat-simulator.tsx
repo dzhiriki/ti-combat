@@ -162,15 +162,17 @@ export function CombatSimulator({
       return next
     })
 
+  // Abilities move between slots as planets are added.
+  const surfaceCount = surfaces.length
   const attackerAbilities = useMemo(
     () => getAvailableAbilities('attacker'),
     // oxlint-disable-next-line react/exhaustive-deps
-    [system, attackerFaction],
+    [system, attackerFaction, surfaceCount],
   )
   const defenderAbilities = useMemo(
     () => getAvailableAbilities('defender'),
     // oxlint-disable-next-line react/exhaustive-deps
-    [system, defenderFaction],
+    [system, defenderFaction, surfaceCount],
   )
 
   const attackerReadContext = useMemo(

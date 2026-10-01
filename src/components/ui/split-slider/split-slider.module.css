@@ -1,0 +1,75 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.root {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: var(--control-size);
+  touch-action: none;
+  user-select: none;
+}
+
+.track {
+  position: relative;
+  flex-grow: 1;
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background-color: var(--color-accent-10);
+}
+
+.segment {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background-color: var(--color-accent-40);
+
+  &[data-parity='1'] {
+    background-color: var(--color-accent-20);
+  }
+}
+
+.thumb {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  cursor: grab;
+  border: 1px solid var(--color-accent-70);
+  border-radius: 9999px;
+  background-color: var(--color-background-surface);
+
+  &:focus-visible {
+    outline: 2px solid var(--color-text-main);
+    outline-offset: 2px;
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.legendItem {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.legendLabel {
+  color: var(--color-text-muted);
+}
+
+.legendValue {
+  color: var(--color-text-main);
+  font-variant-numeric: tabular-nums;
+}

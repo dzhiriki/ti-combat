@@ -3,6 +3,7 @@ import type {
   CombatSide,
   DiceGroup,
   SurfaceId,
+  UnitAbility,
   UnitBaseType,
   UnitId,
   UnitStats,
@@ -56,7 +57,22 @@ export interface ParamFilter {
   withAbility?: boolean
 }
 
-export type UnitSelectorScope = 'participating' | 'system' | 'type'
+/** `planet`: one choice per invaded planet and unit type, whether or not
+ *  units stand there yet (see `declareParam.split`). */
+export type UnitSelectorScope = 'participating' | 'system' | 'type' | 'planet'
+
+/** A `planet` param that divides units the side already fields between the
+ *  invaded planets. Each type's counts add up to its units, and reconcile puts
+ *  units the list doesn't cover on the first planet. */
+export interface UnitSplit {
+  /** Units standing in space (commitment) or anywhere in the system. */
+  from: 'space' | 'system'
+  /** Only units whose stats carry this unit ability. */
+  unitAbility?: UnitAbility
+  /** Units may stay in space; their count is the `@space` entry. Needs
+   *  `from: 'space'`. */
+  canStay?: boolean
+}
 
 /** Location of a surface-qualified option, for grouping and labels. */
 export interface SurfaceOptionMeta {
@@ -86,6 +102,8 @@ export interface SyncSourceConfig {
   /** See `declareParam.limit`. Threaded through so reconcile can clamp
    *  stored values to the per-variant max. */
   limit?: ParamLimit
+  /** See `declareParam.split`. */
+  split?: UnitSplit
 }
 
 export interface DeclaredSubtype {
@@ -180,6 +198,8 @@ declare global {
     AFTER_DESTROY: UnitId[]
 
     COMMIT_UNITS: void
+    /** Driven by the Commit Ground Forces ability: lands ground forces. */
+    COMMIT_UNITS_STEP: void
   }
 
   /** Per-ability params registry. Ability files augment this interface. */
@@ -359,6 +379,9 @@ export interface AbilityCallContext {
    *                defender within `resolveStep`.
    *   - `deferPhaseEndCheck` — defer participant loss detection to a paired
    *                resolution or the enclosing phase driver.
+   *   - `surfaceId` — resolve against this planet: it becomes the active
+   *                surface (targets, shields) before the roll and stays so.
+   *   - `units`   — only these units of the firing side roll.
    *
    *  Composition: multiple `resolveStep` calls in one `call` execute in
    *  reverse call-order (LIFO): the last push sits on top of the script
@@ -370,6 +393,8 @@ export interface AbilityCallContext {
       target?: 'OWN' | 'OPPONENT'
       firing?: ('OWN' | 'OPPONENT')[]
       deferPhaseEndCheck?: boolean
+      surfaceId?: SurfaceId
+      units?: readonly UnitId[]
       /** Ability params overrides for this resolution only — immutable and
        *  applied over base + live params. Boolean shorthand = `{ isEnabled }`.
        *  e.g. `{ SUSTAIN_DAMAGE: false }` to skip Sustain for this step. */
@@ -471,6 +496,15 @@ interface UIConfigSelect<
 
 export type UnitListMode = 'order' | 'checkbox' | 'number'
 
+/** One slider per unit type dividing its units between surfaces; items come
+ *  from a `split` param (`max` is the type's unit count). */
+interface UIConfigUnitSplit<
+  TParams = Record<string, unknown>,
+> extends UIConfigItemBase<TParams> {
+  type: 'unit-split'
+  items: ({ label: string; value: string; max?: number } & SurfaceOptionMeta)[]
+}
+
 interface UIConfigUnitList<
   TParams = Record<string, unknown>,
 > extends UIConfigItemBase<TParams> {
@@ -490,6 +524,7 @@ export type UIConfigItem<TParams = Record<string, unknown>> =
   | UIConfigNumber<TParams>
   | UIConfigSelect<TParams>
   | UIConfigUnitList<TParams>
+  | UIConfigUnitSplit<TParams>
 
 type UIConfig<Params = Record<string, unknown>> =
   | UIConfigItem<Params>[]

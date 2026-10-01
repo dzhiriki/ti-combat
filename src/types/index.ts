@@ -9,6 +9,7 @@ export type {
   LazyContext,
 } from './faction'
 export type {
+  AbilityLayoutContext,
   CollectedAbility,
   GameData,
   SlotCategory,

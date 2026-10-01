@@ -8,6 +8,7 @@ import {
 import type {
   CombatMode,
   CombatStateData,
+  InvasionState,
   SideStateData,
   UnitStatsEntry,
 } from '@/combat/combat-state/types'
@@ -71,6 +72,7 @@ export function applyDeclaredChanges(
   surfaces: readonly SurfaceDefinition[],
   combatMode: CombatMode,
   activeSurfaceId: SurfaceId,
+  invasion?: InvasionState,
 ): Record<CombatSide, SideStateData> {
   // Setup applies what the panel shows as switched on.
   const changing = {
@@ -98,6 +100,7 @@ export function applyDeclaredChanges(
       surfaces,
       combatMode,
       activeSurfaceId,
+      invasion,
       firstCode,
     )
     if (!changing.attacker.length && !changing.defender.length)
@@ -153,6 +156,7 @@ function buildModel(
   surfaces: readonly SurfaceDefinition[],
   combatMode: CombatMode,
   activeSurfaceId: SurfaceId,
+  invasion: InvasionState | undefined,
   firstCode: number | undefined,
 ): CombatStateData {
   const gen: { _nextCode?: number } = { _nextCode: firstCode }
@@ -186,6 +190,7 @@ function buildModel(
     combatMode,
     surfaces: [...surfaces],
     activeSurfaceId,
+    invasion,
     _nextCode: gen._nextCode,
   }
 }

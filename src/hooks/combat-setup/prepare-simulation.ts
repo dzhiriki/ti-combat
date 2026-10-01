@@ -4,6 +4,7 @@ import { makeVariantId } from '@/combat/utils/unit-variant'
 import type { CollectedAbility, CombatSide, UnitStats } from '@/types'
 import { getGameData } from '@/utils/get-game-data'
 import { buildUnitStatsMap } from '@/utils/get-simulation-units'
+import { layoutContext } from '@/utils/layout-context'
 
 import type { Ability } from '../../combat/abilities-engine/types'
 import { applyDeclaredChanges } from './apply-declared-changes'
@@ -50,6 +51,7 @@ export function prepareSimulation(
         'attacker',
         factions.attacker,
         new Set(placements.attacker.upgradedTypes),
+        layoutContext(surfaces),
       ),
       ...customRegistered,
     ],
@@ -58,6 +60,7 @@ export function prepareSimulation(
         'defender',
         factions.defender,
         new Set(placements.defender.upgradedTypes),
+        layoutContext(surfaces),
       ),
       ...customRegistered,
     ],
@@ -95,6 +98,7 @@ export function prepareSimulation(
     surfaces,
     combatMode,
     activeSurfaceId,
+    invasion,
   )
   const gen: { _nextCode?: number } = {}
   const state = {

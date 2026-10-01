@@ -317,6 +317,14 @@ a check there too.
   `ctx.abilities.opponent` may be empty. See
   `tests/engine/declare-changes.test.ts`.
 
+- **The setup model shares the side state's unit ids.** Grants and options
+  look units up by id in `optionMetadata.model` (`isUnitCategory(model, id)`),
+  and rebuilding a side's units gives them new ids. Every setup mutation that
+  rebuilds units must reconcile afterwards, including a param change of a
+  `declareChanges` ability; otherwise split options come up empty (Commit
+  Ground Forces after toggling Matriarch). See
+  `tests/abilities/commit-ground-forces+matriarch.test.ts`.
+
 - **`declareParam` sourced params sync only at reconcile, and those values
   survive into the engine run.** Surface-scoped lists offer only the units the
   setup model holds, so an ability that places units mid-combat must declare
@@ -338,8 +346,9 @@ a check there too.
   Reconcile resolves list options with `allSurfaces` (every surface of the
   param's mode), while `getUnitVariantsOptions` shows only the fought ones:
   the active surface, or every planet of `CombatStateData.invasion`. In
-  ground mode setup's active surface is the first planet holding units (where
-  commitment lands), not the selected tab, which only picks the planet being
+  ground mode every planet is invaded and setup's active surface is the first
+  planet in tab order (where commitment lands unless split), not the selected
+  tab, which only picks the planet being
   edited. Ground participant choices are merged by type (`choosesByType`) and
   reconcile strips the surface from stored ground entries, first entry per
   variant winning, so this applies to space and system lists. UI
@@ -441,6 +450,16 @@ a check there too.
   Custodia Vigilia and Geoform add dice to every planet's SCD roll. See
   `tests/engine/multi-planet-invasion.test.ts`.
 
+- **Commitment is an ability, not an engine step.** The `COMMIT_UNITS`
+  script runs the `COMMIT_UNITS` timing (Matriarch/Morphwing grant fighters
+  the ground-force category, G'hom Sek'kus places units), then
+  `COMMIT_UNITS_STEP`, where the ADVANCED `COMMIT_GROUND_FORCES` driver lands
+  the attacker's ground forces in space by its split. A state built without
+  the registered ADVANCED abilities commits nothing. A split bombardment
+  resolves once per planet (`resolveStep` with `surfaceId`/`units`) and the
+  BOMBARDMENT script re-activates the first planet afterwards; Planetary
+  Shield re-checks the active planet before every bombardment roll.
+
 - **"On this planet" effects must not be side-wide.** With several planets a
   blanket restriction or config change leaks into the other planets' combats.
   Restrict the units standing on the planet with a surface-scoped restriction
@@ -448,10 +467,10 @@ a check there too.
   attacker commits it from space). An effect about the planet being attacked
   rather than where units stand can't be surface-scoped: apply it at the
   planet's `START_OF_COMBAT` (context `GROUND_COMBAT`) when its source stands
-  on the active planet, and undo it at `END_OF_COMBAT` (Planetary Shield,
-  which also sets it at PREPARE for the shared bombardment; Annihilator;
-  Shield Paling). The undo is a unit-sourced invoke, so it needs a surviving
-  carrier.
+  on the active planet, and undo it at `END_OF_COMBAT` (Annihilator, Shield
+  Paling), or re-check it right before the effect applies (Planetary Shield,
+  before each bombardment roll). The undo is a unit-sourced invoke, so it
+  needs a surviving carrier.
 
 - **The `[0.0.1]` assignHits fast path compares base types, not locators.**
   Surface-qualified tiers are equivalent only when they name one surface and

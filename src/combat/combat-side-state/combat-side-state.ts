@@ -1174,6 +1174,7 @@ export class CombatSideState {
     source: HitSource,
     sourceSurfaceId?: SurfaceId,
     instanceModifiers: readonly HitValueModifierDecl[] = [],
+    sourceUnits?: readonly UnitId[],
   ): SideDiceCollection {
     const s = state[side]
     const collection: SideDiceCollection = {}
@@ -1189,6 +1190,7 @@ export class CombatSideState {
     const walk = (pool: UnitIdList) => {
       for (const id of pool) {
         if (sourceSurfaceId && s.unitSurface[id] !== sourceSurfaceId) continue
+        if (sourceUnits && !sourceUnits.includes(id as UnitId)) continue
         const key = s.unitType[id]
         const { baseType: type } = parseUnitLocator(key)
 

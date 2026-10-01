@@ -7,6 +7,7 @@ import type {
   SyncSortSpec,
   SyncSourceConfig,
   UnitSelectorScope,
+  UnitSplit,
 } from './types'
 
 export type { ParamLimit } from './param-limit'
@@ -45,6 +46,9 @@ interface DeclaredParamOptions<T> {
    *  Pair with `filter: { includeOnlyAvailable: true }` to also drop variants
    *  whose cap currently resolves to 0 from the UI and stored list. */
   limit?: ParamLimit
+  /** With `scope: 'planet'`: divide the side's existing units between the
+   *  invaded planets instead of choosing new ones per planet. */
+  split?: UnitSplit
 }
 
 export interface DeclaredParamValue<T> extends Omit<
@@ -71,6 +75,7 @@ export function declareParam<T>(options: DeclaredParamOptions<T>): T {
     defaultItemValue: options.defaultItemValue,
     filter: options.filter,
     limit: options.limit,
+    split: options.split,
   } as unknown as T
 }
 
@@ -125,6 +130,7 @@ export function extractSyncSources(
         defaultItemValue: value.defaultItemValue,
         filter: value.filter,
         limit: value.limit,
+        split: value.split,
       })
     }
   }

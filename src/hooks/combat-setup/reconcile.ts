@@ -20,6 +20,7 @@ import type {
   RegisteredAbility,
   SideOptionMetadata,
   SyncSourceConfig,
+  UnitOption,
 } from '@/combat/abilities-engine/types'
 import {
   choosesByType,
@@ -37,6 +38,7 @@ import {
   type CombatSide,
   createDefaultSurfaces,
   SPACE_SURFACE_ID,
+  type SurfaceId,
   type UnitType,
 } from '@/types'
 import { factionSlot } from '@/utils/faction-slot'
@@ -113,6 +115,7 @@ export function reconcileAbilitiesConfig(
       state.surfaces ?? createDefaultSurfaces(),
       combatMode,
       state.activeSurfaceId ?? SPACE_SURFACE_ID,
+      state.invasion,
     )
   }
   const model = applyChanges(config)
@@ -386,6 +389,69 @@ export function collectDeclaredSubtypes(
   return result
 }
 
+/** Planet-scoped entries stored without a planet (earlier versions chose by
+ *  type) move to the type's first planet. */
+function onFirstPlanet(
+  entries: readonly ([string] | [string, unknown])[],
+  validList: readonly string[],
+): ([string] | [string, unknown])[] {
+  return entries.map(entry => {
+    if (parseUnitLocator(entry[0]).surfaceId !== undefined) return entry
+    const first = validList.find(
+      key => parseUnitLocator(key).unitType === entry[0],
+    )
+    return first ? ([first, ...entry.slice(1)] as typeof entry) : entry
+  })
+}
+
+/** Per base type, a split's counts add up to its units: extra units go to
+ *  the default planet (where commitment lands) and surplus leaves space, then
+ *  the last planets. Other planet params keep their total within the type's
+ *  cap. */
+function balancePlanetCounts(
+  entries: ([string] | [string, unknown])[],
+  options: readonly UnitOption[],
+  split: boolean,
+  defaultPlanet: SurfaceId | undefined,
+): ([string] | [string, unknown])[] {
+  // Variants share their base type's units and reinforcements.
+  const byType = Map.groupBy(
+    options,
+    option => parseUnitLocator(option.value).baseType,
+  )
+  const counts = new Map(
+    entries.map(entry => [entry[0], Number(entry[1]) || 0] as const),
+  )
+  for (const typeOptions of byType.values()) {
+    const cap = typeOptions[0].max ?? Infinity
+    // Space (units kept back) gives way first, then later planets.
+    const keys = typeOptions
+      .map(option => option.value as string)
+      .sort(
+        (a, b) =>
+          Number(parseUnitLocator(a).surfaceId === SPACE_SURFACE_ID) -
+          Number(parseUnitLocator(b).surfaceId === SPACE_SURFACE_ID),
+      )
+    let total = keys.reduce((sum, key) => sum + (counts.get(key) ?? 0), 0)
+    for (let i = keys.length - 1; i >= 0 && total > cap; i--) {
+      const value = counts.get(keys[i]) ?? 0
+      const cut = Math.min(value, total - cap)
+      counts.set(keys[i], value - cut)
+      total -= cut
+    }
+    const target =
+      keys.find(key => parseUnitLocator(key).surfaceId === defaultPlanet) ??
+      keys[0]
+    if (split && total < cap)
+      counts.set(target, (counts.get(target) ?? 0) + cap - total)
+  }
+  return entries.map(entry =>
+    entry.length === 2 && counts.has(entry[0])
+      ? [entry[0], counts.get(entry[0])]
+      : entry,
+  )
+}
+
 /** Unqualified entries, keeping the first entry for each variant. */
 function withoutSurfaces(
   entries: readonly ([string] | [string, unknown])[],
@@ -442,14 +508,17 @@ function reconcileSyncSources(
 
       const currentValue = abilityParams[source.key]
       const surfaceScoped =
-        source.scope !== 'type' &&
-        (scopedDefaults ||
-          (typeof currentValue === 'string'
-            ? currentValue.startsWith('@')
-            : Array.isArray(currentValue) &&
-              currentValue.some(entry =>
-                (typeof entry === 'string' ? entry : entry[0]).startsWith('@'),
-              )))
+        source.scope === 'planet' ||
+        (source.scope !== 'type' &&
+          (scopedDefaults ||
+            (typeof currentValue === 'string'
+              ? currentValue.startsWith('@')
+              : Array.isArray(currentValue) &&
+                currentValue.some(entry =>
+                  (typeof entry === 'string' ? entry : entry[0]).startsWith(
+                    '@',
+                  ),
+                ))))
       // Simulation preparation can run before placements exist. Qualified
       // user selections must survive until that context is available.
       if (surfaceScoped && !state.surfaces) {
@@ -500,7 +569,9 @@ function reconcileSyncSources(
         // stay hidden, so a unit removed and added back keeps its settings.
         const surfaces = new Set(state.surfaces?.map(surface => surface.id))
         const keepAbsent =
-          surfaceScoped && !source.filter?.includeOnlyAvailable
+          surfaceScoped &&
+          source.scope !== 'planet' &&
+          !source.filter?.includeOnlyAvailable
             ? (key: string) => {
                 const { surfaceId } = parseUnitLocator(key)
                 return surfaceId === undefined
@@ -509,13 +580,27 @@ function reconcileSyncSources(
               }
             : undefined
         const entries = currentValue as ([string] | [string, unknown])[]
-        abilityParams[source.key] = reconcileUnitListParam(
-          byType ? withoutSurfaces(entries) : entries,
+        const reconciled = reconcileUnitListParam(
+          byType
+            ? withoutSurfaces(entries)
+            : source.scope === 'planet'
+              ? onFirstPlanet(entries, validList)
+              : entries,
           validList,
           source.defaultItemValue,
           maxFor,
           keepAbsent,
+          source.scope !== 'planet',
         )
+        abilityParams[source.key] =
+          source.scope === 'planet'
+            ? balancePlanetCounts(
+                reconciled,
+                options,
+                !!source.split,
+                state.activeSurfaceId,
+              )
+            : reconciled
       } else if (typeof currentValue === 'string') {
         // Under a combat sort an unpicked choice (the declared default or
         // the last automatic choice) follows the strongest (or weakest)

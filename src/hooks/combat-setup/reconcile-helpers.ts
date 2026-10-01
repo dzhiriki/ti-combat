@@ -40,13 +40,16 @@ function inheritedValue(
  *    length-1 tuple `[key]` when `defaultItemValue` is omitted).
  *  - When `maxFor` is supplied, numeric values are clamped to the returned
  *    maximum (both kept entries and newly inserted ones). Non-finite maxes
- *    (Infinity) are treated as no-clamp. */
+ *    (Infinity) are treated as no-clamp.
+ *  - `inherit: false` builds every new entry from `defaultItemValue`, for
+ *    counts a subtype must not copy from its parent. */
 export function reconcileUnitListParam(
   current: readonly (UnitListEntry | string)[],
   validList: readonly string[],
   defaultItemValue?: unknown,
   maxFor?: (variantKey: string) => number,
   keep?: (key: string) => boolean,
+  inherit = true,
 ): UnitListEntry[] {
   // Order-mode lists round-trip through the URL as flat string arrays —
   // normalize those to 1-tuples here so reconcile treats both shapes
@@ -94,7 +97,7 @@ export function reconcileUnitListParam(
         insertAt = i + 1
       }
     }
-    const inherited = inheritedValue(newKey, valuesByKey)
+    const inherited = inherit ? inheritedValue(newKey, valuesByKey) : NO_PARENT
     let entry: UnitListEntry
     if (inherited !== NO_PARENT && inherited !== undefined) {
       entry = [newKey, clamp(newKey, inherited)]

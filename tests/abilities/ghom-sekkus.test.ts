@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest'
 
+import { makeUnitLocator } from '@/combat'
 import { CombatSetup } from '@/hooks/combat-setup'
+import { SPACE_SURFACE_ID } from '@/types'
 
 import { combatTest } from '../utils/combat-test'
-import { hitOrderUnits, setAbility } from '../utils/setup-options'
+import { hitOrderUnits, setAbility, setupOptions } from '../utils/setup-options'
+import {
+  getSurfaceUnitIds,
+  PLANET_1,
+  PLANET_2,
+  TWO_PLANET_INVASION,
+} from '../utils/surface-units'
+
+const at = makeUnitLocator
 
 describe('GHOM_SEKKUS', () => {
   it('adds configured units during COMMIT_UNITS', () => {
@@ -114,5 +124,71 @@ describe('GHOM_SEKKUS', () => {
       ],
     })
     expect(hitOrderUnits(setup, 'GROUND')).toContain(mech)
+  })
+
+  it('commits the chosen units onto each planet', () => {
+    const t = combatTest({
+      ...TWO_PLANET_INVASION,
+      attacker: {
+        faction: 'ARBOREC',
+        units: {},
+        placements: { [SPACE_SURFACE_ID]: { INFANTRY: 1 } },
+        abilities: {
+          GHOM_SEKKUS: {
+            isEnabled: true,
+            units: [
+              [at('INFANTRY', PLANET_1), 2],
+              [at('MECH', PLANET_2), 1],
+            ],
+          },
+        },
+      },
+      defender: {
+        faction: 'ARBOREC',
+        units: {},
+        placements: {
+          [PLANET_1]: { INFANTRY: 1 },
+          [PLANET_2]: { INFANTRY: 1 },
+        },
+      },
+    })
+
+    t.advanceTo('SPACE_CANNON_DEFENSE')
+
+    // Planet 1 also receives the infantry committed from space.
+    expect(getSurfaceUnitIds(t.state.attacker, PLANET_1)).toHaveLength(3)
+    expect(getSurfaceUnitIds(t.state.attacker, PLANET_2)).toHaveLength(1)
+    expect(t.attacker.units.MECH).toHaveLength(1)
+  })
+
+  it('offers each type per planet within the reinforcements left', () => {
+    const setup = new CombatSetup('FULL')
+    setup.setCombatMode('GROUND')
+    setup.addPlanet()
+    setup.setSurfaceUnitCount('attacker', SPACE_SURFACE_ID, 'MECH', 1)
+    setup.setSurfaceUnitCount('defender', PLANET_1, 'INFANTRY', 1)
+    setup.setSurfaceUnitCount('defender', PLANET_2, 'INFANTRY', 1)
+    setAbility(setup, 'attacker', 'GHOM_SEKKUS', {
+      isEnabled: true,
+      units: [
+        [at('MECH', PLANET_1), 2],
+        [at('MECH', PLANET_2), 2],
+      ],
+    })
+
+    expect(
+      setupOptions(setup, 'GHOM_SEKKUS', 'units')
+        .filter(item => item.value.endsWith('/MECH'))
+        .map(item => [item.value, item.max]),
+    ).toEqual([
+      [at('MECH', PLANET_1), 3],
+      [at('MECH', PLANET_2), 3],
+    ])
+    // Three mechs are left in reinforcements.
+    const counts = new Map(
+      setup.abilities.attacker.GHOM_SEKKUS.units as [string, number][],
+    )
+    expect(counts.get(at('MECH', PLANET_1))).toBe(2)
+    expect(counts.get(at('MECH', PLANET_2))).toBe(1)
   })
 })

@@ -178,7 +178,7 @@ describe('multi-planet simulation input', () => {
     return setup
   }
 
-  it('invades every planet holding units, in tab order', () => {
+  it('invades every planet in tab order', () => {
     const setup = setupTwoPlanets()
     setup.selectPlanet(PLANET_2)
 
@@ -187,20 +187,23 @@ describe('multi-planet simulation input', () => {
     expect(input.activeSurfaceId).toBe(PLANET_1)
   })
 
-  it('invades the planet holding units, whichever tab is selected', () => {
+  it('invades every planet, committing onto the first by default', () => {
     const setup = setupTwoPlanets()
     setup.setSurfaceUnitCount('defender', PLANET_1, 'PDS', 0)
-    setup.selectPlanet(PLANET_1)
+    setup.selectPlanet(PLANET_2)
 
-    expect(setup.toSimulationInput()!.activeSurfaceId).toBe(PLANET_2)
+    const input = setup.toSimulationInput()!
+    expect(input.invasionPlanets).toEqual([PLANET_1, PLANET_2])
+    expect(input.activeSurfaceId).toBe(PLANET_1)
   })
 
-  it('keeps the single-planet input otherwise', () => {
-    const setup = setupTwoPlanets()
-    setup.setSurfaceUnitCount('defender', PLANET_1, 'PDS', 0)
-    expect(setup.toSimulationInput()!.invasionPlanets).toBeUndefined()
+  it('keeps the single-planet input for one planet or space combat', () => {
+    const single = new CombatSetup('FULL')
+    single.setCombatMode('GROUND')
+    single.setSurfaceUnitCount('defender', PLANET_1, 'INFANTRY', 1)
+    expect(single.toSimulationInput()!.invasionPlanets).toBeUndefined()
 
-    setup.setSurfaceUnitCount('defender', PLANET_1, 'PDS', 1)
+    const setup = setupTwoPlanets()
     setup.setCombatMode('SPACE')
     expect(setup.toSimulationInput()!.invasionPlanets).toBeUndefined()
   })
