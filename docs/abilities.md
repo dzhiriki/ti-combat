@@ -1048,3 +1048,27 @@ mode's category counts on its own surface (Alastor), and the attacker's
 granted ground forces in space are committed onto the active planet
 (Matriarch/Morphwing), which also lists them in Commit Ground Forces'
 split. The preview never grants runtime participation.
+
+### Uses per planet
+
+Any ability with limited uses that it spends on a specific planet gets a
+"Uses per planet" control in a multi-planet invasion, with no
+ability code. An ability qualifies when one of its use-spending (non-`system`)
+invokes runs during a planet's turn rather than once for the system:
+`PREPARE`, `COMMIT_UNITS`, `COMMIT_UNITS_STEP`, `BOMBARDMENT_STEP` and the
+space-only steps don't count, so Blitz has no control; read-only and
+SPACE-context abilities never qualify (`spendsUsesOnPlanet` in
+`combat-state/planet-uses.ts`). The caps live in the generic `planetUses` param
+(`[SurfaceId, number][]`, next to `isEnabled` and `uses`); a planet without
+an entry is not limited, and a cap is a maximum, not a reservation: uses a
+planet leaves carry on to the planets after it. While a planet is active
+(its bombardment, Space Cannon Defense and ground combat) the ability's
+`params.uses` is what that planet may still spend, so invokes and dice
+modifiers need nothing planet-aware. The control (a number `List` with
+`optional` counts) steps a cap up from 0 to `uses`, then to no limit (an empty
+field); an ability with a fixed single use (default `uses: 1` and no `uses`
+control in its header or config, e.g. Fire Team) gets a checkbox per planet
+titled "Use on planets" instead (checked = allowed, unchecked = cap 0).
+Editable uses (Morale Boost) always get the counts. It renders first in the
+ability's config, whenever the uses are finite. Reconcile drops caps of missing planets and of abilities that don't qualify,
+and lowers caps above `uses`.

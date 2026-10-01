@@ -26,6 +26,10 @@ import {
   choosesByType,
   resolveUnitOptions,
 } from '@/combat/abilities-engine/unit-options'
+import {
+  type PlanetUsesParam,
+  spendsUsesOnPlanet,
+} from '@/combat/combat-state/planet-uses'
 import type {
   CombatMode,
   CombatStateData,
@@ -38,6 +42,7 @@ import {
   type CombatSide,
   createDefaultSurfaces,
   SPACE_SURFACE_ID,
+  type SurfaceDefinition,
   type SurfaceId,
   type UnitType,
 } from '@/types'
@@ -164,7 +169,53 @@ export function reconcileAbilitiesConfig(
     state[side].optionMetadata = metadata[side]
   }
   reconcileAbilityOrder(config, abilities, combatMode, lookups)
+  prunePlanetUses(
+    config,
+    abilities,
+    lookups,
+    state.surfaces ?? createDefaultSurfaces(),
+  )
   return metadata
+}
+
+/** Per-planet use caps belong to abilities that spend uses on a planet,
+ *  name a planet of the system and never exceed the ability's uses. */
+function prunePlanetUses(
+  config: AbilitiesConfig,
+  abilities: Record<CombatSide, RegisteredAbility[]>,
+  lookups: SideLookups,
+  surfaces: readonly SurfaceDefinition[],
+): void {
+  const planets = new Set(
+    surfaces
+      .filter(surface => surface.type === 'PLANET')
+      .map(surface => surface.id),
+  )
+  for (const side of ['attacker', 'defender'] as const) {
+    for (const [key, params] of Object.entries(config[side])) {
+      const caps = params.planetUses as PlanetUsesParam | undefined
+      if (caps === undefined) continue
+      const ability = abilities[side].find(item => item.key === key)
+      const kept =
+        ability &&
+        spendsUsesOnPlanet(ability, params, hookContext(lookups[side], ability))
+          ? caps
+              .filter(([planet]) => planets.has(planet))
+              .map(([planet, cap]): [SurfaceId, number] => [
+                planet,
+                Math.min(cap, params.uses as number),
+              ])
+          : []
+      if (
+        kept.length &&
+        kept.length === caps.length &&
+        kept.every(([, cap], i) => cap === caps[i][1])
+      )
+        continue
+      const { planetUses: _, ...rest } = params
+      config[side][key] = kept.length ? { ...rest, planetUses: kept } : rest
+    }
+  }
 }
 
 function collectOptionMetadata(

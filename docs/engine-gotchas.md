@@ -450,6 +450,22 @@ a check there too.
   Custodia Vigilia and Geoform add dice to every planet's SCD roll. See
   `tests/engine/multi-planet-invasion.test.ts`.
 
+- **Per-planet use caps rewrite live `uses` at every planet switch.**
+  `CombatStateData.planetUses` (set only when an ability's `planetUses`
+  config caps an invasion planet) holds each capped ability's allowance per
+  planet. Entering a planet lowers its live `uses` to what the planet may
+  spend and parks the rest in `reserved`; leaving bills the spent uses to the
+  planet and restores the rest (`combat-state/planet-uses.ts`). So every
+  reader of `uses` (dispatch gating, dice-math budgets) sees the planet's
+  limit for free, but every planet switch must go through `_activatePlanet`,
+  and the first planet is entered in `forSimulation` after PREPARE. An
+  ability whose uses run out loses its invokes from the index
+  (`addAbilityInvokes` after `decrementUses`), so restoring held-back uses
+  must re-register them (`_refreshPlanetUseInvokes`); a live `uses` value
+  alone doesn't make an ability fire again.
+  `planetUses` is replaced on write and hashed only when set. See
+  `tests/engine/planet-uses.test.ts`.
+
 - **Commitment is an ability, not an engine step.** The `COMMIT_UNITS`
   script runs the `COMMIT_UNITS` timing (Matriarch/Morphwing grant fighters
   the ground-force category, G'hom Sek'kus places units), then

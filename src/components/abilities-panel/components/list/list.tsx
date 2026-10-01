@@ -26,6 +26,11 @@ import { keepHiddenEntries } from './keep-hidden-entries'
 
 import styles from './list.module.css'
 
+/** An optional count steps past its max to none. */
+function noneCount(item: ListItem | undefined): number {
+  return (item?.max ?? Infinity) + 1
+}
+
 export interface ListItem extends SurfaceOptionMeta {
   label: string
   value: string
@@ -58,6 +63,9 @@ export type ListProps = CommonProps &
         mode: 'number'
         value: NumberListValue
         onChange: (value: NumberListValue) => void
+        /** A count steps past its max to none: an empty field (∞), absent
+         *  from the value. */
+        optional?: boolean
       }
   )
 
@@ -92,6 +100,7 @@ export function List(props: ListProps): React.ReactElement {
   )
 
   const ids = orderedItems.map(i => i.value)
+  const optional = props.mode === 'number' && props.optional === true
 
   function handleToggle(id: string): void {
     if (props.mode !== 'checkbox') return
@@ -105,8 +114,13 @@ export function List(props: ListProps): React.ReactElement {
 
   function handleCountChange(id: string, count: number): void {
     if (props.mode !== 'number') return
-    const max = orderedItems.find(i => i.value === id)?.max
+    const item = orderedItems.find(i => i.value === id)
+    const max = optional ? noneCount(item) : item?.max
     const clamped = Math.max(0, max != null ? Math.min(count, max) : count)
+    if (optional && clamped === max) {
+      props.onChange(props.value.filter(([k]) => k !== id))
+      return
+    }
     const has = props.value.some(([k]) => k === id)
     const next: NumberListValue = has
       ? props.value.map(([k, v]) => (k === id ? [k, clamped] : [k, v]))
@@ -150,6 +164,7 @@ export function List(props: ListProps): React.ReactElement {
 
   function isActive(id: string): boolean {
     if (props.mode === 'checkbox') return stateMap.get(id) === true
+    if (optional) return stateMap.has(id)
     if (props.mode === 'number')
       return ((stateMap.get(id) as number | undefined) ?? 0) > 0
     return true
@@ -168,14 +183,18 @@ export function List(props: ListProps): React.ReactElement {
       )
     }
     if (props.mode === 'number') {
-      const count = (stateMap.get(item.value) as number | undefined) ?? 0
+      const none = optional ? noneCount(item) : undefined
+      const count =
+        (stateMap.get(item.value) as number | undefined) ?? none ?? 0
       return (
         <Input
           square
           value={count}
-          active={!!count}
+          active={isActive(item.value)}
           min={0}
-          max={item.max}
+          max={none ?? item.max}
+          emptyValue={none}
+          placeholder={optional ? '∞' : undefined}
           onPointerDown={e => e.stopPropagation()}
           onChange={value => handleCountChange(item.value, value)}
         />

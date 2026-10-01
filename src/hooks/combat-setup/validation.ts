@@ -14,9 +14,13 @@ import type { SerializedConfig } from './serialization'
 
 const unitTypeSet = new Set<string>(UNIT_TYPES)
 
+/** Params every ability takes, outside its own schema. */
+const BASE_PARAMS = new Set(['isEnabled', 'uses', 'planetUses'])
+
 const baseAbilitySchema = z.object({
   isEnabled: z.optional(z.boolean()),
   uses: z.optional(z.union([z.number(), z.literal(Infinity)])),
+  planetUses: z.optional(z.array(z.tuple([z.string(), z.number()]))),
 })
 
 export interface ValidationResult {
@@ -274,11 +278,11 @@ function mergeWithDefaults(
   const defaults = extractDefaults(ability)
   const merged: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(defaults)) {
-    if (k === 'isEnabled' || k === 'uses') continue
+    if (BASE_PARAMS.has(k)) continue
     merged[k] = v
   }
   for (const [k, v] of Object.entries(params)) {
-    if (k === 'isEnabled' || k === 'uses') continue
+    if (BASE_PARAMS.has(k)) continue
     merged[k] = v
   }
   return merged

@@ -68,6 +68,12 @@ planet's first round, `advanceTo('COMPLETE')` runs every planet, and
 lists the finished planets' winners. See
 `tests/engine/multi-planet-invasion.test.ts`.
 
+Cap an ability per planet with `planetUses` in its config
+(`MORALE_BOOST: { uses: 3, planetUses: [[P1, 1]] }`); while a planet is
+active its live `uses` show what that planet may still spend. `customAbilities`
+register for both sides, so disable the other side's copy when a test counts
+calls. See `tests/engine/planet-uses.test.ts`.
+
 ### Ability params shorthand
 
 - `ABILITY_KEY: true` expands to `{ isEnabled: true }`

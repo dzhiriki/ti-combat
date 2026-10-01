@@ -14,9 +14,11 @@ import {
   withRunningAbility,
 } from '@/combat'
 import type { UIConfigItem } from '@/combat/abilities-engine/types'
+import type { PlanetUsesParam } from '@/combat/combat-state/planet-uses'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Tooltip } from '@/components/ui/tooltip'
+import { cappablePlanets } from '@/utils/cappable-planets'
 import { namespaceSvgIds } from '@/utils/namespace-svg-ids'
 
 import {
@@ -25,6 +27,7 @@ import {
   type NumberListValue,
   type OrderListValue,
 } from '../list'
+import { hasFixedSingleUse, PlanetUses, planetUsesTitle } from '../planet-uses'
 import { Select } from '../select'
 import { splitGroups, UnitSplit, type UnitSplitValue } from '../unit-split'
 
@@ -104,7 +107,15 @@ export function AbilityConfig({
     }
   }, [ability.key, uiConfigItems, params, defaults])
 
-  const hasConfigItems = uiConfigItems && uiConfigItems.length > 0
+  // Limited uses of an invasion over several planets can be capped per
+  // planet; uses a planet leaves carry on to the next.
+  const effectiveParams = { ...defaults, ...params }
+  const uses = effectiveParams.uses
+  const usesPlanets = cappablePlanets(ability, effectiveParams, readContext)
+  const singleUse = hasFixedSingleUse(ability, uiConfigItems)
+
+  const hasConfigItems =
+    (uiConfigItems && uiConfigItems.length > 0) || !!usesPlanets
   const isCollapsible = !!hasConfigItems
   const [isCollapsed, setIsCollapsed] = useState(true)
 
@@ -248,7 +259,21 @@ export function AbilityConfig({
       {header}
       {hasConfigItems && !isCollapsed && (
         <div className={styles.configItems} onClick={e => e.stopPropagation()}>
-          {uiConfigItems!.map(config => {
+          {usesPlanets && (
+            <div className={styles.configItemGroup}>
+              <span className={styles.configItemText}>
+                {planetUsesTitle(singleUse)}
+              </span>
+              <PlanetUses
+                planets={usesPlanets}
+                uses={uses as number}
+                singleUse={singleUse}
+                value={params.planetUses as PlanetUsesParam | undefined}
+                onChange={value => handleListChange('planetUses', value)}
+              />
+            </div>
+          )}
+          {uiConfigItems?.map(config => {
             const key = config.key as string
             const defaultValue = config.defaultValue ?? defaults?.[key]
 

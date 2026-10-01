@@ -47,6 +47,12 @@ import {
   participatesInCombat,
 } from '../utils/unit-combat-properties'
 import { getNextPhaseInFlow, isCombatMeta } from './phase-utils'
+import {
+  collectPlanetUseLimits,
+  enterPlanetUses,
+  leavePlanetUses,
+  planetUsesHash,
+} from './planet-uses'
 import type {
   CombatMode,
   CombatStateData,
@@ -229,6 +235,7 @@ export class CombatState {
       surfaces: setup.surfaces,
       activeSurfaceId: setup.activeSurfaceId,
       invasion: setup.invasion,
+      planetUses: undefined,
       _nextCode: setup.nextCode,
     }
 
@@ -250,6 +257,11 @@ export class CombatState {
     // into the simulation flow as bogus pending steps for the initial meta.
     instance._params.runAbilities('PREPARE')
     if (instance.pendingSteps.length > 0) instance.advance()
+
+    // Per-planet use caps hold back the uses the first planet may not spend.
+    baseData.planetUses = collectPlanetUseLimits(baseData)
+    enterPlanetUses(baseData, 0)
+    instance._refreshPlanetUseInvokes()
 
     // One-time sort: filter `units[]` to participating-only and order by
     // combat-mode priority rank. Never re-sorted during combat in iteration 1.
@@ -405,7 +417,7 @@ export class CombatState {
 
   getHash(): string {
     const d = this.data
-    return `${CombatSideState.getHash(d.attacker, d.activeSurfaceId)}|${CombatSideState.getHash(d.defender, d.activeSurfaceId)}${invasionHash(d)}`
+    return `${CombatSideState.getHash(d.attacker, d.activeSurfaceId)}|${CombatSideState.getHash(d.defender, d.activeSurfaceId)}${invasionHash(d)}${planetUsesHash(d)}`
   }
 
   /**
@@ -668,11 +680,28 @@ export class CombatState {
   private _activatePlanet(planet: SurfaceId): void {
     const d = this.data
     if (d.activeSurfaceId === planet) return
+    if (d.planetUses) {
+      const planets = d.invasion!.planets
+      leavePlanetUses(d, planets.indexOf(d.activeSurfaceId))
+      enterPlanetUses(d, planets.indexOf(planet))
+      this._refreshPlanetUseInvokes()
+    }
     d.activeSurfaceId = planet
     d.attacker._resolvedRestrictions = undefined
     d.defender._resolvedRestrictions = undefined
     resyncSide(d, 'attacker')
     resyncSide(d, 'defender')
+  }
+
+  /** A planet switch rewrites capped abilities' live `uses`; an ability
+   *  whose uses ran out had its invokes dropped from the index, so they come
+   *  back with the uses held for the next planet. */
+  private _refreshPlanetUseInvokes(): void {
+    const limits = this.data.planetUses
+    if (!limits) return
+    this._params.setCombatState(this, this._logger)
+    for (const { side, key } of limits)
+      this._params.addAbilityInvokes(side, key, this.data)
   }
 
   /** Whether a finished planet combat is followed by another planet's. */

@@ -360,6 +360,19 @@ export interface InvasionState {
   readonly results: readonly (CombatSide | 'draw')[]
 }
 
+/** How many uses an ability may still spend on each planet of a
+ *  multi-planet invasion. While a planet is active its live `uses` hold at
+ *  most the planet's allowance; the surplus waits in `reserved`. */
+export interface PlanetUseLimit {
+  readonly side: CombatSide
+  readonly key: string
+  /** Uses left per invasion planet, in `planets` order; Infinity if uncapped. */
+  readonly allowance: readonly number[]
+  readonly reserved: number
+  /** Live uses when the active planet was entered. */
+  readonly entered: number
+}
+
 /** Complete combat state data */
 export interface CombatStateData {
   attacker: SideStateData
@@ -372,6 +385,9 @@ export interface CombatStateData {
   /** Set only for multi-planet invasions. Branch clones share it, so it is
    *  replaced on write, never mutated. */
   invasion?: InvasionState
+  /** Per-planet use caps of a multi-planet invasion; undefined when no
+   *  ability is capped. Replaced on write, never mutated. */
+  planetUses?: readonly PlanetUseLimit[]
   /** The scheduler's current meta, set when its script loads; undefined
    *  during PREPARE. Nested metas (AFB) keep the enclosing combat's. Selects
    *  the phase-scoped `CATEGORIES` entries that apply. */

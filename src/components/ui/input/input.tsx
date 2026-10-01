@@ -16,6 +16,10 @@ interface InputProps {
   active?: boolean
   disabled?: boolean
   steppers?: boolean
+  /** Shown as an empty field with the placeholder; clearing the field
+   *  selects it. */
+  emptyValue?: number
+  placeholder?: string
   onClick?: React.MouseEventHandler<HTMLInputElement>
   onPointerDown?: React.PointerEventHandler<HTMLInputElement>
 }
@@ -31,6 +35,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     active,
     disabled,
     steppers = true,
+    emptyValue,
+    placeholder,
     onClick,
     onPointerDown,
   },
@@ -48,6 +54,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>): void {
     const raw = e.target.valueAsNumber
+    if (isNaN(raw) && emptyValue !== undefined) {
+      onChange(emptyValue)
+      return
+    }
     const parsed = isNaN(raw) ? 0 : Math.trunc(raw)
     onChange(clamp(parsed))
   }
@@ -65,7 +75,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           [styles.input_square]: square,
           [styles.input_active]: active,
         })}
-        value={value}
+        value={value === emptyValue ? '' : value}
+        placeholder={placeholder}
         min={min}
         max={max}
         step={step}
@@ -86,7 +97,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         [styles.input_square]: square,
         [styles.input_active]: active,
       })}
-      value={value}
+      value={value === emptyValue ? '' : value}
+      placeholder={placeholder}
       min={min}
       max={max}
       step={step}
