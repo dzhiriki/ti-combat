@@ -105,6 +105,8 @@ export function CombatSimulator({
     setEditorMode,
     selectPlanet,
     addPlanet,
+    removePlanet,
+    reorderPlanets,
     setSurfaceUnitCount,
     resetUnits,
     resetAbilities,
@@ -372,6 +374,8 @@ export function CombatSimulator({
           onCombatModeChange={setCombatMode}
           onPlanetChange={selectPlanet}
           onAddPlanet={addPlanet}
+          onRemovePlanet={removePlanet}
+          onReorderPlanets={reorderPlanets}
           onFactionChange={setFaction}
           onSwap={swap}
           onUnitCountChange={setUnitCount}

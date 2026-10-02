@@ -31,6 +31,7 @@ import type { UnitConfig } from '@/utils/get-unit-config'
 import { Divider } from '../ui/divider'
 import { CombatResultBar } from './components/combat-result-bar'
 import { FactionSelect } from './components/faction-select'
+import { PlanetTabs } from './components/planet-tabs'
 import { type SideUnitControls, UnitRowDual } from './components/unit-row-dual'
 
 import styles from './battle-card.module.css'
@@ -84,6 +85,8 @@ interface BattleCardProps {
   onCombatModeChange: (mode: CombatMode) => void
   onPlanetChange: (surfaceId: SurfaceId) => void
   onAddPlanet: () => void
+  onRemovePlanet: (surfaceId: SurfaceId) => void
+  onReorderPlanets: (planetIds: SurfaceId[]) => void
   onFactionChange: (side: CombatSide, faction: string) => void
   onSwap: () => void
   onUnitCountChange: (
@@ -138,6 +141,8 @@ export function BattleCard({
   onCombatModeChange,
   onPlanetChange,
   onAddPlanet,
+  onRemovePlanet,
+  onReorderPlanets,
   onFactionChange,
   onSwap,
   onUnitCountChange,
@@ -152,37 +157,6 @@ export function BattleCard({
   const planet = surfaces.find(surface => surface.id === selectedPlanetId)!
   const planets = surfaces.filter(surface => surface.type === 'PLANET')
   const multiPlanet = planetReports.length > 0
-
-  const planetTabs = (
-    <nav className={styles.planetTabs} aria-label="Planets">
-      {planets.map((surface, index) => (
-        <span className={styles.planetTabItem} key={surface.id}>
-          {index > 0 && <span className={styles.planetSeparator}>/</span>}
-          <button
-            type="button"
-            className={clsx(
-              styles.planetTab,
-              surface.id === selectedPlanetId && styles.planetTabSelected,
-            )}
-            aria-current={surface.id === selectedPlanetId ? 'page' : undefined}
-            onClick={() => onPlanetChange(surface.id)}
-          >
-            {surface.name}
-          </button>
-        </span>
-      ))}
-      <span className={styles.planetSeparator}>/</span>
-      <button
-        type="button"
-        className={styles.planetTab}
-        onClick={onAddPlanet}
-        title="Add planet"
-        aria-label="Add planet"
-      >
-        +
-      </button>
-    </nav>
-  )
 
   const countOnOtherSurfaces = (
     side: CombatSide,
@@ -306,7 +280,16 @@ export function BattleCard({
               )}
             </section>
             <section className={styles.surfaceSection}>
-              <div className={styles.surfaceTitle}>{planetTabs}</div>
+              <div className={styles.surfaceTitle}>
+                <PlanetTabs
+                  planets={planets}
+                  selectedPlanetId={selectedPlanetId}
+                  onSelect={onPlanetChange}
+                  onAdd={onAddPlanet}
+                  onRemove={onRemovePlanet}
+                  onReorder={onReorderPlanets}
+                />
+              </div>
               {renderUnitGroups(
                 surfaceSelections.attacker[planet.id],
                 surfaceSelections.defender[planet.id],

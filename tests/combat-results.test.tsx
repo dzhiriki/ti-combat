@@ -39,6 +39,8 @@ function render(outcomes: CombatOutcome[]) {
       onCombatModeChange={noop}
       onPlanetChange={noop}
       onAddPlanet={noop}
+      onRemovePlanet={noop}
+      onReorderPlanets={noop}
       onFactionChange={noop}
       onSwap={noop}
       onUnitCountChange={noop}

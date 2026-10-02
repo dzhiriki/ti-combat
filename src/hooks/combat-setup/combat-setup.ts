@@ -67,6 +67,11 @@ import type { SimulationInput } from './types'
 
 export type UnitEditorMode = 'SIMPLIFIED' | 'FULL'
 
+/** A planet is named after its id, so the name follows it when reordered. */
+function planetSurface(id: SurfaceId): SurfaceDefinition {
+  return { id, type: 'PLANET', name: `Planet ${id.replace('planet-', '')}` }
+}
+
 /**
  * Internal backing class for UI state management.
  * Manages unit selections, factions, abilities config, and reconciliation.
@@ -440,10 +445,7 @@ export class CombatSetup {
       .filter(Number.isFinite)
     const number = Math.max(0, ...numbers) + 1
     const id = `planet-${number}` as SurfaceId
-    this._surfaces = [
-      ...this._surfaces,
-      { id, type: 'PLANET', name: `Planet ${number}` },
-    ]
+    this._surfaces = [...this._surfaces, planetSurface(id)]
     for (const side of ['attacker', 'defender'] as const) {
       this._surfaceCounts[side] = {
         ...this._surfaceCounts[side],
@@ -453,6 +455,43 @@ export class CombatSetup {
     this._stateData = { ...this._stateData, surfaces: this._surfaces }
     this.loadAbilities()
     this.selectPlanet(id)
+  }
+
+  /** Drop a planet and the units placed on it; the last planet stays. */
+  removePlanet(surfaceId: SurfaceId): void {
+    if (this._editorMode !== 'FULL') return
+    const planets = this._surfaces.filter(s => s.type === 'PLANET')
+    const index = planets.findIndex(s => s.id === surfaceId)
+    if (index === -1 || planets.length === 1) return
+    this._surfaces = this._surfaces.filter(s => s.id !== surfaceId)
+    for (const side of ['attacker', 'defender'] as const) {
+      const { [surfaceId]: _, ...rest } = this._surfaceCounts[side]
+      this._surfaceCounts[side] = rest
+    }
+    if (surfaceId === this._selectedPlanetId) {
+      this._selectedPlanetId = (planets[index + 1] ?? planets[index - 1]).id
+    }
+    this.loadAbilities()
+    this.rebuildAllUnits()
+  }
+
+  /** Put the planets in this order, which is the order they are invaded. */
+  reorderPlanets(planetIds: readonly SurfaceId[]): void {
+    if (this._editorMode !== 'FULL') return
+    const planets = this._surfaces.filter(s => s.type === 'PLANET')
+    const byId = new Map(planets.map(planet => [planet.id, planet]))
+    if (
+      planetIds.length !== planets.length ||
+      new Set(planetIds).size !== planetIds.length ||
+      !planetIds.every(id => byId.has(id)) ||
+      planetIds.every((id, index) => id === planets[index].id)
+    )
+      return
+    this._surfaces = [
+      ...this._surfaces.filter(s => s.type !== 'PLANET'),
+      ...planetIds.map(id => byId.get(id)!),
+    ]
+    this.rebuildAllUnits()
   }
 
   setSurfaceUnitCount(
@@ -657,11 +696,7 @@ export class CombatSetup {
     const planetIds = config.p.length ? config.p : [DEFAULT_PLANET_ID]
     this._surfaces = [
       { id: SPACE_SURFACE_ID, type: 'SPACE', name: 'Space' },
-      ...planetIds.map((id, index) => ({
-        id: id as SurfaceId,
-        type: 'PLANET' as const,
-        name: `Planet ${index + 1}`,
-      })),
+      ...planetIds.map(id => planetSurface(id as SurfaceId)),
     ]
     this._selectedPlanetId = (
       planetIds.includes(config.sp) ? config.sp : planetIds[0]
