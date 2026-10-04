@@ -26,7 +26,6 @@ export const eidolon: Ability = {
       isCallable: (_params, ctx) =>
         ctx.api.own.getUnitSurface(ctx.getUnit()) === SPACE_SURFACE_ID,
       call: ctx => {
-        console.log('CALL')
         const stats = ctx.api.own.getUnitStats('MECH')!
         ctx.invokeChanges()
         // Modify all mechs to Z-Grav form: combat [8, 2], loses Sustain Damage
