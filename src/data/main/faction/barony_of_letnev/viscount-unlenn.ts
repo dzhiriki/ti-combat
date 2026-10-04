@@ -27,6 +27,7 @@ export const viscountUnlenn: Ability<Params> = {
     unitType: declareParam<UnitLocator>({
       default: 'FIGHTER',
       source: 'SHIPS',
+      sort: 'combat-desc',
       filter: {
         excludeSubtypeSource: ['VISCOUNT_UNLENN'],
         combatMode: 'SPACE',
@@ -55,7 +56,7 @@ export const viscountUnlenn: Ability<Params> = {
       key: 'unitType',
       label: 'Unit Type',
       type: 'select',
-      items: ctx.api.own.getUnitVariantsOptions('unitType').reverse(),
+      items: ctx.api.own.getUnitVariantsOptions('unitType'),
     },
   ],
   invoke: [

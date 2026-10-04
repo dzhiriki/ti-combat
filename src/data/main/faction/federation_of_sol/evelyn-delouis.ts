@@ -27,6 +27,7 @@ export const evelynDelouis: Ability<Params> = {
     unitType: declareParam<UnitLocator>({
       default: 'INFANTRY',
       source: 'GROUND_FORCES',
+      sort: 'combat-desc',
       filter: {
         excludeSubtypeSource: ['EVELYN_DELOUIS'],
         combatMode: 'GROUND',
@@ -55,7 +56,7 @@ export const evelynDelouis: Ability<Params> = {
       key: 'unitType',
       label: 'Unit Type',
       type: 'select',
-      items: ctx.api.own.getUnitVariantsOptions('unitType').reverse(),
+      items: ctx.api.own.getUnitVariantsOptions('unitType'),
     },
   ],
   invoke: [

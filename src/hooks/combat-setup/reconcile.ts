@@ -56,6 +56,11 @@ export type SideLookups = Record<
 
 export type OptionMetadata = Record<CombatSide, SideOptionMetadata>
 
+/** The value reconcile last chose for each combat-sorted single choice the
+ *  user hasn't picked, keyed `ABILITY.param`. A stored value equal to it is
+ *  still unpicked, so it follows the strongest (or weakest) unit present. */
+export type AutoChoices = Record<CombatSide, Record<string, string>>
+
 function hookContext(
   lookups: OwnOpponentContext<RuntimeAbilityList>,
   ability: Ability,
@@ -82,6 +87,7 @@ export function reconcileAbilitiesConfig(
   state: OptionState,
   lookups: SideLookups = createLookups(abilities),
   scopedDefaults = false,
+  autoChoices?: AutoChoices,
 ): OptionMetadata {
   ensureConsumerDefaults(config, abilities)
 
@@ -117,6 +123,7 @@ export function reconcileAbilitiesConfig(
     state,
     combatMode,
     scopedDefaults,
+    autoChoices,
   )
 
   const refreshed = collectOptionMetadata(
@@ -138,6 +145,7 @@ export function reconcileAbilitiesConfig(
       state,
       combatMode,
       scopedDefaults,
+      autoChoices,
     )
   }
 
@@ -263,6 +271,7 @@ function reconcileSyncAll(
   state: OptionState,
   combatMode: CombatMode,
   scopedDefaults: boolean,
+  autoChoices: AutoChoices | undefined,
 ): void {
   for (const side of ['attacker', 'defender'] as const) {
     const opponent = side === 'attacker' ? 'defender' : 'attacker'
@@ -275,6 +284,7 @@ function reconcileSyncAll(
       state,
       combatMode,
       scopedDefaults,
+      autoChoices?.[side],
     )
   }
 }
@@ -392,6 +402,7 @@ function reconcileSyncSources(
   state: OptionState,
   combatMode: CombatMode,
   scopedDefaults: boolean,
+  autoChoices: Record<string, string> | undefined,
 ): void {
   for (const ability of abilities) {
     const syncSources = extractSyncSources(ability)
@@ -475,10 +486,32 @@ function reconcileSyncSources(
           keepAbsent,
         )
       } else if (typeof currentValue === 'string') {
-        abilityParams[source.key] = reconcileStringParam(
-          relocateUnitTarget(currentValue, validList),
-          validList,
-        )
+        // Under a combat sort an unpicked choice (the declared default or
+        // the last automatic choice) follows the strongest (or weakest)
+        // unit present, on its surface while any is offered there.
+        const autoKey = `${ability.key}.${source.key}`
+        const automatic =
+          source.sort === 'combat-asc' || source.sort === 'combat-desc'
+        const unpicked =
+          automatic &&
+          surfaceScoped &&
+          (currentValue === extractDefaults(ability)[source.key] ||
+            currentValue === autoChoices?.[autoKey])
+        if (unpicked) {
+          const { surfaceId } = parseUnitLocator(currentValue)
+          const here = validList.filter(
+            option => parseUnitLocator(option).surfaceId === surfaceId,
+          )
+          const choice = (here.length ? here : validList)[0] ?? currentValue
+          abilityParams[source.key] = choice
+          if (autoChoices) autoChoices[autoKey] = choice
+        } else {
+          abilityParams[source.key] = reconcileStringParam(
+            relocateUnitTarget(currentValue, validList),
+            validList,
+          )
+          if (autoChoices && automatic) delete autoChoices[autoKey]
+        }
       }
     }
   }

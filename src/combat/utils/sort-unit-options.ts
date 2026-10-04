@@ -1,24 +1,79 @@
 import { UNIT_TYPES, UNIT_WORTH } from '@/constants/units'
-import type { UnitBaseType, UnitVariantId } from '@/types'
+import type { UnitBaseType, UnitStats, UnitType, UnitVariantId } from '@/types'
 
 import type { DeclaredSubtype, SyncSortSpec } from '../abilities-engine/types'
+import type { SideStateData } from '../combat-state/types'
 import { parseUnitLocator } from './parse-unit-locator'
+import { resolveUnitStats } from './resolve-unit-stats'
 import { makeVariantId } from './unit-variant'
 
+function isDescending(sort: SyncSortSpec): boolean {
+  return (
+    sort === 'worth-desc' || sort === 'normal-desc' || sort === 'combat-desc'
+  )
+}
+
+/** Combat sorts order base types by worth; `sortVariantsByCombat` then
+ *  reorders the expanded variants, keeping worth order for ties. */
 export function sortBaseTypes(
   types: UnitBaseType[],
   sort: SyncSortSpec,
 ): UnitBaseType[] {
   if (typeof sort === 'function') return [...types].sort(sort)
   const compare =
-    sort === 'worth-asc' || sort === 'worth-desc'
-      ? (a: UnitBaseType, b: UnitBaseType) => UNIT_WORTH[a] - UNIT_WORTH[b]
-      : (a: UnitBaseType, b: UnitBaseType) =>
+    sort === 'normal-asc' || sort === 'normal-desc'
+      ? (a: UnitBaseType, b: UnitBaseType) =>
           UNIT_TYPES.indexOf(a) - UNIT_TYPES.indexOf(b)
+      : (a: UnitBaseType, b: UnitBaseType) => UNIT_WORTH[a] - UNIT_WORTH[b]
   const sorted = [...types].sort(compare)
-  return sort === 'worth-desc' || sort === 'normal-desc'
-    ? sorted.reverse()
-    : sorted
+  return isDescending(sort) ? sorted.reverse() : sorted
+}
+
+/** Expected hits of one combat roll. */
+function combatStrength(stats: UnitStats | undefined): number {
+  if (!stats?.COMBAT) return 0
+  const [hit, dice, bonus = 0] = stats.COMBAT
+  return (dice + bonus) * Math.min(1, Math.max(0, (11 - hit) / 10))
+}
+
+/** A variant's stats: from the side's stats, or built from its base stats
+ *  through the declared subtypes' factories when setup holds none. */
+function variantStats(
+  unitStats: SideStateData['unitStats'],
+  subtypes: readonly DeclaredSubtype[],
+  variant: UnitType,
+): UnitStats | undefined {
+  const known = resolveUnitStats(unitStats, variant)
+  if (known) return known
+  const { baseType, subtypes: names } = parseUnitLocator(variant)
+  let stats = resolveUnitStats(unitStats, baseType)
+  names.forEach((name, index) => {
+    const parent = makeVariantId(baseType, names.slice(0, index))
+    const declaration = subtypes.find(
+      item => item.name === name && item.unitType === parent,
+    )
+    if (stats && declaration) stats = declaration.statsFactory(stats)
+  })
+  return stats
+}
+
+/** Stable: variants of equal strength keep their order. */
+export function sortVariantsByCombat(
+  variants: readonly UnitType[],
+  sort: 'combat-asc' | 'combat-desc',
+  unitStats: SideStateData['unitStats'],
+  subtypes: readonly DeclaredSubtype[],
+): UnitType[] {
+  const direction = sort === 'combat-desc' ? -1 : 1
+  const strength = new Map(
+    variants.map(variant => [
+      variant,
+      combatStrength(variantStats(unitStats, subtypes, variant)),
+    ]),
+  )
+  return [...variants].sort(
+    (a, b) => direction * (strength.get(a)! - strength.get(b)!),
+  )
 }
 
 export function expandWithSubtypes(
@@ -29,11 +84,7 @@ export function expandWithSubtypes(
   // Custom comparators don't carry direction info — treat as ascending so
   // subtype variants follow their parent.
   const direction =
-    typeof sort === 'function'
-      ? 'asc'
-      : sort === 'worth-desc' || sort === 'normal-desc'
-        ? 'desc'
-        : 'asc'
+    typeof sort !== 'function' && isDescending(sort) ? 'desc' : 'asc'
   const simpleByType = new Map<UnitBaseType, DeclaredSubtype[]>()
   const compound: DeclaredSubtype[] = []
 

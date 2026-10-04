@@ -16,7 +16,11 @@ import {
 import { getCombatMeta } from '../combat-state/phase-utils'
 import type { CombatMode, SideStateData } from '../combat-state/types'
 import { parseUnitLocator } from '../utils/parse-unit-locator'
-import { expandWithSubtypes, sortBaseTypes } from '../utils/sort-unit-options'
+import {
+  expandWithSubtypes,
+  sortBaseTypes,
+  sortVariantsByCombat,
+} from '../utils/sort-unit-options'
 import { isUnitCategory } from '../utils/unit-combat-properties'
 import { makeUnitLocator } from '../utils/unit-locator'
 import { getVariantDisplayName } from '../utils/unit-variant'
@@ -85,10 +89,20 @@ export function resolveUnitOptions(
   const subtypes = spec.filter?.includeOnlyBaseTypes
     ? []
     : filterDeclaredSubtypes(s.optionMetadata?.subtypes ?? [], spec.filter)
-  const variants = applyVariantPostFilter(
+  const expanded = applyVariantPostFilter(
     expandWithSubtypes(sorted, subtypes, spec.sort),
     spec.filter,
   ) as UnitType[]
+  // The setup model carries the stats active abilities change.
+  const variants =
+    spec.sort === 'combat-asc' || spec.sort === 'combat-desc'
+      ? sortVariantsByCombat(
+          expanded,
+          spec.sort,
+          (s.optionMetadata?.model ?? s).unitStats,
+          s.optionMetadata?.subtypes ?? [],
+        )
+      : expanded
   const surfaces = context.surfaces
   if (spec.scope === 'type' || !surfaces || !context.activeSurfaceId) {
     return variants

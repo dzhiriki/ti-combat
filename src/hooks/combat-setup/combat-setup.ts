@@ -51,6 +51,7 @@ import {
 import { applyDeclaredChanges } from './apply-declared-changes'
 import { buildSideState } from './build-side-state'
 import {
+  type AutoChoices,
   initializeAbilityDefaults,
   reconcileAbilitiesConfig,
   type SideLookups,
@@ -105,6 +106,7 @@ export class CombatSetup {
   }
   private _stateData: CombatStateData
   private _engine: AbilitiesEngine
+  private _autoChoices: AutoChoices = { attacker: {}, defender: {} }
 
   constructor(editorMode: UnitEditorMode = 'SIMPLIFIED') {
     this._system = DEFAULT_GAME_SYSTEM
@@ -253,6 +255,7 @@ export class CombatSetup {
     // Drop all ability config so nothing carries across systems; setFaction
     // then repopulates each side with the new system's defaults.
     this._abilities = { attacker: {}, defender: {} }
+    this._autoChoices = { attacker: {}, defender: {} }
     this._stateData = {
       ...this._stateData,
       attacker: {
@@ -490,6 +493,7 @@ export class CombatSetup {
 
   resetAbilities(side: CombatSide): void {
     this._abilities[side] = {}
+    this._autoChoices[side] = {}
     this._stateData = {
       ...this._stateData,
       [side]: { ...this._stateData[side], abilities: this._abilities[side] },
@@ -528,6 +532,10 @@ export class CombatSetup {
     this._abilities = {
       attacker: this._abilities.defender,
       defender: this._abilities.attacker,
+    }
+    this._autoChoices = {
+      attacker: this._autoChoices.defender,
+      defender: this._autoChoices.attacker,
     }
 
     // Rebuild stateData (each side's abilities travels with it)
@@ -682,6 +690,7 @@ export class CombatSetup {
     // Apply saved differences to static defaults. The final reconciliation
     // runs after placements and state data are rebuilt.
     this._abilities = { attacker: {}, defender: {} }
+    this._autoChoices = { attacker: {}, defender: {} }
     initializeAbilityDefaults(this._abilities, this._sideRegistered)
     for (const [key, params] of Object.entries(config.aa)) {
       if (this._abilities.attacker[key]) {
@@ -799,6 +808,7 @@ export class CombatSetup {
       this._stateData,
       this._lookups,
       true,
+      this._autoChoices,
     )
   }
 

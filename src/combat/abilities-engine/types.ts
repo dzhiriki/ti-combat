@@ -21,11 +21,16 @@ import type { Logger } from '../logger'
 import type { SideApi } from './api/ability-api'
 import type { ParamLimit } from './param-limit'
 
+/** `combat-*` orders variants by their combat roll's expected hits (weakest
+ *  first for `asc`), ties by worth. A single choice falls back to the first
+ *  option, so `combat-desc` picks the strongest unit present. */
 export type SyncSortSpec =
   | 'worth-asc'
   | 'worth-desc'
   | 'normal-asc'
   | 'normal-desc'
+  | 'combat-asc'
+  | 'combat-desc'
   | ((a: UnitBaseType, b: UnitBaseType) => number)
 
 /** Variant-list filter shape — shared between `SideApi.getUnitVariantsOptions`

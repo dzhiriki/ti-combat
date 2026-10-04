@@ -957,7 +957,18 @@ the active one. It also keeps the entries of units no longer offered, hidden,
 so a unit removed and placed again gets its settings back; share links carry
 only the offered entries.
 Single choices follow the active surface and keep their unit type when the
-planet changes. Give every participating param a `filter.combatMode`; without
+planet changes.
+`sort: 'combat-desc'` (`'combat-asc'`) orders options by the expected hits of
+their combat roll, strongest (weakest) first, with worth breaking ties; it
+reads the setup model's stats, so upgrades and declared changes count. A
+single choice under a combat sort picks automatically until the user picks:
+while it holds the declared default or the value reconcile last chose
+(`CombatSetup` tracks it), reconcile moves it to the first option, on its
+surface while one is offered there. A picked unit sticks while offered and
+falls back to the first option when it leaves (Viscount Unlenn and Evelyn
+DeLouis pick the strongest unit, Cavalry the weakest). Render such a select
+with the options as returned; don't reverse them.
+Give every participating param a `filter.combatMode`; without
 one, the other mode resolves a different catalog and reconcile resets it.
 Ordered controls stay flat and suffix duplicate names with their surface.
 Independent controls are grouped by surface only when a unit type appears on

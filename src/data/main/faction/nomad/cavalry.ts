@@ -36,6 +36,7 @@ export const cavalry: Ability<Params> = {
     unitType: declareParam<UnitLocator>({
       default: 'DESTROYER',
       source: 'SHIPS',
+      sort: 'combat-asc',
       filter: {
         exclude: ['FIGHTER'],
         excludeSubtypeSource: ['CAVALRY'],
@@ -92,7 +93,7 @@ export const cavalry: Ability<Params> = {
       key: 'unitType',
       label: 'Unit Type',
       type: 'select',
-      items: ctx.api.own.getUnitVariantsOptions('unitType').reverse(),
+      items: ctx.api.own.getUnitVariantsOptions('unitType'),
     },
   ],
   invoke: [
