@@ -90,21 +90,31 @@ export const preGalvanized: Ability<Params> = {
       items: ctx.api.own.getUnitVariantsOptions('galvanizedUnits'),
     },
   ],
+  // Setup lists the galvanized units as their own variant (Commit Ground
+  // Forces, Bombardment splits).
+  declareChanges: (ctx, params) => {
+    for (const id of selectedUnits(ctx, params))
+      if (!isGalvanized(ctx, id)) ctx.api.own.addSubtype(id, GALVANIZED)
+  },
   invoke: [
     {
       timing: 'PREPARE',
       call: (ctx, params) => {
-        for (const [unitType, count] of params.galvanizedUnits) {
-          if (count <= 0) continue
-          const ids = ctx.api.own.system.getUnits(unitType)
-          const max = Math.min(count, ids.length)
-          for (let i = 0; i < max; i++) {
-            galvanizeUnit(ctx, ids[i])
-          }
-        }
+        for (const id of selectedUnits(ctx, params)) galvanizeUnit(ctx, id)
       },
     },
   ],
+}
+
+function selectedUnits(ctx: AbilityCallContext, params: Params): UnitId[] {
+  return params.galvanizedUnits.flatMap(([unitType, count]) =>
+    count > 0 ? ctx.api.own.system.getUnits(unitType).slice(0, count) : [],
+  )
+}
+
+function isGalvanized(ctx: AbilityCallContext, id: UnitId): boolean {
+  const key = ctx.api.own.getUnitVariantKey(id)
+  return !!key && parseUnitLocator(key).subtypes.includes(GALVANIZED)
 }
 
 const bumpDice = <T extends [number, number] | [number, number, number]>(
@@ -138,9 +148,7 @@ export function galvanizeUnit(
   consumeToken?: boolean,
 ): boolean {
   const api = ctx.api.own
-  const sourceKey = api.getUnitVariantKey(unitId)
-  if (!sourceKey) return false
-  if (parseUnitLocator(sourceKey).subtypes.includes(GALVANIZED)) return false
+  if (!api.getUnitVariantKey(unitId) || isGalvanized(ctx, unitId)) return false
   if (consumeToken) {
     const tokens =
       api.getAbilityConfig('PRE_GALVANIZED')?.reinforcementTokens ?? 0

@@ -279,8 +279,11 @@ Hel-Titan keeps its plain stats invoke for Janovet and declares
   conditional effects in the invoke (Z-Grav Eidolon's change grants SHIPS to
   the mechs in space; its START_OF_COMBAT invoke also rewrites combat values).
 - Changes see the fielded and declared units, not the combat that follows:
-  don't move or remove units, add subtypes, write ability config, or check
-  `isEnabled` (setup already gates on it).
+  don't move or remove units, write ability config, or check `isEnabled`
+  (setup already gates on it). Add a subtype only when it replaces fielded
+  units before combat (Galvanized Units marks its chosen units, so the
+  Commit Ground Forces and Bombardment splits list them apart); its PREPARE
+  applies the same subtype for real.
 - An invoke whose placement matches the declaration calls
   `ctx.invokeChanges()` instead of repeating it (Brother Milor, Overwing Zeta,
   Dunlain Reaper after removing its infantry). Call `placeUnits` directly only

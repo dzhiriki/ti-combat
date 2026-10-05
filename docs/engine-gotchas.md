@@ -325,6 +325,13 @@ a check there too.
   Ground Forces after toggling Matriarch). See
   `tests/abilities/commit-ground-forces+matriarch.test.ts`.
 
+- **Split params divide units per variant.** `planetOptions` counts each
+  variant the setup model holds (Galvanized units come from Galvanized
+  Units' `declareChanges`), reconcile balances each variant's counts, and
+  `splitUnits` moves units by variant key. A count its variant can't fill
+  (a subtype gained or lost after setup) takes leftover units of the same
+  base type. See `tests/abilities/commit-ground-forces+pre-galvanized.test.ts`.
+
 - **`declareParam` sourced params sync only at reconcile, and those values
   survive into the engine run.** Surface-scoped lists offer only the units the
   setup model holds, so an ability that places units mid-combat must declare

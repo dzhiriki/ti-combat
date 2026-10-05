@@ -455,7 +455,7 @@ function onFirstPlanet(
   })
 }
 
-/** Per base type, a split's counts add up to its units: extra units go to
+/** Per variant, a split's counts add up to its units: extra units go to
  *  the default planet (where commitment lands) and surplus leaves space, then
  *  the last planets. Other planet params keep their total within the type's
  *  cap. */
@@ -465,11 +465,12 @@ function balancePlanetCounts(
   split: boolean,
   defaultPlanet: SurfaceId | undefined,
 ): ([string] | [string, unknown])[] {
-  // Variants share their base type's units and reinforcements.
-  const byType = Map.groupBy(
-    options,
-    option => parseUnitLocator(option.value).baseType,
-  )
+  // A split divides each variant's units; otherwise variants share their
+  // base type's reinforcements.
+  const byType = Map.groupBy(options, option => {
+    const { baseType, unitType } = parseUnitLocator(option.value)
+    return split ? unitType : baseType
+  })
   const counts = new Map(
     entries.map(entry => [entry[0], Number(entry[1]) || 0] as const),
   )

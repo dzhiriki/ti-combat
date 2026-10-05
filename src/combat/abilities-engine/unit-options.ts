@@ -264,8 +264,8 @@ export function resolveUnitOptions(
 }
 
 /** Options of a `planet` param: each variant on every planet. A split
- *  offers the types of the units it divides, capped at their count, plus a
- *  space entry for units that may stay. */
+ *  offers the variants of the units it divides, capped at their count, plus
+ *  a space entry for units that may stay. */
 function planetOptions(
   s: SideStateData,
   spec: OptionSpec,
@@ -303,7 +303,7 @@ function planetOptions(
     )
   }
   // Split units are fielded; the setup model carries declared grants
-  // (Matriarch's fighters count as ground forces).
+  // (Matriarch's fighters count as ground forces) and subtypes (Galvanized).
   const model = s.optionMetadata?.model ?? s
   const offered = new Set(types)
   const categories = [spec.source].flat()
@@ -314,7 +314,7 @@ function planetOptions(
   ] as UnitId[]) {
     if (split.from === 'space' && s.unitSurface[id] !== SPACE_SURFACE_ID)
       continue
-    const type = s.unitType[id]
+    const type = model.unitType[id] ?? s.unitType[id]
     const base = parseUnitLocator(type).baseType
     if (!offered.has(base)) continue
     if (
@@ -329,10 +329,20 @@ function planetOptions(
       ]
     )
       continue
-    counts.set(base, (counts.get(base) ?? 0) + 1)
+    counts.set(type, (counts.get(type) ?? 0) + 1)
   }
-  return variants.flatMap(variant => {
-    const total = counts.get(variant as UnitBaseType)
+  // Variants the filter doesn't list follow their base type.
+  const listed = [...variants]
+  for (const type of counts.keys()) {
+    if (listed.includes(type)) continue
+    const base = parseUnitLocator(type).baseType
+    const after = listed.findLastIndex(
+      variant => parseUnitLocator(variant).baseType === base,
+    )
+    listed.splice(after < 0 ? listed.length : after + 1, 0, type)
+  }
+  return listed.flatMap(variant => {
+    const total = counts.get(variant)
     if (!total) return []
     return [
       ...planets.map(planet => option(variant, planet, total)),
