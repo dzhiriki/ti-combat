@@ -1,0 +1,212 @@
+{
+  "gameCustomName": "Sample Twilight\u2019s Fall Game",
+  "gameName": "sample-tf",
+  "gameRound": 5,
+  "playerData": [
+    {
+      "color": "yellow",
+      "faction": "yellowtf",
+      "galvanizeTokensReinf": 0,
+      "techs": [
+        "tf-asn",
+        "tf-futurepath",
+        "tf-mc",
+        "tf-inheritancesystems",
+        "tf-fl",
+        "wavelength",
+        "tf-as",
+        "antimatter"
+      ],
+      "unitsOwned": [
+        "tf-saggitaria",
+        "yellowtf_flagship",
+        "yellowtf_mech",
+        "tf-hcf",
+        "tf-swa",
+        "tf-dawncrusher",
+        "infantry",
+        "tf-ambassador",
+        "pds",
+        "tf-heliosentity",
+        "tf-universitywarsun"
+      ],
+      "userName": "Ada"
+    },
+    {
+      "color": "purple",
+      "faction": "purpletf",
+      "galvanizeTokensReinf": 0,
+      "techs": ["tf-vpw", "tf-nes", "antimatter", "tf-nomadic"],
+      "unitsOwned": [
+        "tf-dragonfreed",
+        "carrier",
+        "purpletf_flagship",
+        "tf-productionbiomes",
+        "fighter",
+        "dreadnought",
+        "tf-eidolonlandwaster",
+        "destroyer",
+        "tf-ahksylfier",
+        "tf-lataniwarrior",
+        "pds",
+        "purpletf_mech"
+      ],
+      "userName": "Bruno"
+    },
+    {
+      "color": "aberration",
+      "faction": "neutral",
+      "galvanizeTokensReinf": 0,
+      "techs": ["ff2", "dd2", "cv2", "cr2", "ws"],
+      "unitsOwned": [
+        "spacedock",
+        "flagship",
+        "warsun",
+        "dreadnought",
+        "cruiser2",
+        "carrier2",
+        "infantry",
+        "fighter2",
+        "destroyer2",
+        "mech",
+        "pds"
+      ],
+      "userName": "Bot"
+    }
+  ],
+  "ringCount": 3,
+  "tilePositions": ["101:64", "104:86a", "204:87a240", "313:54"],
+  "tileUnitData": {
+    "101": {
+      "anomaly": false,
+      "planets": {
+        "atlas": {
+          "controlledBy": "yellowtf",
+          "entities": {
+            "neutral": [
+              {
+                "count": 1,
+                "entityId": "lazaxsurvivors",
+                "entityType": "attachment",
+                "sustained": null,
+                "unitStates": null
+              }
+            ],
+            "yellowtf": [
+              {
+                "count": 2,
+                "entityId": "mf",
+                "entityType": "unit",
+                "sustained": 2,
+                "unitStates": [0, 2, 0, 0]
+              },
+              {
+                "count": 1,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              }
+            ]
+          }
+        }
+      },
+      "space": {
+        "yellowtf": [
+          {
+            "count": 1,
+            "entityId": "ca",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [1, 0, 0, 0]
+          },
+          {
+            "count": 4,
+            "entityId": "dn",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [4, 0, 0, 0]
+          }
+        ]
+      }
+    },
+    "104": {
+      "anomaly": false,
+      "planets": {},
+      "space": {}
+    },
+    "204": {
+      "anomaly": false,
+      "planets": {},
+      "space": {}
+    },
+    "313": {
+      "anomaly": false,
+      "planets": {
+        "acheron": {
+          "controlledBy": "purpletf",
+          "entities": {
+            "purpletf": [
+              {
+                "count": 1,
+                "entityId": "sd",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [1, 0, 0, 0]
+              },
+              {
+                "count": 2,
+                "entityId": "pd",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [2, 0, 0, 0]
+              },
+              {
+                "count": 4,
+                "entityId": "mf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [4, 0, 0, 0]
+              },
+              {
+                "count": 61,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [61, 0, 0, 0]
+              }
+            ],
+            "yellowtf": [
+              {
+                "count": 2,
+                "entityId": "mf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [2, 0, 0, 0]
+              },
+              {
+                "count": 22,
+                "entityId": "gf",
+                "entityType": "unit",
+                "sustained": null,
+                "unitStates": [22, 0, 0, 0]
+              }
+            ]
+          }
+        }
+      },
+      "space": {
+        "yellowtf": [
+          {
+            "count": 4,
+            "entityId": "cv",
+            "entityType": "unit",
+            "sustained": null,
+            "unitStates": [4, 0, 0, 0]
+          }
+        ]
+      }
+    }
+  },
+  "versionSchema": 7
+}

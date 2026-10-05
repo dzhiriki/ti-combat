@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
+import { makeUnitLocator } from '@/combat'
+import { CombatSetup } from '@/hooks/combat-setup'
 import type { SerializedConfig } from '@/hooks/combat-setup/serialization'
 import { validateSerializedConfig } from '@/hooks/combat-setup/validation'
 import {
   configToSearchString,
   searchParamsToConfig,
 } from '@/hooks/use-url-sync'
+import { SPACE_SURFACE_ID } from '@/types'
 
 function baseConfig(): SerializedConfig {
   return {
@@ -102,6 +105,39 @@ describe('URL round-trip', () => {
     expect(result.warnings).toEqual([])
     expect(result.config.da['UNIT_PRIORITY']).toBeDefined()
     expect(result.config.da['SPACE_CANNON_OFFENSE']).toBeDefined()
+  })
+
+  it('round-trips what reconciliation produces, not just hand-built config', () => {
+    // The cases above hand-write well-formed tuple arrays. Reconciliation is
+    // what fills in the units a player did not set, and if a declared param
+    // has no `defaultItemValue` it fills them in as bare `[type]` 1-tuples —
+    // indistinguishable from an order-mode list once encoded, so the counts
+    // are dropped on the way back. PRE_GALVANIZED declares one; PRE_DAMAGED
+    // did not, and lost its damage on every refresh until it did. Both are
+    // system-scoped, so their keys carry the surface: a bare type is not an
+    // option and reconciliation drops it.
+    const dreadnought = makeUnitLocator('DREADNOUGHT', SPACE_SURFACE_ID)
+    const cruiser = makeUnitLocator('CRUISER', SPACE_SURFACE_ID)
+    const setup = new CombatSetup()
+    setup.setFaction('attacker', 'SARDAKK_NORR')
+    setup.setUnitCount('attacker', 'DREADNOUGHT', 2)
+    setup.setUnitCount('attacker', 'CRUISER', 1)
+    setup.setAbilityParam('attacker', 'PRE_DAMAGED', {
+      ...setup.abilities.attacker['PRE_DAMAGED'],
+      damagedUnits: [[dreadnought, 1]],
+    })
+
+    const search = configToSearchString(setup.toSerializedConfig())
+    const decoded = searchParamsToConfig(`?${search}`)
+    const result = validateSerializedConfig(decoded)
+
+    expect(result.warnings).toEqual([])
+    const restored = new CombatSetup()
+    restored.loadConfig(result.config)
+    expect(restored.abilities.attacker['PRE_DAMAGED'].damagedUnits).toEqual([
+      [cruiser, 0],
+      [dreadnought, 1],
+    ])
   })
 
   it('surfaces a warning for legacy URLs with flat-encoded tuple arrays', () => {
