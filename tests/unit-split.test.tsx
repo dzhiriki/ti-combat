@@ -6,6 +6,7 @@ import {
   splitGroups,
   UnitSplit,
 } from '@/components/abilities-panel/components/unit-split'
+import { moveThumbs } from '@/components/ui/split-slider'
 import { SPACE_SURFACE_ID } from '@/types'
 
 import { PLANET_1, PLANET_2 } from './utils/surface-units'
@@ -51,5 +52,15 @@ describe('unit split control', () => {
     ])
       expect(html).toMatch(new RegExp(`>${label}<.*?>${count}<`))
     expect(html).not.toContain('MECH')
+  })
+
+  it('stops a thumb where a segment would exceed its max', () => {
+    const segments = [
+      { label: 'Planet 1', value: 5 },
+      { label: 'Space', value: 10, max: 10 },
+    ]
+
+    expect(moveThumbs(segments, [2])).toEqual([5, 10])
+    expect(moveThumbs(segments, [8])).toEqual([8, 7])
   })
 })

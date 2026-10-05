@@ -50,6 +50,9 @@ export const commitGroundForces: Ability<Params> = {
     {
       timing: 'COMMIT_UNITS_STEP',
       call: (ctx, params) => {
+        // Units committed from elsewhere (G'hom Sek'kus) were just placed
+        // and have the newest ids: the planets, listed before space, take
+        // them first, so they never stay in space.
         const inSpace = ctx.api.own.system
           .getUnits()
           .filter(
@@ -57,6 +60,7 @@ export const commitGroundForces: Ability<Params> = {
               ctx.api.own.getUnitSurface(id) === SPACE_SURFACE_ID &&
               ctx.api.own.isUnitCategory(id, 'GROUND_FORCES'),
           )
+          .sort((a, b) => (a < b ? 1 : -1))
         for (const [planet, ids] of splitUnits(ctx, params.units, inSpace))
           ctx.api.own.moveUnits(ids, planet)
       },

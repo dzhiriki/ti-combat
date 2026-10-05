@@ -240,6 +240,9 @@ describe('declareChanges', () => {
       .split('')
       .map(id => model.unitType[id as keyof typeof model.unitType])
     expect(types.filter(type => type === 'FIGHTER')).toHaveLength(1)
+    // The counts placed are kept apart from the model.
+    const placements = t.state.attacker.optionMetadata!.placements!
+    expect(placements.get(makeUnitLocator('FIGHTER', SPACE_SURFACE_ID))).toBe(5)
     // Both war suns are fielded, so none is declared.
     expect(types.filter(type => type === 'WAR_SUN')).toHaveLength(2)
     expect(warn).not.toHaveBeenCalled()

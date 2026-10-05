@@ -46,8 +46,8 @@ interface DeclaredParamOptions<T> {
    *  Pair with `filter: { includeOnlyAvailable: true }` to also drop variants
    *  whose cap currently resolves to 0 from the UI and stored list. */
   limit?: ParamLimit
-  /** With `scope: 'planet'`: divide the side's existing units between the
-   *  invaded planets instead of choosing new ones per planet. */
+  /** Required with `scope: 'planet'`: how to divide the side's units
+   *  between the invaded planets. */
   split?: UnitSplit
 }
 

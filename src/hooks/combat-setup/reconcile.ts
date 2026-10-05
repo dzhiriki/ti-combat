@@ -34,7 +34,6 @@ import type {
   CombatMode,
   CombatStateData,
   SideAbilitiesConfig,
-  SideStateData,
 } from '@/combat/combat-state/types'
 import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
 import { UNIT_TYPES } from '@/constants/units'
@@ -48,7 +47,11 @@ import {
 } from '@/types'
 import { factionSlot } from '@/utils/faction-slot'
 
-import { applyDeclaredChanges, isSwitchedOn } from './apply-declared-changes'
+import {
+  applyDeclaredChanges,
+  type DeclaredModel,
+  isSwitchedOn,
+} from './apply-declared-changes'
 import {
   reconcileStringParam,
   reconcileUnitListParam,
@@ -123,13 +126,18 @@ export function reconcileAbilitiesConfig(
       state.invasion,
     )
   }
-  const model = applyChanges(config)
-  const holders = collectAbilityHolders(config, abilities, model, applyChanges)
+  const declared = applyChanges(config)
+  const holders = collectAbilityHolders(
+    config,
+    abilities,
+    declared,
+    applyChanges,
+  )
   let metadata = collectOptionMetadata(
     config,
     abilities,
     lookups,
-    model,
+    declared,
     holders,
   )
   reconcileSyncAll(
@@ -146,7 +154,7 @@ export function reconcileAbilitiesConfig(
     config,
     abilities,
     lookups,
-    model,
+    declared,
     holders,
   )
   // JSON skips the subtypes' stats factories, which never differ here.
@@ -222,11 +230,12 @@ function collectOptionMetadata(
   config: AbilitiesConfig,
   abilities: Record<CombatSide, RegisteredAbility[]>,
   lookups: SideLookups,
-  model: Record<CombatSide, SideStateData>,
+  declared: Record<CombatSide, DeclaredModel>,
   holders: Record<CombatSide, Record<string, UnitType[]>>,
 ): OptionMetadata {
   const sideMetadata = (side: CombatSide): SideOptionMetadata => ({
-    model: model[side],
+    model: declared[side].model,
+    placements: declared[side].placements,
     subtypes: collectDeclaredSubtypes(
       abilities[side],
       config[side],
@@ -246,8 +255,8 @@ function collectOptionMetadata(
 function collectAbilityHolders(
   config: AbilitiesConfig,
   abilities: Record<CombatSide, RegisteredAbility[]>,
-  model: Record<CombatSide, SideStateData>,
-  applyChanges: (config: AbilitiesConfig) => Record<CombatSide, SideStateData>,
+  declared: Record<CombatSide, DeclaredModel>,
+  applyChanges: (config: AbilitiesConfig) => Record<CombatSide, DeclaredModel>,
 ): Record<CombatSide, Record<string, UnitType[]>> {
   const holders: Record<CombatSide, Record<string, UnitType[]>> = {
     attacker: {},
@@ -260,13 +269,13 @@ function collectAbilityHolders(
       )
       if (!listsHolders) continue
       const switchedOn = isSwitchedOn(ability, config[side])
-        ? model
+        ? declared
         : applyChanges({
             ...config,
             [side]: switchOn(ability, abilities[side], config[side]),
           })
       const carriers = CombatSideState.getUnitTypesWithAbility(
-        switchedOn[side],
+        switchedOn[side].model,
         ability.key,
       )
       // An ability in a unit's slot belongs to that unit: Exotrireme II
@@ -440,42 +449,27 @@ export function collectDeclaredSubtypes(
   return result
 }
 
-/** Planet-scoped entries stored without a planet (earlier versions chose by
- *  type) move to the type's first planet. */
-function onFirstPlanet(
-  entries: readonly ([string] | [string, unknown])[],
-  validList: readonly string[],
-): ([string] | [string, unknown])[] {
-  return entries.map(entry => {
-    if (parseUnitLocator(entry[0]).surfaceId !== undefined) return entry
-    const first = validList.find(
-      key => parseUnitLocator(key).unitType === entry[0],
-    )
-    return first ? ([first, ...entry.slice(1)] as typeof entry) : entry
-  })
-}
-
-/** Per variant, a split's counts add up to its units: extra units go to
- *  the default planet (where commitment lands) and surplus leaves space, then
- *  the last planets. Other planet params keep their total within the type's
- *  cap. */
+/** Per variant, a split's counts add up to its units, each within its
+ *  option's cap (space keeps only units standing there): extra units go to
+ *  the default planet (where commitment lands) and surplus leaves space,
+ *  then the last planets. */
 function balancePlanetCounts(
   entries: ([string] | [string, unknown])[],
   options: readonly UnitOption[],
-  split: boolean,
   defaultPlanet: SurfaceId | undefined,
 ): ([string] | [string, unknown])[] {
-  // A split divides each variant's units; otherwise variants share their
-  // base type's reinforcements.
-  const byType = Map.groupBy(options, option => {
-    const { baseType, unitType } = parseUnitLocator(option.value)
-    return split ? unitType : baseType
-  })
+  const byType = Map.groupBy(
+    options,
+    option => parseUnitLocator(option.value).unitType,
+  )
   const counts = new Map(
     entries.map(entry => [entry[0], Number(entry[1]) || 0] as const),
   )
   for (const typeOptions of byType.values()) {
+    // Planets come first and can take every unit.
     const cap = typeOptions[0].max ?? Infinity
+    for (const { value, max = Infinity } of typeOptions)
+      counts.set(value, Math.min(counts.get(value) ?? 0, max))
     // Space (units kept back) gives way first, then later planets.
     const keys = typeOptions
       .map(option => option.value as string)
@@ -494,8 +488,7 @@ function balancePlanetCounts(
     const target =
       keys.find(key => parseUnitLocator(key).surfaceId === defaultPlanet) ??
       keys[0]
-    if (split && total < cap)
-      counts.set(target, (counts.get(target) ?? 0) + cap - total)
+    if (total < cap) counts.set(target, (counts.get(target) ?? 0) + cap - total)
   }
   return entries.map(entry =>
     entry.length === 2 && counts.has(entry[0])
@@ -633,11 +626,7 @@ function reconcileSyncSources(
             : undefined
         const entries = currentValue as ([string] | [string, unknown])[]
         const reconciled = reconcileUnitListParam(
-          byType
-            ? withoutSurfaces(entries)
-            : source.scope === 'planet'
-              ? onFirstPlanet(entries, validList)
-              : entries,
+          byType ? withoutSurfaces(entries) : entries,
           validList,
           source.defaultItemValue,
           maxFor,
@@ -646,12 +635,7 @@ function reconcileSyncSources(
         )
         abilityParams[source.key] =
           source.scope === 'planet'
-            ? balancePlanetCounts(
-                reconciled,
-                options,
-                !!source.split,
-                state.activeSurfaceId,
-              )
+            ? balancePlanetCounts(reconciled, options, state.activeSurfaceId)
             : reconciled
       } else if (typeof currentValue === 'string') {
         // Under a combat sort an unpicked choice (the declared default or

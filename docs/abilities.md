@@ -263,11 +263,14 @@ declareChanges: ctx => {
 In setup, `placeUnits` only makes each variant present on the surface: it adds
 one unit where none stands yet and the unit limit leaves room, enforces nothing
 else, and places nothing for an ability whose `context` is the other combat
-mode. Declare what the ability may place, even if it might not: listing a unit
-that never arrives is harmless, while a placed unit missing from the lists
-takes hits last and can't sustain. Changes run in passes until one places
-nothing new, so a change sees units declared by abilities registered after it
-and by the opponent (Sleeper Cell captures the opponent's ship types).
+mode. The counts asked for are kept apart, in `optionMetadata.placements`
+(only Commit Ground Forces' split reads them, see
+[Per-planet choices](#per-planet-choices)). Declare what the ability may
+place, even if it might not: listing a unit that never arrives is harmless,
+while a placed unit missing from the lists takes hits last and can't sustain.
+Changes run in passes until one places nothing new, so a change sees units
+declared by abilities registered after it and by the opponent (Sleeper Cell
+captures the opponent's ship types).
 
 The engine never runs `declareChanges` on its own. An invoke applying the same
 effect calls `ctx.invokeChanges()` (params default to the ability's current
@@ -881,8 +884,9 @@ There are five UI config item types. The list variants are all expressed as `uni
 
 `unit-split` takes the items of a `split` param
 (`getUnitVariantsOptions(key)`): one slider per unit type whose units have
-more than one place to go, each thumb the border between two surfaces. The
-control is hidden when no type has.
+more than one place to go, each thumb the border between two surfaces. A
+thumb stops where a surface would exceed its item's `max`. The control is
+hidden when no type has.
 
 `unit-list` modes:
 
@@ -1020,26 +1024,32 @@ Subtype declarations use plain `unitType` plus optional `surfaces` metadata.
 
 ### Per-planet choices
 
-`scope: 'planet'` offers each unit type once per planet of the system,
-whether or not units stand there, with `UnitLocator` keys
+`scope: 'planet'` divides the side's units between the planets of the system
+by its `split: UnitSplit` (required), with `UnitLocator` keys
 (`@planet-2/INFANTRY`). A ground invasion fights over every planet, so each
 receives what the list sends it; the runtime reads the invaded planets with
 `foughtPlanetIds(ctx.state)` (`abilities-engine/unit-options.ts`) and puts
-units listed for a planet outside the invasion on the first one. Values stored by type (earlier versions) move to the first
-planet, and a subtype never inherits its parent's count.
+units listed for a planet outside the invasion on the first one. A subtype
+never inherits its parent's count.
 
-- **Per-planet amounts** (G'hom Sek'kus: units committed onto each planet):
-  a `unit-list` in `number` mode, grouped by planet. A `limit` caps each
-  base type's total across planets.
-- **Splits** (`split: UnitSplit`): divide units the side already fields.
-  `from: 'space'` counts units in space (commitment), `from: 'system'` every
-  unit (`unitAbility` narrows them, Bombardment's `'BOMBARDMENT'`);
-  `canStay` adds a `@space` entry for units kept back. Each item's `max` is its
-  type's unit count, and reconcile keeps every type's counts adding up to it:
-  new units go to the first planet, surplus leaves space first, then the last
-  planets. Show it with `unit-split`. At runtime `splitUnits(ctx, list, ids)`
-  (`abilities-engine/api/split-units.ts`) returns the planets and the units
-  each receives, putting units the list doesn't cover on the first planet.
+`from: 'space'` counts units in space (commitment), `from: 'system'` every
+unit (`unitAbility` narrows them, Bombardment's `'BOMBARDMENT'`); `canStay`
+adds a `@space` entry for units kept back. Each planet item's `max` is its
+variant's unit count, and reconcile keeps every variant's counts adding up to
+it: new units go to the first planet, surplus leaves space first, then the
+last planets. Show it with `unit-split`. At runtime `splitUnits(ctx, list,
+ids)` (`abilities-engine/api/split-units.ts`) returns the planets and the
+units each receives, putting units the list doesn't cover on the first planet.
+
+Units an active ability places in space (its `declareChanges` counts, see
+[Setup changes](#setup-changes)) are committed from elsewhere. G'hom Sek'kus
+places its units in space at `COMMIT_UNITS`, so a `from: 'space'` split adds
+them to the units there (within reinforcements). They can only land, though:
+the `@space` item's `max` is the number of units standing in space (no item
+when none does), reconcile and the slider keep the space count within it, and
+the Commit Ground Forces driver lands the newest units first. A new ability
+that commits extra units only needs to place them in space at `COMMIT_UNITS`
+and declare that placement.
 
 `resolveStep(meta, { surfaceId, units })` resolves a unit ability against a
 planet with only the given units rolling: the planet becomes active (targets,

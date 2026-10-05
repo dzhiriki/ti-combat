@@ -108,7 +108,7 @@ export function prepareSimulation(
       placements.attacker,
       surfaces,
       config.attacker,
-      declared.attacker.unitStats as Record<string, UnitStats>,
+      declared.attacker.model.unitStats as Record<string, UnitStats>,
       gen,
     ),
     defender: buildSideState(
@@ -117,7 +117,7 @@ export function prepareSimulation(
       placements.defender,
       surfaces,
       config.defender,
-      declared.defender.unitStats as Record<string, UnitStats>,
+      declared.defender.model.unitStats as Record<string, UnitStats>,
       gen,
     ),
     surfaces: [...surfaces],

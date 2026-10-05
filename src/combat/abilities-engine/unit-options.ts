@@ -1,3 +1,4 @@
+import { UNIT_LIMITS } from '@/constants/units'
 import {
   type CombatSide,
   SPACE_SURFACE_ID,
@@ -29,8 +30,8 @@ import {
 import { isUnitCategory } from '../utils/unit-combat-properties'
 import { makeUnitLocator } from '../utils/unit-locator'
 import { getVariantDisplayName } from '../utils/unit-variant'
-import { resolveVariantLimit } from './param-limit'
-import type { SyncSourceConfig, UnitOption } from './types'
+import { countUnitsByBaseType, resolveVariantLimit } from './param-limit'
+import type { SyncSourceConfig, UnitOption, UnitSplit } from './types'
 
 export interface UnitOptionContext {
   combatMode: CombatMode
@@ -135,7 +136,9 @@ export function resolveUnitOptions(
       : expanded
   const surfaces = context.surfaces
   if (spec.scope === 'planet' && surfaces)
-    return planetOptions(s, spec, types, variants, surfaces, phase)
+    return spec.split
+      ? planetOptions(s, spec, spec.split, types, variants, surfaces, phase)
+      : []
   if (spec.scope === 'type' || !surfaces || !context.activeSurfaceId) {
     return variants
       .map(value => ({
@@ -263,12 +266,13 @@ export function resolveUnitOptions(
   return choosesByType(mode, spec.scope) ? mergeSurfaces(items) : items
 }
 
-/** Options of a `planet` param: each variant on every planet. A split
- *  offers the variants of the units it divides, capped at their count, plus
- *  a space entry for units that may stay. */
+/** Options of a `planet` param: the variants of the units its split
+ *  divides on every planet, capped at their count, plus a space entry for
+ *  the units that may stay. */
 function planetOptions(
   s: SideStateData,
   spec: OptionSpec,
+  split: UnitSplit,
   types: readonly UnitBaseType[],
   variants: readonly UnitType[],
   surfaces: readonly SurfaceDefinition[],
@@ -290,23 +294,21 @@ function planetOptions(
   const planets = surfaces
     .filter(surface => surface.type === 'PLANET')
     .map(surface => surface.id)
-  const split = spec.split
-  if (!split) {
-    return variants.flatMap(variant =>
-      planets.map(planet =>
-        option(
-          variant,
-          planet,
-          spec.limit ? resolveVariantLimit(spec.limit, s, variant) : undefined,
-        ),
-      ),
-    )
-  }
   // Split units are fielded; the setup model carries declared grants
   // (Matriarch's fighters count as ground forces) and subtypes (Galvanized).
   const model = s.optionMetadata?.model ?? s
   const offered = new Set(types)
   const categories = [spec.source].flat()
+  const divides = (id: UnitId, type: UnitType) =>
+    offered.has(parseUnitLocator(type).baseType) &&
+    (spec.filter?.includeNonParticipating ||
+      categories.some(category =>
+        isUnitCategory(model, id, category, phase),
+      )) &&
+    (!split.unitAbility ||
+      !!resolveUnitStats(model.unitStats, type)?.UNIT_ABILITIES?.[
+        split.unitAbility
+      ])
   const counts = new Map<UnitType, number>()
   for (const id of [
     ...s.participatingUnits,
@@ -315,25 +317,42 @@ function planetOptions(
     if (split.from === 'space' && s.unitSurface[id] !== SPACE_SURFACE_ID)
       continue
     const type = model.unitType[id] ?? s.unitType[id]
-    const base = parseUnitLocator(type).baseType
-    if (!offered.has(base)) continue
-    if (
-      !spec.filter?.includeNonParticipating &&
-      !categories.some(category => isUnitCategory(model, id, category, phase))
+    if (divides(id, type)) counts.set(type, (counts.get(type) ?? 0) + 1)
+  }
+  // Units abilities place in space (G'hom Sek'kus) are committed from
+  // elsewhere: they land with the rest, within reinforcements, but can't
+  // stay in space.
+  const committed = new Map<UnitType, number>()
+  const room = new Map<UnitBaseType, number>()
+  const modelIds = [
+    ...model.participatingUnits,
+    ...model.nonParticipatingUnits,
+  ] as UnitId[]
+  const placements = split.from === 'space' ? s.optionMetadata?.placements : []
+  for (const [locator, count] of placements ?? []) {
+    const {
+      unitType: type,
+      baseType: base,
+      surfaceId,
+    } = parseUnitLocator(locator)
+    if (surfaceId !== SPACE_SURFACE_ID) continue
+    // The model holds a unit of each placed variant there.
+    const sample = modelIds.find(
+      id =>
+        model.unitType[id] === type &&
+        model.unitSurface[id] === SPACE_SURFACE_ID,
     )
-      continue
-    if (
-      split.unitAbility &&
-      !resolveUnitStats(model.unitStats, type)?.UNIT_ABILITIES?.[
-        split.unitAbility
-      ]
-    )
-      continue
-    counts.set(type, (counts.get(type) ?? 0) + 1)
+    if (sample === undefined || !divides(sample, type)) continue
+    const left =
+      room.get(base) ??
+      Math.max(0, UNIT_LIMITS[base] - countUnitsByBaseType(s, base))
+    const placed = Math.min(count, left)
+    room.set(base, left - placed)
+    if (placed) committed.set(type, (committed.get(type) ?? 0) + placed)
   }
   // Variants the filter doesn't list follow their base type.
   const listed = [...variants]
-  for (const type of counts.keys()) {
+  for (const type of new Set([...counts.keys(), ...committed.keys()])) {
     if (listed.includes(type)) continue
     const base = parseUnitLocator(type).baseType
     const after = listed.findLastIndex(
@@ -342,11 +361,14 @@ function planetOptions(
     listed.splice(after < 0 ? listed.length : after + 1, 0, type)
   }
   return listed.flatMap(variant => {
-    const total = counts.get(variant)
+    const fielded = counts.get(variant) ?? 0
+    const total = fielded + (committed.get(variant) ?? 0)
     if (!total) return []
     return [
       ...planets.map(planet => option(variant, planet, total)),
-      ...(split.canStay ? [option(variant, SPACE_SURFACE_ID, total)] : []),
+      ...(split.canStay && fielded
+        ? [option(variant, SPACE_SURFACE_ID, fielded)]
+        : []),
     ]
   })
 }

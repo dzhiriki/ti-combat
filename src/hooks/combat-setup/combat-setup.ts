@@ -944,7 +944,7 @@ export class CombatSetup {
       this._combatMode,
       this.activeSurfaceId,
       this.invasion,
-    )[side].unitStats as Record<string, UnitStats>
+    )[side].model.unitStats as Record<string, UnitStats>
   }
 
   private rebuildUnits(side: CombatSide): void {

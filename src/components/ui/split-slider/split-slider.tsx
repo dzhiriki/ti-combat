@@ -5,12 +5,29 @@ import styles from './split-slider.module.css'
 export interface SplitSegment {
   label: string
   value: number
+  /** The most the segment may hold; its thumbs stop there. */
+  max?: number
 }
 
 interface SplitSliderProps {
   segments: readonly SplitSegment[]
   onChange: (values: number[]) => void
   label?: string
+}
+
+/** The segment values once the thumbs move to `bounds`: a thumb stops where
+ *  either neighbouring segment would exceed its max. */
+export function moveThumbs(
+  segments: readonly SplitSegment[],
+  bounds: readonly number[],
+): number[] {
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0)
+  const clamped = bounds.map((bound, i) => {
+    const low = (bounds[i + 1] ?? total) - (segments[i + 1].max ?? Infinity)
+    const high = (bounds[i - 1] ?? 0) + (segments[i].max ?? Infinity)
+    return Math.min(Math.max(bound, low), high)
+  })
+  return [...clamped, total].map((bound, i) => bound - (clamped[i - 1] ?? 0))
 }
 
 /** Divides a fixed total between ordered segments: each thumb is the border
@@ -24,6 +41,10 @@ export function SplitSlider({ segments, onChange, label }: SplitSliderProps) {
     bounds.push(start)
   }
   const percent = (value: number) => `${total > 0 ? (value / total) * 100 : 0}%`
+  const change = (next: number[]) => {
+    const values = moveThumbs(segments, next)
+    if (values.some((value, i) => value !== segments[i].value)) onChange(values)
+  }
 
   return (
     <div className={styles.wrapper}>
@@ -34,11 +55,7 @@ export function SplitSlider({ segments, onChange, label }: SplitSliderProps) {
         step={1}
         minStepsBetweenThumbs={0}
         value={bounds}
-        onValueChange={next =>
-          onChange(
-            [...next, total].map((bound, i) => bound - (next[i - 1] ?? 0)),
-          )
-        }
+        onValueChange={change}
         aria-label={label}
       >
         <Slider.Track className={styles.track}>

@@ -307,12 +307,15 @@ a check there too.
   model (`optionMetadata.model`) holds both sides' fielded units; `placeUnits`
   in a change adds one unit per variant and surface (within unit limits, no
   Fleet Pool enforcement, nothing for an ability whose `context` is the other
-  mode). Changes run in registration order with no PREPARE run, in passes on a
-  fresh model until a pass places nothing new, so a grant sees units declared
-  by later abilities or the opponent; a change reading categories another
-  change sets must still register later. Reconcile applies them before
-  syncing, so a `declareParam` unit list they read has its stored value (user
-  counts survive; synced entries may be missing). The setup's placement runs
+  mode). The counts asked for go to `optionMetadata.placements`, from the
+  last pass, unclamped: a reader caps them by reinforcements itself (Commit
+  Ground Forces' split adds those in space). Changes run in registration
+  order with no PREPARE run, in passes on a fresh model until a pass places
+  nothing new, so a grant sees units declared by later abilities or the
+  opponent; a change reading categories another change sets must still
+  register later. Reconcile applies them before syncing, so a `declareParam`
+  unit list they read has its stored value (user counts survive; synced
+  entries may be missing). The setup's placement runs
   one side's changes without units or the opponent's abilities, so
   `ctx.abilities.opponent` may be empty. See
   `tests/engine/declare-changes.test.ts`.
@@ -475,11 +478,17 @@ a check there too.
 
 - **Commitment is an ability, not an engine step.** The `COMMIT_UNITS`
   script runs the `COMMIT_UNITS` timing (Matriarch/Morphwing grant fighters
-  the ground-force category, G'hom Sek'kus places units), then
+  the ground-force category, G'hom Sek'kus places its units in space), then
   `COMMIT_UNITS_STEP`, where the ADVANCED `COMMIT_GROUND_FORCES` driver lands
   the attacker's ground forces in space by its split. A state built without
-  the registered ADVANCED abilities commits nothing. A split bombardment
-  resolves once per planet (`resolveStep` with `surfaceId`/`units`) and the
+  the registered ADVANCED abilities commits nothing, so G'hom Sek'kus's units
+  then stay in space. The units committed from elsewhere must not stay in
+  space: setup caps the split's `@space` count at the units standing there,
+  and the driver hands the newest ids (the units just placed) to the planets
+  first, which relies on the split listing planets before space (reconcile
+  keeps the options' order). See
+  `tests/abilities/commit-ground-forces+ghom-sekkus.test.ts`. A split
+  bombardment resolves once per planet (`resolveStep` with `surfaceId`/`units`) and the
   BOMBARDMENT script re-activates the first planet afterwards; Planetary
   Shield re-checks the active planet before every bombardment roll.
 

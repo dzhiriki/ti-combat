@@ -2,14 +2,12 @@ import { z } from 'zod/mini'
 
 import sardakkNorrIcon from '@/assets/faction/sardakk_norr.svg?raw'
 import { type Ability, declareParam } from '@/combat'
-import { foughtPlanetIds } from '@/combat/abilities-engine/unit-options'
-import { parseUnitLocator } from '@/combat/utils/parse-unit-locator'
-import type { UnitList } from '@/types'
+import { SPACE_SURFACE_ID, type UnitList, type UnitType } from '@/types'
 import { UnitListNumberSchema } from '@/types'
 
 type Params = {
   isEnabled: boolean
-  units: UnitList<number>
+  units: UnitList<number, UnitType>
 }
 
 export const ghomSekkus: Ability<Params> = {
@@ -26,9 +24,8 @@ export const ghomSekkus: Ability<Params> = {
   params: {
     isEnabled: false,
     uses: Infinity,
-    // Units to commit onto each invaded planet.
-    units: declareParam<UnitList<number>>({
-      scope: 'planet',
+    units: declareParam<UnitList<number, UnitType>>({
+      scope: 'type',
       default: [],
       source: 'GROUND_FORCES',
       sort: 'worth-desc',
@@ -42,13 +39,14 @@ export const ghomSekkus: Ability<Params> = {
     }),
   },
   headerUI: 'isEnabled',
+  // The units join the ones in space, and Commit Ground Forces lands them
+  // on the planets by its split.
   declareChanges: (ctx, params) => {
-    // Earlier versions stored types without a planet: the first one.
-    const [first] = foughtPlanetIds(ctx.state)
+    const toPlace: Partial<Record<UnitType, number>> = {}
     for (const [key, count] of params.units) {
-      const { unitType, surfaceId = first } = parseUnitLocator(key)
-      if (count > 0) ctx.api.own.placeUnits({ [unitType]: count }, surfaceId)
+      if (count > 0) toPlace[key] = count
     }
+    ctx.api.own.placeUnits(toPlace, SPACE_SURFACE_ID)
   },
   invoke: [
     {

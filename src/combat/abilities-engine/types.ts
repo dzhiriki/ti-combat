@@ -6,6 +6,7 @@ import type {
   UnitAbility,
   UnitBaseType,
   UnitId,
+  UnitLocator,
   UnitStats,
   UnitType,
   UnitVariantId,
@@ -57,15 +58,17 @@ export interface ParamFilter {
   withAbility?: boolean
 }
 
-/** `planet`: one choice per invaded planet and unit type, whether or not
- *  units stand there yet (see `declareParam.split`). */
+/** `planet`: divides units between the planets of the system, by its
+ *  `split` (see `declareParam.split`). */
 export type UnitSelectorScope = 'participating' | 'system' | 'type' | 'planet'
 
-/** A `planet` param that divides units the side already fields between the
- *  invaded planets. Each type's counts add up to its units, and reconcile puts
- *  units the list doesn't cover on the first planet. */
+/** How a `planet` param divides the side's units between the invaded
+ *  planets. Each type's counts add up to its units, and reconcile puts units
+ *  the list doesn't cover on the first planet. */
 export interface UnitSplit {
-  /** Units standing in space (commitment) or anywhere in the system. */
+  /** Units standing in space (commitment) or anywhere in the system. Units
+   *  active abilities place in space (G'hom Sek'kus) join a `space` split,
+   *  but never stay there: they are committed from elsewhere. */
   from: 'space' | 'system'
   /** Only units whose stats carry this unit ability. */
   unitAbility?: UnitAbility
@@ -135,6 +138,9 @@ export interface SideOptionMetadata {
   /** The fielded units plus those active abilities may place, once the
    *  active abilities' `declareChanges` applied. */
   model: SideStateData
+  /** How many units of each variant the active abilities' changes place on
+   *  each surface; `model` holds a single unit of each. */
+  placements?: ReadonlyMap<UnitLocator, number>
   subtypes: DeclaredSubtype[]
   /** Unit types carrying each ability with a `filter.withAbility` list, as
    *  if that ability were switched on: its list keeps its options and order
@@ -497,7 +503,7 @@ interface UIConfigSelect<
 export type UnitListMode = 'order' | 'checkbox' | 'number'
 
 /** One slider per unit type dividing its units between surfaces; items come
- *  from a `split` param (`max` is the type's unit count). */
+ *  from a `split` param (`max` is the most a surface may take). */
 interface UIConfigUnitSplit<
   TParams = Record<string, unknown>,
 > extends UIConfigItemBase<TParams> {

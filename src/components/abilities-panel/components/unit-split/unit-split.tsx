@@ -7,6 +7,7 @@ interface SplitItem {
   label: string
   value: string
   surfaceName?: string
+  max?: number
 }
 
 export type UnitSplitValue = [string, number][]
@@ -46,6 +47,7 @@ export function UnitSplit({ items, value, onChange }: UnitSplitProps) {
         const segments = group.map(item => ({
           label: item.surfaceName ?? item.value,
           value: counts.get(item.value) ?? 0,
+          max: item.max,
         }))
         const total = segments.reduce((sum, segment) => sum + segment.value, 0)
         return (
