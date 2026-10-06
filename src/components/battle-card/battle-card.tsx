@@ -2,7 +2,7 @@ import { LoopIcon, TrashIcon } from '@radix-ui/react-icons'
 import { clsx } from 'clsx'
 import type { ReactNode } from 'react'
 
-import type { CombatMode, CombatOutcome } from '@/combat'
+import type { CombatMode, CombatOutcome, CombatResult } from '@/combat'
 import { ButtonIcon } from '@/components/ui/button-icon'
 import { ButtonIconPlain } from '@/components/ui/button-icon-plain'
 import { GlassCard } from '@/components/ui/glass-card'
@@ -25,14 +25,13 @@ import type {
   UnitSelection,
 } from '@/types'
 import { GAME_SYSTEMS, getGameData } from '@/utils/get-game-data'
+import type { PlanetReport } from '@/utils/get-planet-reports'
 import type { UnitConfig } from '@/utils/get-unit-config'
 
 import { Divider } from '../ui/divider'
-import {
-  type CombatResult,
-  CombatResultBar,
-} from './components/combat-result-bar'
+import { CombatResultBar } from './components/combat-result-bar'
 import { FactionSelect } from './components/faction-select'
+import { PlanetTabs } from './components/planet-tabs'
 import { type SideUnitControls, UnitRowDual } from './components/unit-row-dual'
 
 import styles from './battle-card.module.css'
@@ -77,6 +76,8 @@ interface BattleCardProps {
   defenderConfig: Record<UnitBaseType, UnitConfig>
   combatResult: CombatResult | null
   outcomes: CombatOutcome[] | null
+  /** One report per planet of a multi-planet invasion, else empty. */
+  planetReports: PlanetReport[]
   unitPriority: { attacker: string[]; defender: string[] }
   participatingTypes: { attacker: string[]; defender: string[] }
   isComputing?: boolean
@@ -84,6 +85,8 @@ interface BattleCardProps {
   onCombatModeChange: (mode: CombatMode) => void
   onPlanetChange: (surfaceId: SurfaceId) => void
   onAddPlanet: () => void
+  onRemovePlanet: (surfaceId: SurfaceId) => void
+  onReorderPlanets: (planetIds: SurfaceId[]) => void
   onFactionChange: (side: CombatSide, faction: string) => void
   onSwap: () => void
   onUnitCountChange: (
@@ -130,6 +133,7 @@ export function BattleCard({
   defenderConfig,
   combatResult,
   outcomes,
+  planetReports,
   unitPriority,
   participatingTypes,
   isComputing,
@@ -137,6 +141,8 @@ export function BattleCard({
   onCombatModeChange,
   onPlanetChange,
   onAddPlanet,
+  onRemovePlanet,
+  onReorderPlanets,
   onFactionChange,
   onSwap,
   onUnitCountChange,
@@ -150,37 +156,7 @@ export function BattleCard({
   const space = surfaces.find(surface => surface.type === 'SPACE')!
   const planet = surfaces.find(surface => surface.id === selectedPlanetId)!
   const planets = surfaces.filter(surface => surface.type === 'PLANET')
-
-  const planetTabs = (
-    <nav className={styles.planetTabs} aria-label="Planets">
-      {planets.map((surface, index) => (
-        <span className={styles.planetTabItem} key={surface.id}>
-          {index > 0 && <span className={styles.planetSeparator}>/</span>}
-          <button
-            type="button"
-            className={clsx(
-              styles.planetTab,
-              surface.id === selectedPlanetId && styles.planetTabSelected,
-            )}
-            aria-current={surface.id === selectedPlanetId ? 'page' : undefined}
-            onClick={() => onPlanetChange(surface.id)}
-          >
-            {surface.name}
-          </button>
-        </span>
-      ))}
-      <span className={styles.planetSeparator}>/</span>
-      <button
-        type="button"
-        className={styles.planetTab}
-        onClick={onAddPlanet}
-        title="Add planet"
-        aria-label="Add planet"
-      >
-        +
-      </button>
-    </nav>
-  )
+  const multiPlanet = planetReports.length > 0
 
   const countOnOtherSurfaces = (
     side: CombatSide,
@@ -304,7 +280,16 @@ export function BattleCard({
               )}
             </section>
             <section className={styles.surfaceSection}>
-              <div className={styles.surfaceTitle}>{planetTabs}</div>
+              <div className={styles.surfaceTitle}>
+                <PlanetTabs
+                  planets={planets}
+                  selectedPlanetId={selectedPlanetId}
+                  onSelect={onPlanetChange}
+                  onAdd={onAddPlanet}
+                  onRemove={onRemovePlanet}
+                  onReorder={onReorderPlanets}
+                />
+              </div>
               {renderUnitGroups(
                 surfaceSelections.attacker[planet.id],
                 surfaceSelections.defender[planet.id],
@@ -350,14 +335,30 @@ export function BattleCard({
         <Divider className="theme-defender" />
       </div>
 
-      <CombatResultBar
-        result={combatResult}
-        outcomes={outcomes}
-        unitPriority={unitPriority}
-        participatingTypes={participatingTypes}
-        surfaces={editorMode === 'FULL' ? surfaces : undefined}
-        isComputing={isComputing}
-      />
+      <div className={styles.results}>
+        <CombatResultBar
+          title={multiPlanet ? 'All planets' : undefined}
+          drawLabel={multiPlanet ? 'Mixed' : undefined}
+          result={combatResult}
+          outcomes={multiPlanet ? undefined : outcomes}
+          unitPriority={unitPriority}
+          participatingTypes={participatingTypes}
+          surfaces={editorMode === 'FULL' ? surfaces : undefined}
+          isComputing={isComputing}
+        />
+        {planetReports.map(report => (
+          <CombatResultBar
+            key={report.surface.id}
+            title={report.surface.name}
+            result={report.result}
+            outcomes={report.outcomes}
+            unitPriority={unitPriority}
+            participatingTypes={participatingTypes}
+            surfaces={[report.surface]}
+            isComputing={isComputing}
+          />
+        ))}
+      </div>
     </GlassCard>
   )
 }

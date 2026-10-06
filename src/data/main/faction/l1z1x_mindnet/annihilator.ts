@@ -11,14 +11,30 @@ export const annihilator: Ability = {
   },
   headerUI: 'isEnabled',
   readOnly: true,
+  // Only mechs on the planet being fought participate; in a multi-planet
+  // invasion the others may still bombard (Harrow) from their own planets.
   invoke: [
     {
-      timing: 'COMMIT_UNITS',
+      timing: 'START_OF_COMBAT',
+      context: 'GROUND_COMBAT',
       call: ctx => {
         ctx.api.own.setUnitAbilityCannotBeUsed(
           'BOMBARDMENT',
           ctx.this.key,
           'MECH',
+          ctx.api.own.getActiveSurfaceId(),
+        )
+      },
+    },
+    {
+      timing: 'END_OF_COMBAT',
+      context: 'GROUND_COMBAT',
+      call: ctx => {
+        ctx.api.own.removeUnitAbilityCannotBeUsed(
+          'BOMBARDMENT',
+          ctx.this.key,
+          'MECH',
+          ctx.api.own.getActiveSurfaceId(),
         )
       },
     },

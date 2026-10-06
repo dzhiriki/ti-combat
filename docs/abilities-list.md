@@ -6,6 +6,7 @@
 - [x] **Fleet Pool**
 - [x] **Capacity check between phases**
 - [x] **Retreat flow**
+- [x] **Commit Ground Forces** — split ground forces in space between the invaded planets, or keep them in space
 
 ## Faction
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { makeUnitLocator } from '@/combat'
 import { CombatSetup } from '@/hooks/combat-setup'
-import { DEFAULT_PLANET_ID, SPACE_SURFACE_ID } from '@/types'
+import { SPACE_SURFACE_ID } from '@/types'
 
 import { combatTest } from '../utils/combat-test'
 import { hitOrderUnits, setAbility } from '../utils/setup-options'
@@ -85,8 +85,6 @@ describe.forEachSide('BROTHER_MILOR', () => {
 
     setup.setCombatMode('GROUND')
     setup.setUnitCount('attacker', 'MECH', 1)
-    expect(hitOrderUnits(setup, 'GROUND')).toContain(
-      makeUnitLocator('INFANTRY', DEFAULT_PLANET_ID),
-    )
+    expect(hitOrderUnits(setup, 'GROUND')).toContain('INFANTRY')
   })
 })

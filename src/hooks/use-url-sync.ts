@@ -173,6 +173,13 @@ function decodeValue(
   // Base params — always known types regardless of ability lookup
   if (paramKey === 'isEnabled') return raw === 'true'
   if (paramKey === 'uses') return raw === 'Inf' ? Infinity : Number(raw)
+  if (paramKey === 'planetUses')
+    return raw
+      ? raw.split(',').map(entry => {
+          const [planet, cap] = entry.split('~')
+          return [planet, Number(cap)]
+        })
+      : []
 
   if (!ability) return raw
 

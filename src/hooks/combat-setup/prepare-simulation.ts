@@ -4,6 +4,7 @@ import { makeVariantId } from '@/combat/utils/unit-variant'
 import type { CollectedAbility, CombatSide, UnitStats } from '@/types'
 import { getGameData } from '@/utils/get-game-data'
 import { buildUnitStatsMap } from '@/utils/get-simulation-units'
+import { layoutContext } from '@/utils/layout-context'
 
 import type { Ability } from '../../combat/abilities-engine/types'
 import { applyDeclaredChanges } from './apply-declared-changes'
@@ -50,6 +51,7 @@ export function prepareSimulation(
         'attacker',
         factions.attacker,
         new Set(placements.attacker.upgradedTypes),
+        layoutContext(surfaces),
       ),
       ...customRegistered,
     ],
@@ -58,10 +60,20 @@ export function prepareSimulation(
         'defender',
         factions.defender,
         new Set(placements.defender.upgradedTypes),
+        layoutContext(surfaces),
       ),
       ...customRegistered,
     ],
   }
+
+  // A multi-planet invasion starts on its first planet; settings reconcile
+  // against every planet it fights on, as the panel shows them.
+  const planets = input.invasionPlanets
+  const invasion =
+    combatMode === 'GROUND' && planets && planets.length > 1
+      ? { planets: [...planets], results: [] }
+      : undefined
+  const activeSurfaceId = invasion?.planets[0] ?? input.activeSurfaceId
 
   const savedParams = snapshotConsumerParams(config, registered)
   // Materialize every registered ability's static defaults into the config so
@@ -85,7 +97,8 @@ export function prepareSimulation(
     { attacker: declaredSide('attacker'), defender: declaredSide('defender') },
     surfaces,
     combatMode,
-    input.activeSurfaceId,
+    activeSurfaceId,
+    invasion,
   )
   const gen: { _nextCode?: number } = {}
   const state = {
@@ -95,7 +108,7 @@ export function prepareSimulation(
       placements.attacker,
       surfaces,
       config.attacker,
-      declared.attacker.unitStats as Record<string, UnitStats>,
+      declared.attacker.model.unitStats as Record<string, UnitStats>,
       gen,
     ),
     defender: buildSideState(
@@ -104,11 +117,12 @@ export function prepareSimulation(
       placements.defender,
       surfaces,
       config.defender,
-      declared.defender.unitStats as Record<string, UnitStats>,
+      declared.defender.model.unitStats as Record<string, UnitStats>,
       gen,
     ),
     surfaces: [...surfaces],
-    activeSurfaceId: input.activeSurfaceId,
+    activeSurfaceId,
+    invasion,
     combatMode,
   }
   const metadata = reconcileAbilitiesConfig(
@@ -141,7 +155,8 @@ export function prepareSimulation(
     defender: state.defender,
     combatMode,
     surfaces: input.surfaces,
-    activeSurfaceId: input.activeSurfaceId,
+    activeSurfaceId,
+    invasion,
     abilities: registered,
     unitAbilityKeys: {
       attacker: gameData.getUnitDefinitionAbilityKeys(factions.attacker),

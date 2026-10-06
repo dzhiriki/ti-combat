@@ -8,6 +8,7 @@ import {
 import type {
   CombatMode,
   CombatStateData,
+  InvasionState,
   SideStateData,
   UnitStatsEntry,
 } from '@/combat/combat-state/types'
@@ -17,6 +18,7 @@ import type {
   SurfaceId,
   UnitId,
   UnitIdList,
+  UnitLocator,
   UnitType,
 } from '@/types'
 
@@ -40,6 +42,12 @@ interface DeclaredUnit {
   surface: SurfaceId
 }
 
+export interface DeclaredModel {
+  model: SideStateData
+  /** How many units of each variant the changes place on each surface. */
+  placements: ReadonlyMap<UnitLocator, number>
+}
+
 /** Whether the panel shows `ability` as switched on in `config`. */
 export function isSwitchedOn(
   ability: RegisteredAbility,
@@ -61,7 +69,8 @@ function unitIds(units: FieldedUnits): UnitId[] {
 }
 
 /** The model setup reads: each side's fielded units, plus the units active
- *  abilities may place, after every active ability's `declareChanges`.
+ *  abilities may place, after every active ability's `declareChanges`, and
+ *  the counts those abilities place.
  *
  *  Changes run in passes, each on a fresh model holding the units earlier
  *  passes placed, until a pass places nothing new. A change therefore sees
@@ -71,7 +80,8 @@ export function applyDeclaredChanges(
   surfaces: readonly SurfaceDefinition[],
   combatMode: CombatMode,
   activeSurfaceId: SurfaceId,
-): Record<CombatSide, SideStateData> {
+  invasion?: InvasionState,
+): Record<CombatSide, DeclaredModel> {
   // Setup applies what the panel shows as switched on.
   const changing = {
     attacker: activeChanges(sides.attacker),
@@ -98,10 +108,18 @@ export function applyDeclaredChanges(
       surfaces,
       combatMode,
       activeSurfaceId,
+      invasion,
       firstCode,
     )
-    if (!changing.attacker.length && !changing.defender.length)
-      return { attacker: data.attacker, defender: data.defender }
+    const placements = {
+      attacker: new Map<UnitLocator, number>(),
+      defender: new Map<UnitLocator, number>(),
+    }
+    const result = () => ({
+      attacker: { model: data.attacker, placements: placements.attacker },
+      defender: { model: data.defender, placements: placements.defender },
+    })
+    if (!changing.attacker.length && !changing.defender.length) return result()
 
     const seeded = {
       attacker: new Set(unitIds(data.attacker)),
@@ -115,7 +133,7 @@ export function applyDeclaredChanges(
       const ctx = state.params.context(side)
       for (const ability of changing[side]) {
         ctx.upgradeForCall(ability)
-        ctx.declaringChanges = true
+        ctx.declaringChanges = placements[side]
         try {
           ctx.invokeChanges()
         } finally {
@@ -137,7 +155,7 @@ export function applyDeclaredChanges(
         placed = true
       }
     }
-    if (!placed) return { attacker: data.attacker, defender: data.defender }
+    if (!placed) return result()
   }
 }
 
@@ -153,6 +171,7 @@ function buildModel(
   surfaces: readonly SurfaceDefinition[],
   combatMode: CombatMode,
   activeSurfaceId: SurfaceId,
+  invasion: InvasionState | undefined,
   firstCode: number | undefined,
 ): CombatStateData {
   const gen: { _nextCode?: number } = { _nextCode: firstCode }
@@ -186,6 +205,7 @@ function buildModel(
     combatMode,
     surfaces: [...surfaces],
     activeSurfaceId,
+    invasion,
     _nextCode: gen._nextCode,
   }
 }

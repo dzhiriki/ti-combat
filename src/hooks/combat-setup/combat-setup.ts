@@ -8,6 +8,7 @@ import {
   extractDefaults,
   extractSyncSources,
   getOpponentSide,
+  type InvasionState,
   type SideAbilitiesConfig,
   type SideStateData,
 } from '@/combat'
@@ -39,6 +40,7 @@ import {
   getUnitConfig as buildUnitConfig,
   type UnitConfig,
 } from '@/utils/get-unit-config'
+import { layoutContext } from '@/utils/layout-context'
 import {
   allowedSurfaceTypes,
   collapseSurfaceCounts,
@@ -64,6 +66,11 @@ import {
 import type { SimulationInput } from './types'
 
 export type UnitEditorMode = 'SIMPLIFIED' | 'FULL'
+
+/** A planet is named after its id, so the name follows it when reordered. */
+function planetSurface(id: SurfaceId): SurfaceDefinition {
+  return { id, type: 'PLANET', name: `Planet ${id.replace('planet-', '')}` }
+}
 
 /**
  * Internal backing class for UI state management.
@@ -272,6 +279,7 @@ export class CombatSetup {
       },
       surfaces: this._surfaces,
       activeSurfaceId: this.activeSurfaceId,
+      invasion: this.invasion,
     }
 
     this.setFaction('attacker', faction)
@@ -376,6 +384,8 @@ export class CombatSetup {
       if (this._editorMode === 'SIMPLIFIED') this.reflowSimplified(side)
       else this.normalizeSideCounts(side)
       this.rebuildUnits(side)
+      // Rebuilt units get new ids; the option model must describe them.
+      this.reconcile()
     }
     // Force new stateData reference so React memoization triggers
     this._stateData = { ...this._stateData }
@@ -388,6 +398,7 @@ export class CombatSetup {
       ...this._stateData,
       combatMode: mode,
       activeSurfaceId: this.activeSurfaceId,
+      invasion: this.invasion,
     }
     this.reconcile()
     if (this._editorMode === 'SIMPLIFIED') {
@@ -408,6 +419,7 @@ export class CombatSetup {
       }
       this.resetSurfaces()
       this._editorMode = mode
+      this.loadAbilities()
       this.reflowSimplified('attacker', totals.attacker)
       this.reflowSimplified('defender', totals.defender)
     } else {
@@ -422,10 +434,6 @@ export class CombatSetup {
     if (!this._surfaces.some(s => s.id === surfaceId && s.type === 'PLANET'))
       return
     this._selectedPlanetId = surfaceId
-    this._stateData = {
-      ...this._stateData,
-      activeSurfaceId: this.activeSurfaceId,
-    }
     this.rebuildAllUnits()
   }
 
@@ -437,10 +445,7 @@ export class CombatSetup {
       .filter(Number.isFinite)
     const number = Math.max(0, ...numbers) + 1
     const id = `planet-${number}` as SurfaceId
-    this._surfaces = [
-      ...this._surfaces,
-      { id, type: 'PLANET', name: `Planet ${number}` },
-    ]
+    this._surfaces = [...this._surfaces, planetSurface(id)]
     for (const side of ['attacker', 'defender'] as const) {
       this._surfaceCounts[side] = {
         ...this._surfaceCounts[side],
@@ -448,7 +453,45 @@ export class CombatSetup {
       }
     }
     this._stateData = { ...this._stateData, surfaces: this._surfaces }
+    this.loadAbilities()
     this.selectPlanet(id)
+  }
+
+  /** Drop a planet and the units placed on it; the last planet stays. */
+  removePlanet(surfaceId: SurfaceId): void {
+    if (this._editorMode !== 'FULL') return
+    const planets = this._surfaces.filter(s => s.type === 'PLANET')
+    const index = planets.findIndex(s => s.id === surfaceId)
+    if (index === -1 || planets.length === 1) return
+    this._surfaces = this._surfaces.filter(s => s.id !== surfaceId)
+    for (const side of ['attacker', 'defender'] as const) {
+      const { [surfaceId]: _, ...rest } = this._surfaceCounts[side]
+      this._surfaceCounts[side] = rest
+    }
+    if (surfaceId === this._selectedPlanetId) {
+      this._selectedPlanetId = (planets[index + 1] ?? planets[index - 1]).id
+    }
+    this.loadAbilities()
+    this.rebuildAllUnits()
+  }
+
+  /** Put the planets in this order, which is the order they are invaded. */
+  reorderPlanets(planetIds: readonly SurfaceId[]): void {
+    if (this._editorMode !== 'FULL') return
+    const planets = this._surfaces.filter(s => s.type === 'PLANET')
+    const byId = new Map(planets.map(planet => [planet.id, planet]))
+    if (
+      planetIds.length !== planets.length ||
+      new Set(planetIds).size !== planetIds.length ||
+      !planetIds.every(id => byId.has(id)) ||
+      planetIds.every((id, index) => id === planets[index].id)
+    )
+      return
+    this._surfaces = [
+      ...this._surfaces.filter(s => s.type !== 'PLANET'),
+      ...planetIds.map(id => byId.get(id)!),
+    ]
+    this.rebuildAllUnits()
   }
 
   setSurfaceUnitCount(
@@ -559,17 +602,27 @@ export class CombatSetup {
       ),
     )
     if (!hasUnits) return null
+    const invasionPlanets = this.invasionPlanets()
     return {
       system: this._system,
       attackerFaction: this._attackerFaction,
       defenderFaction: this._defenderFaction,
       surfaces: this._surfaces,
       activeSurfaceId: this.activeSurfaceId,
+      ...(invasionPlanets.length > 1 && { invasionPlanets }),
       attackerPlacements: this.placements('attacker'),
       defenderPlacements: this.placements('defender'),
       combatMode: this._combatMode,
       abilities: this._abilities,
     }
+  }
+
+  /** GROUND mode: every planet, in tab order. */
+  private invasionPlanets(): SurfaceId[] {
+    if (this._combatMode !== 'GROUND') return []
+    return this._surfaces
+      .filter(surface => surface.type === 'PLANET')
+      .map(surface => surface.id)
   }
 
   toSerializedConfig(): SerializedConfig {
@@ -643,11 +696,7 @@ export class CombatSetup {
     const planetIds = config.p.length ? config.p : [DEFAULT_PLANET_ID]
     this._surfaces = [
       { id: SPACE_SURFACE_ID, type: 'SPACE', name: 'Space' },
-      ...planetIds.map((id, index) => ({
-        id: id as SurfaceId,
-        type: 'PLANET' as const,
-        name: `Planet ${index + 1}`,
-      })),
+      ...planetIds.map(id => planetSurface(id as SurfaceId)),
     ]
     this._selectedPlanetId = (
       planetIds.includes(config.sp) ? config.sp : planetIds[0]
@@ -734,6 +783,7 @@ export class CombatSetup {
       combatMode: this._combatMode,
       surfaces: this._surfaces,
       activeSurfaceId: this.activeSurfaceId,
+      invasion: this.invasion,
     }
 
     // Final reconcile and engine rebuild
@@ -747,10 +797,18 @@ export class CombatSetup {
     return side === 'attacker' ? this._attackerFaction : this._defenderFaction
   }
 
+  /** Where the combat starts: space, or the first planet, where ground
+   *  forces land unless split. The selected tab only picks the planet being
+   *  edited. */
   private get activeSurfaceId(): SurfaceId {
-    return this._combatMode === 'SPACE'
-      ? SPACE_SURFACE_ID
-      : this._selectedPlanetId
+    if (this._combatMode === 'SPACE') return SPACE_SURFACE_ID
+    return this.invasionPlanets()[0]
+  }
+
+  /** With two or more planets, all are fought over. */
+  private get invasion(): InvasionState | undefined {
+    const planets = this.invasionPlanets()
+    return planets.length > 1 ? { planets, results: [] } : undefined
   }
 
   /** Each ability's synced params, by ability key. */
@@ -779,8 +837,8 @@ export class CombatSetup {
     }
   }
 
-  /** Reload the abilities available to `sides` for their current factions
-   *  and upgrades. */
+  /** Reload the abilities available to `sides` for their current factions,
+   *  upgrades, and planets (the layout context). */
   private loadAbilities(
     sides: readonly CombatSide[] = ['attacker', 'defender'],
   ): void {
@@ -791,6 +849,7 @@ export class CombatSetup {
         side,
         faction,
         this._upgradedTypes[side],
+        layoutContext(this._surfaces),
       )
       this._unitAbilityKeys[side] =
         gameData.getUnitDefinitionAbilityKeys(faction)
@@ -884,7 +943,8 @@ export class CombatSetup {
       this._surfaces,
       this._combatMode,
       this.activeSurfaceId,
-    )[side].unitStats as Record<string, UnitStats>
+      this.invasion,
+    )[side].model.unitStats as Record<string, UnitStats>
   }
 
   private rebuildUnits(side: CombatSide): void {
@@ -906,6 +966,7 @@ export class CombatSetup {
       _nextCode: gen._nextCode,
       surfaces: this._surfaces,
       activeSurfaceId: this.activeSurfaceId,
+      invasion: this.invasion,
     }
   }
 

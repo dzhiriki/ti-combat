@@ -1,7 +1,7 @@
 import { CombatState } from '../combat-state/combat-state'
 import { getInitialMetaPhase, isCombatMeta } from '../combat-state/phase-utils'
 import type { MetaPhase } from '../combat-state/types'
-import type { CombatOutcome } from '../types'
+import type { CombatOutcome, CombatWinner } from '../types'
 import { extractSurvivors } from './utils/extract-survivors'
 import type { OutcomeRecord } from './utils/types'
 
@@ -225,6 +225,14 @@ export class CombatEngine {
         if (round > this.maxRounds) {
           console.warn(`Exceed ${this.maxRounds} rounds`)
         }
+        // Multi-planet invasion: the next planet's combat continues this
+        // node with its own rounds.
+        const next = state.beginNextCombat()
+        if (next !== undefined) {
+          currentMeta = next
+          round = 0
+          continue
+        }
         if (state.isFinished() || round > this.maxRounds) {
           finalNodes++
           const leaf = makeLeafOutcome(state)
@@ -278,6 +286,7 @@ export class CombatEngine {
                 defenderData: o.defenderData,
                 probability: adjustedProb,
                 winnerSide: o.winnerSide,
+                planetWinners: o.planetWinners,
               })
             }
           }
@@ -313,7 +322,21 @@ export class CombatEngine {
  *  end script flips `isFinished`. The maxRounds escape hatch is the one path
  *  that reaches here without the end script, so fall back. */
 function makeLeafOutcome(state: CombatState): OutcomeRecord {
-  const winnerSide = state.data.winnerSide ?? 'draw'
+  const { invasion } = state.data
+  let winnerSide = state.data.winnerSide ?? 'draw'
+  let planetWinners: Record<string, CombatWinner> | undefined
+  if (invasion) {
+    // Planets never reached (maxRounds escape hatch) count as draws.
+    const results = invasion.planets.map(
+      (_, i) =>
+        invasion.results[i] ??
+        (i === invasion.results.length ? winnerSide : 'draw'),
+    )
+    winnerSide = results.every(r => r === results[0]) ? results[0] : 'draw'
+    planetWinners = Object.fromEntries(
+      invasion.planets.map((planet, i) => [planet, results[i]]),
+    )
+  }
   const key = state.getUnitsHash()
   const record: OutcomeRecord = new Map()
   record.set(key, {
@@ -321,6 +344,7 @@ function makeLeafOutcome(state: CombatState): OutcomeRecord {
     defenderData: state.data.defender,
     probability: 1,
     winnerSide,
+    planetWinners,
   })
   return record
 }
@@ -340,6 +364,7 @@ function outcomeRecordToArray(
       attackerSurfaces: attacker.bySurface,
       defenderSurfaces: defender.bySurface,
       winner: o.winnerSide,
+      ...(o.planetWinners && { planetWinners: o.planetWinners }),
       probability: o.probability,
     })
   }

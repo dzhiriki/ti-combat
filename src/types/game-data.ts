@@ -68,6 +68,13 @@ export interface CollectedAbility extends RegisteredAbility {
   deploy?: { unitType: UnitBaseType; base: boolean; upgraded: boolean }
 }
 
+/** What decides which slot a shared deck registers under. GameData collects
+ *  its abilities per context; setup reloads them when the context changes. */
+export interface AbilityLayoutContext {
+  /** Planets in the combat's system. */
+  planets: number
+}
+
 export interface GameData {
   id: GameSystem
   label: string
@@ -78,13 +85,17 @@ export interface GameData {
   /** Every ability reachable through this system, for config validation. */
   allAbilities: readonly RegisteredAbility[]
   /** All shared, faction, and unit abilities registered under a slot. */
-  getAbilities(slot: string): readonly RegisteredAbility[]
+  getAbilities(
+    slot: string,
+    context?: AbilityLayoutContext,
+  ): readonly RegisteredAbility[]
   getFaction(factionKey: string): Faction
   getFactionUnitConfig(factionKey: string): Record<UnitBaseType, UnitDefinition>
   getAvailableAbilities(
     side: CombatSide,
     factionKey: string,
     upgradedTypes?: ReadonlySet<UnitBaseType>,
+    context?: AbilityLayoutContext,
   ): CollectedAbility[]
   getUnitDefinitionAbilityKeys(factionKey: string): ReadonlySet<string>
   getFactionOwnedAbilityKeys(factionKey: string): ReadonlySet<string>

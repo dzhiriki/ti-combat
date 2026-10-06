@@ -16,6 +16,7 @@ export {
   type CombatMode,
   type CombatStateData,
   type HitSource,
+  type InvasionState,
   type MetaPhase,
   type PhaseMarker,
   type PhaseStep,

@@ -307,15 +307,33 @@ a check there too.
   model (`optionMetadata.model`) holds both sides' fielded units; `placeUnits`
   in a change adds one unit per variant and surface (within unit limits, no
   Fleet Pool enforcement, nothing for an ability whose `context` is the other
-  mode). Changes run in registration order with no PREPARE run, in passes on a
-  fresh model until a pass places nothing new, so a grant sees units declared
-  by later abilities or the opponent; a change reading categories another
-  change sets must still register later. Reconcile applies them before
-  syncing, so a `declareParam` unit list they read has its stored value (user
-  counts survive; synced entries may be missing). The setup's placement runs
+  mode). The counts asked for go to `optionMetadata.placements`, from the
+  last pass, unclamped: a reader caps them by reinforcements itself (Commit
+  Ground Forces' split adds those in space). Changes run in registration
+  order with no PREPARE run, in passes on a fresh model until a pass places
+  nothing new, so a grant sees units declared by later abilities or the
+  opponent; a change reading categories another change sets must still
+  register later. Reconcile applies them before syncing, so a `declareParam`
+  unit list they read has its stored value (user counts survive; synced
+  entries may be missing). The setup's placement runs
   one side's changes without units or the opponent's abilities, so
   `ctx.abilities.opponent` may be empty. See
   `tests/engine/declare-changes.test.ts`.
+
+- **The setup model shares the side state's unit ids.** Grants and options
+  look units up by id in `optionMetadata.model` (`isUnitCategory(model, id)`),
+  and rebuilding a side's units gives them new ids. Every setup mutation that
+  rebuilds units must reconcile afterwards, including a param change of a
+  `declareChanges` ability; otherwise split options come up empty (Commit
+  Ground Forces after toggling Matriarch). See
+  `tests/abilities/commit-ground-forces+matriarch.test.ts`.
+
+- **Split params divide units per variant.** `planetOptions` counts each
+  variant the setup model holds (Galvanized units come from Galvanized
+  Units' `declareChanges`), reconcile balances each variant's counts, and
+  `splitUnits` moves units by variant key. A count its variant can't fill
+  (a subtype gained or lost after setup) takes leftover units of the same
+  base type. See `tests/abilities/commit-ground-forces+pre-galvanized.test.ts`.
 
 - **`declareParam` sourced params sync only at reconcile, and those values
   survive into the engine run.** Surface-scoped lists offer only the units the
@@ -336,7 +354,14 @@ a check there too.
 
 - **Reconciled participating lists are wider than their controls.**
   Reconcile resolves list options with `allSurfaces` (every surface of the
-  param's mode), while `getUnitVariantsOptions` shows only the active one. UI
+  param's mode), while `getUnitVariantsOptions` shows only the fought ones:
+  the active surface, or every planet of `CombatStateData.invasion`. In
+  ground mode every planet is invaded and setup's active surface is the first
+  planet in tab order (where commitment lands unless split), not the selected
+  tab, which only picks the planet being
+  edited. Ground participant choices are merged by type (`choosesByType`) and
+  reconcile strips the surface from stored ground entries, first entry per
+  variant winning, so this applies to space and system lists. UI
   edits that rebuild a list from the visible items must merge the hidden
   entries back (`keepHiddenEntries` in the abilities-panel list) or they
   silently delete other planets' settings. See
@@ -415,6 +440,69 @@ a check there too.
   (`CombatEngine` / test harness) must be mirrored there. See `tests/abilities/claire-gibson.test.ts`,
   `tests/abilities/claire-gibson+indoctrination.test.ts`, and
   `tests/surfaces.test.ts`.
+
+- **A multi-planet invasion chains one combat per planet.**
+  `CombatStateData.invasion` (set only when `invasionPlanets` names two or
+  more planets) runs one bombardment and commitment onto `planets[0]`,
+  Space Cannon Defense on every planet (skipped where the attacker has no
+  ground forces), then a ground combat per planet. Each planet's combat ends
+  like any other (end script → `_finish`, which appends the winner to
+  `invasion.results`) and sets `isFinished`; the schedulers (`CombatEngine`,
+  the test harness) then call `beginNextCombat()` and restart their round
+  count, so `START_OF_COMBAT` fires per planet. COMPLETE handling itself is
+  unchanged, so `_loadEndScriptIfFlowExhausted` needs no mirror. State,
+  uses and unit stats carry over. `invasion` is shared by branch clones:
+  replace it, never mutate it. Moving the active planet must resync both
+  sides and drop `_resolvedRestrictions` (`_activatePlanet`), and the state
+  hash appends the planet cursor only while `invasion` is set — the unit
+  segments are relative to the active surface, so two planets' states would
+  otherwise collide. Known gaps until per-planet selectors: Plasma Scoring,
+  Custodia Vigilia and Geoform add dice to every planet's SCD roll. See
+  `tests/engine/multi-planet-invasion.test.ts`.
+
+- **Per-planet use caps rewrite live `uses` at every planet switch.**
+  `CombatStateData.planetUses` (set only when an ability's `planetUses`
+  config caps an invasion planet) holds each capped ability's allowance per
+  planet. Entering a planet lowers its live `uses` to what the planet may
+  spend and parks the rest in `reserved`; leaving bills the spent uses to the
+  planet and restores the rest (`combat-state/planet-uses.ts`). So every
+  reader of `uses` (dispatch gating, dice-math budgets) sees the planet's
+  limit for free, but every planet switch must go through `_activatePlanet`,
+  and the first planet is entered in `forSimulation` after PREPARE. An
+  ability whose uses run out loses its invokes from the index
+  (`addAbilityInvokes` after `decrementUses`), so restoring held-back uses
+  must re-register them (`_refreshPlanetUseInvokes`); a live `uses` value
+  alone doesn't make an ability fire again.
+  `planetUses` is replaced on write and hashed only when set. See
+  `tests/engine/planet-uses.test.ts`.
+
+- **Commitment is an ability, not an engine step.** The `COMMIT_UNITS`
+  script runs the `COMMIT_UNITS` timing (Matriarch/Morphwing grant fighters
+  the ground-force category, G'hom Sek'kus places its units in space), then
+  `COMMIT_UNITS_STEP`, where the ADVANCED `COMMIT_GROUND_FORCES` driver lands
+  the attacker's ground forces in space by its split. A state built without
+  the registered ADVANCED abilities commits nothing, so G'hom Sek'kus's units
+  then stay in space. The units committed from elsewhere must not stay in
+  space: setup caps the split's `@space` count at the units standing there,
+  and the driver hands the newest ids (the units just placed) to the planets
+  first, which relies on the split listing planets before space (reconcile
+  keeps the options' order). See
+  `tests/abilities/commit-ground-forces+ghom-sekkus.test.ts`. A split
+  bombardment resolves once per planet (`resolveStep` with `surfaceId`/`units`) and the
+  BOMBARDMENT script re-activates the first planet afterwards; Planetary
+  Shield re-checks the active planet before every bombardment roll.
+
+- **"On this planet" effects must not be side-wide.** With several planets a
+  blanket restriction or config change leaks into the other planets' combats.
+  Restrict the units standing on the planet with a surface-scoped restriction
+  (Moll Terminus passes the mech's planet, or the invaded planet when the
+  attacker commits it from space). An effect about the planet being attacked
+  rather than where units stand can't be surface-scoped: apply it at the
+  planet's `START_OF_COMBAT` (context `GROUND_COMBAT`) when its source stands
+  on the active planet, and undo it at `END_OF_COMBAT` (Annihilator, Shield
+  Paling), or re-check it right before the effect applies (Planetary Shield,
+  before each bombardment roll). The undo is a unit-sourced invoke, so it
+  needs a surviving carrier.
 
 - **The `[0.0.1]` assignHits fast path compares base types, not locators.**
   Surface-qualified tiers are equivalent only when they name one surface and
@@ -539,7 +627,8 @@ a check there too.
 ## UI config and data modules
 
 - **Unit selector keys are not variant/stat keys.** Scoped `declareParam` lists
-  store `UnitLocator` values containing both a variant and a surface. Use scoped
+  store `UnitLocator` values containing both a variant and a surface (ground
+  participant choices store plain variants; see above). Use scoped
   unit queries or `matchesUnitLocator` (also valid for destroyed-unit metadata),
   and use `parseUnitLocator` for both plain and qualified keys. Its `unitType`
   is the decoded variant; `baseType` and `subtypes` describe that variant, and

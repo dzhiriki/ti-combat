@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { makeUnitLocator } from '@/combat'
 import { CombatSetup } from '@/hooks/combat-setup'
-import { DEFAULT_PLANET_ID } from '@/types'
 
 import { combatTest } from '../utils/combat-test'
 import { hitOrderUnits, setAbility } from '../utils/setup-options'
@@ -76,7 +74,7 @@ describe('Claire Gibson', () => {
     const setup = new CombatSetup()
     setup.setCombatMode('GROUND')
     setup.setUnitCount('defender', 'MECH', 1)
-    const infantry = makeUnitLocator('INFANTRY', DEFAULT_PLANET_ID)
+    const infantry = 'INFANTRY'
     expect(hitOrderUnits(setup, 'GROUND', 'defender')).not.toContain(infantry)
 
     setAbility(setup, 'defender', 'CLAIRE_GIBSON', { isEnabled: true })

@@ -3,8 +3,10 @@ import type {
   CombatSide,
   DiceGroup,
   SurfaceId,
+  UnitAbility,
   UnitBaseType,
   UnitId,
+  UnitLocator,
   UnitStats,
   UnitType,
   UnitVariantId,
@@ -56,7 +58,24 @@ export interface ParamFilter {
   withAbility?: boolean
 }
 
-export type UnitSelectorScope = 'participating' | 'system' | 'type'
+/** `planet`: divides units between the planets of the system, by its
+ *  `split` (see `declareParam.split`). */
+export type UnitSelectorScope = 'participating' | 'system' | 'type' | 'planet'
+
+/** How a `planet` param divides the side's units between the invaded
+ *  planets. Each type's counts add up to its units, and reconcile puts units
+ *  the list doesn't cover on the first planet. */
+export interface UnitSplit {
+  /** Units standing in space (commitment) or anywhere in the system. Units
+   *  active abilities place in space (G'hom Sek'kus) join a `space` split,
+   *  but never stay there: they are committed from elsewhere. */
+  from: 'space' | 'system'
+  /** Only units whose stats carry this unit ability. */
+  unitAbility?: UnitAbility
+  /** Units may stay in space; their count is the `@space` entry. Needs
+   *  `from: 'space'`. */
+  canStay?: boolean
+}
 
 /** Location of a surface-qualified option, for grouping and labels. */
 export interface SurfaceOptionMeta {
@@ -86,6 +105,8 @@ export interface SyncSourceConfig {
   /** See `declareParam.limit`. Threaded through so reconcile can clamp
    *  stored values to the per-variant max. */
   limit?: ParamLimit
+  /** See `declareParam.split`. */
+  split?: UnitSplit
 }
 
 export interface DeclaredSubtype {
@@ -117,6 +138,9 @@ export interface SideOptionMetadata {
   /** The fielded units plus those active abilities may place, once the
    *  active abilities' `declareChanges` applied. */
   model: SideStateData
+  /** How many units of each variant the active abilities' changes place on
+   *  each surface; `model` holds a single unit of each. */
+  placements?: ReadonlyMap<UnitLocator, number>
   subtypes: DeclaredSubtype[]
   /** Unit types carrying each ability with a `filter.withAbility` list, as
    *  if that ability were switched on: its list keeps its options and order
@@ -180,6 +204,8 @@ declare global {
     AFTER_DESTROY: UnitId[]
 
     COMMIT_UNITS: void
+    /** Driven by the Commit Ground Forces ability: lands ground forces. */
+    COMMIT_UNITS_STEP: void
   }
 
   /** Per-ability params registry. Ability files augment this interface. */
@@ -359,6 +385,9 @@ export interface AbilityCallContext {
    *                defender within `resolveStep`.
    *   - `deferPhaseEndCheck` — defer participant loss detection to a paired
    *                resolution or the enclosing phase driver.
+   *   - `surfaceId` — resolve against this planet: it becomes the active
+   *                surface (targets, shields) before the roll and stays so.
+   *   - `units`   — only these units of the firing side roll.
    *
    *  Composition: multiple `resolveStep` calls in one `call` execute in
    *  reverse call-order (LIFO): the last push sits on top of the script
@@ -370,6 +399,8 @@ export interface AbilityCallContext {
       target?: 'OWN' | 'OPPONENT'
       firing?: ('OWN' | 'OPPONENT')[]
       deferPhaseEndCheck?: boolean
+      surfaceId?: SurfaceId
+      units?: readonly UnitId[]
       /** Ability params overrides for this resolution only — immutable and
        *  applied over base + live params. Boolean shorthand = `{ isEnabled }`.
        *  e.g. `{ SUSTAIN_DAMAGE: false }` to skip Sustain for this step. */
@@ -471,6 +502,15 @@ interface UIConfigSelect<
 
 export type UnitListMode = 'order' | 'checkbox' | 'number'
 
+/** One slider per unit type dividing its units between surfaces; items come
+ *  from a `split` param (`max` is the most a surface may take). */
+interface UIConfigUnitSplit<
+  TParams = Record<string, unknown>,
+> extends UIConfigItemBase<TParams> {
+  type: 'unit-split'
+  items: ({ label: string; value: string; max?: number } & SurfaceOptionMeta)[]
+}
+
 interface UIConfigUnitList<
   TParams = Record<string, unknown>,
 > extends UIConfigItemBase<TParams> {
@@ -490,6 +530,7 @@ export type UIConfigItem<TParams = Record<string, unknown>> =
   | UIConfigNumber<TParams>
   | UIConfigSelect<TParams>
   | UIConfigUnitList<TParams>
+  | UIConfigUnitSplit<TParams>
 
 type UIConfig<Params = Record<string, unknown>> =
   | UIConfigItem<Params>[]

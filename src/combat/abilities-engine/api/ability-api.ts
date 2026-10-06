@@ -53,7 +53,11 @@ import {
   isNativeCategory,
   isUnitCategory,
 } from '../../utils/unit-combat-properties'
-import { matchesUnitList, matchesUnitLocator } from '../../utils/unit-locator'
+import {
+  makeUnitLocator,
+  matchesUnitList,
+  matchesUnitLocator,
+} from '../../utils/unit-locator'
 import type {
   AbilitiesEngine,
   AbilityCandidate,
@@ -490,7 +494,11 @@ export class SideApi {
   ): Record<UnitType, UnitId[]> {
     const destination = surfaceId ?? this.state.activeSurfaceId
     if (this._ctx.declaringChanges)
-      return this._declarePlacement(unitsToAdd, destination)
+      return this._declarePlacement(
+        unitsToAdd,
+        destination,
+        this._ctx.declaringChanges,
+      )
     const placed = CombatSideState.placeUnits(
       this._sideData,
       this.state,
@@ -513,11 +521,13 @@ export class SideApi {
 
   /** Setup's `placeUnits`: the model only needs each variant present on the
    *  surface, so it places one unit where none stands yet and room is left
-   *  under the unit limit, and enforces nothing else. An ability limited to
-   *  the other combat mode never runs, so it places nothing. */
+   *  under the unit limit, and enforces nothing else; `placements` counts
+   *  the units requested. An ability limited to the other combat mode never
+   *  runs, so it places nothing. */
   private _declarePlacement(
     unitsToAdd: Partial<Record<UnitType, number>>,
     destination: SurfaceId,
+    placements: Map<UnitLocator, number>,
   ): Record<UnitType, UnitId[]> {
     const context = this._ctx.ability?.context
     if (context && context !== this.state.combatMode)
@@ -527,6 +537,8 @@ export class SideApi {
     const missing: Partial<Record<UnitType, number>> = {}
     for (const [variantKey, count] of Object.entries(unitsToAdd)) {
       if (!count || count <= 0) continue
+      const locator = makeUnitLocator(variantKey as UnitType, destination)
+      placements.set(locator, (placements.get(locator) ?? 0) + count)
       const present = ids.some(
         id =>
           s.unitType[id] === variantKey && s.unitSurface[id] === destination,
@@ -1085,9 +1097,9 @@ export class AbilityContext {
    *  `pushModifier` to tag emitted modifiers so the dice-math kernel can
    *  bill `uses` only when the declaration actually survives. */
   isDeclarationInvoke?: boolean
-  /** True while setup runs `declareChanges` on its model: `placeUnits` then
-   *  declares the units an ability may place. */
-  declaringChanges?: boolean
+  /** Set while setup runs `declareChanges` on its model: `placeUnits` then
+   *  declares the units an ability may place and counts them here. */
+  declaringChanges?: Map<UnitLocator, number>
 
   _abilitiesParams: AbilitiesEngine
   private _side: CombatSide
@@ -1510,6 +1522,8 @@ export class AbilityContext {
       target?: 'OWN' | 'OPPONENT'
       firing?: ('OWN' | 'OPPONENT')[]
       deferPhaseEndCheck?: boolean
+      surfaceId?: SurfaceId
+      units?: readonly UnitId[]
       abilitiesOverride?: AbilitiesOverride
     },
   ): void {
@@ -1548,6 +1562,8 @@ export class AbilityContext {
       customDice,
       selfTarget,
       deferPhaseEndCheck: overrides?.deferPhaseEndCheck,
+      surfaceId: overrides?.surfaceId,
+      sourceUnits: overrides?.units,
       abilitiesOverride: overrides?.abilitiesOverride,
     })
   }

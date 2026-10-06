@@ -1,7 +1,6 @@
 import {
   type CombatSide,
   type DiceGroup,
-  SPACE_SURFACE_ID,
   type SurfaceDefinition,
   type SurfaceId,
   type UnitAbility,
@@ -45,10 +44,15 @@ import { canonicalizeUnitState } from '../utils/canonicalize-unit-state'
 import { sortUnitsByPriority } from '../utils/sort-units-by-priority'
 import {
   hasPhaseCategories,
-  isUnitCategory,
   participatesInCombat,
 } from '../utils/unit-combat-properties'
 import { getNextPhaseInFlow, isCombatMeta } from './phase-utils'
+import {
+  collectPlanetUseLimits,
+  enterPlanetUses,
+  leavePlanetUses,
+  planetUsesHash,
+} from './planet-uses'
 import type {
   CombatMode,
   CombatStateData,
@@ -59,6 +63,7 @@ import type {
   PendingStep,
   PhaseStep,
   PhaseStepGroup,
+  InvasionState,
   PhaseTransitionTarget,
   SideStateData,
   UnitAbilityMeta,
@@ -102,6 +107,15 @@ function resyncSide(data: CombatStateData, side: CombatSide): void {
   )
 }
 
+/** State-hash segment for a multi-planet invasion: the unit segments are
+ *  relative to the active planet, so without the cursor two planets' states
+ *  could collide. Empty for every other combat. */
+function invasionHash(data: CombatStateData): string {
+  const invasion = data.invasion
+  if (invasion === undefined) return ''
+  return `|${data.activeSurfaceId}:${invasion.results.join(',')}`
+}
+
 /** AFB-context AFTER_UNIT_ABILITY_ROLL abilities (e.g. RAID_FORMATION) need
  *  to read excess-hit counts; clamping would hide them. Gate per-side. */
 function hasAfbAfterRollInvokes(
@@ -118,6 +132,8 @@ export interface SimulationSetup {
   combatMode: CombatMode
   surfaces: SurfaceDefinition[]
   activeSurfaceId: SurfaceId
+  /** Multi-planet invasions only; `activeSurfaceId` is its first planet. */
+  invasion?: InvasionState
   abilities: Record<CombatSide, RegisteredAbility[]>
   unitAbilityKeys: Record<CombatSide, ReadonlySet<string>>
   factionOwnedKeys: Record<CombatSide, ReadonlySet<string>>
@@ -218,6 +234,8 @@ export class CombatState {
       combatMode: setup.combatMode,
       surfaces: setup.surfaces,
       activeSurfaceId: setup.activeSurfaceId,
+      invasion: setup.invasion,
+      planetUses: undefined,
       _nextCode: setup.nextCode,
     }
 
@@ -239,6 +257,11 @@ export class CombatState {
     // into the simulation flow as bogus pending steps for the initial meta.
     instance._params.runAbilities('PREPARE')
     if (instance.pendingSteps.length > 0) instance.advance()
+
+    // Per-planet use caps hold back the uses the first planet may not spend.
+    baseData.planetUses = collectPlanetUseLimits(baseData)
+    enterPlanetUses(baseData, 0)
+    instance._refreshPlanetUseInvokes()
 
     // One-time sort: filter `units[]` to participating-only and order by
     // combat-mode priority rank. Never re-sorted during combat in iteration 1.
@@ -389,12 +412,12 @@ export class CombatState {
 
   getUnitsHash(): string {
     const d = this.data
-    return `${CombatSideState.getUnitsHash(d.attacker, d.activeSurfaceId)}|${CombatSideState.getUnitsHash(d.defender, d.activeSurfaceId)}`
+    return `${CombatSideState.getUnitsHash(d.attacker, d.activeSurfaceId)}|${CombatSideState.getUnitsHash(d.defender, d.activeSurfaceId)}${invasionHash(d)}`
   }
 
   getHash(): string {
     const d = this.data
-    return `${CombatSideState.getHash(d.attacker, d.activeSurfaceId)}|${CombatSideState.getHash(d.defender, d.activeSurfaceId)}`
+    return `${CombatSideState.getHash(d.attacker, d.activeSurfaceId)}|${CombatSideState.getHash(d.defender, d.activeSurfaceId)}${invasionHash(d)}${planetUsesHash(d)}`
   }
 
   /**
@@ -525,8 +548,24 @@ export class CombatState {
       case 'AFB':
         return [{ kind: 'timing', timing: 'AFB_STEP', phase }]
 
-      case 'BOMBARDMENT':
-        return [{ kind: 'timing', timing: 'BOMBARDMENT_STEP', phase }]
+      case 'BOMBARDMENT': {
+        const planets = this.data.invasion?.planets
+        // A split bombardment moves between planets; commitment follows
+        // on the first.
+        return [
+          { kind: 'timing', timing: 'BOMBARDMENT_STEP', phase },
+          ...(planets
+            ? [
+                {
+                  kind: 'method' as const,
+                  fn: CombatState.prototype._activatePlanetStep,
+                  phase,
+                  payload: planets[0],
+                },
+              ]
+            : []),
+        ]
+      }
 
       case 'SPACE_CANNON_OFFENSE':
         return [
@@ -534,8 +573,29 @@ export class CombatState {
           { kind: 'timing', timing: 'CLEANUP', phase },
         ]
 
-      case 'SPACE_CANNON_DEFENSE':
-        return [{ kind: 'timing', timing: 'SPACE_CANNON_DEFENSE_STEP', phase }]
+      case 'SPACE_CANNON_DEFENSE': {
+        const planets = this.data.invasion?.planets
+        if (!planets)
+          return [
+            { kind: 'timing', timing: 'SPACE_CANNON_DEFENSE_STEP', phase },
+          ]
+        // Every planet's defense resolves before any ground combat, then the
+        // first planet's combat starts.
+        return [
+          ...planets.map((planet): PhaseStep => ({
+            kind: 'method',
+            fn: CombatState.prototype._spaceCannonDefenseOn,
+            phase,
+            payload: planet,
+          })),
+          {
+            kind: 'method',
+            fn: CombatState.prototype._activatePlanetStep,
+            phase,
+            payload: planets[0],
+          },
+        ]
+      }
 
       case 'SPACE_COMBAT':
       case 'GROUND_COMBAT': {
@@ -564,14 +624,13 @@ export class CombatState {
         ]
       }
 
+      // COMMIT_UNITS abilities run first so Matriarch/Morphwing-style rules
+      // make more units ground forces before the Commit Ground Forces driver
+      // lands them.
       case 'COMMIT_UNITS':
         return [
           { kind: 'timing', timing: 'COMMIT_UNITS', phase },
-          {
-            kind: 'method',
-            fn: CombatState.prototype._commitUnits,
-            phase,
-          },
+          { kind: 'timing', timing: 'COMMIT_UNITS_STEP', phase },
         ]
     }
   }
@@ -602,28 +661,70 @@ export class CombatState {
   // STEP METHODS (referenced by PhaseStep entries in getPhaseScript)
   // ===========================================================================
 
-  /** Land every eligible attacking unit currently in space on the selected
-   *  planet. COMMIT_UNITS abilities run first so Matriarch/Morphwing-style
-   *  rules can extend the eligible type list before movement. */
-  private _commitUnits(): void {
-    const data = this.data
-    if (data.combatMode !== 'GROUND') return
-    const attacker = data.attacker
-    const moving: UnitId[] = []
-    for (const pool of [
-      attacker.participatingUnits,
-      attacker.nonParticipatingUnits,
-    ]) {
-      for (const id of pool) {
-        if (
-          attacker.unitSurface[id] === SPACE_SURFACE_ID &&
-          isUnitCategory(attacker, id, 'GROUND_FORCES', data.meta)
-        )
-          moving.push(id as UnitId)
-      }
+  /** Multi-planet Space Cannon Defense: fire from `planet` at the ground
+   *  forces committed there; a planet without them gets no roll. */
+  private _spaceCannonDefenseOn(phase: MetaPhase[], planet: unknown): void {
+    this._activatePlanet(planet as SurfaceId)
+    if (!CombatSideState.hasParticipatingUnits(this.data.attacker)) return
+    this.pushScript([
+      { kind: 'timing', timing: 'SPACE_CANNON_DEFENSE_STEP', phase },
+    ])
+  }
+
+  private _activatePlanetStep(_phase: MetaPhase[], planet: unknown): void {
+    this._activatePlanet(planet as SurfaceId)
+  }
+
+  /** Move the invasion to `planet`: participation and surface-scoped
+   *  restrictions follow the active surface. */
+  private _activatePlanet(planet: SurfaceId): void {
+    const d = this.data
+    if (d.activeSurfaceId === planet) return
+    if (d.planetUses) {
+      const planets = d.invasion!.planets
+      leavePlanetUses(d, planets.indexOf(d.activeSurfaceId))
+      enterPlanetUses(d, planets.indexOf(planet))
+      this._refreshPlanetUseInvokes()
     }
-    CombatSideState.moveUnits(attacker, moving, data.activeSurfaceId)
-    this.resyncParticipating('attacker')
+    d.activeSurfaceId = planet
+    d.attacker._resolvedRestrictions = undefined
+    d.defender._resolvedRestrictions = undefined
+    resyncSide(d, 'attacker')
+    resyncSide(d, 'defender')
+  }
+
+  /** A planet switch rewrites capped abilities' live `uses`; an ability
+   *  whose uses ran out had its invokes dropped from the index, so they come
+   *  back with the uses held for the next planet. */
+  private _refreshPlanetUseInvokes(): void {
+    const limits = this.data.planetUses
+    if (!limits) return
+    this._params.setCombatState(this, this._logger)
+    for (const { side, key } of limits)
+      this._params.addAbilityInvokes(side, key, this.data)
+  }
+
+  /** Whether a finished planet combat is followed by another planet's. */
+  public hasNextCombat(): boolean {
+    const invasion = this.data.invasion
+    return (
+      invasion !== undefined &&
+      invasion.results.length < invasion.planets.length
+    )
+  }
+
+  /** Multi-planet invasions resolve one ground combat per planet. Once a
+   *  planet's combat has finished, activate the next planet and reopen the
+   *  flow after the shared steps. Returns the meta the scheduler resumes
+   *  from as if its script had just drained, or undefined when no planet is
+   *  left. Schedulers must restart their round count for the new combat. */
+  public beginNextCombat(): MetaPhase | undefined {
+    if (!this.isFinished() || !this.hasNextCombat()) return undefined
+    const d = this.data
+    d.isFinished = false
+    d.winnerSide = undefined
+    this._activatePlanet(d.invasion!.planets[d.invasion!.results.length])
+    return 'SPACE_CANNON_DEFENSE'
   }
 
   /** Swap the two sides' pending hit pools. Queued inside a self-targeting
@@ -756,10 +857,16 @@ export class CombatState {
   }
 
   private _finish(): void {
-    this.data.winnerSide = this._deriveWinner()
-    for (const side of returnCommittedFighters(this.data))
+    const d = this.data
+    d.winnerSide = this._deriveWinner()
+    for (const side of returnCommittedFighters(d))
       this.resyncParticipating(side)
-    this.data.isFinished = true
+    if (d.invasion)
+      d.invasion = {
+        ...d.invasion,
+        results: [...d.invasion.results, d.winnerSide],
+      }
+    d.isFinished = true
   }
 
   /** Rebuild membership from native categories and explicit instance grants. */
@@ -1238,6 +1345,10 @@ export class CombatState {
     /** Defer the phase-end participant check to a later paired resolution or
      *  to the enclosing phase driver. */
     deferPhaseEndCheck?: boolean
+    /** Planet to resolve against; activated before the roll. */
+    surfaceId?: SurfaceId
+    /** Only these units of the firing side roll. */
+    sourceUnits?: readonly UnitId[]
     /** Ability params overrides scoped to this resolution. Stamped onto every
      *  timing step the resolution pushes; consumed by the ability loop. */
     abilitiesOverride?: Readonly<AbilitiesOverride>
@@ -1247,6 +1358,16 @@ export class CombatState {
     const phase: MetaPhase[] =
       innermostOuter === meta ? [...outerPhase] : [...outerPhase, meta]
     const script: PendingStep[] = [
+      ...(config.surfaceId
+        ? [
+            {
+              kind: 'method' as const,
+              fn: CombatState.prototype._activatePlanetStep,
+              phase,
+              payload: config.surfaceId,
+            },
+          ]
+        : []),
       buildUnitAbilityDiceRollGroup({
         phase,
         firing,
@@ -1259,6 +1380,7 @@ export class CombatState {
           meta === 'SPACE_CANNON_DEFENSE'
             ? this.data.activeSurfaceId
             : undefined,
+        sourceUnits: config.sourceUnits,
         customDice,
         selfTarget,
         abilitiesOverride: config.abilitiesOverride,
@@ -1443,6 +1565,7 @@ export function buildUnitAbilityDiceRollGroup(args: {
   firing: CombatSide[]
   hitSource: HitSource
   sourceSurfaceId?: SurfaceId
+  sourceUnits?: readonly UnitId[]
   selfTarget?: boolean
   customDice?: { attacker: SideDiceCollection; defender: SideDiceCollection }
   abilitiesOverride?: Readonly<AbilitiesOverride>
@@ -1452,6 +1575,7 @@ export function buildUnitAbilityDiceRollGroup(args: {
     firing,
     hitSource,
     sourceSurfaceId,
+    sourceUnits,
     selfTarget,
     customDice,
     abilitiesOverride,
@@ -1464,6 +1588,7 @@ export function buildUnitAbilityDiceRollGroup(args: {
       selfTarget,
       customDice,
       sourceSurfaceId,
+      sourceUnits,
       isUnitAbility: true,
       abilitiesOverride,
     },
@@ -1523,6 +1648,7 @@ function collectSideDice(
       (mod): mod is HitValueModifierDecl =>
         mod.type === 'HIT_VALUE' && mod.side === side && !!mod.unitId,
     ),
+    ctx.sourceUnits,
   )
 }
 

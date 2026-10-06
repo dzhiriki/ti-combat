@@ -2,7 +2,7 @@ import { z } from 'zod/mini'
 
 import sardakkNorrIcon from '@/assets/faction/sardakk_norr.svg?raw'
 import { type Ability, declareParam } from '@/combat'
-import type { UnitList, UnitType } from '@/types'
+import { SPACE_SURFACE_ID, type UnitList, type UnitType } from '@/types'
 import { UnitListNumberSchema } from '@/types'
 
 type Params = {
@@ -39,12 +39,14 @@ export const ghomSekkus: Ability<Params> = {
     }),
   },
   headerUI: 'isEnabled',
+  // The units join the ones in space, and Commit Ground Forces lands them
+  // on the planets by its split.
   declareChanges: (ctx, params) => {
     const toPlace: Partial<Record<UnitType, number>> = {}
     for (const [key, count] of params.units) {
       if (count > 0) toPlace[key] = count
     }
-    ctx.api.own.placeUnits(toPlace)
+    ctx.api.own.placeUnits(toPlace, SPACE_SURFACE_ID)
   },
   invoke: [
     {

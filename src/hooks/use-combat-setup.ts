@@ -29,6 +29,8 @@ export function useCombatSetup(
       setEditorMode: act(setup.setEditorMode),
       selectPlanet: act(setup.selectPlanet),
       addPlanet: act(setup.addPlanet),
+      removePlanet: act(setup.removePlanet),
+      reorderPlanets: act(setup.reorderPlanets),
       setSurfaceUnitCount: act(setup.setSurfaceUnitCount),
       resetUnits: act(setup.resetUnits),
       resetAbilities: act(setup.resetAbilities),

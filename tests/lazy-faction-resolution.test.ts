@@ -23,7 +23,7 @@ function createData(
     label: 'Test',
     factions,
     units: {},
-    abilities,
+    abilities: () => abilities,
     slots: SLOTS,
   })
 }

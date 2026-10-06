@@ -4,6 +4,7 @@ import type { Ability } from '@/combat'
 import { createGameData } from '@/data/create-game-data'
 import { SLOTS as MAIN_SLOTS } from '@/data/main/ability-slots'
 import { SLOTS as TF_SLOTS } from '@/data/tf/ability-slots'
+import { CombatSetup } from '@/hooks/combat-setup'
 import type { FactionAbilities, FactionDefinition, LazyContext } from '@/types'
 import { getGameData } from '@/utils/get-game-data'
 
@@ -63,7 +64,7 @@ describe('GameData faction resolution', () => {
     label: 'Test',
     factions: { S: staticFaction, L: lazyOne, M: lazyTwo },
     units: {},
-    abilities: { TECHNOLOGY: [techT] },
+    abilities: () => ({ TECHNOLOGY: [techT] }),
     slots: MAIN_SLOTS,
   })
   const resolved = gameData.factions
@@ -123,7 +124,7 @@ describe('GameData faction resolution', () => {
           },
         },
         units: {},
-        abilities: {},
+        abilities: () => ({}),
         slots: TF_SLOTS,
       }),
     ).toThrow(
@@ -190,7 +191,7 @@ describe('slot config', () => {
       NEUTRAL: { name: 'Neutral', units: {} },
     },
     units: {},
-    abilities: {},
+    abilities: () => ({}),
     slots: MAIN_SLOTS,
   })
   const shownTo = (factionKey: string, key: string) =>
@@ -240,7 +241,7 @@ describe('slot config', () => {
         label: 'Test',
         factions: {},
         units: {},
-        abilities: { NOPE: [heroA] },
+        abilities: () => ({ NOPE: [heroA] }),
         slots: TF_SLOTS,
       }),
     ).toThrow('Slot "NOPE" of "HERO_A" is not declared by TF')
@@ -258,7 +259,7 @@ describe('slot config', () => {
           },
         },
         units: {},
-        abilities: {},
+        abilities: () => ({}),
         slots: TF_SLOTS,
       }),
     ).toThrow('Slot "FACTION_CRUISER" of "CRUISER_X" is not declared by TF')
@@ -271,7 +272,7 @@ describe('slot config', () => {
         label: 'Test',
         factions: {},
         units: {},
-        abilities: {},
+        abilities: () => ({}),
         slots: [
           { title: 'General', slot: 'GENERAL' },
           { title: 'Also general', slot: 'GENERAL' },
@@ -296,5 +297,52 @@ describe('resolved game data', () => {
         }
       }
     }
+  })
+})
+
+describe('ability layout', () => {
+  const slotOf = (abilities: { key: string; slot: string }[], key: string) =>
+    abilities.find(ability => ability.key === key)?.slot
+
+  it.each(['TI4', 'TF'] as const)(
+    '%s moves the planet splits to GENERAL with two planets',
+    system => {
+      const data = getGameData(system)
+      const available = (planets: number) =>
+        data.getAvailableAbilities('attacker', data.defaultFaction, undefined, {
+          planets,
+        })
+      for (const key of ['BOMBARDMENT', 'COMMIT_GROUND_FORCES']) {
+        expect(slotOf(available(1), key)).toBe('ADVANCED')
+        expect(slotOf(available(2), key)).toBe('GENERAL')
+      }
+      expect(slotOf(available(2), 'CAPACITY')).toBe('ADVANCED')
+      expect(
+        data
+          .getAbilities('GENERAL', { planets: 2 })
+          .map(ability => ability.key),
+      ).toEqual(expect.arrayContaining(['BOMBARDMENT', 'COMMIT_GROUND_FORCES']))
+      expect(
+        data
+          .getAbilities('ADVANCED', { planets: 2 })
+          .map(ability => ability.key),
+      ).not.toContain('BOMBARDMENT')
+      expect(slotOf(available(1), 'BOMBARDMENT')).toBe('ADVANCED')
+    },
+  )
+
+  it('reloads the layout when planets change', () => {
+    const setup = new CombatSetup('FULL')
+    const slot = () =>
+      slotOf(setup.getAvailableAbilities('attacker'), 'BOMBARDMENT')
+    expect(slot()).toBe('ADVANCED')
+    setup.addPlanet()
+    expect(slot()).toBe('GENERAL')
+    setup.removePlanet(setup.selectedPlanetId)
+    expect(slot()).toBe('ADVANCED')
+    setup.addPlanet()
+    expect(slot()).toBe('GENERAL')
+    setup.setEditorMode('SIMPLIFIED')
+    expect(slot()).toBe('ADVANCED')
   })
 })

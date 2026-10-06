@@ -1,0 +1,82 @@
+.tabs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.planet {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-radius: var(--radius-md);
+}
+
+.planet_dragging {
+  position: relative;
+  z-index: 10;
+}
+
+.tab {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.tab:hover {
+  color: var(--color-text-main);
+}
+
+.tab_sortable {
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.planet_dragging .tab {
+  cursor: grabbing;
+}
+
+.tab_selected {
+  color: var(--color-text-main);
+
+  :global(.dark) & {
+    color: hsl(var(--color-light-100));
+  }
+}
+
+.remove {
+  display: flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.remove:hover {
+  color: var(--color-text-main);
+}
+
+.removeIcon {
+  width: 0.8em;
+  height: 0.8em;
+}
+
+.separator {
+  color: var(--color-border-main);
+}

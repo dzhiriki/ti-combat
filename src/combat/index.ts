@@ -49,6 +49,7 @@ export {
   getNextPhaseInFlow,
   GROUND_FLOW,
   type HitSource,
+  type InvasionState,
   isCombatMeta,
   type MetaPhase,
   type PhaseMarker,
@@ -62,7 +63,13 @@ export {
   type UnitAbilityMeta,
 } from './combat-state'
 export { type LogEntry, Logger } from './logger'
-export type { CombatOutcome, SurfaceSurvivors, SurvivorSide } from './types'
+export type {
+  CombatOutcome,
+  CombatResult,
+  CombatWinner,
+  SurfaceSurvivors,
+  SurvivorSide,
+} from './types'
 export { nextUnitIds } from './utils/unit-id'
 export { makeVariantId } from './utils/unit-variant'
 

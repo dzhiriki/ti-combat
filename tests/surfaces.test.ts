@@ -165,6 +165,104 @@ describe('surface editor conversion', () => {
     expect(restored.surfaceSelections.defender[PLANET_1].INFANTRY.count).toBe(2)
     expect(restored.surfaceSelections.defender[PLANET_2].MECH.count).toBe(1)
   })
+
+  it('removes a planet with its units and selects a neighbour', () => {
+    const setup = new CombatSetup('FULL')
+    setup.addPlanet()
+    setup.setSurfaceUnitCount('defender', PLANET_1, 'INFANTRY', 2)
+    setup.setSurfaceUnitCount('defender', PLANET_2, 'MECH', 1)
+    setup.selectPlanet(PLANET_1)
+
+    setup.removePlanet(PLANET_1)
+
+    expect(setup.surfaces.map(s => s.id)).toEqual([SPACE_SURFACE_ID, PLANET_2])
+    expect(setup.selectedPlanetId).toBe(PLANET_2)
+    expect(setup.surfaceSelections.defender[PLANET_1]).toBeUndefined()
+    expect(setup.defenderSelections.INFANTRY.count).toBe(0)
+    expect(setup.defenderSelections.MECH.count).toBe(1)
+
+    setup.removePlanet(PLANET_2)
+    expect(setup.surfaces.map(s => s.id)).toEqual([SPACE_SURFACE_ID, PLANET_2])
+  })
+
+  it('names planets after their ids through removal, reorder, and roundtrip', () => {
+    const setup = new CombatSetup('FULL')
+    setup.addPlanet()
+    setup.addPlanet()
+    setup.removePlanet(PLANET_2)
+    setup.reorderPlanets(['planet-3' as SurfaceId, PLANET_1])
+
+    const restored = new CombatSetup()
+    restored.loadConfig(setup.toSerializedConfig())
+
+    for (const result of [setup, restored]) {
+      expect(
+        result.surfaces.filter(s => s.type === 'PLANET').map(s => s.name),
+      ).toEqual(['Planet 3', 'Planet 1'])
+    }
+  })
+})
+
+describe('multi-planet simulation input', () => {
+  const setupTwoPlanets = () => {
+    const setup = new CombatSetup('FULL')
+    setup.setCombatMode('GROUND')
+    setup.addPlanet()
+    setup.setSurfaceUnitCount('attacker', SPACE_SURFACE_ID, 'INFANTRY', 2)
+    setup.setSurfaceUnitCount('defender', PLANET_2, 'INFANTRY', 1)
+    setup.setSurfaceUnitCount('defender', PLANET_1, 'PDS', 1)
+    return setup
+  }
+
+  it('invades every planet in tab order', () => {
+    const setup = setupTwoPlanets()
+    setup.selectPlanet(PLANET_2)
+
+    const input = setup.toSimulationInput()!
+    expect(input.invasionPlanets).toEqual([PLANET_1, PLANET_2])
+    expect(input.activeSurfaceId).toBe(PLANET_1)
+  })
+
+  it('invades every planet, committing onto the first by default', () => {
+    const setup = setupTwoPlanets()
+    setup.setSurfaceUnitCount('defender', PLANET_1, 'PDS', 0)
+    setup.selectPlanet(PLANET_2)
+
+    const input = setup.toSimulationInput()!
+    expect(input.invasionPlanets).toEqual([PLANET_1, PLANET_2])
+    expect(input.activeSurfaceId).toBe(PLANET_1)
+  })
+
+  it('invades in the reordered tab order', () => {
+    const setup = setupTwoPlanets()
+    setup.reorderPlanets([PLANET_2, PLANET_1])
+
+    const input = setup.toSimulationInput()!
+    expect(input.invasionPlanets).toEqual([PLANET_2, PLANET_1])
+    expect(input.activeSurfaceId).toBe(PLANET_2)
+  })
+
+  it('ignores an order that is not a permutation of the planets', () => {
+    const setup = setupTwoPlanets()
+    setup.reorderPlanets([PLANET_2])
+    setup.reorderPlanets([PLANET_2, PLANET_2])
+
+    expect(setup.toSimulationInput()!.invasionPlanets).toEqual([
+      PLANET_1,
+      PLANET_2,
+    ])
+  })
+
+  it('keeps the single-planet input for one planet or space combat', () => {
+    const single = new CombatSetup('FULL')
+    single.setCombatMode('GROUND')
+    single.setSurfaceUnitCount('defender', PLANET_1, 'INFANTRY', 1)
+    expect(single.toSimulationInput()!.invasionPlanets).toBeUndefined()
+
+    const setup = setupTwoPlanets()
+    setup.setCombatMode('SPACE')
+    expect(setup.toSimulationInput()!.invasionPlanets).toBeUndefined()
+  })
 })
 
 describe('surface combat behavior', () => {

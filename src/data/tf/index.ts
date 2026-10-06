@@ -1,5 +1,5 @@
 import type { Ability } from '@/combat'
-import advanced from '@/data/main/abilities/advanced'
+import { layoutPlanetSplits } from '@/data/main/abilities/advanced'
 import environment from '@/data/main/abilities/environment'
 import general from '@/data/main/abilities/general'
 import relic from '@/data/main/abilities/relic'
@@ -35,17 +35,17 @@ const gameData = createGameData({
   // unit-upgrade cards are the TF analog of TI4's build-time UPGRADED stats:
   // their PREPARE applies the stat block that the ADVANCED drivers (Capacity,
   // Fleet Pool) read during their own PREPARE enforcement, so they go first.
-  abilities: {
-    ...unitUpgrade,
-    GENERAL: tfGeneral,
-    ADVANCED: advanced,
-    ENVIRONMENT: environment,
-    RELIC: relic,
-    ABILITY: ability,
-    GENOME: genome,
-    PARADIGM: paradigm,
-    ACTION_CARD: actionCard,
-  } satisfies Partial<Record<AbilitySlot, readonly Ability[]>>,
+  abilities: context =>
+    ({
+      ...unitUpgrade,
+      ...layoutPlanetSplits(context, tfGeneral),
+      ENVIRONMENT: environment,
+      RELIC: relic,
+      ABILITY: ability,
+      GENOME: genome,
+      PARADIGM: paradigm,
+      ACTION_CARD: actionCard,
+    }) satisfies Partial<Record<AbilitySlot, readonly Ability[]>>,
   slots: SLOTS,
 })
 

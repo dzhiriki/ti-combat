@@ -5,6 +5,7 @@ import {
 } from '@/combat'
 import { UNIT_TYPES } from '@/constants/units'
 import type {
+  AbilityLayoutContext,
   CollectedAbility,
   CombatSide,
   Faction,
@@ -29,12 +30,18 @@ export interface CreateGameDataOptions {
   /** Generic unit stats a faction inherits where it defines nothing. */
   units: Readonly<Partial<Record<UnitBaseType, UnitDefinition>>>
   /**
-   * The shared decks, keyed by slot. Key order is registration order, which
-   * drives invoke resolution within a timing pass.
+   * The shared decks, keyed by slot, for a layout context (a deck may move
+   * between slots as the system changes). Key order is registration order,
+   * which drives invoke resolution within a timing pass.
    */
-  abilities: Readonly<Record<string, readonly Ability[]>>
+  abilities: (
+    context: AbilityLayoutContext,
+  ) => Readonly<Record<string, readonly Ability[]>>
   slots: readonly SlotEntry[]
 }
+
+/** A single-planet system. */
+export const DEFAULT_LAYOUT: AbilityLayoutContext = { planets: 1 }
 
 /**
  * Abilities a faction owns but the slot config never shows land here, so an
@@ -117,22 +124,30 @@ export function createGameData(options: CreateGameDataOptions): GameData {
     }
   }
 
-  const genericAbilities: CollectedAbility[] = []
-  for (const [slot, deck] of Object.entries(options.abilities)) {
-    for (const ability of deck) {
-      assertSlot(ability, slot, false)
-      genericAbilities.push({ ...ability, slot })
+  const collectGeneric = (
+    context: AbilityLayoutContext,
+  ): CollectedAbility[] => {
+    const result: CollectedAbility[] = []
+    for (const [slot, deck] of Object.entries(options.abilities(context))) {
+      for (const ability of deck) {
+        assertSlot(ability, slot, false)
+        result.push({ ...ability, slot })
+      }
     }
+    return result
   }
+  const genericAbilities = collectGeneric(DEFAULT_LAYOUT)
   const genericAbilityKeys = new Set(
     genericAbilities.map(ability => ability.key),
   )
 
+  // Lazy factions resolve once: they read faction slots, which no layout
+  // moves.
   const factions = resolveFactions(options.factions, genericAbilities)
 
   // Dependency order does not change registration order. Collect once after
-  // every field has finished, with generic abilities ahead of the roster.
-  const collected = [...genericAbilities]
+  // every field has finished; each layout puts its generic abilities ahead.
+  const factionAbilities: CollectedAbility[] = []
   for (const [key, faction] of Object.entries(factions)) {
     for (const group of Object.keys(faction.abilities ?? {})) {
       if (hasSlot(factionSlot(group))) continue
@@ -146,13 +161,36 @@ export function createGameData(options: CreateGameDataOptions): GameData {
       genericAbilityKeys,
     )) {
       assertSlot(ability, ability.slot, true)
-      collected.push(ability)
+      factionAbilities.push(ability)
     }
   }
-  const allAbilities = uniqueAbilities(collected)
 
-  const getAbilities = (slot: string): readonly RegisteredAbility[] =>
-    allAbilities.filter(ability => ability.slot === slot)
+  const layouts = new Map<string, CollectedAbility[]>()
+  /** Registration order for a layout, rebuilt when its context changes. */
+  const collectedFor = (context: AbilityLayoutContext): CollectedAbility[] => {
+    const key = JSON.stringify(context)
+    let collected = layouts.get(key)
+    if (!collected) {
+      collected = [
+        ...(key === JSON.stringify(DEFAULT_LAYOUT)
+          ? genericAbilities
+          : collectGeneric(context)),
+        ...factionAbilities,
+      ]
+      layouts.set(key, collected)
+    }
+    return collected
+  }
+  // Layouts move abilities between slots, never in or out of the system.
+  const allAbilities = uniqueAbilities(collectedFor(DEFAULT_LAYOUT))
+
+  const getAbilities = (
+    slot: string,
+    context: AbilityLayoutContext = DEFAULT_LAYOUT,
+  ): readonly RegisteredAbility[] =>
+    uniqueAbilities(collectedFor(context)).filter(
+      ability => ability.slot === slot,
+    )
 
   const getFaction = (factionKey: string): Faction => {
     const faction = factions[factionKey]
@@ -217,8 +255,10 @@ export function createGameData(options: CreateGameDataOptions): GameData {
     side: CombatSide,
     factionKey: string,
     upgradedTypes?: ReadonlySet<UnitBaseType>,
+    context: AbilityLayoutContext = DEFAULT_LAYOUT,
   ): CollectedAbility[] => {
     getFaction(factionKey)
+    const collected = collectedFor(context)
     const result: CollectedAbility[] = []
     const shown = new Set<string>()
 
